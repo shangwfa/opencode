@@ -1,0 +1,285 @@
+{
+  "service": "metatextai",
+  "displayName": "MetatextAI",
+  "categories": [
+    "AI",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Auth Token",
+      "placeholder": "metatext_auth_token",
+      "description": "MetatextAI auth token used with the Authorization: Bearer <token> header for guard-api requests. Create or copy it from the MetatextAI console API/auth token settings documented in the official API reference: https://docs.metatext.ai/introduction.",
+      "extraFields": [
+        {
+          "key": "applicationId",
+          "label": "Application ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "my-app",
+          "description": "MetatextAI application identifier used in application-scoped guardrails endpoints. Use an existing application ID from your MetatextAI console before connecting this provider."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://metatext.ai",
+  "actions": [
+    {
+      "id": "metatextai.create_policy",
+      "service": "metatextai",
+      "name": "create_policy",
+      "description": "Create one guardrail policy for the connected MetatextAI application.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Policy name shown in MetatextAI."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Policy type identifier accepted by MetatextAI."
+          },
+          "target": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "input",
+                "output"
+              ],
+              "description": "Policy target checked by MetatextAI guardrails."
+            },
+            "description": "Application message targets checked by this policy.",
+            "minItems": 1
+          },
+          "rule": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Policy rule payload accepted by MetatextAI. Keep nested fields flexible because rule shape varies by policy type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type"
+        ],
+        "description": "Input for creating one MetatextAI policy."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The MetatextAI policy identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The policy display name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The MetatextAI policy type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A MetatextAI policy object returned by the guard API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "policy"
+        ],
+        "description": "The created MetatextAI policy."
+      }
+    },
+    {
+      "id": "metatextai.evaluate",
+      "service": "metatextai",
+      "name": "evaluate",
+      "description": "Evaluate one chat transcript against the connected MetatextAI application's configured guardrails.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "Message role accepted by MetatextAI evaluation."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The chat message content."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A chat message submitted to MetatextAI evaluation."
+            },
+            "description": "Messages checked by MetatextAI.",
+            "minItems": 1
+          },
+          "policyIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Policy ID."
+            },
+            "description": "Optional policy identifiers to evaluate explicitly."
+          },
+          "failFast": {
+            "type": "boolean",
+            "description": "Whether MetatextAI should stop at the first violation."
+          },
+          "correctionEnabled": {
+            "type": "boolean",
+            "description": "Whether MetatextAI should return a corrected output when a violation is found."
+          },
+          "overrideResponse": {
+            "type": "string",
+            "description": "Optional fixed response string returned instead of the blocked model output."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "Input for running a MetatextAI guardrails evaluation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw MetatextAI evaluate response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The MetatextAI evaluation result payload."
+      }
+    },
+    {
+      "id": "metatextai.list_policies",
+      "service": "metatextai",
+      "name": "list_policies",
+      "description": "List all guardrail policies configured for the connected MetatextAI application.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The MetatextAI policy identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The policy display name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The MetatextAI policy type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A MetatextAI policy object returned by the guard API."
+            },
+            "description": "Policies configured for the application."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "policies"
+        ],
+        "description": "The policies returned by MetatextAI for the current application."
+      }
+    },
+    {
+      "id": "metatextai.run_test_scan",
+      "service": "metatextai",
+      "name": "run_test_scan",
+      "description": "Run a MetatextAI red-team test scan for the connected application with the selected probes.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "probes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Probe name."
+            },
+            "description": "Probe identifiers to run in the red-team scan.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for triggering a MetatextAI red-team scan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw MetatextAI red-team scan response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The red-team scan response returned by MetatextAI."
+      }
+    }
+  ]
+}

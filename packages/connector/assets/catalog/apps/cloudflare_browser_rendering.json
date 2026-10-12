@@ -1,0 +1,1308 @@
+{
+  "service": "cloudflare_browser_rendering",
+  "displayName": "Cloudflare Browser Run",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key",
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "CLOUDFLARE_API_TOKEN",
+      "description": "Cloudflare API token used with the Authorization Bearer header. Create a custom token with Browser Rendering - Edit permission from https://dash.cloudflare.com/profile/api-tokens/.",
+      "extraFields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "CLOUDFLARE_ACCOUNT_ID",
+          "description": "Cloudflare account ID used in Browser Run API paths. Find it from https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/."
+        }
+      ]
+    },
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://dash.cloudflare.com/oauth2/auth",
+      "tokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "refreshTokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "scopes": [
+        "offline_access",
+        "memberships.read",
+        "browser-rendering.read",
+        "browser-rendering.write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://developers.cloudflare.com/browser-run/",
+  "actions": [
+    {
+      "id": "cloudflare_browser_rendering.get_html_content",
+      "service": "cloudflare_browser_rendering",
+      "name": "get_html_content",
+      "description": "Render a URL or raw HTML with Cloudflare Browser Run and return the fully rendered HTML content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. OAuth connections that can access multiple accounts must provide this value."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Cloudflare Browser Run should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content Cloudflare Browser Run should render."
+          },
+          "cacheTtl": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Cloudflare Browser Run cache TTL in seconds. Set to 0 to disable caching."
+          },
+          "actionTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum duration in milliseconds allowed for the browser action after page load."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should proceed when awaited events fail or timeout."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "referer": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Referer header value used for navigation."
+              },
+              "referrerPolicy": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The referrer policy used for navigation."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The navigation timeout in milliseconds."
+              },
+              "waitUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "domcontentloaded",
+                      "networkidle0",
+                      "networkidle2"
+                    ],
+                    "description": "One Puppeteer page load event to wait for."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "load",
+                        "domcontentloaded",
+                        "networkidle0",
+                        "networkidle2"
+                      ],
+                      "description": "One Puppeteer page load event to wait for."
+                    },
+                    "description": "The page load events Cloudflare should wait for.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "The page load event or events Cloudflare should wait for."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Puppeteer navigation options forwarded to Cloudflare Browser Run."
+          },
+          "setJavaScriptEnabled": {
+            "type": "boolean",
+            "description": "Whether JavaScript should be enabled on the page."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user agent string used by the browser page."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport height in pixels."
+              },
+              "deviceScaleFactor": {
+                "type": "number",
+                "description": "The device scale factor."
+              },
+              "hasTouch": {
+                "type": "boolean",
+                "description": "Whether the viewport supports touch events."
+              },
+              "isLandscape": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate landscape orientation."
+              },
+              "isMobile": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate a mobile device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "width",
+              "height"
+            ],
+            "description": "Browser viewport options forwarded to Cloudflare Browser Run."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The selector Cloudflare should wait for."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be hidden."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The selector wait timeout in milliseconds."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be visible."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "Selector wait options forwarded to Cloudflare Browser Run."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed wait time in milliseconds before extraction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the Browser Run content endpoint.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The rendered HTML content."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "The HTTP status reported by the rendered page."
+              },
+              "title": {
+                "type": "string",
+                "description": "The title reported by the rendered page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cloudflare Browser Run response metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The rendered HTML content returned by Cloudflare Browser Run."
+      }
+    },
+    {
+      "id": "cloudflare_browser_rendering.get_json",
+      "service": "cloudflare_browser_rendering",
+      "name": "get_json",
+      "description": "Render a URL or raw HTML with Cloudflare Browser Run and extract structured JSON from the page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. OAuth connections that can access multiple accounts must provide this value."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Cloudflare Browser Run should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content Cloudflare Browser Run should render."
+          },
+          "cacheTtl": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Cloudflare Browser Run cache TTL in seconds. Set to 0 to disable caching."
+          },
+          "actionTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum duration in milliseconds allowed for the browser action after page load."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should proceed when awaited events fail or timeout."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "referer": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Referer header value used for navigation."
+              },
+              "referrerPolicy": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The referrer policy used for navigation."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The navigation timeout in milliseconds."
+              },
+              "waitUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "domcontentloaded",
+                      "networkidle0",
+                      "networkidle2"
+                    ],
+                    "description": "One Puppeteer page load event to wait for."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "load",
+                        "domcontentloaded",
+                        "networkidle0",
+                        "networkidle2"
+                      ],
+                      "description": "One Puppeteer page load event to wait for."
+                    },
+                    "description": "The page load events Cloudflare should wait for.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "The page load event or events Cloudflare should wait for."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Puppeteer navigation options forwarded to Cloudflare Browser Run."
+          },
+          "setJavaScriptEnabled": {
+            "type": "boolean",
+            "description": "Whether JavaScript should be enabled on the page."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user agent string used by the browser page."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport height in pixels."
+              },
+              "deviceScaleFactor": {
+                "type": "number",
+                "description": "The device scale factor."
+              },
+              "hasTouch": {
+                "type": "boolean",
+                "description": "Whether the viewport supports touch events."
+              },
+              "isLandscape": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate landscape orientation."
+              },
+              "isMobile": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate a mobile device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "width",
+              "height"
+            ],
+            "description": "Browser viewport options forwarded to Cloudflare Browser Run."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The selector Cloudflare should wait for."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be hidden."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The selector wait timeout in milliseconds."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be visible."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "Selector wait options forwarded to Cloudflare Browser Run."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed wait time in milliseconds before extraction."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural language prompt for extracting structured data."
+          },
+          "responseFormat": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The response format type accepted by Cloudflare Browser Run."
+              },
+              "jsonSchema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The JSON schema Cloudflare should use for the structured result."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "Structured JSON response format options forwarded to Cloudflare Browser Run."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the Browser Run JSON endpoint.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "prompt"
+            ]
+          },
+          {
+            "required": [
+              "responseFormat"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The structured JSON result returned by Cloudflare Browser Run."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The structured JSON data returned by Cloudflare Browser Run."
+      }
+    },
+    {
+      "id": "cloudflare_browser_rendering.get_links",
+      "service": "cloudflare_browser_rendering",
+      "name": "get_links",
+      "description": "Render a URL or raw HTML with Cloudflare Browser Run and return links discovered on the page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. OAuth connections that can access multiple accounts must provide this value."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Cloudflare Browser Run should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content Cloudflare Browser Run should render."
+          },
+          "cacheTtl": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Cloudflare Browser Run cache TTL in seconds. Set to 0 to disable caching."
+          },
+          "actionTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum duration in milliseconds allowed for the browser action after page load."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should proceed when awaited events fail or timeout."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "referer": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Referer header value used for navigation."
+              },
+              "referrerPolicy": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The referrer policy used for navigation."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The navigation timeout in milliseconds."
+              },
+              "waitUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "domcontentloaded",
+                      "networkidle0",
+                      "networkidle2"
+                    ],
+                    "description": "One Puppeteer page load event to wait for."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "load",
+                        "domcontentloaded",
+                        "networkidle0",
+                        "networkidle2"
+                      ],
+                      "description": "One Puppeteer page load event to wait for."
+                    },
+                    "description": "The page load events Cloudflare should wait for.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "The page load event or events Cloudflare should wait for."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Puppeteer navigation options forwarded to Cloudflare Browser Run."
+          },
+          "setJavaScriptEnabled": {
+            "type": "boolean",
+            "description": "Whether JavaScript should be enabled on the page."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user agent string used by the browser page."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport height in pixels."
+              },
+              "deviceScaleFactor": {
+                "type": "number",
+                "description": "The device scale factor."
+              },
+              "hasTouch": {
+                "type": "boolean",
+                "description": "Whether the viewport supports touch events."
+              },
+              "isLandscape": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate landscape orientation."
+              },
+              "isMobile": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate a mobile device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "width",
+              "height"
+            ],
+            "description": "Browser viewport options forwarded to Cloudflare Browser Run."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The selector Cloudflare should wait for."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be hidden."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The selector wait timeout in milliseconds."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be visible."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "Selector wait options forwarded to Cloudflare Browser Run."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed wait time in milliseconds before extraction."
+          },
+          "excludeExternalLinks": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should exclude external links."
+          },
+          "visibleLinksOnly": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should return only visible links."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the Browser Run links endpoint.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One extracted link."
+            },
+            "description": "The extracted links."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "links"
+        ],
+        "description": "The links returned by Cloudflare Browser Run."
+      }
+    },
+    {
+      "id": "cloudflare_browser_rendering.get_markdown",
+      "service": "cloudflare_browser_rendering",
+      "name": "get_markdown",
+      "description": "Render a URL or raw HTML with Cloudflare Browser Run and return the page content as Markdown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. OAuth connections that can access multiple accounts must provide this value."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Cloudflare Browser Run should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content Cloudflare Browser Run should render."
+          },
+          "cacheTtl": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Cloudflare Browser Run cache TTL in seconds. Set to 0 to disable caching."
+          },
+          "actionTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum duration in milliseconds allowed for the browser action after page load."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should proceed when awaited events fail or timeout."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "referer": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Referer header value used for navigation."
+              },
+              "referrerPolicy": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The referrer policy used for navigation."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The navigation timeout in milliseconds."
+              },
+              "waitUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "domcontentloaded",
+                      "networkidle0",
+                      "networkidle2"
+                    ],
+                    "description": "One Puppeteer page load event to wait for."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "load",
+                        "domcontentloaded",
+                        "networkidle0",
+                        "networkidle2"
+                      ],
+                      "description": "One Puppeteer page load event to wait for."
+                    },
+                    "description": "The page load events Cloudflare should wait for.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "The page load event or events Cloudflare should wait for."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Puppeteer navigation options forwarded to Cloudflare Browser Run."
+          },
+          "setJavaScriptEnabled": {
+            "type": "boolean",
+            "description": "Whether JavaScript should be enabled on the page."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user agent string used by the browser page."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport height in pixels."
+              },
+              "deviceScaleFactor": {
+                "type": "number",
+                "description": "The device scale factor."
+              },
+              "hasTouch": {
+                "type": "boolean",
+                "description": "Whether the viewport supports touch events."
+              },
+              "isLandscape": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate landscape orientation."
+              },
+              "isMobile": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate a mobile device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "width",
+              "height"
+            ],
+            "description": "Browser viewport options forwarded to Cloudflare Browser Run."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The selector Cloudflare should wait for."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be hidden."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The selector wait timeout in milliseconds."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be visible."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "Selector wait options forwarded to Cloudflare Browser Run."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed wait time in milliseconds before extraction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the Browser Run markdown endpoint.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "description": "The extracted Markdown content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "markdown"
+        ],
+        "description": "The Markdown content returned by Cloudflare Browser Run."
+      }
+    },
+    {
+      "id": "cloudflare_browser_rendering.list_accounts",
+      "service": "cloudflare_browser_rendering",
+      "name": "list_accounts",
+      "description": "List Cloudflare accounts accessible to the current connection so callers can confirm account IDs used by Browser Run actions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Cloudflare accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Cloudflare account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Cloudflare account name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Cloudflare account type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Cloudflare account summary."
+            },
+            "description": "Cloudflare accounts visible to the current connection."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts",
+          "resultInfo"
+        ],
+        "description": "The Cloudflare accounts visible to the current connection."
+      }
+    },
+    {
+      "id": "cloudflare_browser_rendering.scrape_elements",
+      "service": "cloudflare_browser_rendering",
+      "name": "scrape_elements",
+      "description": "Render a URL or raw HTML with Cloudflare Browser Run and scrape selected HTML elements.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. OAuth connections that can access multiple accounts must provide this value."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Cloudflare Browser Run should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content Cloudflare Browser Run should render."
+          },
+          "cacheTtl": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Cloudflare Browser Run cache TTL in seconds. Set to 0 to disable caching."
+          },
+          "actionTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum duration in milliseconds allowed for the browser action after page load."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Cloudflare should proceed when awaited events fail or timeout."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "referer": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Referer header value used for navigation."
+              },
+              "referrerPolicy": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The referrer policy used for navigation."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The navigation timeout in milliseconds."
+              },
+              "waitUntil": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "load",
+                      "domcontentloaded",
+                      "networkidle0",
+                      "networkidle2"
+                    ],
+                    "description": "One Puppeteer page load event to wait for."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "load",
+                        "domcontentloaded",
+                        "networkidle0",
+                        "networkidle2"
+                      ],
+                      "description": "One Puppeteer page load event to wait for."
+                    },
+                    "description": "The page load events Cloudflare should wait for.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "The page load event or events Cloudflare should wait for."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Puppeteer navigation options forwarded to Cloudflare Browser Run."
+          },
+          "setJavaScriptEnabled": {
+            "type": "boolean",
+            "description": "Whether JavaScript should be enabled on the page."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user agent string used by the browser page."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The viewport height in pixels."
+              },
+              "deviceScaleFactor": {
+                "type": "number",
+                "description": "The device scale factor."
+              },
+              "hasTouch": {
+                "type": "boolean",
+                "description": "Whether the viewport supports touch events."
+              },
+              "isLandscape": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate landscape orientation."
+              },
+              "isMobile": {
+                "type": "boolean",
+                "description": "Whether the viewport should emulate a mobile device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "width",
+              "height"
+            ],
+            "description": "Browser viewport options forwarded to Cloudflare Browser Run."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The selector Cloudflare should wait for."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be hidden."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The selector wait timeout in milliseconds."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether Cloudflare should wait for the selector to be visible."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "Selector wait options forwarded to Cloudflare Browser Run."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed wait time in milliseconds before extraction."
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The CSS selector Cloudflare Browser Run should scrape."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "selector"
+              ],
+              "description": "One element selector to scrape."
+            },
+            "description": "The CSS selectors to scrape after rendering.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "elements"
+        ],
+        "description": "Input parameters for the Browser Run scrape endpoint.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "description": "The CSS selector used for this result."
+                },
+                "results": {
+                  "description": "The element result or result array returned by Cloudflare for this selector."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "selector",
+                "results"
+              ],
+              "description": "One Cloudflare Browser Run scrape selector result."
+            },
+            "description": "The scrape results by selector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "elements"
+        ],
+        "description": "The scrape results returned by Cloudflare Browser Run."
+      }
+    }
+  ]
+}

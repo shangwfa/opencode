@@ -1,0 +1,664 @@
+{
+  "service": "fal_ai",
+  "displayName": "fal.ai",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FAL_KEY",
+      "description": "fal.ai API key sent with the Authorization: Key header. Create or view keys in the fal dashboard: https://fal.ai/dashboard/keys."
+    }
+  ],
+  "homepageUrl": "https://fal.ai",
+  "actions": [
+    {
+      "id": "fal_ai.cancel_queue_request",
+      "service": "fal_ai",
+      "name": "cancel_queue_request",
+      "description": "Cancel a queued or in-progress fal request using its cancellation URL.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cancelUrl": {
+            "type": "string",
+            "description": "The exact cancel URL returned by submit_queue_request.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cancelUrl"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The cancellation result status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The output payload for this action."
+      },
+      "asyncLifecycle": {
+        "startActionId": "fal_ai.submit_queue_request",
+        "statusActionId": "fal_ai.queue_get_status",
+        "cancelActionId": "fal_ai.cancel_queue_request"
+      }
+    },
+    {
+      "id": "fal_ai.estimate_pricing",
+      "service": "fal_ai",
+      "name": "estimate_pricing",
+      "description": "Estimate total fal model cost using either historical API call quantities or expected billing-unit quantities.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "estimateType": {
+            "type": "string",
+            "enum": [
+              "historical_api_price",
+              "unit_price"
+            ],
+            "description": "The pricing estimation method to use."
+          },
+          "endpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A raw fal property value."
+            },
+            "description": "The raw fal object payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "estimateType",
+          "endpoints"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "estimateType": {
+            "type": "string",
+            "description": "The estimation method that was applied."
+          },
+          "totalCost": {
+            "type": "number",
+            "description": "The aggregate estimated cost across all endpoints."
+          },
+          "currency": {
+            "type": "string",
+            "description": "The ISO 4217 currency code for the estimate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "estimateType",
+          "totalCost",
+          "currency"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.get_jwks",
+      "service": "fal_ai",
+      "name": "get_jwks",
+      "description": "Retrieve the fal JSON Web Key Set used for webhook signature verification.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A raw fal property value."
+              },
+              "description": "The raw fal object payload."
+            },
+            "description": "The list of raw fal objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keys"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.get_models",
+      "service": "fal_ai",
+      "name": "get_models",
+      "description": "Discover fal model endpoints with optional text search, status, category, pagination, endpoint filtering, and response expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "The free-text search query for model discovery."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of models to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from a previous response."
+          },
+          "expand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single string value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A string value in the list."
+                },
+                "description": "The list of strings."
+              }
+            ],
+            "description": "A single string or a list of strings."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "deprecated"
+            ],
+            "description": "Filter models by active or deprecated status."
+          },
+          "category": {
+            "type": "string",
+            "description": "Filter models by category name."
+          },
+          "endpointId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single string value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A string value in the list."
+                },
+                "description": "The list of strings."
+              }
+            ],
+            "description": "A single string or a list of strings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A raw fal property value."
+              },
+              "description": "The raw fal object payload."
+            },
+            "description": "The list of raw fal objects."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether additional result pages are available."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination cursor for the next page of results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination cursor for the next page of results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "models",
+          "hasMore",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.get_pricing",
+      "service": "fal_ai",
+      "name": "get_pricing",
+      "description": "Retrieve unit pricing information for one or more fal model endpoints, including billing unit and currency.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single string value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A string value in the list."
+                },
+                "description": "The list of strings."
+              }
+            ],
+            "description": "A single string or a list of strings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A raw fal property value."
+              },
+              "description": "The raw fal object payload."
+            },
+            "description": "The list of raw fal objects."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether additional result pages are available."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination cursor for the next page of pricing results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination cursor for the next page of pricing results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prices",
+          "hasMore",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.get_queue_request_result",
+      "service": "fal_ai",
+      "name": "get_queue_request_result",
+      "description": "Retrieve the stored final result payload for a completed fal queued request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "responseUrl": {
+            "type": "string",
+            "description": "The exact response URL returned by submit_queue_request.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "responseUrl"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The completed request status."
+          },
+          "response": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A raw fal property value."
+            },
+            "description": "The raw fal object payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "response"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.queue_get_status",
+      "service": "fal_ai",
+      "name": "queue_get_status",
+      "description": "Check the status of a queued fal request, with optional log retrieval for in-progress or completed work.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statusUrl": {
+            "type": "string",
+            "description": "The exact status URL returned by submit_queue_request.",
+            "format": "uri"
+          },
+          "logs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Set to 1 to include logs in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statusUrl"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The current queue status."
+          },
+          "responseUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for fetching the final queued response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for fetching the final queued response."
+          },
+          "queuePosition": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current queue position when the request is still queued."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current queue position when the request is still queued."
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The log message text."
+                },
+                "level": {
+                  "type": "string",
+                  "description": "The log severity level."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "The log source identifier."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The log timestamp in ISO 8601 format."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A queue log entry."
+            },
+            "description": "The queue processing logs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The output payload for this action."
+      },
+      "asyncLifecycle": {
+        "startActionId": "fal_ai.submit_queue_request",
+        "statusActionId": "fal_ai.queue_get_status",
+        "cancelActionId": "fal_ai.cancel_queue_request"
+      }
+    },
+    {
+      "id": "fal_ai.queue_get_status_stream",
+      "service": "fal_ai",
+      "name": "queue_get_status_stream",
+      "description": "Consume fal queue status updates as a streamed sequence of SSE events until the server closes the stream.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statusUrl": {
+            "type": "string",
+            "description": "The exact status URL returned by submit_queue_request.",
+            "format": "uri"
+          },
+          "logs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Set to 1 to include logs inside streamed updates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statusUrl"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A raw fal property value."
+              },
+              "description": "The raw fal object payload."
+            },
+            "description": "The list of raw fal objects."
+          },
+          "finalStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last status value seen in the stream."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last status value seen in the stream."
+          },
+          "responseUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The final response URL seen in the stream, if present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final response URL seen in the stream, if present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updates"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "fal_ai.submit_queue_request",
+      "service": "fal_ai",
+      "name": "submit_queue_request",
+      "description": "Submit a job to a fal model endpoint's async queue and return the URLs used to track it.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model identifier, such as fal-ai/flux/schnell."
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A raw fal property value."
+            },
+            "description": "The raw fal object payload."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "An optional URL fal calls with the final result.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId",
+          "input"
+        ],
+        "description": "The model and payload to submit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The queue request identifier."
+          },
+          "status": {
+            "type": "string",
+            "description": "The initial queue status."
+          },
+          "queuePosition": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The initial queue position when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The initial queue position when available."
+          },
+          "statusUrl": {
+            "type": "string",
+            "description": "The exact URL used to poll request status."
+          },
+          "responseUrl": {
+            "type": "string",
+            "description": "The exact URL used to fetch the result."
+          },
+          "cancelUrl": {
+            "type": "string",
+            "description": "The exact URL used to cancel the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "status",
+          "queuePosition",
+          "statusUrl",
+          "responseUrl",
+          "cancelUrl"
+        ],
+        "description": "The submitted queue request."
+      },
+      "followUpActions": [
+        "fal_ai.queue_get_status",
+        "fal_ai.get_queue_request_result",
+        "fal_ai.cancel_queue_request"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fal_ai.submit_queue_request",
+        "statusActionId": "fal_ai.queue_get_status",
+        "cancelActionId": "fal_ai.cancel_queue_request"
+      }
+    }
+  ]
+}

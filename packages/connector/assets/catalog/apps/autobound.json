@@ -1,0 +1,1481 @@
+{
+  "service": "autobound",
+  "displayName": "Autobound",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ab_...",
+      "description": "Autobound Signal API key sent with the x-api-key header. Create or copy it from the Signal API dashboard at https://signalapi.autobound.ai.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.autobound.ai",
+  "actions": [
+    {
+      "id": "autobound.enrich_company",
+      "service": "autobound",
+      "name": "enrich_company",
+      "description": "Enrich one company with Autobound company-level signals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company domain to enrich, for example stripe.com."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company name to enrich when the domain is unavailable."
+          },
+          "linkedinUrl": {
+            "type": "string",
+            "description": "The company LinkedIn URL to enrich when other identifiers are unavailable.",
+            "format": "uri"
+          },
+          "signalTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+            },
+            "description": "The signal types Autobound should include in the enrichment response.",
+            "minItems": 1
+          },
+          "detectedAfter": {
+            "type": "string",
+            "description": "Only return signals detected on or after this timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of signals to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for enriching one company with Autobound signals.",
+        "anyOf": [
+          {
+            "required": [
+              "domain"
+            ]
+          },
+          {
+            "required": [
+              "companyName"
+            ]
+          },
+          {
+            "required": [
+              "linkedinUrl"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company name returned by Autobound."
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company domain returned by Autobound."
+              },
+              "linkedinUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company LinkedIn URL returned by Autobound."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw JSON object returned by Autobound."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized company object returned by Autobound."
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signalId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Autobound signal identifier."
+                },
+                "signalType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+                },
+                "signalSubtype": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Autobound signal subtype."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "The human-readable Autobound signal title."
+                },
+                "detectedAt": {
+                  "type": "string",
+                  "description": "When Autobound detected the signal.",
+                  "format": "date-time"
+                },
+                "association": {
+                  "type": "string",
+                  "enum": [
+                    "company",
+                    "contact"
+                  ],
+                  "description": "The Autobound signal association for filtering or classification."
+                },
+                "company": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company name returned by Autobound."
+                        },
+                        "domain": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company domain returned by Autobound."
+                        },
+                        "linkedinUrl": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company LinkedIn URL returned by Autobound."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The raw JSON object returned by Autobound."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A normalized company object returned by Autobound."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A normalized company object returned by Autobound."
+                },
+                "contact": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "description": "The contact email returned by Autobound.",
+                          "format": "email"
+                        },
+                        "linkedinUrl": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact LinkedIn URL returned by Autobound."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact name returned by Autobound."
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact title returned by Autobound."
+                        },
+                        "company": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company name returned by Autobound."
+                            },
+                            "domain": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company domain returned by Autobound."
+                            },
+                            "linkedinUrl": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company LinkedIn URL returned by Autobound."
+                            },
+                            "raw": {
+                              "type": "object",
+                              "properties": {},
+                              "additionalProperties": true,
+                              "description": "The raw JSON object returned by Autobound."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A normalized company object returned by Autobound."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The raw JSON object returned by Autobound."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A normalized contact object returned by Autobound."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A normalized contact object returned by Autobound."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized signal record returned by Autobound."
+            },
+            "description": "The normalized signals returned for the company."
+          },
+          "signalSummary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total number of signals returned in this response."
+                  },
+                  "byType": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The number of returned signals for one signal type."
+                    },
+                    "description": "The count of returned signals grouped by signal type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Summary counts for the returned Autobound signals."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Summary counts for the returned Autobound signals."
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Autobound coverage metadata for this enrichment."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Autobound coverage metadata for this enrichment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Autobound company enrichment."
+      }
+    },
+    {
+      "id": "autobound.enrich_contact",
+      "service": "autobound",
+      "name": "enrich_contact",
+      "description": "Enrich one contact with Autobound contact-level signals and employer context.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactEmail": {
+            "type": "string",
+            "description": "The contact email address to enrich.",
+            "format": "email"
+          },
+          "contactLinkedinUrl": {
+            "type": "string",
+            "description": "The contact LinkedIn URL to enrich when the email is unavailable.",
+            "format": "uri"
+          },
+          "signalTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+            },
+            "description": "The signal types Autobound should include in the enrichment response.",
+            "minItems": 1
+          },
+          "detectedAfter": {
+            "type": "string",
+            "description": "Only return signals detected on or after this timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of signals to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for enriching one contact with Autobound signals.",
+        "anyOf": [
+          {
+            "required": [
+              "contactEmail"
+            ]
+          },
+          {
+            "required": [
+              "contactLinkedinUrl"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The contact email returned by Autobound.",
+                    "format": "email"
+                  },
+                  "linkedinUrl": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The contact LinkedIn URL returned by Autobound."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The contact name returned by Autobound."
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The contact title returned by Autobound."
+                  },
+                  "company": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The company name returned by Autobound."
+                      },
+                      "domain": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The company domain returned by Autobound."
+                      },
+                      "linkedinUrl": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The company LinkedIn URL returned by Autobound."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by Autobound."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A normalized company object returned by Autobound."
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw JSON object returned by Autobound."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A normalized contact object returned by Autobound."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A normalized contact object returned by Autobound."
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name returned by Autobound."
+                  },
+                  "domain": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company domain returned by Autobound."
+                  },
+                  "linkedinUrl": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company LinkedIn URL returned by Autobound."
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw JSON object returned by Autobound."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A normalized company object returned by Autobound."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A normalized company object returned by Autobound."
+          },
+          "contactSignals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signalId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Autobound signal identifier."
+                },
+                "signalType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+                },
+                "signalSubtype": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Autobound signal subtype."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "The human-readable Autobound signal title."
+                },
+                "detectedAt": {
+                  "type": "string",
+                  "description": "When Autobound detected the signal.",
+                  "format": "date-time"
+                },
+                "association": {
+                  "type": "string",
+                  "enum": [
+                    "company",
+                    "contact"
+                  ],
+                  "description": "The Autobound signal association for filtering or classification."
+                },
+                "company": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company name returned by Autobound."
+                        },
+                        "domain": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company domain returned by Autobound."
+                        },
+                        "linkedinUrl": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company LinkedIn URL returned by Autobound."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The raw JSON object returned by Autobound."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A normalized company object returned by Autobound."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A normalized company object returned by Autobound."
+                },
+                "contact": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "description": "The contact email returned by Autobound.",
+                          "format": "email"
+                        },
+                        "linkedinUrl": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact LinkedIn URL returned by Autobound."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact name returned by Autobound."
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The contact title returned by Autobound."
+                        },
+                        "company": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company name returned by Autobound."
+                            },
+                            "domain": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company domain returned by Autobound."
+                            },
+                            "linkedinUrl": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The company LinkedIn URL returned by Autobound."
+                            },
+                            "raw": {
+                              "type": "object",
+                              "properties": {},
+                              "additionalProperties": true,
+                              "description": "The raw JSON object returned by Autobound."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A normalized company object returned by Autobound."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The raw JSON object returned by Autobound."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A normalized contact object returned by Autobound."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A normalized contact object returned by Autobound."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized signal record returned by Autobound."
+            },
+            "description": "The normalized signals returned for the contact."
+          },
+          "signalSummary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total number of signals returned in this response."
+                  },
+                  "byType": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The number of returned signals for one signal type."
+                    },
+                    "description": "The count of returned signals grouped by signal type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Summary counts for the returned Autobound signals."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Summary counts for the returned Autobound signals."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of returned contact-level signals."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of returned contact-level signals."
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Autobound coverage metadata for this enrichment."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Autobound coverage metadata for this enrichment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Autobound contact enrichment."
+      }
+    },
+    {
+      "id": "autobound.get_account",
+      "service": "autobound",
+      "name": "get_account",
+      "description": "Get the authenticated Autobound Signals account details and current credit balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for loading the current Autobound account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "customerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Autobound customer identifier."
+              },
+              "customerName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Autobound customer name."
+              },
+              "rateLimit": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The Autobound requests-per-minute rate limit."
+              },
+              "creditBalance": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The remaining Autobound signal credits."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw JSON object returned by Autobound."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The normalized Autobound account details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Autobound account details."
+      }
+    },
+    {
+      "id": "autobound.list_signal_types",
+      "service": "autobound",
+      "name": "list_signal_types",
+      "description": "List Autobound signal types and optionally include live counts and refresh cadence metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeCounts": {
+            "type": "boolean",
+            "description": "Whether Autobound should include per-type counts and cadence metadata."
+          },
+          "association": {
+            "type": "string",
+            "enum": [
+              "company",
+              "contact"
+            ],
+            "description": "The Autobound signal association for filtering or classification."
+          },
+          "since": {
+            "type": "string",
+            "description": "Only include type counts for signals detected on or after this timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Autobound signal types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signalTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+                },
+                "association": {
+                  "type": "string",
+                  "enum": [
+                    "company",
+                    "contact"
+                  ],
+                  "description": "The Autobound signal association for filtering or classification."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The description for this Autobound signal type."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of available signals for this type."
+                },
+                "refreshCadence": {
+                  "type": "string",
+                  "enum": [
+                    "twice_daily",
+                    "daily",
+                    "weekly",
+                    "biweekly",
+                    "monthly",
+                    "quarterly"
+                  ],
+                  "description": "The refresh cadence reported by Autobound."
+                },
+                "refreshHours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The nominal refresh period in hours."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "A normalized Autobound signal type entry."
+            },
+            "description": "The normalized Autobound signal type entries."
+          },
+          "totalSignals": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total live signal count across returned types."
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "When Autobound counted the live signal totals.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalTypes"
+        ],
+        "description": "The output payload for Autobound signal type listing."
+      }
+    },
+    {
+      "id": "autobound.search_companies",
+      "service": "autobound",
+      "name": "search_companies",
+      "description": "Search companies that match Autobound company-level signal filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signalTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+            },
+            "description": "The Autobound signal types that companies must match.",
+            "minItems": 1
+          },
+          "signalSubtype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Autobound signal subtype filter."
+          },
+          "detectedAfter": {
+            "type": "string",
+            "description": "Only include companies with matching signals detected on or after this timestamp.",
+            "format": "date-time"
+          },
+          "detectedBefore": {
+            "type": "string",
+            "description": "Only include companies with matching signals detected before this timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of companies to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The zero-based result offset."
+          },
+          "signalsPerEntity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many of each company's most recent signals to attach."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalTypes"
+        ],
+        "description": "The input payload for searching companies by Autobound signal filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The company name returned by Autobound."
+                },
+                "domain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The company domain returned by Autobound."
+                },
+                "linkedinUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The company LinkedIn URL returned by Autobound."
+                },
+                "signalCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of matching signals for this company."
+                },
+                "mostRecentSignalAt": {
+                  "type": "string",
+                  "description": "When the most recent matching signal was detected for this company.",
+                  "format": "date-time"
+                },
+                "signals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "signalId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Autobound signal identifier."
+                      },
+                      "signalType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+                      },
+                      "signalSubtype": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Autobound signal subtype."
+                      },
+                      "signalName": {
+                        "type": "string",
+                        "description": "The human-readable Autobound signal title."
+                      },
+                      "detectedAt": {
+                        "type": "string",
+                        "description": "When Autobound detected the signal.",
+                        "format": "date-time"
+                      },
+                      "association": {
+                        "type": "string",
+                        "enum": [
+                          "company",
+                          "contact"
+                        ],
+                        "description": "The Autobound signal association for filtering or classification."
+                      },
+                      "company": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company name returned by Autobound."
+                              },
+                              "domain": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company domain returned by Autobound."
+                              },
+                              "linkedinUrl": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company LinkedIn URL returned by Autobound."
+                              },
+                              "raw": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": true,
+                                "description": "The raw JSON object returned by Autobound."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A normalized company object returned by Autobound."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A normalized company object returned by Autobound."
+                      },
+                      "contact": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "email": {
+                                "type": "string",
+                                "description": "The contact email returned by Autobound.",
+                                "format": "email"
+                              },
+                              "linkedinUrl": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact LinkedIn URL returned by Autobound."
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact name returned by Autobound."
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact title returned by Autobound."
+                              },
+                              "company": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company name returned by Autobound."
+                                  },
+                                  "domain": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company domain returned by Autobound."
+                                  },
+                                  "linkedinUrl": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company LinkedIn URL returned by Autobound."
+                                  },
+                                  "raw": {
+                                    "type": "object",
+                                    "properties": {},
+                                    "additionalProperties": true,
+                                    "description": "The raw JSON object returned by Autobound."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "description": "A normalized company object returned by Autobound."
+                              },
+                              "raw": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": true,
+                                "description": "The raw JSON object returned by Autobound."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A normalized contact object returned by Autobound."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A normalized contact object returned by Autobound."
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by Autobound."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by Autobound."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A normalized signal record returned by Autobound."
+                  },
+                  "description": "The attached most recent signals for this company."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One company result returned by Autobound company search."
+            },
+            "description": "The companies returned by Autobound search."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result offset returned by Autobound."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result limit returned by Autobound."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Autobound has another page of company results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Autobound company search."
+      }
+    },
+    {
+      "id": "autobound.search_contacts",
+      "service": "autobound",
+      "name": "search_contacts",
+      "description": "Search contacts that match Autobound contact-level signal filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signalTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+            },
+            "description": "The Autobound signal types that contacts must match.",
+            "minItems": 1
+          },
+          "signalSubtype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Autobound signal subtype filter."
+          },
+          "detectedAfter": {
+            "type": "string",
+            "description": "Only include contacts with matching signals detected on or after this timestamp.",
+            "format": "date-time"
+          },
+          "detectedBefore": {
+            "type": "string",
+            "description": "Only include contacts with matching signals detected before this timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of contacts to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The zero-based result offset."
+          },
+          "signalsPerEntity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many of each contact's most recent signals to attach."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalTypes"
+        ],
+        "description": "The input payload for searching contacts by Autobound signal filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The contact email returned by Autobound.",
+                  "format": "email"
+                },
+                "linkedinUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact LinkedIn URL returned by Autobound."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact name returned by Autobound."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact title returned by Autobound."
+                },
+                "company": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The company name returned by Autobound."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The company domain returned by Autobound."
+                    },
+                    "linkedinUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The company LinkedIn URL returned by Autobound."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw JSON object returned by Autobound."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A normalized company object returned by Autobound."
+                },
+                "signalCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of matching signals for this contact."
+                },
+                "mostRecentSignalAt": {
+                  "type": "string",
+                  "description": "When the most recent matching signal was detected for this contact.",
+                  "format": "date-time"
+                },
+                "signals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "signalId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Autobound signal identifier."
+                      },
+                      "signalType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The canonical Autobound signal type slug or an accepted legacy alias."
+                      },
+                      "signalSubtype": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Autobound signal subtype."
+                      },
+                      "signalName": {
+                        "type": "string",
+                        "description": "The human-readable Autobound signal title."
+                      },
+                      "detectedAt": {
+                        "type": "string",
+                        "description": "When Autobound detected the signal.",
+                        "format": "date-time"
+                      },
+                      "association": {
+                        "type": "string",
+                        "enum": [
+                          "company",
+                          "contact"
+                        ],
+                        "description": "The Autobound signal association for filtering or classification."
+                      },
+                      "company": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company name returned by Autobound."
+                              },
+                              "domain": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company domain returned by Autobound."
+                              },
+                              "linkedinUrl": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The company LinkedIn URL returned by Autobound."
+                              },
+                              "raw": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": true,
+                                "description": "The raw JSON object returned by Autobound."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A normalized company object returned by Autobound."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A normalized company object returned by Autobound."
+                      },
+                      "contact": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "email": {
+                                "type": "string",
+                                "description": "The contact email returned by Autobound.",
+                                "format": "email"
+                              },
+                              "linkedinUrl": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact LinkedIn URL returned by Autobound."
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact name returned by Autobound."
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The contact title returned by Autobound."
+                              },
+                              "company": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company name returned by Autobound."
+                                  },
+                                  "domain": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company domain returned by Autobound."
+                                  },
+                                  "linkedinUrl": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "The company LinkedIn URL returned by Autobound."
+                                  },
+                                  "raw": {
+                                    "type": "object",
+                                    "properties": {},
+                                    "additionalProperties": true,
+                                    "description": "The raw JSON object returned by Autobound."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "description": "A normalized company object returned by Autobound."
+                              },
+                              "raw": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": true,
+                                "description": "The raw JSON object returned by Autobound."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A normalized contact object returned by Autobound."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A normalized contact object returned by Autobound."
+                      },
+                      "data": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by Autobound."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by Autobound."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A normalized signal record returned by Autobound."
+                  },
+                  "description": "The attached most recent signals for this contact."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by Autobound."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One contact result returned by Autobound contact search."
+            },
+            "description": "The contacts returned by Autobound search."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result offset returned by Autobound."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result limit returned by Autobound."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Autobound has another page of contact results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Autobound contact search."
+      }
+    }
+  ]
+}

@@ -1,0 +1,771 @@
+{
+  "service": "graphhopper",
+  "displayName": "GraphHopper",
+  "categories": [
+    "Location",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GRAPHHOPPER_API_KEY",
+      "description": "GraphHopper API key sent as the key query parameter. Create or manage API keys in the GraphHopper dashboard: https://www.graphhopper.com/dashboard/."
+    }
+  ],
+  "homepageUrl": "https://www.graphhopper.com",
+  "actions": [
+    {
+      "id": "graphhopper.calculate_route",
+      "service": "graphhopper",
+      "name": "calculate_route",
+      "description": "Calculate the best route connecting two or more coordinates with the GraphHopper Routing API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "description": "A coordinate string in `latitude,longitude` format."
+            },
+            "description": "Route waypoints in `latitude,longitude` format.",
+            "minItems": 2
+          },
+          "profile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphHopper routing profile, such as `car`, `bike`, `foot`, or a custom profile id."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale for turn instructions, such as `en`, `de`, or `fr`."
+          },
+          "pointHint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One road name hint."
+            },
+            "description": "Optional road name hints for snapping each route waypoint.",
+            "minItems": 1
+          },
+          "snapPrevention": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One snap prevention value such as `motorway`, `trunk`, `ferry`, `tunnel`, `bridge`, or `ford`."
+            },
+            "description": "Road types that should be avoided while snapping input points.",
+            "minItems": 1
+          },
+          "curbside": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "any",
+                "right",
+                "left"
+              ],
+              "description": "One curbside preference."
+            },
+            "description": "Curbside preferences for each route waypoint."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One GraphHopper path detail type."
+            },
+            "description": "Path detail types to include in the route response.",
+            "minItems": 1
+          },
+          "optimize": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should reorder more than two points to reduce travel time."
+          },
+          "instructions": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should return turn-by-turn instructions."
+          },
+          "calcPoints": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should calculate route geometry points."
+          },
+          "pointsEncoded": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should return encoded polyline geometry."
+          },
+          "elevation": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should include altitude as a third coordinate."
+          },
+          "debug": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should format debug output."
+          },
+          "chDisable": {
+            "type": "boolean",
+            "description": "Whether to enable flexible mode for advanced routing options."
+          },
+          "heading": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 360,
+              "description": "One heading direction in degrees."
+            },
+            "description": "Preferred heading directions in degrees, north-based clockwise."
+          },
+          "headingPenalty": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The time penalty in seconds for not obeying heading."
+          },
+          "passThrough": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should avoid u-turns at via-points."
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "round_trip",
+              "alternative_route"
+            ],
+            "description": "The special route algorithm to use."
+          },
+          "roundTripDistance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The approximate round-trip length in meters."
+          },
+          "roundTripSeed": {
+            "type": "integer",
+            "description": "The random seed used for deterministic round-trip results."
+          },
+          "alternativeRouteMaxPaths": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of alternative routes."
+          },
+          "alternativeRouteMaxWeightFactor": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum factor by which alternative routes may be longer than the optimal route."
+          },
+          "alternativeRouteMaxShareFactor": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The maximum similarity factor between an alternative route and the optimal route."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "point"
+        ],
+        "description": "Input parameters for calculating a GraphHopper route."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "distance": {
+                  "type": "number",
+                  "description": "The total route distance in meters."
+                },
+                "time": {
+                  "type": "integer",
+                  "description": "The total route travel time in milliseconds."
+                },
+                "ascend": {
+                  "type": "number",
+                  "description": "The total ascent in meters."
+                },
+                "descend": {
+                  "type": "number",
+                  "description": "The total descent in meters."
+                },
+                "points": {
+                  "description": "The route geometry, either encoded or a coordinate object."
+                },
+                "snapped_waypoints": {
+                  "description": "The snapped input waypoints, either encoded or a coordinate object."
+                },
+                "points_encoded": {
+                  "type": "boolean",
+                  "description": "Whether route geometry fields use encoded polyline strings."
+                },
+                "bbox": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One bounding box coordinate."
+                  },
+                  "description": "The route bounding box as `[minLon, minLat, maxLon, maxLat]`."
+                },
+                "instructions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "An upstream GraphHopper object returned as-is."
+                  },
+                  "description": "The turn-by-turn route instructions returned by GraphHopper."
+                },
+                "details": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Path details keyed by requested detail type."
+                },
+                "points_order": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "One zero-based input point index."
+                  },
+                  "description": "The optimized visit order when route optimization was requested."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One route path returned by GraphHopper."
+            },
+            "description": "The calculated route paths."
+          },
+          "info": {
+            "type": "object",
+            "properties": {
+              "copyrights": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One notice."
+                },
+                "description": "The copyright notices returned by GraphHopper."
+              },
+              "took": {
+                "type": "number",
+                "description": "The time GraphHopper spent processing the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Additional GraphHopper response metadata."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The route response returned by GraphHopper."
+      }
+    },
+    {
+      "id": "graphhopper.compute_isochrone",
+      "service": "graphhopper",
+      "name": "compute_isochrone",
+      "description": "Compute GeoJSON isochrone polygons around a coordinate with the GraphHopper Isochrone API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "string",
+            "minLength": 3,
+            "description": "A coordinate string in `latitude,longitude` format."
+          },
+          "profile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphHopper routing profile, such as `car`, `bike`, `foot`, or a custom profile id."
+          },
+          "timeLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The travel time limit in seconds."
+          },
+          "distanceLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The travel distance limit in meters."
+          },
+          "buckets": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of nested isochrone buckets to return."
+          },
+          "reverseFlow": {
+            "type": "boolean",
+            "description": "Whether the flow should go from polygons toward the point."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "point"
+        ],
+        "description": "Input parameters for computing GraphHopper isochrone polygons."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "polygons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An upstream GraphHopper object returned as-is."
+            },
+            "description": "The GeoJSON isochrone polygons returned by GraphHopper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The isochrone response returned by GraphHopper."
+      }
+    },
+    {
+      "id": "graphhopper.compute_matrix",
+      "service": "graphhopper",
+      "name": "compute_matrix",
+      "description": "Compute a synchronous travel time, distance, or weight matrix with the GraphHopper Matrix API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "description": "A coordinate string in `latitude,longitude` format."
+            },
+            "description": "Points in `latitude,longitude` format used as both origins and destinations.",
+            "minItems": 3
+          },
+          "fromPoint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "description": "A coordinate string in `latitude,longitude` format."
+            },
+            "description": "Origin points in `latitude,longitude` format.",
+            "minItems": 1
+          },
+          "toPoint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "description": "A coordinate string in `latitude,longitude` format."
+            },
+            "description": "Destination points in `latitude,longitude` format.",
+            "minItems": 1
+          },
+          "profile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphHopper routing profile, such as `car`, `bike`, `foot`, or a custom profile id."
+          },
+          "pointHint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One point hint."
+            },
+            "description": "Hints for point entries.",
+            "minItems": 1
+          },
+          "fromPointHint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One origin point hint."
+            },
+            "description": "Hints for origin points.",
+            "minItems": 1
+          },
+          "toPointHint": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One destination point hint."
+            },
+            "description": "Hints for destination points.",
+            "minItems": 1
+          },
+          "snapPrevention": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One snap prevention value."
+            },
+            "description": "Road types that should be avoided while snapping matrix points.",
+            "minItems": 1
+          },
+          "curbside": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "any",
+                "right",
+                "left"
+              ],
+              "description": "One curbside preference."
+            },
+            "description": "Curbside preferences for point entries."
+          },
+          "fromCurbside": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "any",
+                "right",
+                "left"
+              ],
+              "description": "One curbside preference."
+            },
+            "description": "Curbside preferences for origin points."
+          },
+          "toCurbside": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "any",
+                "right",
+                "left"
+              ],
+              "description": "One curbside preference."
+            },
+            "description": "Curbside preferences for destination points."
+          },
+          "outArray": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "weights",
+                "times",
+                "distances"
+              ],
+              "description": "One matrix output array name."
+            },
+            "description": "Matrix arrays to include in the response.",
+            "minItems": 1
+          },
+          "failFast": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should fail immediately when points cannot be resolved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for computing a synchronous GraphHopper matrix."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "distances": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "One matrix value, or null when the route could not be calculated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One matrix value, or null when the route could not be calculated."
+              },
+              "description": "One matrix row."
+            },
+            "description": "A GraphHopper matrix of numeric values or null entries."
+          },
+          "times": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "One matrix value, or null when the route could not be calculated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One matrix value, or null when the route could not be calculated."
+              },
+              "description": "One matrix row."
+            },
+            "description": "A GraphHopper matrix of numeric values or null entries."
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "One matrix value, or null when the route could not be calculated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One matrix value, or null when the route could not be calculated."
+              },
+              "description": "One matrix row."
+            },
+            "description": "A GraphHopper matrix of numeric values or null entries."
+          },
+          "info": {
+            "type": "object",
+            "properties": {
+              "copyrights": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One notice."
+                },
+                "description": "The copyright notices returned by GraphHopper."
+              },
+              "took": {
+                "type": "number",
+                "description": "The time GraphHopper spent processing the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Additional GraphHopper response metadata."
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An upstream GraphHopper object returned as-is."
+            },
+            "description": "Additional GraphHopper matrix hints."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The matrix response returned by GraphHopper."
+      }
+    },
+    {
+      "id": "graphhopper.geocode",
+      "service": "graphhopper",
+      "name": "geocode",
+      "description": "Convert text to coordinates or coordinates to place candidates with the GraphHopper Geocoding API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The textual address or place query for forward geocoding."
+          },
+          "point": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The `latitude,longitude` location bias for forward geocoding or target coordinate for reverse geocoding."
+          },
+          "reverse": {
+            "type": "boolean",
+            "description": "Whether to perform reverse geocoding. When true, point is required and q must be omitted."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale used for localized geocoding results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of geocoding results to return."
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphHopper geocoding provider, such as `default`, `nominatim`, `gisgraphy`, or `opencagedata`."
+          },
+          "debug": {
+            "type": "boolean",
+            "description": "Whether GraphHopper should format debug output."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for forward or reverse geocoding with GraphHopper."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "point": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "description": "The latitude coordinate."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "description": "The longitude coordinate."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A latitude and longitude point returned by GraphHopper."
+                },
+                "osm_id": {
+                  "type": "integer",
+                  "description": "The OpenStreetMap entity id."
+                },
+                "osm_type": {
+                  "type": "string",
+                  "description": "The OpenStreetMap entity type."
+                },
+                "osm_key": {
+                  "type": "string",
+                  "description": "The OpenStreetMap key."
+                },
+                "osm_value": {
+                  "type": "string",
+                  "description": "The OpenStreetMap value."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The matched place, address, or entity name."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country of the result."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city of the result."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state or region of the result."
+                },
+                "street": {
+                  "type": "string",
+                  "description": "The street of the result."
+                },
+                "housenumber": {
+                  "type": "string",
+                  "description": "The house number of the result."
+                },
+                "postcode": {
+                  "type": "string",
+                  "description": "The postal code of the result."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One geocoding hit returned by GraphHopper."
+            },
+            "description": "The geocoding candidates returned by GraphHopper."
+          },
+          "took": {
+            "type": "number",
+            "description": "The time GraphHopper spent processing the geocoding request in milliseconds."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The geocoding response returned by GraphHopper."
+      }
+    },
+    {
+      "id": "graphhopper.list_profiles",
+      "service": "graphhopper",
+      "name": "list_profiles",
+      "description": "List custom routing profiles available to the GraphHopper API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing GraphHopper custom profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The custom profile id."
+                },
+                "profile": {
+                  "type": "string",
+                  "description": "The built-in routing profile this custom profile is based on."
+                },
+                "bounds": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The geographic bounds where this custom profile can be used."
+                },
+                "custom_model": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The custom model definition for this profile."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One custom GraphHopper routing profile."
+            },
+            "description": "The available custom routing profiles."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The custom routing profiles returned by GraphHopper."
+      }
+    }
+  ]
+}

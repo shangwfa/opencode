@@ -1,0 +1,596 @@
+{
+  "service": "reddit",
+  "displayName": "Reddit",
+  "description": "Search and read Reddit discussions, and manage posts or comments for the authenticated user.",
+  "categories": [
+    "Social",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://www.reddit.com/api/v1/authorize",
+      "tokenUrl": "https://www.reddit.com/api/v1/access_token",
+      "scopes": [
+        "identity",
+        "read",
+        "submit",
+        "edit"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic",
+      "authorizationParams": {
+        "duration": "permanent"
+      },
+      "clientSetup": {
+        "docsUrl": "https://www.reddit.com/prefs/apps",
+        "steps": [
+          "Create a Reddit web application and register the Callback URL shown below as its redirect URI.",
+          "Copy the application's Client ID and Client Secret into the fields below.",
+          "Review Reddit's Developer Terms and Data API Terms before using the connection."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://www.reddit.com",
+  "actions": [
+    {
+      "id": "reddit.create_comment",
+      "service": "reddit",
+      "name": "create_comment",
+      "description": "Reply to a Reddit post or comment as the authenticated Reddit user.",
+      "operationType": "write",
+      "requiredScopes": [
+        "submit"
+      ],
+      "providerPermissions": [
+        "submit"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentFullname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Reddit fullname such as t3_postid for a post or t1_commentid for a comment."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Markdown body of the comment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Reddit comment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Reddit Data API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Reddit comment created by the request."
+      }
+    },
+    {
+      "id": "reddit.create_post",
+      "service": "reddit",
+      "name": "create_post",
+      "description": "Create a text or link post in a subreddit as the authenticated Reddit user.",
+      "operationType": "write",
+      "requiredScopes": [
+        "submit"
+      ],
+      "providerPermissions": [
+        "submit"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit name without the r/ prefix."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "The title of the Reddit post."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "self",
+              "link"
+            ],
+            "description": "Whether to create a text post or link post."
+          },
+          "text": {
+            "type": "string",
+            "description": "The Markdown body for a text post."
+          },
+          "url": {
+            "type": "string",
+            "description": "The destination URL for a link post.",
+            "format": "uri"
+          },
+          "flairId": {
+            "type": "string",
+            "maxLength": 36,
+            "description": "The subreddit link flair template ID to apply."
+          },
+          "flairText": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The custom link flair text to apply when supported."
+          },
+          "sendReplies": {
+            "type": "boolean",
+            "description": "Whether Reddit should send inbox replies for the post."
+          },
+          "nsfw": {
+            "type": "boolean",
+            "description": "Whether the post should be marked not safe for work."
+          },
+          "spoiler": {
+            "type": "boolean",
+            "description": "Whether the post should be marked as a spoiler."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subreddit",
+          "title",
+          "kind"
+        ],
+        "description": "The input payload for creating a Reddit post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Reddit Data API."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The resulting Reddit post URL, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The resulting Reddit post URL, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Reddit post created by the request."
+      }
+    },
+    {
+      "id": "reddit.delete_content",
+      "service": "reddit",
+      "name": "delete_content",
+      "description": "Permanently delete the authenticated user's Reddit post or comment.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "edit"
+      ],
+      "providerPermissions": [
+        "edit"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fullname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Reddit fullname such as t3_postid for a post or t1_commentid for a comment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting Reddit content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Reddit accepted the deletion request."
+          },
+          "fullname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Reddit fullname such as t3_postid for a post or t1_commentid for a comment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of deleting Reddit content."
+      }
+    },
+    {
+      "id": "reddit.edit_content",
+      "service": "reddit",
+      "name": "edit_content",
+      "description": "Replace the body of the authenticated user's Reddit comment or text post.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "edit"
+      ],
+      "providerPermissions": [
+        "edit"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fullname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Reddit fullname such as t3_postid for a post or t1_commentid for a comment."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement Markdown body."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for editing Reddit content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Reddit Data API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Reddit content returned after editing."
+      }
+    },
+    {
+      "id": "reddit.get_me",
+      "service": "reddit",
+      "name": "get_me",
+      "description": "Get the profile of the authenticated Reddit account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "identity"
+      ],
+      "providerPermissions": [
+        "identity"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for the authenticated Reddit profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Reddit Data API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated Reddit profile response."
+      }
+    },
+    {
+      "id": "reddit.get_post_comments",
+      "service": "reddit",
+      "name": "get_post_comments",
+      "description": "Get a Reddit post and its comment tree.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [
+        "read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base-36 Reddit post ID without the t3_ prefix."
+          },
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit name without the r/ prefix."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "confidence",
+              "top",
+              "new",
+              "controversial",
+              "old",
+              "random",
+              "qa",
+              "live"
+            ],
+            "description": "The comment sort order."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of comments to return."
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum depth of comment subtrees to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postId"
+        ],
+        "description": "The input payload for retrieving a Reddit comment tree."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Reddit Data API."
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the Reddit Data API."
+            },
+            "description": "The top-level comment things, including nested replies."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Reddit post and its recursive comment listing."
+      }
+    },
+    {
+      "id": "reddit.list_posts",
+      "service": "reddit",
+      "name": "list_posts",
+      "description": "List posts from a subreddit using a supported Reddit sort order.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [
+        "read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit name without the r/ prefix."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, from 1 through 100."
+          },
+          "after": {
+            "type": "string",
+            "description": "The Reddit fullname cursor after which to continue the listing."
+          },
+          "before": {
+            "type": "string",
+            "description": "The Reddit fullname cursor before which to continue the listing."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "hot",
+              "new",
+              "top",
+              "controversial",
+              "rising"
+            ],
+            "description": "The Reddit listing sort order."
+          },
+          "time": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "all"
+            ],
+            "description": "The time range for top or controversial listings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subreddit"
+        ],
+        "description": "The input payload for listing Reddit posts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the Reddit Data API."
+            },
+            "description": "The posts returned in this page."
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The fullname cursor for the next page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fullname cursor for the next page, or null."
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The fullname cursor for the previous page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fullname cursor for the previous page, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized page of Reddit posts."
+      }
+    },
+    {
+      "id": "reddit.search_posts",
+      "service": "reddit",
+      "name": "search_posts",
+      "description": "Search Reddit posts globally or within one subreddit.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [
+        "read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Reddit search query."
+          },
+          "subreddit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subreddit name without the r/ prefix."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "hot",
+              "top",
+              "new",
+              "comments"
+            ],
+            "description": "The Reddit search sort order."
+          },
+          "time": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month",
+              "year",
+              "all"
+            ],
+            "description": "The search time range."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, from 1 through 100."
+          },
+          "after": {
+            "type": "string",
+            "description": "The Reddit fullname cursor after which to continue the listing."
+          },
+          "before": {
+            "type": "string",
+            "description": "The Reddit fullname cursor before which to continue the listing."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching Reddit posts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the Reddit Data API."
+            },
+            "description": "The posts returned in this page."
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The fullname cursor for the next page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fullname cursor for the next page, or null."
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The fullname cursor for the previous page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fullname cursor for the previous page, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized page of Reddit posts."
+      }
+    }
+  ]
+}

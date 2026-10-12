@@ -1,0 +1,258 @@
+{
+  "service": "embase",
+  "displayName": "Embase",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Elsevier API Key",
+      "placeholder": "ELSEVIER_API_KEY",
+      "description": "Elsevier API key from https://dev.elsevier.com/apikey/manage",
+      "extraFields": [
+        {
+          "key": "institutionToken",
+          "label": "Institutional Token",
+          "inputType": "password",
+          "required": false,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.elsevier.com/products/embase",
+  "actions": [
+    {
+      "id": "embase.get_article",
+      "service": "embase",
+      "name": "get_article",
+      "description": "Get one Embase article record by a documented literature identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "lui",
+              "pii",
+              "doi",
+              "embase",
+              "pubmed_id",
+              "medline"
+            ],
+            "description": "The identifier namespace used by the supplied value."
+          },
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The article identifier in the selected namespace.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Embase article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "One raw Embase record returned by Elsevier."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Embase quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of retrieving one Embase article record."
+      }
+    },
+    {
+      "id": "embase.search_articles",
+      "service": "embase",
+      "name": "search_articles",
+      "description": "Search Embase biomedical literature with a CommandLanguage query or an encoded alert identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Embase CommandLanguage Boolean query.",
+            "pattern": "\\S"
+          },
+          "alertId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An encoded Embase alert identifier from an alert email.",
+            "pattern": "\\S"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based position of the first result to return."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of results to return, subject to the account service limit."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "entrydate",
+              "publicationyear",
+              "relevance"
+            ],
+            "description": "The ordering applied to matching records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching Embase articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw Embase record returned by Elsevier."
+            },
+            "description": "The raw Embase result records in this page."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Embase quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized page of Embase search results."
+      }
+    }
+  ]
+}

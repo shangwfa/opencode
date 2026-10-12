@@ -1,0 +1,649 @@
+{
+  "service": "opengraph_io",
+  "displayName": "OpenGraph.io",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "App ID",
+      "placeholder": "your-opengraph-app-id",
+      "description": "OpenGraph.io App ID sent as the app_id query parameter. Get it from the OpenGraph.io dashboard as described at https://www.opengraph.io/docs/concepts/auth.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.opengraph.io",
+  "actions": [
+    {
+      "id": "opengraph_io.capture_screenshot",
+      "service": "opengraph_io",
+      "name": "capture_screenshot",
+      "description": "Capture a webpage screenshot through the OpenGraph.io Screenshot endpoint with configurable viewport, delay, and element selection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The page URL to capture as an image.",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "description": "The output image format."
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 80,
+            "description": "The image quality from 10 to 80."
+          },
+          "cacheOk": {
+            "type": "boolean",
+            "description": "Whether cached screenshots may be returned when available."
+          },
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional CSS selector that limits the capture to a specific element."
+          },
+          "darkMode": {
+            "type": "boolean",
+            "description": "Whether the page should be rendered with a dark color-scheme preference."
+          },
+          "fullPage": {
+            "type": "boolean",
+            "description": "Whether the entire scrollable page should be captured."
+          },
+          "useProxy": {
+            "type": "boolean",
+            "description": "Whether a proxy should be used for the request."
+          },
+          "dimensions": {
+            "type": "string",
+            "enum": [
+              "xs",
+              "sm",
+              "md",
+              "lg"
+            ],
+            "description": "A viewport size preset."
+          },
+          "captureDelay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The delay in milliseconds before taking the screenshot."
+          },
+          "excludeSelectors": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated CSS selectors for elements that should be hidden."
+          },
+          "navigationTimeout": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 60000,
+            "description": "The navigation timeout in milliseconds."
+          },
+          "blockCookieBanner": {
+            "type": "boolean",
+            "description": "Whether known cookie consent banners should be blocked."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for capturing a screenshot with OpenGraph.io."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "screenshotUrl": {
+            "type": "string",
+            "description": "The URL of the generated screenshot image.",
+            "format": "uri"
+          },
+          "dimensions": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "description": "The screenshot width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The screenshot height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The dimensions of the captured screenshot."
+          },
+          "requestInfo": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "The host that responded to the request."
+              },
+              "redirects": {
+                "type": "integer",
+                "description": "The number of redirects followed while fetching the URL."
+              },
+              "responseCode": {
+                "type": "integer",
+                "description": "The HTTP response code returned upstream."
+              },
+              "responseContentType": {
+                "type": "string",
+                "description": "The upstream response Content-Type header when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Information about the upstream request performed by OpenGraph.io."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized output payload returned by the OpenGraph.io Screenshot endpoint."
+      }
+    },
+    {
+      "id": "opengraph_io.extract_site",
+      "service": "opengraph_io",
+      "name": "extract_site",
+      "description": "Extract Open Graph, Twitter Card, oEmbed, and inferred metadata for a site through the OpenGraph.io Site endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string",
+            "description": "The site URL to inspect.",
+            "format": "uri"
+          },
+          "cacheOk": {
+            "type": "boolean",
+            "description": "Whether cached results may be returned when available."
+          },
+          "fullRender": {
+            "type": "boolean",
+            "description": "Whether the page should be rendered in a browser before extraction."
+          },
+          "useProxy": {
+            "type": "boolean",
+            "description": "Whether a proxy should be used for the request."
+          },
+          "usePremium": {
+            "type": "boolean",
+            "description": "Whether a residential proxy should be used when available."
+          },
+          "useSuperior": {
+            "type": "boolean",
+            "description": "Whether a mobile-grade proxy should be used when available."
+          },
+          "useAi": {
+            "type": "boolean",
+            "description": "Whether AI-enhanced metadata extraction should be enabled."
+          },
+          "maxCacheAge": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum accepted cache age in seconds."
+          },
+          "acceptLang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Accept-Language header value sent to the target site."
+          },
+          "autoProxy": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether to use a proxy."
+          },
+          "autoRender": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether full rendering is needed."
+          },
+          "retry": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io should retry with fallback transport strategies."
+          },
+          "maxRetries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of retry attempts."
+          },
+          "retryEscalate": {
+            "type": "boolean",
+            "description": "Whether retries may escalate to more expensive fallback strategies."
+          },
+          "proxyCountry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 3166-1 alpha-2 country code to use for proxy egress."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "description": "The input payload for extracting OpenGraph.io site metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hybridGraph": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "openGraph": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "twitterCard": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "htmlInferred": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "oEmbed": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "requestUrl": {
+            "type": "string",
+            "description": "The final URL that OpenGraph.io resolved after redirects."
+          },
+          "requestInfo": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "The host that responded to the request."
+              },
+              "redirects": {
+                "type": "integer",
+                "description": "The number of redirects followed while fetching the URL."
+              },
+              "responseCode": {
+                "type": "integer",
+                "description": "The HTTP response code returned upstream."
+              },
+              "responseContentType": {
+                "type": "string",
+                "description": "The upstream response Content-Type header when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Information about the upstream request performed by OpenGraph.io."
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "Whether the result came from cache."
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the cached result was created."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO 8601 timestamp when the cached result was created."
+          },
+          "retryInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "aiSafety": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain extracted from the requested URL."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object returned by OpenGraph.io."
+            },
+            "description": "Additional tag-level extraction results when returned by the API."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized metadata payload returned by the OpenGraph.io Site endpoint."
+      }
+    },
+    {
+      "id": "opengraph_io.scrape_site",
+      "service": "opengraph_io",
+      "name": "scrape_site",
+      "description": "Retrieve a site's metadata through the OpenGraph.io Site endpoint with cache, proxy, render, and retry controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "string",
+            "description": "The site URL to inspect.",
+            "format": "uri"
+          },
+          "cacheOk": {
+            "type": "boolean",
+            "description": "Whether cached results may be returned when available."
+          },
+          "fullRender": {
+            "type": "boolean",
+            "description": "Whether the page should be rendered in a browser before extraction."
+          },
+          "useProxy": {
+            "type": "boolean",
+            "description": "Whether a proxy should be used for the request."
+          },
+          "usePremium": {
+            "type": "boolean",
+            "description": "Whether a residential proxy should be used when available."
+          },
+          "useSuperior": {
+            "type": "boolean",
+            "description": "Whether a mobile-grade proxy should be used when available."
+          },
+          "useAi": {
+            "type": "boolean",
+            "description": "Whether AI-enhanced metadata extraction should be enabled."
+          },
+          "maxCacheAge": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum accepted cache age in seconds."
+          },
+          "acceptLang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Accept-Language header value sent to the target site."
+          },
+          "autoProxy": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether to use a proxy."
+          },
+          "autoRender": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether full rendering is needed."
+          },
+          "retry": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io should retry with fallback transport strategies."
+          },
+          "maxRetries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of retry attempts."
+          },
+          "retryEscalate": {
+            "type": "boolean",
+            "description": "Whether retries may escalate to more expensive fallback strategies."
+          },
+          "proxyCountry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 3166-1 alpha-2 country code to use for proxy egress."
+          },
+          "scrape": {
+            "type": "boolean",
+            "description": "A reserved compatibility flag. The current official Site endpoint does not expose a separate scrape mode, so this value is ignored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "description": "The input payload for retrieving OpenGraph.io site metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hybridGraph": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "openGraph": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "twitterCard": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "htmlInferred": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "oEmbed": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "requestUrl": {
+            "type": "string",
+            "description": "The final URL that OpenGraph.io resolved after redirects."
+          },
+          "requestInfo": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "The host that responded to the request."
+              },
+              "redirects": {
+                "type": "integer",
+                "description": "The number of redirects followed while fetching the URL."
+              },
+              "responseCode": {
+                "type": "integer",
+                "description": "The HTTP response code returned upstream."
+              },
+              "responseContentType": {
+                "type": "string",
+                "description": "The upstream response Content-Type header when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Information about the upstream request performed by OpenGraph.io."
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "Whether the result came from cache."
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the cached result was created."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO 8601 timestamp when the cached result was created."
+          },
+          "retryInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "aiSafety": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain extracted from the requested URL."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object returned by OpenGraph.io."
+            },
+            "description": "Additional tag-level extraction results when returned by the API."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized metadata payload returned by the OpenGraph.io Site endpoint."
+      }
+    },
+    {
+      "id": "opengraph_io.scrape_url",
+      "service": "opengraph_io",
+      "name": "scrape_url",
+      "description": "Fetch the raw HTML for a page through the OpenGraph.io Scrape endpoint with optional render and proxy controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The page URL to scrape for raw HTML.",
+            "format": "uri"
+          },
+          "cacheOk": {
+            "type": "boolean",
+            "description": "Whether cached results may be returned when available."
+          },
+          "fullRender": {
+            "type": "boolean",
+            "description": "Whether the page should be rendered in a browser before scraping."
+          },
+          "useProxy": {
+            "type": "boolean",
+            "description": "Whether a proxy should be used for the request."
+          },
+          "usePremium": {
+            "type": "boolean",
+            "description": "Whether a residential proxy should be used when available."
+          },
+          "useSuperior": {
+            "type": "boolean",
+            "description": "Whether a mobile-grade proxy should be used when available."
+          },
+          "acceptLang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Accept-Language header value sent to the target site."
+          },
+          "autoProxy": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether to use a proxy."
+          },
+          "autoRender": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io may automatically decide whether full rendering is needed."
+          },
+          "retry": {
+            "type": "boolean",
+            "description": "Whether OpenGraph.io should retry with fallback transport strategies."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for scraping a URL with OpenGraph.io."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "htmlContent": {
+            "type": "string",
+            "description": "The raw HTML content returned for the page."
+          },
+          "requestInfo": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "The host that responded to the request."
+              },
+              "redirects": {
+                "type": "integer",
+                "description": "The number of redirects followed while fetching the URL."
+              },
+              "responseCode": {
+                "type": "integer",
+                "description": "The HTTP response code returned upstream."
+              },
+              "responseContentType": {
+                "type": "string",
+                "description": "The upstream response Content-Type header when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Information about the upstream request performed by OpenGraph.io."
+          },
+          "retryInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object returned by OpenGraph.io."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized output payload returned by the OpenGraph.io Scrape endpoint."
+      }
+    }
+  ]
+}

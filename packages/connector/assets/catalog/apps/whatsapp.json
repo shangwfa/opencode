@@ -1,0 +1,1782 @@
+{
+  "service": "whatsapp",
+  "displayName": "WhatsApp",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "EAAG...",
+      "description": "Meta access token used with the Authorization Bearer header. Generate a permanent token from the official WhatsApp Cloud API getting started guide and Meta Business Settings: https://developers.facebook.com/docs/whatsapp/cloud-api/get-started and https://business.facebook.com/latest/settings . The token should include WhatsApp Business messaging and management permissions.",
+      "extraFields": [
+        {
+          "key": "wabaId",
+          "label": "Default WABA ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "123456789012345",
+          "description": "Optional default WhatsApp Business Account ID reused by phone-number and template actions."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.whatsapp.com",
+  "actions": [
+    {
+      "id": "whatsapp.create_message_template",
+      "service": "whatsapp",
+      "name": "create_message_template",
+      "description": "Create a new WhatsApp message template for a WABA.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "waba_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp Business Account ID. Omit to use the default credential WABA ID."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Unique template name.",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "AUTHENTICATION",
+              "MARKETING",
+              "UTILITY"
+            ],
+            "description": "Template category."
+          },
+          "language": {
+            "type": "string",
+            "description": "Template language code such as en_US."
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "HEADER",
+                    "BODY",
+                    "BUTTONS"
+                  ],
+                  "description": "Template component type."
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "description": "Text value for BODY or TEXT HEADER components."
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "TEXT",
+                    "IMAGE",
+                    "VIDEO",
+                    "DOCUMENT"
+                  ],
+                  "description": "HEADER format."
+                },
+                "buttons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A template button."
+                  },
+                  "description": "Buttons defined for a BUTTONS component.",
+                  "minItems": 1,
+                  "maxItems": 3
+                },
+                "example": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Example placeholder values used for submission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A component submitted when creating the template."
+            },
+            "description": "Components submitted when creating the template.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "category",
+          "language",
+          "components"
+        ],
+        "description": "Input for creating a WhatsApp message template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Template ID created by Meta."
+          },
+          "status": {
+            "type": "string",
+            "description": "Initial template status returned by Meta."
+          },
+          "category": {
+            "type": "string",
+            "description": "Template category returned by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "category"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.delete_message_template",
+      "service": "whatsapp",
+      "name": "delete_message_template",
+      "description": "Delete all message template variants that share the same name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Template name to delete."
+          },
+          "waba_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp Business Account ID. Omit to use the default credential WABA ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input for deleting a WhatsApp message template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.get_business_profile",
+      "service": "whatsapp",
+      "name": "get_business_profile",
+      "description": "Get the business profile configured for a WhatsApp Business phone number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated list of fields to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id"
+        ],
+        "description": "Input for reading a WhatsApp business profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messaging_product": {
+            "type": "string",
+            "description": "Messaging product identifier, typically whatsapp."
+          },
+          "about": {
+            "type": "string",
+            "description": "About text shown on the business profile."
+          },
+          "address": {
+            "type": "string",
+            "description": "Business address."
+          },
+          "description": {
+            "type": "string",
+            "description": "Business description."
+          },
+          "email": {
+            "type": "string",
+            "description": "Business support email address."
+          },
+          "profile_picture_url": {
+            "type": "string",
+            "description": "Public URL for the business profile picture."
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A website URL."
+            },
+            "description": "Websites linked from the business profile."
+          },
+          "vertical": {
+            "type": "string",
+            "description": "Business vertical selected in Meta."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A WhatsApp business profile."
+      }
+    },
+    {
+      "id": "whatsapp.get_media_info",
+      "service": "whatsapp",
+      "name": "get_media_info",
+      "description": "Get metadata and a short-lived download URL for uploaded media.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta media ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "media_id"
+        ],
+        "description": "Input for reading media info."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Meta media ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "Short-lived download URL for the media file."
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "MIME type of the uploaded media."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA256 hash of the media file."
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "Size of the media file in bytes."
+          },
+          "messaging_product": {
+            "type": "string",
+            "description": "Messaging product identifier, typically whatsapp."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A WhatsApp media record."
+      }
+    },
+    {
+      "id": "whatsapp.get_message_templates",
+      "service": "whatsapp",
+      "name": "get_message_templates",
+      "description": "List message templates for a WhatsApp Business Account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "waba_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp Business Account ID. Omit to use the default credential WABA ID."
+          },
+          "after": {
+            "type": "string",
+            "description": "Pagination cursor returned by a previous response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of templates to return.",
+            "default": 25
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional template status filter."
+          },
+          "category": {
+            "type": "string",
+            "description": "Optional template category filter."
+          },
+          "language": {
+            "type": "string",
+            "description": "Optional template language filter."
+          },
+          "name_or_content": {
+            "type": "string",
+            "description": "Optional filter that matches template name or content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing WhatsApp message templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta template ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Template name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Template status returned by Meta."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Template category."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "Template language code."
+                },
+                "components": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A template component returned by Meta."
+                  },
+                  "description": "Template components."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A WhatsApp message template."
+            },
+            "description": "Templates returned for the WABA."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "type": "string",
+                    "description": "Cursor for the previous page."
+                  },
+                  "after": {
+                    "type": "string",
+                    "description": "Cursor for the next page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Cursor values returned by Meta."
+              },
+              "previous": {
+                "type": "string",
+                "description": "URL for the previous page, when provided."
+              },
+              "next": {
+                "type": "string",
+                "description": "URL for the next page, when provided."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination data returned by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates",
+          "paging"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.get_phone_number",
+      "service": "whatsapp",
+      "name": "get_phone_number",
+      "description": "Get metadata for a specific WhatsApp Business phone number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated list of fields to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id"
+        ],
+        "description": "Input for a phone number."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Meta phone number ID."
+          },
+          "display_phone_number": {
+            "type": "string",
+            "description": "Phone number in display format, including country code."
+          },
+          "verified_name": {
+            "type": "string",
+            "description": "Verified business name shown to WhatsApp users."
+          },
+          "quality_rating": {
+            "type": "string",
+            "description": "Meta quality rating for this phone number."
+          },
+          "code_verification_status": {
+            "type": "string",
+            "description": "Verification status of the phone number."
+          },
+          "platform_type": {
+            "type": "string",
+            "description": "Hosting platform type, such as CLOUD_API."
+          },
+          "last_onboarded_time": {
+            "type": "string",
+            "description": "Timestamp for the latest phone number onboarding event."
+          },
+          "throughput": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "description": "Messaging throughput tier for the phone number."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Messaging throughput information returned by Meta."
+          },
+          "webhook_configuration": {
+            "type": "object",
+            "properties": {
+              "application": {
+                "type": "string",
+                "description": "Webhook endpoint configured for the phone number, when Meta returns one."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Webhook configuration returned by Meta."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A WhatsApp Business phone number."
+      }
+    },
+    {
+      "id": "whatsapp.get_phone_numbers",
+      "service": "whatsapp",
+      "name": "get_phone_numbers",
+      "description": "List phone numbers for a WhatsApp Business Account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "waba_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WhatsApp Business Account ID. Omit to use the default credential WABA ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of phone numbers to return.",
+            "default": 25
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing WhatsApp phone numbers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_numbers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta phone number ID."
+                },
+                "display_phone_number": {
+                  "type": "string",
+                  "description": "Phone number in display format, including country code."
+                },
+                "verified_name": {
+                  "type": "string",
+                  "description": "Verified business name shown to WhatsApp users."
+                },
+                "quality_rating": {
+                  "type": "string",
+                  "description": "Meta quality rating for this phone number."
+                },
+                "code_verification_status": {
+                  "type": "string",
+                  "description": "Verification status of the phone number."
+                },
+                "platform_type": {
+                  "type": "string",
+                  "description": "Hosting platform type, such as CLOUD_API."
+                },
+                "last_onboarded_time": {
+                  "type": "string",
+                  "description": "Timestamp for the latest phone number onboarding event."
+                },
+                "throughput": {
+                  "type": "object",
+                  "properties": {
+                    "level": {
+                      "type": "string",
+                      "description": "Messaging throughput tier for the phone number."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Messaging throughput information returned by Meta."
+                },
+                "webhook_configuration": {
+                  "type": "object",
+                  "properties": {
+                    "application": {
+                      "type": "string",
+                      "description": "Webhook endpoint configured for the phone number, when Meta returns one."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Webhook configuration returned by Meta."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A WhatsApp Business phone number."
+            },
+            "description": "Phone numbers returned for the WABA."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "type": "string",
+                    "description": "Cursor for the previous page."
+                  },
+                  "after": {
+                    "type": "string",
+                    "description": "Cursor for the next page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Cursor values returned by Meta."
+              },
+              "previous": {
+                "type": "string",
+                "description": "URL for the previous page, when provided."
+              },
+              "next": {
+                "type": "string",
+                "description": "URL for the next page, when provided."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination data returned by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_numbers",
+          "paging"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.get_template_status",
+      "service": "whatsapp",
+      "name": "get_template_status",
+      "description": "Get status details for a specific message template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_management"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta template ID."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated list of fields to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template_id"
+        ],
+        "description": "Input for reading a WhatsApp template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Meta template ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Template name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Template status returned by Meta."
+          },
+          "category": {
+            "type": "string",
+            "description": "Template category."
+          },
+          "language": {
+            "type": "string",
+            "description": "Template language code."
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A template component returned by Meta."
+            },
+            "description": "Template components."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A WhatsApp message template."
+      }
+    },
+    {
+      "id": "whatsapp.send_contacts",
+      "service": "whatsapp",
+      "name": "send_contacts",
+      "description": "Send one or more contacts to a WhatsApp user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Contact name information."
+                },
+                "org": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Organization information."
+                },
+                "emails": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A contact email."
+                  },
+                  "description": "Email addresses for the contact."
+                },
+                "phones": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A contact phone number."
+                  },
+                  "description": "Phone numbers for the contact."
+                },
+                "addresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A contact address."
+                  },
+                  "description": "Postal addresses for the contact."
+                },
+                "birthday": {
+                  "type": "string",
+                  "description": "Birthday in YYYY-MM-DD format."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A WhatsApp contact message payload."
+            },
+            "description": "Contacts to send in the message.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "contacts"
+        ],
+        "description": "Input for sending WhatsApp contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_interactive_buttons",
+      "service": "whatsapp",
+      "name": "send_interactive_buttons",
+      "description": "Send an interactive reply-button message.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "body_text": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Body text shown above the buttons."
+          },
+          "buttons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 256,
+                  "description": "Unique identifier for the reply button."
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 20,
+                  "description": "Button label shown to the user."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A reply button."
+            },
+            "description": "Reply buttons shown in the interactive message.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "header_text": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Optional header text."
+          },
+          "footer_text": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Optional footer text."
+          },
+          "reply_to_message_id": {
+            "type": "string",
+            "description": "WhatsApp message ID to reply to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "body_text",
+          "buttons"
+        ],
+        "description": "Input for sending a WhatsApp interactive button message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_interactive_list",
+      "service": "whatsapp",
+      "name": "send_interactive_list",
+      "description": "Send an interactive list message with sections and rows.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "body_text": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Body text shown above the list button."
+          },
+          "button_text": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "Label shown on the list button."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 24,
+                  "description": "Section title."
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "maxLength": 24,
+                        "description": "Unique identifier for the row."
+                      },
+                      "title": {
+                        "type": "string",
+                        "maxLength": 24,
+                        "description": "Row title shown to the user."
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 72,
+                        "description": "Optional row description."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "An interactive list row."
+                  },
+                  "description": "Rows listed inside the section.",
+                  "minItems": 1,
+                  "maxItems": 10
+                }
+              },
+              "additionalProperties": false,
+              "description": "An interactive list section."
+            },
+            "description": "Sections and rows shown inside the interactive list.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "header_text": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Optional header text."
+          },
+          "footer_text": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "Optional footer text."
+          },
+          "reply_to_message_id": {
+            "type": "string",
+            "description": "WhatsApp message ID to reply to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "body_text",
+          "button_text",
+          "sections"
+        ],
+        "description": "Input for sending a WhatsApp interactive list message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_location",
+      "service": "whatsapp",
+      "name": "send_location",
+      "description": "Send a location message to a WhatsApp user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Latitude in decimal degrees."
+              },
+              {
+                "type": "string",
+                "description": "Latitude in decimal degrees."
+              }
+            ]
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Longitude in decimal degrees."
+              },
+              {
+                "type": "string",
+                "description": "Longitude in decimal degrees."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Location title."
+          },
+          "address": {
+            "type": "string",
+            "description": "Location address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "latitude",
+          "longitude",
+          "name",
+          "address"
+        ],
+        "description": "Input for sending a WhatsApp location message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_media",
+      "service": "whatsapp",
+      "name": "send_media",
+      "description": "Send a media message by public URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "document",
+              "image",
+              "sticker",
+              "video"
+            ],
+            "description": "WhatsApp media type."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "link": {
+            "type": "string",
+            "description": "Public HTTPS URL for the media file.",
+            "format": "uri"
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Optional caption for image, video, or document messages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "media_type",
+          "to_number",
+          "link"
+        ],
+        "description": "Input for sending a WhatsApp media message by URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_media_by_id",
+      "service": "whatsapp",
+      "name": "send_media_by_id",
+      "description": "Send previously uploaded media by Meta media ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "document",
+              "image",
+              "sticker",
+              "video"
+            ],
+            "description": "WhatsApp media type."
+          },
+          "media_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta media ID."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Optional caption for image, video, or document messages."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Filename to attach when sending a document by media ID."
+          },
+          "reply_to_message_id": {
+            "type": "string",
+            "description": "WhatsApp message ID to reply to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "media_type",
+          "media_id"
+        ],
+        "description": "Input for sending a WhatsApp media message by uploaded media ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_message",
+      "service": "whatsapp",
+      "name": "send_message",
+      "description": "Send a text message to a WhatsApp user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Text body of the message to send."
+          },
+          "message_id": {
+            "type": "string",
+            "description": "WhatsApp message ID. Omit to send a standalone message."
+          },
+          "preview_url": {
+            "type": "boolean",
+            "description": "Whether Meta should render a link preview for the first URL in the text.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "text"
+        ],
+        "description": "Input for sending a WhatsApp text message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.send_template_message",
+      "service": "whatsapp",
+      "name": "send_template_message",
+      "description": "Send an approved WhatsApp template message.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "to_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number in international format without the plus sign."
+          },
+          "template_name": {
+            "type": "string",
+            "description": "Approved template name."
+          },
+          "language_code": {
+            "type": "string",
+            "description": "Template language code used for delivery.",
+            "default": "en_US"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Template component type such as header, body, or button."
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "Button index for button components."
+                },
+                "sub_type": {
+                  "type": "string",
+                  "description": "Button subtype such as quick_reply or url."
+                },
+                "parameters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A template parameter."
+                  },
+                  "description": "Parameters used to fill template placeholders."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Template component parameters passed to Meta."
+            },
+            "description": "Template component parameters passed to Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "to_number",
+          "template_name"
+        ],
+        "description": "Input for sending a WhatsApp template message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "description": "Phone number submitted in the request."
+                },
+                "wa_id": {
+                  "type": "string",
+                  "description": "WhatsApp ID resolved by Meta for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact returned by Meta."
+            },
+            "description": "Resolved contacts associated with the delivery request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meta message identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One accepted message."
+            },
+            "description": "Messages accepted by Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "messages"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "whatsapp.upload_media",
+      "service": "whatsapp",
+      "name": "upload_media",
+      "description": "Upload media to Meta and return the resulting media record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "whatsapp_business_messaging"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone_number_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta phone number ID for the WhatsApp Business number used by this action."
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "audio",
+              "document",
+              "image",
+              "sticker",
+              "video"
+            ],
+            "description": "WhatsApp media type."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "Source file to upload to Meta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone_number_id",
+          "media_type",
+          "file"
+        ],
+        "description": "Input for uploading WhatsApp media."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Meta media ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "Short-lived download URL for the media file."
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "MIME type of the uploaded media."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA256 hash of the media file."
+          },
+          "file_size": {
+            "type": "integer",
+            "description": "Size of the media file in bytes."
+          },
+          "messaging_product": {
+            "type": "string",
+            "description": "Messaging product identifier, typically whatsapp."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A WhatsApp media record."
+      },
+      "followUpActions": [
+        "whatsapp.send_media_by_id"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1408 @@
+{
+  "service": "todoist",
+  "displayName": "Todoist",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://app.todoist.com/oauth/authorize",
+      "tokenUrl": "https://api.todoist.com/oauth/access_token",
+      "scopes": [
+        "data:read_write"
+      ],
+      "scopeSeparator": ",",
+      "tokenEndpointAuthMethod": "client_secret_post"
+    },
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "todoist_access_token",
+      "description": "Paste a Todoist OAuth access token or personal API token. It is sent with the Authorization Bearer header."
+    }
+  ],
+  "homepageUrl": "https://todoist.com",
+  "actions": [
+    {
+      "id": "todoist.close_task",
+      "service": "todoist",
+      "name": "close_task",
+      "description": "Close a Todoist task.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.create_comment",
+      "service": "todoist",
+      "name": "create_comment",
+      "description": "Create a Todoist comment on a task or project.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist comment content."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID that owns the comment."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID that owns the comment."
+          },
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "fileUrl": {
+                "type": "string",
+                "description": "Attachment download URL.",
+                "format": "uri"
+              },
+              "fileName": {
+                "type": "string",
+                "description": "Attachment file name."
+              },
+              "fileType": {
+                "type": "string",
+                "description": "Attachment MIME type."
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "Attachment resource type."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Todoist comment attachment metadata."
+          },
+          "uidsToNotify": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "A Todoist user ID."
+            },
+            "description": "Todoist user IDs to notify.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.create_project",
+      "service": "todoist",
+      "name": "create_project",
+      "description": "Create a Todoist project.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist project name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Todoist project description."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Parent project ID, or null where the API supports clearing it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent project ID, or null where the API supports clearing it."
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "berry_red",
+                  "red",
+                  "orange",
+                  "yellow",
+                  "olive_green",
+                  "lime_green",
+                  "green",
+                  "mint_green",
+                  "teal",
+                  "sky_blue",
+                  "light_blue",
+                  "blue",
+                  "grape",
+                  "violet",
+                  "lavender",
+                  "magenta",
+                  "salmon",
+                  "charcoal",
+                  "grey",
+                  "taupe"
+                ],
+                "description": "Todoist color name."
+              },
+              {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 49,
+                "description": "Todoist legacy numeric color code."
+              }
+            ],
+            "description": "Todoist color value as a named palette entry or legacy numeric code."
+          },
+          "isFavorite": {
+            "type": "boolean",
+            "description": "Whether the project is a favorite."
+          },
+          "viewStyle": {
+            "type": "string",
+            "enum": [
+              "list",
+              "board",
+              "calendar"
+            ],
+            "description": "Todoist project view style."
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Todoist workspace ID for creating a workspace-scoped project."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Todoist workspace ID for creating a workspace-scoped project."
+              }
+            ],
+            "description": "Todoist workspace ID for creating a workspace-scoped project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.create_section",
+      "service": "todoist",
+      "name": "create_section",
+      "description": "Create a Todoist section.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist project ID that will own the section."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist section name."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Optional section order within the project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.create_task",
+      "service": "todoist",
+      "name": "create_task",
+      "description": "Create a Todoist task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist task title."
+          },
+          "description": {
+            "type": "string",
+            "description": "Todoist task description."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID that will own the task."
+          },
+          "sectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Section ID that will own the task."
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Parent task ID."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Task order."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Todoist label names to attach.",
+            "minItems": 1
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Todoist priority from 1 to 4."
+          },
+          "assigneeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Todoist user ID to assign, or null where supported."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Todoist user ID to assign, or null where supported."
+          },
+          "dueString": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Natural language due date string."
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Due date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dueDatetime": {
+            "type": "string",
+            "description": "Due date-time in RFC 3339 form.",
+            "format": "date-time"
+          },
+          "dueLang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used to parse the due string."
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration amount."
+          },
+          "durationUnit": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "day"
+            ],
+            "description": "Todoist duration unit."
+          },
+          "deadlineDate": {
+            "type": "string",
+            "description": "Deadline date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "childOrder": {
+            "type": "integer",
+            "description": "Task order among siblings."
+          },
+          "isCollapsed": {
+            "type": "boolean",
+            "description": "Whether subtasks are collapsed."
+          },
+          "dayOrder": {
+            "type": "integer",
+            "description": "Task order in Today and Upcoming."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.get_comment",
+      "service": "todoist",
+      "name": "get_comment",
+      "description": "Get one Todoist comment by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist comment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.get_current_user",
+      "service": "todoist",
+      "name": "get_current_user",
+      "description": "Get the current Todoist user profile.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.get_project",
+      "service": "todoist",
+      "name": "get_project",
+      "description": "Get one Todoist project by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.get_section",
+      "service": "todoist",
+      "name": "get_section",
+      "description": "Get one Todoist section by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist section ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.get_task",
+      "service": "todoist",
+      "name": "get_task",
+      "description": "Get one Todoist task by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.list_comments",
+      "service": "todoist",
+      "name": "list_comments",
+      "description": "List Todoist comments by task or project.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional task ID filter."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional project ID filter."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Todoist response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of Todoist results to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Todoist comment."
+            },
+            "description": "The Todoist comments returned for the page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when no further page exists."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.list_labels",
+      "service": "todoist",
+      "name": "list_labels",
+      "description": "List Todoist labels visible to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Todoist response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of Todoist results to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Todoist label."
+            },
+            "description": "The Todoist labels returned for the page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when no further page exists."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.list_projects",
+      "service": "todoist",
+      "name": "list_projects",
+      "description": "List Todoist projects visible to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Optional Todoist folder ID to filter projects by."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional Todoist folder ID to filter projects by."
+              }
+            ],
+            "description": "Optional Todoist folder ID to filter projects by."
+          },
+          "workspaceId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Optional Todoist workspace ID to filter projects by."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional Todoist workspace ID to filter projects by."
+              }
+            ],
+            "description": "Optional Todoist workspace ID to filter projects by."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Todoist response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of Todoist results to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Todoist project."
+            },
+            "description": "The Todoist projects returned for the page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when no further page exists."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.list_sections",
+      "service": "todoist",
+      "name": "list_sections",
+      "description": "List Todoist sections, optionally scoped to a project.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist project ID."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Todoist response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of Todoist results to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Todoist section."
+            },
+            "description": "The Todoist sections returned for the page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when no further page exists."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.list_tasks",
+      "service": "todoist",
+      "name": "list_tasks",
+      "description": "List Todoist tasks using the API v1 filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist project ID filter."
+          },
+          "sectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist section ID filter."
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist parent task ID filter."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist label name filter."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Explicit Todoist task IDs to fetch.",
+            "minItems": 1
+          },
+          "goalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Todoist goal ID filter."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Todoist response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of Todoist results to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Todoist task."
+            },
+            "description": "The Todoist tasks returned for the page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when no further page exists."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.update_comment",
+      "service": "todoist",
+      "name": "update_comment",
+      "description": "Update a Todoist comment.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist comment ID."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated Todoist comment content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.update_project",
+      "service": "todoist",
+      "name": "update_project",
+      "description": "Update a Todoist project.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist project ID."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Updated project name."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated project name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Updated project description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated project description."
+          },
+          "color": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "berry_red",
+                      "red",
+                      "orange",
+                      "yellow",
+                      "olive_green",
+                      "lime_green",
+                      "green",
+                      "mint_green",
+                      "teal",
+                      "sky_blue",
+                      "light_blue",
+                      "blue",
+                      "grape",
+                      "violet",
+                      "lavender",
+                      "magenta",
+                      "salmon",
+                      "charcoal",
+                      "grey",
+                      "taupe"
+                    ],
+                    "description": "Todoist color name."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 49,
+                    "description": "Todoist legacy numeric color code."
+                  }
+                ],
+                "description": "Todoist color value as a named palette entry or legacy numeric code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Todoist color value as a named palette entry or legacy numeric code."
+          },
+          "isFavorite": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Updated favorite flag."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated favorite flag."
+          },
+          "viewStyle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "list",
+                  "board",
+                  "calendar"
+                ],
+                "description": "Todoist project view style."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Todoist project view style."
+          },
+          "childOrder": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Updated project order among sibling projects."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated project order among sibling projects."
+          },
+          "isCollapsed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Updated collapsed state of the project."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated collapsed state of the project."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Updated folder ID for a workspace project."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated folder ID for a workspace project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.update_section",
+      "service": "todoist",
+      "name": "update_section",
+      "description": "Update a Todoist section.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist section ID."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Updated section name."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated section name."
+          },
+          "sectionOrder": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Updated section order."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated section order."
+          },
+          "isCollapsed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Updated collapsed state of the section."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated collapsed state of the section."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sectionId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "todoist.update_task",
+      "service": "todoist",
+      "name": "update_task",
+      "description": "Update a Todoist task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data:read_write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist task ID."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Todoist task title."
+          },
+          "description": {
+            "type": "string",
+            "description": "Todoist task description."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID that will own the task."
+          },
+          "sectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Section ID that will own the task."
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Parent task ID."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Task order."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Todoist label names to attach.",
+            "minItems": 1
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Todoist priority from 1 to 4."
+          },
+          "assigneeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Todoist user ID to assign, or null where supported."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Todoist user ID to assign, or null where supported."
+          },
+          "dueString": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Natural language due date string."
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Due date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dueDatetime": {
+            "type": "string",
+            "description": "Due date-time in RFC 3339 form.",
+            "format": "date-time"
+          },
+          "dueLang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used to parse the due string."
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration amount."
+          },
+          "durationUnit": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "day"
+            ],
+            "description": "Todoist duration unit."
+          },
+          "deadlineDate": {
+            "type": "string",
+            "description": "Deadline date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "childOrder": {
+            "type": "integer",
+            "description": "Task order among siblings."
+          },
+          "isCollapsed": {
+            "type": "boolean",
+            "description": "Whether subtasks are collapsed."
+          },
+          "dayOrder": {
+            "type": "integer",
+            "description": "Task order in Today and Upcoming."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Todoist object returned by the API."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

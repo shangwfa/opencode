@@ -1,0 +1,1027 @@
+{
+  "service": "opsgenie",
+  "displayName": "Opsgenie",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OPSGENIE_API_KEY",
+      "description": "Opsgenie API Integration key sent with the Authorization GenieKey header. Create an API Integration and copy its API key from Opsgenie Settings > Integrations: https://docs.opsgenie.com/docs/alert-api",
+      "extraFields": [
+        {
+          "key": "environment",
+          "label": "Environment",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "us",
+          "description": "Opsgenie API region for this key. Use us for https://api.opsgenie.com or eu for https://api.eu.opsgenie.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.atlassian.com/software/opsgenie",
+  "actions": [
+    {
+      "id": "opsgenie.acknowledge_alert",
+      "service": "opsgenie",
+      "name": "acknowledge_alert",
+      "description": "Acknowledge an Opsgenie alert and return the asynchronous request ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie alert identifier."
+          },
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "tiny",
+              "alias"
+            ],
+            "description": "Type of Opsgenie alert identifier."
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of the request owner."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of the request source."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 25000,
+            "description": "Additional alert note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Opsgenie alert mutation target."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "Opsgenie request acceptance message."
+          },
+          "took": {
+            "type": "number",
+            "description": "Time Opsgenie spent accepting the request."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID for polling request status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie asynchronous request response."
+      },
+      "followUpActions": [
+        "opsgenie.get_request_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "opsgenie.acknowledge_alert",
+        "statusActionId": "opsgenie.get_request_status"
+      }
+    },
+    {
+      "id": "opsgenie.close_alert",
+      "service": "opsgenie",
+      "name": "close_alert",
+      "description": "Close an Opsgenie alert and return the asynchronous request ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie alert identifier."
+          },
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "tiny",
+              "alias"
+            ],
+            "description": "Type of Opsgenie alert identifier."
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of the request owner."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of the request source."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 25000,
+            "description": "Additional alert note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Opsgenie alert mutation target."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "Opsgenie request acceptance message."
+          },
+          "took": {
+            "type": "number",
+            "description": "Time Opsgenie spent accepting the request."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID for polling request status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie asynchronous request response."
+      },
+      "followUpActions": [
+        "opsgenie.get_request_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "opsgenie.close_alert",
+        "statusActionId": "opsgenie.get_request_status"
+      }
+    },
+    {
+      "id": "opsgenie.create_alert",
+      "service": "opsgenie",
+      "name": "create_alert",
+      "description": "Create an Opsgenie alert and return the asynchronous request ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 130,
+            "description": "Message of the alert."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Client-defined identifier for alert de-duplication."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 15000,
+            "description": "Detailed alert description."
+          },
+          "responders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "user",
+                    "escalation",
+                    "schedule"
+                  ],
+                  "description": "Opsgenie responder type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie responder ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie responder name."
+                },
+                "username": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie user responder username."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "Opsgenie responder target. Provide id, name, or username according to the responder type."
+            },
+            "description": "Teams, users, escalations, or schedules to notify.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "visibleTo": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "team",
+                    "user"
+                  ],
+                  "description": "Opsgenie visibility target type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie visibility target ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie team name."
+                },
+                "username": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Opsgenie user username."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "Opsgenie visibility target. Provide id, name, or username according to the target type."
+            },
+            "description": "Teams or users that can view the alert.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string value."
+            },
+            "description": "Custom actions available for the alert.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string value."
+            },
+            "description": "Tags to add to the alert.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One Opsgenie alert detail value."
+            },
+            "description": "Opsgenie alert details as key-value string properties."
+          },
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Entity related to the alert."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Alert source."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "P4",
+              "P5"
+            ],
+            "description": "Opsgenie alert priority."
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display name of the request owner."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 25000,
+            "description": "Additional note added while creating the alert."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "Opsgenie alert creation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "Opsgenie request acceptance message."
+          },
+          "took": {
+            "type": "number",
+            "description": "Time Opsgenie spent accepting the request."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID for polling request status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie asynchronous request response."
+      },
+      "followUpActions": [
+        "opsgenie.get_request_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "opsgenie.create_alert",
+        "statusActionId": "opsgenie.get_request_status"
+      }
+    },
+    {
+      "id": "opsgenie.get_alert",
+      "service": "opsgenie",
+      "name": "get_alert",
+      "description": "Get one Opsgenie alert by ID, tiny ID, or alias.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie alert identifier."
+          },
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "tiny",
+              "alias"
+            ],
+            "description": "Type of Opsgenie alert identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Opsgenie alert lookup request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Opsgenie alert ID."
+              },
+              "tinyId": {
+                "type": "string",
+                "description": "Opsgenie tiny alert ID."
+              },
+              "alias": {
+                "type": "string",
+                "description": "Opsgenie alert alias."
+              },
+              "message": {
+                "type": "string",
+                "description": "Opsgenie alert message."
+              },
+              "status": {
+                "type": "string",
+                "description": "Opsgenie alert status."
+              },
+              "acknowledged": {
+                "type": "boolean",
+                "description": "Whether the alert has been acknowledged."
+              },
+              "isSeen": {
+                "type": "boolean",
+                "description": "Whether the alert has been seen."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One alert tag."
+                },
+                "description": "Alert tags."
+              },
+              "snoozed": {
+                "type": "boolean",
+                "description": "Whether the alert is snoozed."
+              },
+              "snoozedUntil": {
+                "type": "string",
+                "description": "Date and time when the alert snooze ends."
+              },
+              "count": {
+                "type": "integer",
+                "description": "Alert occurrence count."
+              },
+              "lastOccurredAt": {
+                "type": "string",
+                "description": "Date and time when the alert last occurred."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Date and time when the alert was created."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Date and time when the alert was last updated."
+              },
+              "source": {
+                "type": "string",
+                "description": "Alert source."
+              },
+              "owner": {
+                "type": "string",
+                "description": "Alert owner."
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5"
+                ],
+                "description": "Opsgenie alert priority."
+              },
+              "responders": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "team",
+                        "user",
+                        "escalation",
+                        "schedule"
+                      ],
+                      "description": "Opsgenie responder type."
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Opsgenie responder ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Opsgenie responder name."
+                    },
+                    "username": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Opsgenie user responder username."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "Opsgenie responder target. Provide id, name, or username according to the responder type."
+                },
+                "description": "Alert responders."
+              },
+              "integration": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Opsgenie integration ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Opsgenie integration name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Opsgenie integration type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Opsgenie integration that created the alert."
+              },
+              "report": {
+                "type": "object",
+                "properties": {
+                  "ackTime": {
+                    "type": "integer",
+                    "description": "Alert acknowledgement time in milliseconds."
+                  },
+                  "closeTime": {
+                    "type": "integer",
+                    "description": "Alert close time in milliseconds."
+                  },
+                  "acknowledgedBy": {
+                    "type": "string",
+                    "description": "User who acknowledged the alert."
+                  },
+                  "closedBy": {
+                    "type": "string",
+                    "description": "User who closed the alert."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Opsgenie alert report metrics."
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One custom action."
+                },
+                "description": "Custom actions available on the alert."
+              },
+              "entity": {
+                "type": "string",
+                "description": "Entity related to the alert."
+              },
+              "description": {
+                "type": "string",
+                "description": "Detailed alert description."
+              },
+              "details": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One Opsgenie alert detail value."
+                },
+                "description": "Opsgenie alert details as key-value string properties."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Opsgenie alert record."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie alert lookup response."
+      }
+    },
+    {
+      "id": "opsgenie.get_current_account",
+      "service": "opsgenie",
+      "name": "get_current_account",
+      "description": "Validate the Opsgenie API key and return account information for the key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Opsgenie account name."
+              },
+              "plan": {
+                "type": "string",
+                "description": "Opsgenie account plan."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Opsgenie account information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie account validation result."
+      }
+    },
+    {
+      "id": "opsgenie.get_request_status",
+      "service": "opsgenie",
+      "name": "get_request_status",
+      "description": "Get processing status for an Opsgenie asynchronous alert request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie asynchronous request ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "description": "Opsgenie request status lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "description": "Whether the asynchronous request status call succeeded."
+              },
+              "action": {
+                "type": "string",
+                "description": "Opsgenie asynchronous action name."
+              },
+              "processedAt": {
+                "type": "string",
+                "description": "Date and time when Opsgenie processed the request."
+              },
+              "integrationId": {
+                "type": "string",
+                "description": "Opsgenie integration ID."
+              },
+              "isSuccess": {
+                "type": "boolean",
+                "description": "Whether the original asynchronous request succeeded."
+              },
+              "status": {
+                "type": "string",
+                "description": "Human-readable processing status."
+              },
+              "alertId": {
+                "type": "string",
+                "description": "Alert ID affected by the request, when available."
+              },
+              "alias": {
+                "type": "string",
+                "description": "Alert alias affected by the request, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Opsgenie request status data."
+          },
+          "took": {
+            "type": "number",
+            "description": "Time Opsgenie spent returning the request status."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID for this status lookup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie request status response."
+      }
+    },
+    {
+      "id": "opsgenie.list_alerts",
+      "service": "opsgenie",
+      "name": "list_alerts",
+      "description": "List Opsgenie alerts with query, saved-search, sorting, and paging filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie alert search query."
+          },
+          "searchIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opsgenie saved-search identifier."
+          },
+          "searchIdentifierType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name"
+            ],
+            "description": "Type of Opsgenie saved-search identifier."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Start index of the result set."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of alerts to return."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alert field to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for the Opsgenie result set."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie alert list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Opsgenie alert ID."
+                },
+                "tinyId": {
+                  "type": "string",
+                  "description": "Opsgenie tiny alert ID."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "Opsgenie alert alias."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Opsgenie alert message."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Opsgenie alert status."
+                },
+                "acknowledged": {
+                  "type": "boolean",
+                  "description": "Whether the alert has been acknowledged."
+                },
+                "isSeen": {
+                  "type": "boolean",
+                  "description": "Whether the alert has been seen."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One alert tag."
+                  },
+                  "description": "Alert tags."
+                },
+                "snoozed": {
+                  "type": "boolean",
+                  "description": "Whether the alert is snoozed."
+                },
+                "snoozedUntil": {
+                  "type": "string",
+                  "description": "Date and time when the alert snooze ends."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "Alert occurrence count."
+                },
+                "lastOccurredAt": {
+                  "type": "string",
+                  "description": "Date and time when the alert last occurred."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Date and time when the alert was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Date and time when the alert was last updated."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Alert source."
+                },
+                "owner": {
+                  "type": "string",
+                  "description": "Alert owner."
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "P1",
+                    "P2",
+                    "P3",
+                    "P4",
+                    "P5"
+                  ],
+                  "description": "Opsgenie alert priority."
+                },
+                "responders": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "team",
+                          "user",
+                          "escalation",
+                          "schedule"
+                        ],
+                        "description": "Opsgenie responder type."
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Opsgenie responder ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Opsgenie responder name."
+                      },
+                      "username": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Opsgenie user responder username."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "type"
+                    ],
+                    "description": "Opsgenie responder target. Provide id, name, or username according to the responder type."
+                  },
+                  "description": "Alert responders."
+                },
+                "integration": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Opsgenie integration ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Opsgenie integration name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Opsgenie integration type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Opsgenie integration that created the alert."
+                },
+                "report": {
+                  "type": "object",
+                  "properties": {
+                    "ackTime": {
+                      "type": "integer",
+                      "description": "Alert acknowledgement time in milliseconds."
+                    },
+                    "closeTime": {
+                      "type": "integer",
+                      "description": "Alert close time in milliseconds."
+                    },
+                    "acknowledgedBy": {
+                      "type": "string",
+                      "description": "User who acknowledged the alert."
+                    },
+                    "closedBy": {
+                      "type": "string",
+                      "description": "User who closed the alert."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Opsgenie alert report metrics."
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One custom action."
+                  },
+                  "description": "Custom actions available on the alert."
+                },
+                "entity": {
+                  "type": "string",
+                  "description": "Entity related to the alert."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Detailed alert description."
+                },
+                "details": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "One Opsgenie alert detail value."
+                  },
+                  "description": "Opsgenie alert details as key-value string properties."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Opsgenie alert record."
+            },
+            "description": "Opsgenie alerts returned by the query."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "description": "Start index of this result page."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of records requested."
+              },
+              "count": {
+                "type": "integer",
+                "description": "Number of records returned in this page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Opsgenie pagination metadata."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Opsgenie request ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opsgenie alert list response."
+      }
+    }
+  ]
+}

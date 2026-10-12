@@ -1,0 +1,334 @@
+{
+  "service": "helloleads",
+  "displayName": "HelloLeads",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Web Form Key",
+      "placeholder": "helloleads_web_form_key",
+      "description": "HelloLeads Web Form Key used by HelloForm / Web Form Integration. Copy it from Settings > Web Form Integration > Website Integration, where the official guide shows the embedded script and data-key: https://helloleads.io/knowledge-base/converting-your-website-enquires-as-leads/ and https://helloleads.io/learnmore-web/helloform-customization/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.helloleads.io/",
+  "actions": [
+    {
+      "id": "helloleads.get_web_form_definition",
+      "service": "helloleads",
+      "name": "get_web_form_definition",
+      "description": "Fetch the visible HelloLeads web form definition for the connected Web Form Key and report whether reCAPTCHA v2 is enabled.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No additional input is required for fetching the connected HelloLeads web form definition."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads organization ID returned by the form definition API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads organization ID returned by the form definition API."
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads event ID returned by the form definition API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads event ID returned by the form definition API."
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The default country returned by HelloLeads when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default country returned by HelloLeads when present."
+          },
+          "mobileCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The default mobile country code returned by HelloLeads when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default mobile country code returned by HelloLeads when present."
+          },
+          "requiresRecaptcha": {
+            "type": "boolean",
+            "description": "Whether HelloLeads reports reCAPTCHA v2 for this web form."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The field identifier expected by HelloLeads."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The field label shown in HelloLeads."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "textarea",
+                    "dropdown",
+                    "multiselect",
+                    "date",
+                    "file",
+                    "unknown"
+                  ],
+                  "description": "The normalized HelloLeads field type."
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether HelloLeads marks the field as required."
+                },
+                "placeholder": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The placeholder configured for the field when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The placeholder configured for the field when present."
+                },
+                "acceptsMultiple": {
+                  "type": "boolean",
+                  "description": "Whether the field accepts multiple submitted values."
+                },
+                "allowsFileUpload": {
+                  "type": "boolean",
+                  "description": "Whether the field requires or accepts file uploads."
+                },
+                "custom": {
+                  "type": "boolean",
+                  "description": "Whether HelloLeads marks the field as a custom field."
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The configured option values for dropdown-like fields."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "label",
+                "type",
+                "required",
+                "placeholder",
+                "acceptsMultiple",
+                "allowsFileUpload",
+                "custom",
+                "options"
+              ],
+              "description": "One visible field exposed by a HelloLeads web form."
+            },
+            "description": "The visible HelloLeads fields that callers may fill."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizationId",
+          "eventId",
+          "country",
+          "mobileCode",
+          "requiresRecaptcha",
+          "fields"
+        ],
+        "description": "The normalized HelloLeads web form definition."
+      }
+    },
+    {
+      "id": "helloleads.submit_web_form",
+      "service": "helloleads",
+      "name": "submit_web_form",
+      "description": "Submit one HelloLeads web form lead with JSON field values, excluding reCAPTCHA and file-upload workflows.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional mobile country code such as +91. When provided with a mobile field, it is prepended unless the mobile value already starts with the same code."
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "One submitted HelloLeads string field value."
+                },
+                {
+                  "type": "number",
+                  "description": "One submitted HelloLeads numeric field value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "One submitted HelloLeads boolean field value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One selected multiselect option value."
+                  },
+                  "description": "Multiple submitted values for one HelloLeads multiselect field.",
+                  "minItems": 1
+                }
+              ],
+              "description": "One submitted HelloLeads field value."
+            },
+            "description": "Field values keyed by the HelloLeads form field names returned by get_web_form_definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values"
+        ],
+        "description": "The input payload for submitting one HelloLeads web form lead."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "successful": {
+            "type": "boolean",
+            "description": "Whether HelloLeads reported a successful form submission."
+          },
+          "status": {
+            "type": "string",
+            "description": "The raw HelloLeads status string."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable HelloLeads submission message."
+          },
+          "submissionAction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads submissionAction value when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads submissionAction value when returned."
+          },
+          "leadFullName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The full lead name returned by HelloLeads when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The full lead name returned by HelloLeads when present."
+          },
+          "visitorId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads visitor ID returned after submission."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads visitor ID returned after submission."
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads user ID returned after submission."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads user ID returned after submission."
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HelloLeads event ID returned after submission."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HelloLeads event ID returned after submission."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw HelloLeads submission payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "successful",
+          "status",
+          "message",
+          "submissionAction",
+          "leadFullName",
+          "visitorId",
+          "userId",
+          "eventId",
+          "raw"
+        ],
+        "description": "The normalized HelloLeads web form submission result."
+      }
+    }
+  ]
+}

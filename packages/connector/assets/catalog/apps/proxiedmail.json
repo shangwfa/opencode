@@ -1,0 +1,724 @@
+{
+  "service": "proxiedmail",
+  "displayName": "ProxiedMail",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "PROXIEDMAIL_API_TOKEN",
+      "description": "ProxiedMail API token used with the Token header. Copy it from the ProxiedMail Settings API page: https://proxiedmail.com/en/settings."
+    }
+  ],
+  "homepageUrl": "https://proxiedmail.com/",
+  "actions": [
+    {
+      "id": "proxiedmail.create_proxy_binding",
+      "service": "proxiedmail",
+      "name": "create_proxy_binding",
+      "description": "Create a ProxiedMail proxy email binding that forwards to real addresses.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "realAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One real forwarding email address.",
+              "format": "email"
+            },
+            "description": "Real email addresses that should receive mail forwarded from the proxy address.",
+            "minItems": 1
+          },
+          "proxyAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The proxy email address ProxiedMail should issue.",
+            "format": "email"
+          },
+          "callbackUrl": {
+            "anyOf": [
+              {
+                "const": "",
+                "type": "string",
+                "description": "An empty callback URL."
+              },
+              {
+                "type": "string",
+                "description": "A callback URL ProxiedMail should call when new mail arrives.",
+                "format": "uri"
+              }
+            ],
+            "description": "The callback URL ProxiedMail should call when new mail arrives, or an empty string."
+          },
+          "isBrowsable": {
+            "type": "boolean",
+            "description": "Whether received emails should be listable through the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "realAddresses",
+          "proxyAddress"
+        ],
+        "description": "Input for creating a ProxiedMail proxy binding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "usedProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings used by the account."
+              },
+              "availableProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings available to the account."
+              },
+              "isVerificationEmailSend": {
+                "type": "boolean",
+                "description": "Whether ProxiedMail sent a verification email."
+              },
+              "firstProxyBinding": {
+                "type": "boolean",
+                "description": "Whether this response is for the account's first proxy binding."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Metadata returned with proxy binding responses."
+          },
+          "proxyBinding": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The JSON:API resource type, usually proxy_bindings."
+              },
+              "id": {
+                "type": "string",
+                "description": "The ProxiedMail proxy binding ID."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "real_addresses": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "is_enabled": {
+                          "type": "boolean",
+                          "description": "Whether forwarding to this real address is enabled."
+                        },
+                        "is_verified": {
+                          "type": "boolean",
+                          "description": "Whether this real address has been verified."
+                        },
+                        "is_verification_needed": {
+                          "type": "boolean",
+                          "description": "Whether ProxiedMail reports verification is still needed."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Status metadata for one real forwarding address."
+                    },
+                    "description": "Real forwarding addresses keyed by email address."
+                  },
+                  "proxy_address": {
+                    "type": "string",
+                    "description": "The ProxiedMail proxy email address."
+                  },
+                  "received_emails": {
+                    "type": "integer",
+                    "description": "The number of received emails for this proxy binding."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "The proxy binding description."
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "description": "The callback URL ProxiedMail calls when new mail arrives."
+                  },
+                  "is_browsable": {
+                    "type": "boolean",
+                    "description": "Whether received emails can be listed with the API."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail created this proxy binding."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail last updated this proxy binding."
+                  },
+                  "type": {
+                    "type": "integer",
+                    "description": "The internal ProxiedMail binding type code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Attributes of a ProxiedMail proxy binding."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ProxiedMail."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A ProxiedMail proxy binding resource."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ProxiedMail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "proxyBinding",
+          "raw"
+        ],
+        "description": "The response returned after creating a ProxiedMail proxy binding."
+      }
+    },
+    {
+      "id": "proxiedmail.get_received_email",
+      "service": "proxiedmail",
+      "name": "get_received_email",
+      "description": "Get the payload and metadata for one ProxiedMail received email.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "receivedEmailId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ProxiedMail received email ID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "receivedEmailId"
+        ],
+        "description": "Input for fetching one ProxiedMail received email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "receivedEmail": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The JSON:API resource type, usually received_emails_details."
+              },
+              "id": {
+                "type": "string",
+                "description": "The ProxiedMail received email ID."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "recipient_email": {
+                    "type": "string",
+                    "description": "The proxy email address that received the message."
+                  },
+                  "sender_email": {
+                    "type": "string",
+                    "description": "The sender email address."
+                  },
+                  "payload": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The message payload returned by ProxiedMail."
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "items": {
+                      "description": "One attachment payload."
+                    },
+                    "description": "Attachments returned by ProxiedMail for this received email."
+                  },
+                  "is_processed": {
+                    "type": "boolean",
+                    "description": "Whether ProxiedMail has processed the received email."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail created the received email record."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail last updated the received email record."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Attributes for one ProxiedMail email."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A ProxiedMail received-email detail resource."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ProxiedMail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "receivedEmail",
+          "raw"
+        ],
+        "description": "The response returned when fetching one ProxiedMail received email."
+      }
+    },
+    {
+      "id": "proxiedmail.list_proxy_bindings",
+      "service": "proxiedmail",
+      "name": "list_proxy_bindings",
+      "description": "List ProxiedMail proxy email bindings for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for listing ProxiedMail proxy bindings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "usedProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings used by the account."
+              },
+              "availableProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings available to the account."
+              },
+              "isVerificationEmailSend": {
+                "type": "boolean",
+                "description": "Whether ProxiedMail sent a verification email."
+              },
+              "firstProxyBinding": {
+                "type": "boolean",
+                "description": "Whether this response is for the account's first proxy binding."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Metadata returned with proxy binding responses."
+          },
+          "proxyBindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The JSON:API resource type, usually proxy_bindings."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The ProxiedMail proxy binding ID."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "real_addresses": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "is_enabled": {
+                            "type": "boolean",
+                            "description": "Whether forwarding to this real address is enabled."
+                          },
+                          "is_verified": {
+                            "type": "boolean",
+                            "description": "Whether this real address has been verified."
+                          },
+                          "is_verification_needed": {
+                            "type": "boolean",
+                            "description": "Whether ProxiedMail reports verification is still needed."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Status metadata for one real forwarding address."
+                      },
+                      "description": "Real forwarding addresses keyed by email address."
+                    },
+                    "proxy_address": {
+                      "type": "string",
+                      "description": "The ProxiedMail proxy email address."
+                    },
+                    "received_emails": {
+                      "type": "integer",
+                      "description": "The number of received emails for this proxy binding."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "The proxy binding description."
+                    },
+                    "callback_url": {
+                      "type": "string",
+                      "description": "The callback URL ProxiedMail calls when new mail arrives."
+                    },
+                    "is_browsable": {
+                      "type": "boolean",
+                      "description": "Whether received emails can be listed with the API."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "The date and time when ProxiedMail created this proxy binding."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "The date and time when ProxiedMail last updated this proxy binding."
+                    },
+                    "type": {
+                      "type": "integer",
+                      "description": "The internal ProxiedMail binding type code."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Attributes of a ProxiedMail proxy binding."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by ProxiedMail."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A ProxiedMail proxy binding resource."
+            },
+            "description": "The proxy bindings returned by ProxiedMail."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ProxiedMail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "proxyBindings",
+          "raw"
+        ],
+        "description": "The response returned when listing ProxiedMail proxy bindings."
+      }
+    },
+    {
+      "id": "proxiedmail.list_received_email_links",
+      "service": "proxiedmail",
+      "name": "list_received_email_links",
+      "description": "List received-email links for a browsable ProxiedMail proxy binding.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "proxyBindingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ProxiedMail proxy binding ID whose messages to list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "proxyBindingId"
+        ],
+        "description": "Input for listing ProxiedMail received-email links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "receivedEmailLinks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The JSON:API resource type, usually received_emails_link."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The ProxiedMail received email ID."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "recipient_email": {
+                      "type": "string",
+                      "description": "The proxy email address that received the message."
+                    },
+                    "sender_email": {
+                      "type": "string",
+                      "description": "The sender email address."
+                    },
+                    "subject": {
+                      "type": "string",
+                      "description": "The received email subject."
+                    },
+                    "attachmentsCounter": {
+                      "type": "integer",
+                      "description": "The number of attachments reported by ProxiedMail."
+                    },
+                    "link": {
+                      "type": "string",
+                      "description": "The API path for fetching the received email payload."
+                    },
+                    "is_processed": {
+                      "type": "boolean",
+                      "description": "Whether ProxiedMail has processed the received email."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "description": "The date and time when ProxiedMail created the received email record."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "The date and time when ProxiedMail last updated the received email record."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Attributes for a ProxiedMail received-email link."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A ProxiedMail received-email link resource."
+            },
+            "description": "The received-email links returned by ProxiedMail."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ProxiedMail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "receivedEmailLinks",
+          "raw"
+        ],
+        "description": "The response returned when listing ProxiedMail received-email links."
+      }
+    },
+    {
+      "id": "proxiedmail.update_proxy_binding",
+      "service": "proxiedmail",
+      "name": "update_proxy_binding",
+      "description": "Update a ProxiedMail proxy email binding by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "proxyBindingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ProxiedMail proxy binding ID to update."
+          },
+          "realAddresses": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "description": "Whether this real forwarding address should be enabled."
+            },
+            "description": "Real forwarding addresses keyed by email address with true to enable and false to disable."
+          },
+          "proxyAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The proxy email address for this binding.",
+            "format": "email"
+          },
+          "description": {
+            "type": "string",
+            "description": "The free-form description for this proxy binding."
+          },
+          "callbackUrl": {
+            "anyOf": [
+              {
+                "const": "",
+                "type": "string",
+                "description": "An empty callback URL."
+              },
+              {
+                "type": "string",
+                "description": "A callback URL ProxiedMail should call when new mail arrives.",
+                "format": "uri"
+              }
+            ],
+            "description": "The callback URL ProxiedMail should call when new mail arrives, or an empty string to clear it."
+          },
+          "isBrowsable": {
+            "type": "boolean",
+            "description": "Whether received emails should be listable through the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "proxyBindingId"
+        ],
+        "description": "Input for updating a ProxiedMail proxy binding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "usedProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings used by the account."
+              },
+              "availableProxyBindings": {
+                "type": "integer",
+                "description": "The number of proxy bindings available to the account."
+              },
+              "isVerificationEmailSend": {
+                "type": "boolean",
+                "description": "Whether ProxiedMail sent a verification email."
+              },
+              "firstProxyBinding": {
+                "type": "boolean",
+                "description": "Whether this response is for the account's first proxy binding."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Metadata returned with proxy binding responses."
+          },
+          "proxyBinding": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The JSON:API resource type, usually proxy_bindings."
+              },
+              "id": {
+                "type": "string",
+                "description": "The ProxiedMail proxy binding ID."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "real_addresses": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "is_enabled": {
+                          "type": "boolean",
+                          "description": "Whether forwarding to this real address is enabled."
+                        },
+                        "is_verified": {
+                          "type": "boolean",
+                          "description": "Whether this real address has been verified."
+                        },
+                        "is_verification_needed": {
+                          "type": "boolean",
+                          "description": "Whether ProxiedMail reports verification is still needed."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Status metadata for one real forwarding address."
+                    },
+                    "description": "Real forwarding addresses keyed by email address."
+                  },
+                  "proxy_address": {
+                    "type": "string",
+                    "description": "The ProxiedMail proxy email address."
+                  },
+                  "received_emails": {
+                    "type": "integer",
+                    "description": "The number of received emails for this proxy binding."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "The proxy binding description."
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "description": "The callback URL ProxiedMail calls when new mail arrives."
+                  },
+                  "is_browsable": {
+                    "type": "boolean",
+                    "description": "Whether received emails can be listed with the API."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail created this proxy binding."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "The date and time when ProxiedMail last updated this proxy binding."
+                  },
+                  "type": {
+                    "type": "integer",
+                    "description": "The internal ProxiedMail binding type code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Attributes of a ProxiedMail proxy binding."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ProxiedMail."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A ProxiedMail proxy binding resource."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ProxiedMail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "proxyBinding",
+          "raw"
+        ],
+        "description": "The response returned after updating a ProxiedMail proxy binding."
+      }
+    }
+  ]
+}

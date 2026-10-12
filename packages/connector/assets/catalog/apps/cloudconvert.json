@@ -1,0 +1,905 @@
+{
+  "service": "cloudconvert",
+  "displayName": "CloudConvert",
+  "categories": [
+    "Productivity",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "cloudconvert_api_key",
+      "description": "CloudConvert API key sent with the Authorization Bearer header. Create and manage it at https://cloudconvert.com/dashboard/api/v2/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://cloudconvert.com",
+  "actions": [
+    {
+      "id": "cloudconvert.cancel_task",
+      "service": "cloudconvert",
+      "name": "cancel_task",
+      "description": "Cancel a CloudConvert task that is still waiting or processing.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input payload for canceling a CloudConvert task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert task."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single CloudConvert task."
+      }
+    },
+    {
+      "id": "cloudconvert.create_url_conversion_job",
+      "service": "cloudconvert",
+      "name": "create_url_conversion_job",
+      "description": "Create a CloudConvert job that imports a remote file URL, converts it, and exports the result via `export/url`.",
+      "operationType": "write",
+      "requiredScopes": [
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceUrl": {
+            "type": "string",
+            "description": "Remote file URL that CloudConvert should import.",
+            "format": "uri"
+          },
+          "sourceFilename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name override used for the imported source."
+          },
+          "sourceHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One string value."
+            },
+            "description": "String-to-string map forwarded to CloudConvert."
+          },
+          "inputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "outputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "engine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional CloudConvert engine name."
+          },
+          "engineVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional CloudConvert engine version."
+          },
+          "conversionOptions": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One conversion option value."
+            },
+            "description": "Additional `convert` task options forwarded to CloudConvert as-is, excluding reserved task wrapper fields."
+          },
+          "outputFilename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name for the exported result."
+          },
+          "inline": {
+            "type": "boolean",
+            "description": "Whether the exported file should be marked for inline display when possible."
+          },
+          "archiveMultipleFiles": {
+            "type": "boolean",
+            "description": "Whether CloudConvert should archive multiple exported files when needed."
+          },
+          "jobTag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional tag stored on the created job."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "Optional webhook URL CloudConvert should call for job status updates.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceUrl",
+          "outputFormat"
+        ],
+        "description": "Input payload for creating a URL-based CloudConvert conversion job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert job."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Exported file name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Download URL for the exported file.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "description": "File returned by an `export/url` task."
+            },
+            "description": "Files extracted from completed `export/url` tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CloudConvert job plus exported files extracted from the job tasks."
+      },
+      "followUpActions": [
+        "cloudconvert.wait_for_job",
+        "cloudconvert.get_job"
+      ]
+    },
+    {
+      "id": "cloudconvert.create_url_conversion_job_and_wait",
+      "service": "cloudconvert",
+      "name": "create_url_conversion_job_and_wait",
+      "description": "Create a URL-based CloudConvert conversion job and wait synchronously until the job finishes.",
+      "operationType": "write",
+      "requiredScopes": [
+        "task.read",
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceUrl": {
+            "type": "string",
+            "description": "Remote file URL that CloudConvert should import.",
+            "format": "uri"
+          },
+          "sourceFilename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name override used for the imported source."
+          },
+          "sourceHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One string value."
+            },
+            "description": "String-to-string map forwarded to CloudConvert."
+          },
+          "inputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "outputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "engine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional CloudConvert engine name."
+          },
+          "engineVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional CloudConvert engine version."
+          },
+          "conversionOptions": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One conversion option value."
+            },
+            "description": "Additional `convert` task options forwarded to CloudConvert as-is, excluding reserved task wrapper fields."
+          },
+          "outputFilename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name for the exported result."
+          },
+          "inline": {
+            "type": "boolean",
+            "description": "Whether the exported file should be marked for inline display when possible."
+          },
+          "archiveMultipleFiles": {
+            "type": "boolean",
+            "description": "Whether CloudConvert should archive multiple exported files when needed."
+          },
+          "jobTag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional tag stored on the created job."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "Optional webhook URL CloudConvert should call for job status updates.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceUrl",
+          "outputFormat"
+        ],
+        "description": "Input payload for creating a URL-based CloudConvert conversion job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert job."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Exported file name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Download URL for the exported file.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "description": "File returned by an `export/url` task."
+            },
+            "description": "Files extracted from completed `export/url` tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CloudConvert job plus exported files extracted from the job tasks."
+      },
+      "followUpActions": [
+        "cloudconvert.get_job"
+      ]
+    },
+    {
+      "id": "cloudconvert.delete_job",
+      "service": "cloudconvert",
+      "name": "delete_job",
+      "description": "Delete a CloudConvert job, including all tasks and related data.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "Input payload for deleting a CloudConvert job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the resource deletion request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "Deleted CloudConvert resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deletion result returned by the connector."
+      }
+    },
+    {
+      "id": "cloudconvert.delete_task",
+      "service": "cloudconvert",
+      "name": "delete_task",
+      "description": "Delete a CloudConvert task, including all related data.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input payload for deleting a CloudConvert task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the resource deletion request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "Deleted CloudConvert resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deletion result returned by the connector."
+      }
+    },
+    {
+      "id": "cloudconvert.get_current_user",
+      "service": "cloudconvert",
+      "name": "get_current_user",
+      "description": "Get the current CloudConvert user and remaining credits for the API token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Current CloudConvert user and credits."
+      }
+    },
+    {
+      "id": "cloudconvert.get_job",
+      "service": "cloudconvert",
+      "name": "get_job",
+      "description": "Get a single CloudConvert job and include its tasks.",
+      "operationType": "read",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "Input payload for getting a CloudConvert job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert job."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Exported file name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Download URL for the exported file.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "description": "File returned by an `export/url` task."
+            },
+            "description": "Files extracted from completed `export/url` tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CloudConvert job plus exported files extracted from the job tasks."
+      },
+      "followUpActions": [
+        "cloudconvert.wait_for_job"
+      ]
+    },
+    {
+      "id": "cloudconvert.get_task",
+      "service": "cloudconvert",
+      "name": "get_task",
+      "description": "Get a single CloudConvert task by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input payload for getting a CloudConvert task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert task."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single CloudConvert task."
+      },
+      "followUpActions": [
+        "cloudconvert.wait_for_task"
+      ]
+    },
+    {
+      "id": "cloudconvert.list_conversion_types",
+      "service": "cloudconvert",
+      "name": "list_conversion_types",
+      "description": "List possible CloudConvert conversion types for the requested input and output formats.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "outputFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File format such as `pdf`, `docx`, or `png`."
+          },
+          "engine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional engine filter."
+          },
+          "engineVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional engine version filter."
+          },
+          "alternatives": {
+            "type": "boolean",
+            "description": "Whether to include alternative engines for the same format pair."
+          },
+          "includeOptions": {
+            "type": "boolean",
+            "description": "Whether to include conversion option descriptors in the response."
+          },
+          "includeEngineVersions": {
+            "type": "boolean",
+            "description": "Whether to include compatible engine version descriptors in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing CloudConvert conversion types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversionTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Possible CloudConvert conversion type."
+            },
+            "description": "Possible CloudConvert conversion types matching the filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Possible CloudConvert conversion types."
+      }
+    },
+    {
+      "id": "cloudconvert.list_jobs",
+      "service": "cloudconvert",
+      "name": "list_jobs",
+      "description": "List CloudConvert jobs for the current account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CloudConvert status filter such as `waiting`, `processing`, `finished`, `error`, or `canceled`."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional job tag filter."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from CloudConvert."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of items to request per CloudConvert page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing CloudConvert jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "CloudConvert job."
+            },
+            "description": "Jobs returned by CloudConvert."
+          },
+          "links": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination links returned by CloudConvert."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination links returned by CloudConvert."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by CloudConvert."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by CloudConvert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated CloudConvert job list."
+      }
+    },
+    {
+      "id": "cloudconvert.list_tasks",
+      "service": "cloudconvert",
+      "name": "list_tasks",
+      "description": "List CloudConvert tasks for the current account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CloudConvert status filter such as `waiting`, `processing`, `finished`, `error`, or `canceled`."
+          },
+          "operation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional task operation filter."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from CloudConvert."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of items to request per CloudConvert page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing CloudConvert tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "CloudConvert task."
+            },
+            "description": "Tasks returned by CloudConvert."
+          },
+          "links": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination links returned by CloudConvert."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination links returned by CloudConvert."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by CloudConvert."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by CloudConvert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated CloudConvert task list."
+      }
+    },
+    {
+      "id": "cloudconvert.retry_task",
+      "service": "cloudconvert",
+      "name": "retry_task",
+      "description": "Retry a CloudConvert task by creating a new task from the original payload.",
+      "operationType": "write",
+      "requiredScopes": [
+        "task.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input payload for retrying a CloudConvert task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert task."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single CloudConvert task."
+      }
+    },
+    {
+      "id": "cloudconvert.wait_for_job",
+      "service": "cloudconvert",
+      "name": "wait_for_job",
+      "description": "Wait synchronously for a CloudConvert job to finish and return the finished or failed job with tasks.",
+      "operationType": "write",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "Input payload for waiting on a CloudConvert job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert job."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "description": "Exported file name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Download URL for the exported file.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "description": "File returned by an `export/url` task."
+            },
+            "description": "Files extracted from completed `export/url` tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CloudConvert job plus exported files extracted from the job tasks."
+      }
+    },
+    {
+      "id": "cloudconvert.wait_for_task",
+      "service": "cloudconvert",
+      "name": "wait_for_task",
+      "description": "Wait synchronously for a CloudConvert task to finish and return the finished or failed task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "task.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CloudConvert task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input payload for waiting on a CloudConvert task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "CloudConvert task."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single CloudConvert task."
+      }
+    }
+  ]
+}

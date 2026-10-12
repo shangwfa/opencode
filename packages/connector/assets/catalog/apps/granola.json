@@ -1,0 +1,831 @@
+{
+  "service": "granola",
+  "displayName": "Granola",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://mcp-auth.granola.ai/oauth2/authorize",
+      "tokenUrl": "https://mcp-auth.granola.ai/oauth2/token",
+      "scopes": [
+        "openid",
+        "profile",
+        "email",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "resource": "https://mcp.granola.ai/mcp"
+      },
+      "clientSetup": {
+        "docsUrl": "https://docs.granola.ai/help-center/sharing/integrations/mcp",
+        "steps": [
+          "Copy the Callback URL shown below.",
+          "POST {\"client_name\":\"Open Connector\",\"redirect_uris\":[\"<Callback URL>\"],\"grant_types\":[\"authorization_code\",\"refresh_token\"],\"response_types\":[\"code\"],\"token_endpoint_auth_method\":\"none\",\"scope\":\"openid profile email offline_access\"} as JSON to https://mcp-auth.granola.ai/oauth2/register.",
+          "Copy the returned client_id into the Client ID field below and leave Client Secret empty.",
+          "Connect with OAuth for MCP access. The free plan covers personal notes from the last 30 days; some tools require a paid plan."
+        ]
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "granola_api_key",
+      "description": "For Granola REST API actions on Business or Enterprise plans. Create a key in Granola Settings > Connectors > API keys. Use OAuth for MCP access, including the free plan: https://docs.granola.ai/help-center/sharing/integrations/granola-api."
+    }
+  ],
+  "homepageUrl": "https://www.granola.ai",
+  "actions": [
+    {
+      "id": "granola.get_meeting_transcript",
+      "service": "granola",
+      "name": "get_meeting_transcript",
+      "description": "Read a Granola meeting transcript with OAuth or an API key. Requires an eligible paid Granola plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meeting ID returned for this connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meeting_id"
+        ],
+        "description": "Meeting whose transcript to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Native Granola meeting ID."
+          },
+          "transcript": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Transcript text with speaker labels and timestamps when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meeting_id",
+          "transcript"
+        ],
+        "description": "Transcript text for the requested meeting."
+      }
+    },
+    {
+      "id": "granola.get_meetings",
+      "service": "granola",
+      "name": "get_meetings",
+      "description": "Read Granola meeting details and summaries by ID with OAuth or an API key. Use IDs returned for the same connection. Free-plan OAuth access covers personal notes from the last 30 days.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Meeting ID returned by list_meetings."
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meeting_ids"
+        ],
+        "description": "Meetings to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Meeting ID for this connection. OAuth and API-key IDs are not interchangeable."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Meeting title, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting title, when available."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Meeting date when available, not a creation or update timestamp."
+                },
+                "attendees": {
+                  "type": "string",
+                  "description": "Participant names and email addresses when available."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Meeting summary, preserving its original Markdown when present."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "A Granola meeting."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetings"
+        ],
+        "description": "Requested meetings in input order."
+      }
+    },
+    {
+      "id": "granola.get_note",
+      "service": "granola",
+      "name": "get_note",
+      "description": "Get a Granola note and summary by ID with OAuth or an API key, optionally including the transcript on eligible paid plans. Use an ID returned for the same connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Granola note ID to retrieve."
+          },
+          "include": {
+            "type": "string",
+            "enum": [
+              "transcript"
+            ],
+            "description": "Optional related Granola note data to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id"
+        ],
+        "description": "Path and query parameters for retrieving a Granola note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The ID of the note."
+              },
+              "object": {
+                "type": "string",
+                "description": "The object type returned by Granola."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The title of the note."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The title of the note."
+              },
+              "owner": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The name of the user."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user.",
+                    "format": "email"
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Granola user object."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The creation time of the note."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The last update time of the note."
+              },
+              "web_url": {
+                "type": "string",
+                "description": "The URL to view the note in Granola.",
+                "format": "uri"
+              },
+              "calendar_event": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "event_title": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The title of the calendar event."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The title of the calendar event."
+                      },
+                      "invitees": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "email": {
+                              "type": "string",
+                              "description": "The email address of the calendar invitee.",
+                              "format": "email"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A Granola calendar invitee object."
+                        },
+                        "description": "Calendar invitees returned by Granola."
+                      },
+                      "organiser": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The email address of the organiser."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The email address of the organiser."
+                      },
+                      "calendar_event_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The ID of the calendar event."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The ID of the calendar event."
+                      },
+                      "scheduled_start_time": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The scheduled start time of the calendar event."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The scheduled start time of the calendar event."
+                      },
+                      "scheduled_end_time": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The scheduled end time of the calendar event."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The scheduled end time of the calendar event."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Granola calendar event object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Granola calendar event object."
+              },
+              "attendees": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The name of the user."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The name of the user."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address of the user.",
+                      "format": "email"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Granola user object."
+                },
+                "description": "Meeting attendees returned by Granola."
+              },
+              "folder_membership": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The ID of the folder."
+                    },
+                    "object": {
+                      "type": "string",
+                      "description": "The object type returned by Granola."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The name of the folder."
+                    },
+                    "parent_folder_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ID of the parent folder, or null for top-level folders."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ID of the parent folder, or null for top-level folders."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Granola folder object. MCP supplies ID and name; REST also supplies object type and folder hierarchy."
+                },
+                "description": "Folders that contain the note."
+              },
+              "summary_text": {
+                "type": "string",
+                "description": "The plain text summary of the note."
+              },
+              "summary_markdown": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The markdown summary of the note, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The markdown summary of the note, when available."
+              },
+              "transcript": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "speaker": {
+                          "type": "object",
+                          "properties": {
+                            "source": {
+                              "type": "string",
+                              "description": "The source of the speaker, such as microphone or speaker."
+                            },
+                            "diarization_label": {
+                              "type": "string",
+                              "description": "The diarized anonymous speaker label when Granola returns one."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A Granola transcript speaker object."
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "The transcript text."
+                        },
+                        "start_time": {
+                          "type": "string",
+                          "description": "The start time of the transcript item."
+                        },
+                        "end_time": {
+                          "type": "string",
+                          "description": "The end time of the transcript item."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A Granola transcript item. MCP returns one text-only item preserving the full transcript."
+                    },
+                    "description": "Transcript items returned by Granola."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Transcript items returned by Granola."
+              },
+              "date": {
+                "type": "string",
+                "description": "MCP only: meeting date when available, not a creation or update timestamp."
+              },
+              "participants": {
+                "type": "string",
+                "description": "MCP only: participant names and email addresses as Granola lists them."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "object",
+              "title",
+              "owner",
+              "created_at",
+              "updated_at",
+              "web_url",
+              "calendar_event",
+              "attendees",
+              "folder_membership",
+              "summary_text",
+              "summary_markdown",
+              "transcript"
+            ],
+            "description": "A Granola note object. MCP supplies ID, title, Markdown summary, and an optional transcript; other REST metadata is omitted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Granola note response."
+      }
+    },
+    {
+      "id": "granola.list_folders",
+      "service": "granola",
+      "name": "list_folders",
+      "description": "List accessible Granola folders with OAuth or an API key and cursor pagination. MCP folder access requires a paid plan and uses local pagination of the returned list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by this action for the same connection and filters."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Maximum number of records to return. Granola allows 1 to 30."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Granola folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The ID of the folder."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by Granola."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the folder."
+                },
+                "parent_folder_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ID of the parent folder, or null for top-level folders."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ID of the parent folder, or null for top-level folders."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Granola folder object. MCP supplies ID and name; REST also supplies object type and folder hierarchy."
+            },
+            "description": "Folders returned by Granola."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Granola has more folders to fetch."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to continue from, when one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to continue from, when one is available."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor to pass into the next request, when one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to pass into the next request, when one is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Granola folders response."
+      }
+    },
+    {
+      "id": "granola.list_meetings",
+      "service": "granola",
+      "name": "list_meetings",
+      "description": "List recent Granola meetings with OAuth or an API key. OAuth uses MCP's last-30-days window; API keys list notes created in the last 30 days. Use get_meetings to read summaries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Meeting ID for this connection. OAuth and API-key IDs are not interchangeable."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Meeting title, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting title, when available."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Meeting date when available, not a creation or update timestamp."
+                },
+                "attendees": {
+                  "type": "string",
+                  "description": "Participant names and email addresses when available."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Meeting summary, preserving its original Markdown when present."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "A Granola meeting."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetings"
+        ],
+        "description": "Recent meetings accessible to this connection."
+      },
+      "followUpActions": [
+        "granola.get_meetings"
+      ]
+    },
+    {
+      "id": "granola.list_notes",
+      "service": "granola",
+      "name": "list_notes",
+      "description": "List Granola notes with OAuth or an API key. MCP lists meetings from the last 30 days and supports folder filtering and local cursor pagination. Creation and update filters require an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "created_before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "API-key-only date or date-time filter, such as 2026-01-27 or 2026-01-27T15:30:00Z. MCP does not expose note creation or update timestamps."
+          },
+          "created_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "API-key-only date or date-time filter, such as 2026-01-27 or 2026-01-27T15:30:00Z. MCP does not expose note creation or update timestamps."
+          },
+          "updated_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "API-key-only date or date-time filter, such as 2026-01-27 or 2026-01-27T15:30:00Z. MCP does not expose note creation or update timestamps."
+          },
+          "folder_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Folder ID returned for this connection. Folder filtering through MCP requires a paid plan."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by this action for the same connection and filters."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Maximum number of records to return. Granola allows 1 to 30."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Granola notes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The ID of the note."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by Granola."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The title of the note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The title of the note."
+                },
+                "owner": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The name of the user."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The name of the user."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address of the user.",
+                      "format": "email"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Granola user object."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The creation time of the note."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The last update time of the note."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Granola note summary object. MCP supplies the ID and title; REST includes owner and timestamps."
+            },
+            "description": "Notes returned by Granola."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Granola has more notes to fetch."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to continue from, when one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to continue from, when one is available."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor to pass into the next request, when one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to pass into the next request, when one is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Granola notes response."
+      }
+    }
+  ]
+}

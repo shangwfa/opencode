@@ -1,0 +1,931 @@
+{
+  "service": "kuaidi100",
+  "displayName": "Kuaidi100",
+  "categories": [
+    "Productivity",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "KUAIDI100_API_KEY",
+      "description": "Kuaidi100 (快递100) authorization key sent as the key query parameter. Find it in the Kuaidi100 API console under 授权参数: https://api.kuaidi100.com/manager/v2/query/overview."
+    }
+  ],
+  "homepageUrl": "https://api.kuaidi100.com/product/mcp",
+  "actions": [
+    {
+      "id": "kuaidi100.auto_number",
+      "service": "kuaidi100",
+      "name": "auto_number",
+      "description": "Detect the likely express carriers for a tracking number from its format.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackingNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express tracking number (快递单号)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "trackingNumber"
+        ],
+        "description": "The tracking number to identify."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "comCode": {
+                  "type": "string",
+                  "description": "The Kuaidi100 carrier code."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The carrier display name."
+                },
+                "lengthPre": {
+                  "type": "string",
+                  "description": "The tracking number length the carrier uses."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "comCode",
+                "name",
+                "lengthPre"
+              ],
+              "description": "One candidate carrier."
+            },
+            "description": "The candidate carriers for the tracking number."
+          },
+          "tips": {
+            "type": "string",
+            "description": "An upstream notice, present when the call consumed the Kuaidi100 free daily quota."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The carriers that could own the tracking number."
+      },
+      "followUpActions": [
+        "kuaidi100.query_trace"
+      ]
+    },
+    {
+      "id": "kuaidi100.cancel_order",
+      "service": "kuaidi100",
+      "name": "cancel_order",
+      "description": "Cancel a pickup order that is no longer needed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kuaidi100 pickup order ID."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "description": "The cancellation reason, up to 30 characters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "reason"
+        ],
+        "description": "The pickup order cancellation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The provider-defined response payload."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider business status code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The provider response message."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The parsed JSON object returned by Kuaidi100."
+      }
+    },
+    {
+      "id": "kuaidi100.create_order",
+      "service": "kuaidi100",
+      "name": "create_order",
+      "description": "Create a pay-offline pickup order after obtaining an order_price quote.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "enum": [
+              "jd",
+              "debangkuaidi",
+              "shunfeng",
+              "yuantong",
+              "zhongtong",
+              "shunfengkuaiyun",
+              "sxjdfreight",
+              "kuayue",
+              "ems"
+            ],
+            "description": "The carrier code used for pickup orders."
+          },
+          "sender": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact name."
+              },
+              "mobile": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact mobile number."
+              },
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The full contact address."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "mobile",
+              "address"
+            ],
+            "description": "A sender or recipient contact."
+          },
+          "recipient": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact name."
+              },
+              "mobile": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact mobile number."
+              },
+              "address": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The full contact address."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "mobile",
+              "address"
+            ],
+            "description": "A sender or recipient contact."
+          },
+          "itemName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item name, such as 文件."
+          },
+          "weightKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The parcel weight in kilograms."
+          },
+          "payment": {
+            "type": "string",
+            "enum": [
+              "SHIPPER",
+              "CONSIGNEE"
+            ],
+            "description": "Who pays the shipping fee."
+          },
+          "pickupDay": {
+            "type": "string",
+            "enum": [
+              "今天",
+              "明天",
+              "后天"
+            ],
+            "description": "The requested pickup day."
+          },
+          "pickupStartTime": {
+            "type": "string",
+            "description": "The pickup window start time in HH:mm format."
+          },
+          "pickupEndTime": {
+            "type": "string",
+            "description": "The pickup window end time in HH:mm format."
+          },
+          "remark": {
+            "type": "string",
+            "description": "An optional order note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "sender",
+          "recipient",
+          "itemName"
+        ],
+        "description": "The pickup order to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The provider-defined response payload."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider business status code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The provider response message."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The parsed JSON object returned by Kuaidi100."
+      },
+      "followUpActions": [
+        "kuaidi100.query_order"
+      ]
+    },
+    {
+      "id": "kuaidi100.estimate_price",
+      "service": "kuaidi100",
+      "name": "estimate_price",
+      "description": "Estimate the shipping price for a carrier, sender and recipient addresses, and parcel weight.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "enum": [
+              "shunfeng",
+              "jd",
+              "debangkuaidi",
+              "yuantong",
+              "zhongtong",
+              "shentong",
+              "yunda",
+              "ems"
+            ],
+            "description": "The Kuaidi100 carrier code in lowercase: shunfeng (顺丰), jd (京东), debangkuaidi (德邦快递), yuantong (圆通), zhongtong (中通), shentong (申通), yunda (韵达), ems (EMS)."
+          },
+          "senderAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender address, for example 北京市海淀区."
+          },
+          "recipientAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recipient address, for example 广东省深圳市南山区."
+          },
+          "weightKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The parcel weight in kilograms."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "senderAddress",
+          "recipientAddress",
+          "weightKg"
+        ],
+        "description": "The shipment whose price should be estimated."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "kuaidicom": {
+            "type": "string",
+            "description": "The Kuaidi100 carrier code."
+          },
+          "kuaidiName": {
+            "type": "string",
+            "description": "The carrier display name."
+          },
+          "from": {
+            "type": "string",
+            "description": "The normalized sender address."
+          },
+          "to": {
+            "type": "string",
+            "description": "The normalized recipient address."
+          },
+          "weight": {
+            "type": "string",
+            "description": "The parcel weight in kilograms the estimate used."
+          },
+          "combos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "expType": {
+                  "type": "string",
+                  "description": "The business or product type."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "The estimated shipping price in CNY."
+                },
+                "productName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product name when the carrier distinguishes products."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product name when the carrier distinguishes products."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "expType",
+                "price",
+                "productName"
+              ],
+              "description": "One product price estimate."
+            },
+            "description": "The per-product price estimates."
+          },
+          "tips": {
+            "type": "string",
+            "description": "An upstream notice, present when the call consumed the Kuaidi100 free daily quota."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "kuaidicom",
+          "kuaidiName",
+          "from",
+          "to",
+          "weight",
+          "combos"
+        ],
+        "description": "The Kuaidi100 shipping price estimate."
+      }
+    },
+    {
+      "id": "kuaidi100.estimate_time",
+      "service": "kuaidi100",
+      "name": "estimate_time",
+      "description": "Estimate the delivery time for a shipment before it is sent, from the carrier, origin, destination, and optional order time and product type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "enum": [
+              "yuantong",
+              "zhongtong",
+              "shunfeng",
+              "shunfengkuaiyun",
+              "jd",
+              "jtexpress",
+              "shentong",
+              "yunda",
+              "ems",
+              "kuayue",
+              "debangkuaidi",
+              "emsguoji",
+              "youzhengguonei",
+              "youzhengguoji",
+              "zhaijisong",
+              "zhimakaimen",
+              "lianbangkuaidi",
+              "tiandihuayu",
+              "annengwuliu",
+              "jinguangsudikuaijian",
+              "jiayunmeiwuliu"
+            ],
+            "description": "The Kuaidi100 carrier code in lowercase: yuantong (圆通), zhongtong (中通), shunfeng (顺丰), shunfengkuaiyun (顺丰快运), jd (京东), jtexpress (极兔速递), shentong (申通), yunda (韵达), ems (EMS), kuayue (跨越), debangkuaidi (德邦快递), emsguoji (EMS国际件), youzhengguonei (邮政国内), youzhengguoji (国际包裹), zhaijisong (宅急送), zhimakaimen (芝麻开门), lianbangkuaidi (联邦快递), tiandihuayu (天地华宇), annengwuliu (安能快运), jinguangsudikuaijian (京广速递), jiayunmeiwuliu (加运美)."
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin address, for example 广东省深圳市南山区."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination address, for example 北京市海淀区."
+          },
+          "orderTime": {
+            "type": "string",
+            "description": "The order placement time in yyyy-MM-dd HH:mm:ss format, for example 2026-09-04 08:08:08. Defaults to the current time when omitted.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+          },
+          "productType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The carrier business or product type, such as 标准快递."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "origin",
+          "destination"
+        ],
+        "description": "The shipment whose delivery time should be estimated."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fromName": {
+            "type": "string",
+            "description": "The normalized origin name."
+          },
+          "toName": {
+            "type": "string",
+            "description": "The normalized destination name."
+          },
+          "orderTime": {
+            "type": "string",
+            "description": "The order time the estimate is based on."
+          },
+          "arrivalTime": {
+            "type": "string",
+            "description": "The estimated arrival time in yyyy-MM-dd HH:mm:ss format."
+          },
+          "deliveryExpendTime": {
+            "type": "string",
+            "description": "The estimated total transit duration in days."
+          },
+          "remainTime": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The remaining transit time in hours, or null when it does not apply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The remaining transit time in hours, or null when it does not apply."
+          },
+          "expType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The business or product type the estimate used."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The business or product type the estimate used."
+          },
+          "tips": {
+            "type": "string",
+            "description": "An upstream notice, present when the call consumed the Kuaidi100 free daily quota."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromName",
+          "toName",
+          "orderTime",
+          "arrivalTime",
+          "deliveryExpendTime",
+          "remainTime",
+          "expType"
+        ],
+        "description": "The Kuaidi100 delivery time estimate."
+      }
+    },
+    {
+      "id": "kuaidi100.estimate_time_with_logistic",
+      "service": "kuaidi100",
+      "name": "estimate_time_with_logistic",
+      "description": "Estimate the remaining delivery time for an in-transit shipment from its existing logistics trajectory, usually the data returned by kuaidi100.query_trace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "enum": [
+              "yuantong",
+              "zhongtong",
+              "shunfeng",
+              "shunfengkuaiyun",
+              "jd",
+              "jtexpress",
+              "shentong",
+              "yunda",
+              "ems",
+              "kuayue",
+              "debangkuaidi",
+              "emsguoji",
+              "youzhengguonei",
+              "youzhengguoji",
+              "zhaijisong",
+              "zhimakaimen",
+              "lianbangkuaidi",
+              "tiandihuayu",
+              "annengwuliu",
+              "jinguangsudikuaijian",
+              "jiayunmeiwuliu"
+            ],
+            "description": "The Kuaidi100 carrier code in lowercase: yuantong (圆通), zhongtong (中通), shunfeng (顺丰), shunfengkuaiyun (顺丰快运), jd (京东), jtexpress (极兔速递), shentong (申通), yunda (韵达), ems (EMS), kuayue (跨越), debangkuaidi (德邦快递), emsguoji (EMS国际件), youzhengguonei (邮政国内), youzhengguoji (国际包裹), zhaijisong (宅急送), zhimakaimen (芝麻开门), lianbangkuaidi (联邦快递), tiandihuayu (天地华宇), annengwuliu (安能快运), jinguangsudikuaijian (京广速递), jiayunmeiwuliu (加运美)."
+          },
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin address, for example 广东省深圳市南山区."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination address, for example 北京市海淀区."
+          },
+          "orderTime": {
+            "type": "string",
+            "description": "The order placement time in yyyy-MM-dd HH:mm:ss format, for example 2026-09-04 08:08:08. Defaults to the current time when omitted.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$"
+          },
+          "trajectory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "description": "The event time in yyyy-MM-dd HH:mm:ss format."
+                },
+                "context": {
+                  "type": "string",
+                  "description": "The event description."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The event status, such as 揽收, 在途, or 已签收."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "time",
+                "context"
+              ],
+              "description": "One historical logistics trajectory event."
+            },
+            "description": "The historical logistics trajectory events, usually the data returned by kuaidi100.query_trace.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "origin",
+          "destination",
+          "orderTime",
+          "trajectory"
+        ],
+        "description": "The in-transit shipment whose arrival time should be estimated."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fromName": {
+            "type": "string",
+            "description": "The normalized origin name."
+          },
+          "toName": {
+            "type": "string",
+            "description": "The normalized destination name."
+          },
+          "orderTime": {
+            "type": "string",
+            "description": "The order time the estimate is based on."
+          },
+          "arrivalTime": {
+            "type": "string",
+            "description": "The estimated arrival time in yyyy-MM-dd HH:mm:ss format."
+          },
+          "deliveryExpendTime": {
+            "type": "string",
+            "description": "The estimated total transit duration in days."
+          },
+          "remainTime": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The remaining transit time in hours, or null when it does not apply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The remaining transit time in hours, or null when it does not apply."
+          },
+          "expType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The business or product type the estimate used."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The business or product type the estimate used."
+          },
+          "tips": {
+            "type": "string",
+            "description": "An upstream notice, present when the call consumed the Kuaidi100 free daily quota."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromName",
+          "toName",
+          "orderTime",
+          "arrivalTime",
+          "deliveryExpendTime",
+          "remainTime",
+          "expType"
+        ],
+        "description": "The Kuaidi100 delivery time estimate."
+      }
+    },
+    {
+      "id": "kuaidi100.order_price",
+      "service": "kuaidi100",
+      "name": "order_price",
+      "description": "Quote a pickup order before creating it. This uses the pickup-order pricing service, not the general estimate_price calculation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "enum": [
+              "jd",
+              "debangkuaidi",
+              "shunfeng",
+              "yuantong",
+              "zhongtong",
+              "shunfengkuaiyun",
+              "sxjdfreight",
+              "kuayue",
+              "ems"
+            ],
+            "description": "The carrier code used for pickup orders."
+          },
+          "senderAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender address, at least to city level."
+          },
+          "recipientAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recipient address, at least to city level."
+          },
+          "weightKg": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The parcel weight in kilograms."
+          },
+          "serviceType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The carrier service type, such as 顺丰标快."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "senderAddress",
+          "recipientAddress"
+        ],
+        "description": "The pickup order to quote."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The provider-defined response payload."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider business status code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The provider response message."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The parsed JSON object returned by Kuaidi100."
+      }
+    },
+    {
+      "id": "kuaidi100.query_order",
+      "service": "kuaidi100",
+      "name": "query_order",
+      "description": "Get a pickup order and optionally include its logistics trajectory.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kuaidi100 pickup order ID."
+          },
+          "includeTracking": {
+            "type": "boolean",
+            "description": "Whether to include the logistics trajectory."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The phone number needed by carriers such as SF Express or ZTO."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "The pickup order to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The provider-defined response payload."
+          },
+          "code": {
+            "type": "string",
+            "description": "The provider business status code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The provider response message."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The parsed JSON object returned by Kuaidi100."
+      },
+      "followUpActions": [
+        "kuaidi100.cancel_order"
+      ]
+    },
+    {
+      "id": "kuaidi100.query_trace",
+      "service": "kuaidi100",
+      "name": "query_trace",
+      "description": "Query the real-time logistics trajectory for an express tracking number. The carrier is detected automatically.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackingNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express tracking number (快递单号)."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender or recipient phone number; required only for SF Express (顺丰), SF Freight (顺丰快运), and ZTO (中通) shipments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "trackingNumber"
+        ],
+        "description": "The tracking number whose trajectory should be queried."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "kuaidiCom": {
+            "type": "string",
+            "description": "The Kuaidi100 carrier code handling the shipment."
+          },
+          "kuaidiName": {
+            "type": "string",
+            "description": "The carrier display name."
+          },
+          "kuaidiNum": {
+            "type": "string",
+            "description": "The queried tracking number."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current shipment state, such as 在途 (in transit) or 已签收 (delivered)."
+          },
+          "fromTo": {
+            "type": "string",
+            "description": "The shipment route in origin -> destination form."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "description": "The event time in yyyy-MM-dd HH:mm:ss format."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The event status, such as 揽收, 在途, or 已签收."
+                },
+                "context": {
+                  "type": "string",
+                  "description": "The event description."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "time",
+                "status",
+                "context"
+              ],
+              "description": "One logistics trajectory event."
+            },
+            "description": "The logistics trajectory events."
+          },
+          "tips": {
+            "type": "string",
+            "description": "An upstream notice, present when the call consumed the Kuaidi100 free daily quota."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "kuaidiCom",
+          "kuaidiName",
+          "kuaidiNum",
+          "state",
+          "fromTo",
+          "data"
+        ],
+        "description": "The Kuaidi100 logistics trajectory for a tracking number."
+      },
+      "followUpActions": [
+        "kuaidi100.estimate_time_with_logistic"
+      ]
+    }
+  ]
+}

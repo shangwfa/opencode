@@ -1,0 +1,870 @@
+{
+  "service": "grist",
+  "displayName": "Grist",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "grist_api_key",
+      "description": "Grist API key used with the Authorization Bearer header against Grist Cloud. Create it in Profile Settings > API: https://support.getgrist.com/rest-api/."
+    }
+  ],
+  "homepageUrl": "https://www.getgrist.com",
+  "actions": [
+    {
+      "id": "grist.add_records",
+      "service": "grist",
+      "name": "add_records",
+      "description": "Add one or more records to a Grist table.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist table identifier."
+          },
+          "noparse": {
+            "type": "boolean",
+            "description": "Whether Grist should store values without automatic parsing."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Grist cell value."
+                  },
+                  "description": "Column IDs mapped to cell values."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A record to add to a Grist table."
+            },
+            "description": "Records to add to the target table.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "tableId",
+          "records"
+        ],
+        "description": "The input payload for adding records to a Grist table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Row ID of the created record."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Grist record creation acknowledgement."
+            },
+            "description": "Created record IDs returned by Grist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Record creation acknowledgement returned by Grist."
+      },
+      "followUpActions": [
+        "grist.list_records"
+      ]
+    },
+    {
+      "id": "grist.delete_records",
+      "service": "grist",
+      "name": "delete_records",
+      "description": "Delete one or more records from a Grist table by row ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist table identifier."
+          },
+          "rowIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Grist row ID to delete."
+            },
+            "description": "Row IDs to delete from the target table.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "tableId",
+          "rowIds"
+        ],
+        "description": "The input payload for deleting records from a Grist table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the Grist delete request completed successfully."
+          },
+          "deletedRowIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "A deleted row ID."
+            },
+            "description": "Row IDs that were requested for deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Local acknowledgement for a successful Grist record deletion."
+      }
+    },
+    {
+      "id": "grist.get_document",
+      "service": "grist",
+      "name": "get_document",
+      "description": "Fetch metadata for a Grist document by document ID or short URL alias.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching a Grist document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique document identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "Document name."
+          },
+          "access": {
+            "type": "string",
+            "description": "Access level for the authenticated user."
+          },
+          "urlId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Short URL alias for the document, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Short URL alias for the document, if any."
+          },
+          "isPinned": {
+            "type": "boolean",
+            "description": "Whether the document is pinned."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Document type, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Document type, when present."
+          },
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Workspace identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "Workspace name."
+              },
+              "access": {
+                "type": "string",
+                "description": "Access level for the authenticated user."
+              },
+              "orgDomain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Organization domain that owns the workspace, when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Organization domain that owns the workspace, when present."
+              },
+              "docs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique document identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Document name."
+                    },
+                    "access": {
+                      "type": "string",
+                      "description": "Access level for the authenticated user."
+                    },
+                    "urlId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Short URL alias for the document, if any."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Short URL alias for the document, if any."
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Document type, if Grist reports one."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Document type, if Grist reports one."
+                    },
+                    "trunkId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Parent document ID when the document is a fork."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Parent document ID when the document is a fork."
+                    },
+                    "isPinned": {
+                      "type": "boolean",
+                      "description": "Whether the document is pinned in the workspace."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "Timestamp in ISO 8601 format."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "Timestamp in ISO 8601 format."
+                    },
+                    "forks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A raw Grist object."
+                      },
+                      "description": "Fork summaries attached to the document, when present."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Summary of a Grist document."
+                },
+                "description": "Documents contained in the workspace."
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A raw Grist object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A raw Grist object."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              },
+              "isSupportWorkspace": {
+                "type": "boolean",
+                "description": "Whether Grist marks this as a support workspace."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Summary of a Grist workspace."
+          },
+          "org": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Grist object."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "forks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Grist object."
+            },
+            "description": "Fork metadata attached to the document, when present."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Grist object."
+            },
+            "description": "Document aliases attached to the document, when present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Metadata for a Grist document."
+      },
+      "followUpActions": [
+        "grist.list_tables"
+      ]
+    },
+    {
+      "id": "grist.list_columns",
+      "service": "grist",
+      "name": "list_columns",
+      "description": "List the columns defined in a Grist table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist table identifier."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Whether hidden metadata columns should be included."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "tableId"
+        ],
+        "description": "The input payload for listing Grist table columns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Column identifier."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "description": "Display label of the column."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Grist column type."
+                    },
+                    "formula": {
+                      "type": "string",
+                      "description": "Formula expression when the column is formula-backed."
+                    },
+                    "isFormula": {
+                      "type": "boolean",
+                      "description": "Whether the column is formula-backed."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Help text or description of the column."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Metadata fields for the column."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Metadata for a Grist column."
+            },
+            "description": "Columns returned by Grist for the table."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Column list returned by Grist."
+      }
+    },
+    {
+      "id": "grist.list_records",
+      "service": "grist",
+      "name": "list_records",
+      "description": "List records from a Grist table with optional filtering, sorting, limits, and hidden-column inclusion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist table identifier."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "Whether hidden metadata columns should be included."
+          },
+          "sort": {
+            "type": "string",
+            "description": "Comma-separated columns to sort by. Prefix with '-' for descending."
+          },
+          "filter": {
+            "type": "string",
+            "description": "JSON string that maps column IDs to allowed values arrays, such as '{\"pet\":[\"cat\"]}'."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of records to return. Use 0 for no limit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "tableId"
+        ],
+        "description": "The input payload for listing Grist table records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Row ID of the record."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Grist cell value."
+                  },
+                  "description": "Column IDs mapped to cell values."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Grist table record."
+            },
+            "description": "Records returned by Grist for the table."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Record list returned by Grist."
+      },
+      "followUpActions": [
+        "grist.update_records",
+        "grist.delete_records"
+      ]
+    },
+    {
+      "id": "grist.list_tables",
+      "service": "grist",
+      "name": "list_tables",
+      "description": "List the tables defined in a Grist document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Grist document tables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Table identifier."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {
+                    "tableRef": {
+                      "type": "integer",
+                      "description": "Internal table reference identifier."
+                    },
+                    "onDemand": {
+                      "type": "boolean",
+                      "description": "Whether the table is loaded on demand."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Metadata fields for the table."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Metadata for a Grist table."
+            },
+            "description": "Tables returned by Grist for the document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Table list returned by Grist."
+      },
+      "followUpActions": [
+        "grist.list_columns",
+        "grist.list_records"
+      ]
+    },
+    {
+      "id": "grist.list_workspaces",
+      "service": "grist",
+      "name": "list_workspaces",
+      "description": "List the Grist workspaces and documents that the authenticated API key can access on the current Grist site.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Grist workspaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Workspace identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Workspace name."
+                },
+                "access": {
+                  "type": "string",
+                  "description": "Access level for the authenticated user."
+                },
+                "orgDomain": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Organization domain that owns the workspace, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Organization domain that owns the workspace, when present."
+                },
+                "docs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique document identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Document name."
+                      },
+                      "access": {
+                        "type": "string",
+                        "description": "Access level for the authenticated user."
+                      },
+                      "urlId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Short URL alias for the document, if any."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Short URL alias for the document, if any."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Document type, if Grist reports one."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Document type, if Grist reports one."
+                      },
+                      "trunkId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Parent document ID when the document is a fork."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Parent document ID when the document is a fork."
+                      },
+                      "isPinned": {
+                        "type": "boolean",
+                        "description": "Whether the document is pinned in the workspace."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "Timestamp in ISO 8601 format."
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "description": "Timestamp in ISO 8601 format."
+                      },
+                      "forks": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "A raw Grist object."
+                        },
+                        "description": "Fork summaries attached to the document, when present."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Summary of a Grist document."
+                  },
+                  "description": "Documents contained in the workspace."
+                },
+                "owner": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A raw Grist object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A raw Grist object."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "isSupportWorkspace": {
+                  "type": "boolean",
+                  "description": "Whether Grist marks this as a support workspace."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Summary of a Grist workspace."
+            },
+            "description": "Workspaces available to the authenticated user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Workspace and document list returned by Grist."
+      },
+      "followUpActions": [
+        "grist.get_document"
+      ]
+    },
+    {
+      "id": "grist.update_records",
+      "service": "grist",
+      "name": "update_records",
+      "description": "Update one or more existing Grist records by row ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist document identifier."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Grist table identifier."
+          },
+          "noparse": {
+            "type": "boolean",
+            "description": "Whether Grist should store values without automatic parsing."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Grist row ID to update."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Grist cell value."
+                  },
+                  "description": "Column IDs mapped to cell values."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A record update for an existing Grist row."
+            },
+            "description": "Records to update in the target table.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "tableId",
+          "records"
+        ],
+        "description": "The input payload for updating records in a Grist table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the Grist update request completed successfully."
+          },
+          "updatedCount": {
+            "type": "integer",
+            "description": "Number of records included in the update request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Local acknowledgement for a successful Grist record update."
+      }
+    }
+  ]
+}

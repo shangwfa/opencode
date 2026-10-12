@@ -1,0 +1,1005 @@
+{
+  "service": "short_io",
+  "displayName": "Short.io",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret API Key",
+      "placeholder": "short_io_secret_key",
+      "description": "Short.io secret API key used with the Authorization header. Create it in Short.io under Integrations & API: https://developers.short.io/docs/creating-an-api-key.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://short.io",
+  "actions": [
+    {
+      "id": "short_io.create_link",
+      "service": "short_io",
+      "name": "create_link",
+      "description": "Create a new Short.io link on one of the authenticated domains.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Domain hostname that should own the new short link."
+          },
+          "originalURL": {
+            "type": "string",
+            "description": "Original destination URL to shorten.",
+            "format": "uri"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional custom path for the short link."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional title for the short link."
+          },
+          "allowDuplicates": {
+            "type": "boolean",
+            "description": "Whether duplicate links to the same originalURL should be allowed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "originalURL"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the link."
+          },
+          "idString": {
+            "type": "string",
+            "description": "String form of the Short.io link identifier."
+          },
+          "domain": {
+            "type": "string",
+            "description": "Domain hostname used by the short link."
+          },
+          "DomainId": {
+            "type": "integer",
+            "description": "Numeric domain identifier associated with the short link."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path segment of the short link."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional title assigned to the short link."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags assigned to the short link."
+          },
+          "originalURL": {
+            "type": "string",
+            "description": "Original destination URL."
+          },
+          "shortURL": {
+            "type": "string",
+            "description": "Non-secure short URL returned by Short.io."
+          },
+          "secureShortURL": {
+            "type": "string",
+            "description": "Secure HTTPS short URL returned by Short.io."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the link is archived."
+          },
+          "cloaking": {
+            "type": "boolean",
+            "description": "Whether cloaking is enabled for the link."
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "Whether the link resolves over HTTPS."
+          },
+          "clicks": {
+            "type": "integer",
+            "description": "Total clicks recorded for the link, when present."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the link was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the link was last updated, when present."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Timestamp when the link expires, when present."
+          },
+          "utmSource": {
+            "type": "string",
+            "description": "UTM source parameter applied to the link, when present."
+          },
+          "utmMedium": {
+            "type": "string",
+            "description": "UTM medium parameter applied to the link, when present."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "description": "UTM campaign parameter applied to the link, when present."
+          },
+          "utmContent": {
+            "type": "string",
+            "description": "UTM content parameter applied to the link, when present."
+          },
+          "utmTerm": {
+            "type": "string",
+            "description": "UTM term parameter applied to the link, when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "originalURL",
+          "shortURL",
+          "secureShortURL",
+          "createdAt"
+        ],
+        "description": "Short.io short link."
+      },
+      "followUpActions": [
+        "short_io.get_link",
+        "short_io.get_link_statistics"
+      ]
+    },
+    {
+      "id": "short_io.delete_link",
+      "service": "short_io",
+      "name": "delete_link",
+      "description": "Delete a Short.io link by link ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Short.io link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the delete operation succeeded."
+          },
+          "idString": {
+            "type": "string",
+            "description": "Identifier of the deleted Short.io link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Acknowledgement for a deleted Short.io link."
+      }
+    },
+    {
+      "id": "short_io.get_domain",
+      "service": "short_io",
+      "name": "get_domain",
+      "description": "Get Short.io domain details by domain ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique identifier of the Short.io domain."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique identifier of the Short.io domain."
+          },
+          "hostname": {
+            "type": "string",
+            "description": "Hostname of the Short.io domain."
+          },
+          "state": {
+            "type": "string",
+            "description": "Current configuration state of the domain."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional title assigned to the domain."
+          },
+          "linkType": {
+            "type": "string",
+            "description": "Short link generation mode configured for the domain."
+          },
+          "TeamId": {
+            "type": "integer",
+            "description": "Team identifier associated with the domain, when present."
+          },
+          "provider": {
+            "type": "string",
+            "description": "DNS provider configured for the domain, when present."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the domain was created, when present."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the domain was last updated, when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "hostname"
+        ],
+        "description": "Short.io domain."
+      },
+      "followUpActions": [
+        "short_io.list_links"
+      ]
+    },
+    {
+      "id": "short_io.get_link",
+      "service": "short_io",
+      "name": "get_link",
+      "description": "Get Short.io link details by link ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Short.io link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the link."
+          },
+          "idString": {
+            "type": "string",
+            "description": "String form of the Short.io link identifier."
+          },
+          "domain": {
+            "type": "string",
+            "description": "Domain hostname used by the short link."
+          },
+          "DomainId": {
+            "type": "integer",
+            "description": "Numeric domain identifier associated with the short link."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path segment of the short link."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional title assigned to the short link."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags assigned to the short link."
+          },
+          "originalURL": {
+            "type": "string",
+            "description": "Original destination URL."
+          },
+          "shortURL": {
+            "type": "string",
+            "description": "Non-secure short URL returned by Short.io."
+          },
+          "secureShortURL": {
+            "type": "string",
+            "description": "Secure HTTPS short URL returned by Short.io."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the link is archived."
+          },
+          "cloaking": {
+            "type": "boolean",
+            "description": "Whether cloaking is enabled for the link."
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "Whether the link resolves over HTTPS."
+          },
+          "clicks": {
+            "type": "integer",
+            "description": "Total clicks recorded for the link, when present."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the link was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the link was last updated, when present."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Timestamp when the link expires, when present."
+          },
+          "utmSource": {
+            "type": "string",
+            "description": "UTM source parameter applied to the link, when present."
+          },
+          "utmMedium": {
+            "type": "string",
+            "description": "UTM medium parameter applied to the link, when present."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "description": "UTM campaign parameter applied to the link, when present."
+          },
+          "utmContent": {
+            "type": "string",
+            "description": "UTM content parameter applied to the link, when present."
+          },
+          "utmTerm": {
+            "type": "string",
+            "description": "UTM term parameter applied to the link, when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "originalURL",
+          "shortURL",
+          "secureShortURL",
+          "createdAt"
+        ],
+        "description": "Short.io short link."
+      },
+      "followUpActions": [
+        "short_io.update_link",
+        "short_io.delete_link",
+        "short_io.get_link_statistics"
+      ]
+    },
+    {
+      "id": "short_io.get_link_statistics",
+      "service": "short_io",
+      "name": "get_link_statistics",
+      "description": "Get click statistics for a Short.io link.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Short.io link."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "today",
+              "yesterday",
+              "total",
+              "week",
+              "month",
+              "lastmonth",
+              "last7",
+              "last30"
+            ],
+            "description": "Time interval used by the Short.io statistics API."
+          },
+          "tz": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Timezone used by the statistics API."
+          },
+          "clicksChartInterval": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Chart granularity used by the Short.io statistics API."
+          },
+          "skipTops": {
+            "type": "boolean",
+            "description": "Whether top breakdown sections should be skipped."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Custom interval start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Custom interval end date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "linkId"
+        ],
+        "description": "Request payload for reading Short.io link statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalClicks": {
+            "type": "integer",
+            "description": "Total clicks counted in the selected interval."
+          },
+          "humanClicks": {
+            "type": "integer",
+            "description": "Human clicks counted in the selected interval, when present."
+          },
+          "chart": {
+            "type": "object",
+            "properties": {
+              "datasets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "string",
+                            "description": "Timestamp of the chart data point."
+                          },
+                          "y": {
+                            "type": "integer",
+                            "description": "Click count at the given timestamp."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Single click chart data point."
+                      },
+                      "description": "Series data points for the current chart dataset."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Short.io statistics dataset."
+                },
+                "description": "Chart datasets returned by Short.io."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Short.io click chart."
+          },
+          "interval": {
+            "type": "object",
+            "properties": {
+              "startDate": {
+                "type": "string",
+                "description": "Start timestamp of the current interval, when present."
+              },
+              "endDate": {
+                "type": "string",
+                "description": "End timestamp of the current interval, when present."
+              },
+              "prevStartDate": {
+                "type": "string",
+                "description": "Start timestamp of the previous interval, when present."
+              },
+              "prevEndDate": {
+                "type": "string",
+                "description": "End timestamp of the previous interval, when present."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Interval metadata returned by the Short.io statistics API."
+          },
+          "tops": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by Short.io."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "totalClicks"
+        ],
+        "description": "Short.io link statistics."
+      }
+    },
+    {
+      "id": "short_io.list_domains",
+      "service": "short_io",
+      "name": "list_domains",
+      "description": "List domains available to the authenticated Short.io API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The unique identifier of the Short.io domain."
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "Hostname of the Short.io domain."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "Current configuration state of the domain."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Optional title assigned to the domain."
+                },
+                "linkType": {
+                  "type": "string",
+                  "description": "Short link generation mode configured for the domain."
+                },
+                "TeamId": {
+                  "type": "integer",
+                  "description": "Team identifier associated with the domain, when present."
+                },
+                "provider": {
+                  "type": "string",
+                  "description": "DNS provider configured for the domain, when present."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the domain was created, when present."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the domain was last updated, when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "hostname"
+              ],
+              "description": "Short.io domain."
+            },
+            "description": "Domains returned by Short.io."
+          }
+        },
+        "additionalProperties": false,
+        "description": "List of Short.io domains."
+      }
+    },
+    {
+      "id": "short_io.list_links",
+      "service": "short_io",
+      "name": "list_links",
+      "description": "List links for a Short.io domain with optional pagination and sort order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique identifier of the Short.io domain."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of links to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination token returned by a previous Short.io response."
+          },
+          "dateSortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort order for link creation time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domainId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the link."
+                },
+                "idString": {
+                  "type": "string",
+                  "description": "String form of the Short.io link identifier."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "Domain hostname used by the short link."
+                },
+                "DomainId": {
+                  "type": "integer",
+                  "description": "Numeric domain identifier associated with the short link."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Path segment of the short link."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Optional title assigned to the short link."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Tags assigned to the short link."
+                },
+                "originalURL": {
+                  "type": "string",
+                  "description": "Original destination URL."
+                },
+                "shortURL": {
+                  "type": "string",
+                  "description": "Non-secure short URL returned by Short.io."
+                },
+                "secureShortURL": {
+                  "type": "string",
+                  "description": "Secure HTTPS short URL returned by Short.io."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the link is archived."
+                },
+                "cloaking": {
+                  "type": "boolean",
+                  "description": "Whether cloaking is enabled for the link."
+                },
+                "secure": {
+                  "type": "boolean",
+                  "description": "Whether the link resolves over HTTPS."
+                },
+                "clicks": {
+                  "type": "integer",
+                  "description": "Total clicks recorded for the link, when present."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the link was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the link was last updated, when present."
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "description": "Timestamp when the link expires, when present."
+                },
+                "utmSource": {
+                  "type": "string",
+                  "description": "UTM source parameter applied to the link, when present."
+                },
+                "utmMedium": {
+                  "type": "string",
+                  "description": "UTM medium parameter applied to the link, when present."
+                },
+                "utmCampaign": {
+                  "type": "string",
+                  "description": "UTM campaign parameter applied to the link, when present."
+                },
+                "utmContent": {
+                  "type": "string",
+                  "description": "UTM content parameter applied to the link, when present."
+                },
+                "utmTerm": {
+                  "type": "string",
+                  "description": "UTM term parameter applied to the link, when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "originalURL",
+                "shortURL",
+                "secureShortURL",
+                "createdAt"
+              ],
+              "description": "Short.io short link."
+            },
+            "description": "Links returned by Short.io."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of links that match the current filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Short.io link list."
+      }
+    },
+    {
+      "id": "short_io.update_link",
+      "service": "short_io",
+      "name": "update_link",
+      "description": "Update an existing Short.io link by link ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Short.io link."
+          },
+          "originalURL": {
+            "type": "string",
+            "description": "Updated destination URL for the short link.",
+            "format": "uri"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated path segment for the short link."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated title for the short link."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Updated tags to assign to the short link.",
+            "minItems": 1
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the short link should be archived."
+          },
+          "cloaking": {
+            "type": "boolean",
+            "description": "Whether cloaking should be enabled for the short link."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Expiration timestamp in ISO 8601 format.",
+                "format": "date-time"
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Millisecond timestamp string accepted by Short.io."
+              }
+            ],
+            "description": "Expiration timestamp to assign to the short link."
+          },
+          "redirectType": {
+            "oneOf": [
+              {
+                "const": 301,
+                "type": "number"
+              },
+              {
+                "const": 302,
+                "type": "number"
+              },
+              {
+                "const": 307,
+                "type": "number"
+              },
+              {
+                "const": 308,
+                "type": "number"
+              }
+            ],
+            "description": "HTTP redirect status code used by the short link."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "linkId"
+        ],
+        "description": "Request payload for updating a Short.io link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the link."
+          },
+          "idString": {
+            "type": "string",
+            "description": "String form of the Short.io link identifier."
+          },
+          "domain": {
+            "type": "string",
+            "description": "Domain hostname used by the short link."
+          },
+          "DomainId": {
+            "type": "integer",
+            "description": "Numeric domain identifier associated with the short link."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path segment of the short link."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional title assigned to the short link."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags assigned to the short link."
+          },
+          "originalURL": {
+            "type": "string",
+            "description": "Original destination URL."
+          },
+          "shortURL": {
+            "type": "string",
+            "description": "Non-secure short URL returned by Short.io."
+          },
+          "secureShortURL": {
+            "type": "string",
+            "description": "Secure HTTPS short URL returned by Short.io."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the link is archived."
+          },
+          "cloaking": {
+            "type": "boolean",
+            "description": "Whether cloaking is enabled for the link."
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "Whether the link resolves over HTTPS."
+          },
+          "clicks": {
+            "type": "integer",
+            "description": "Total clicks recorded for the link, when present."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the link was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the link was last updated, when present."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Timestamp when the link expires, when present."
+          },
+          "utmSource": {
+            "type": "string",
+            "description": "UTM source parameter applied to the link, when present."
+          },
+          "utmMedium": {
+            "type": "string",
+            "description": "UTM medium parameter applied to the link, when present."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "description": "UTM campaign parameter applied to the link, when present."
+          },
+          "utmContent": {
+            "type": "string",
+            "description": "UTM content parameter applied to the link, when present."
+          },
+          "utmTerm": {
+            "type": "string",
+            "description": "UTM term parameter applied to the link, when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "originalURL",
+          "shortURL",
+          "secureShortURL",
+          "createdAt"
+        ],
+        "description": "Short.io short link."
+      },
+      "followUpActions": [
+        "short_io.get_link",
+        "short_io.get_link_statistics"
+      ]
+    }
+  ]
+}

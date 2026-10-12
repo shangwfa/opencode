@@ -1,0 +1,2550 @@
+{
+  "service": "dub",
+  "displayName": "Dub",
+  "categories": [
+    "Marketing",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "dub_xxxxxx",
+      "description": "Dub API key sent as a Bearer token in the Authorization header. Create or view API keys in the Dub workspace settings: https://dub.co/docs/api-reference/authentication#api-keys."
+    }
+  ],
+  "homepageUrl": "https://dub.co",
+  "actions": [
+    {
+      "id": "dub.count_links",
+      "service": "dub",
+      "name": "count_links",
+      "description": "Retrieve the number of matching links in the authenticated Dub workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Only count links for this domain."
+          },
+          "tagIds": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag ID."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag IDs.",
+                "minItems": 1
+              }
+            ],
+            "description": "Only count links with these tag IDs."
+          },
+          "tagNames": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag name."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag names.",
+                "minItems": 1
+              }
+            ],
+            "description": "Only count links with these tag names."
+          },
+          "folderId": {
+            "type": "string",
+            "description": "Only count links in this folder."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search against link slugs and destination URLs."
+          },
+          "userId": {
+            "type": "string",
+            "description": "Only count links created by this Dub user ID."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Only count links for this tenant ID."
+          },
+          "showArchived": {
+            "type": "boolean",
+            "description": "Whether archived links should be included."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for counting Dub links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "The number of matching Dub links."
+          },
+          "raw": {
+            "description": "The raw Dub count response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Dub links count result."
+      }
+    },
+    {
+      "id": "dub.create_folder",
+      "service": "dub",
+      "name": "create_folder",
+      "description": "Create a folder in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Dub folder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the folder."
+              },
+              "name": {
+                "type": "string",
+                "description": "The folder name."
+              },
+              "accessLevel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The folder access level returned by Dub."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The folder access level returned by Dub."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub folder payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub folder action result."
+      }
+    },
+    {
+      "id": "dub.create_link",
+      "service": "dub",
+      "name": "create_link",
+      "description": "Create a short link in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 32000,
+            "description": "The destination URL of the short link.",
+            "format": "uri"
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 190,
+            "description": "The short-link domain without protocol."
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 190,
+            "description": "The short-link slug."
+          },
+          "keyLength": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 190,
+            "description": "The length of the generated short-link slug."
+          },
+          "externalId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The ID of the link in your database."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ID of the link in your database."
+          },
+          "tenantId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The tenant ID that created the link in your system."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tenant ID that created the link in your system."
+          },
+          "programId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The partner program ID associated with the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The partner program ID associated with the link."
+          },
+          "partnerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The partner ID associated with the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The partner ID associated with the link."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The prefix used for randomly generated slugs."
+          },
+          "trackConversion": {
+            "type": "boolean",
+            "description": "Whether Dub should track conversions for this link."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the link should be archived."
+          },
+          "tagIds": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag ID."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag IDs assigned to the link.",
+                "minItems": 1
+              }
+            ],
+            "description": "The tag IDs assigned to the link."
+          },
+          "tagNames": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag name."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag names assigned to the link.",
+                "minItems": 1
+              }
+            ],
+            "description": "The tag names assigned to the link."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The folder ID assigned to the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder ID assigned to the link."
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Comments for the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comments for the link."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when the link expires."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when the link expires."
+          },
+          "expiredUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The URL used when the short link has expired.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL used when the short link has expired."
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The password required to access the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The password required to access the destination URL."
+          },
+          "proxy": {
+            "type": "boolean",
+            "description": "Whether the link uses Dub custom link previews."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview description."
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview image URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview image URL."
+          },
+          "video": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview video URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview video URL."
+          },
+          "rewrite": {
+            "type": "boolean",
+            "description": "Whether the link uses link cloaking."
+          },
+          "ios": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The iOS destination URL for device targeting.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The iOS destination URL for device targeting."
+          },
+          "android": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The Android destination URL for device targeting.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android destination URL for device targeting."
+          },
+          "geo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 32000,
+                  "description": "The destination URL for this country.",
+                  "format": "uri"
+                },
+                "description": "Geo targeting destinations keyed by country code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Geo targeting destinations keyed by country code."
+          },
+          "doIndex": {
+            "type": "boolean",
+            "description": "Whether search engines may index the short link."
+          },
+          "utm_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM source to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM source to apply to the destination URL."
+          },
+          "utm_medium": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM medium to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM medium to apply to the destination URL."
+          },
+          "utm_campaign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM campaign to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM campaign to apply to the destination URL."
+          },
+          "utm_term": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM term to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM term to apply to the destination URL."
+          },
+          "utm_content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM content to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM content to apply to the destination URL."
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The referral query parameter to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The referral query parameter to apply to the destination URL."
+          },
+          "webhookIds": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub webhook ID."
+                },
+                "description": "Webhook IDs to trigger when the link is clicked."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Webhook IDs to trigger when the link is clicked."
+          },
+          "testVariants": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The variant destination URL.",
+                      "format": "uri"
+                    },
+                    "percentage": {
+                      "type": "integer",
+                      "minimum": 10,
+                      "maximum": 90,
+                      "description": "The traffic percentage for this variant."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An A/B test URL variant."
+                },
+                "description": "A/B test URL variants for the short link.",
+                "minItems": 2,
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A/B test URL variants for the short link."
+          },
+          "testStartedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when A/B testing started."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when A/B testing started."
+          },
+          "testCompletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when A/B testing completes."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when A/B testing completes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input parameters for creating a Dub link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the Dub link."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The domain of the short link."
+              },
+              "key": {
+                "type": "string",
+                "description": "The short-link slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The destination URL of the link."
+              },
+              "shortLink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The full short-link URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The full short-link URL."
+              },
+              "qrCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The QR code URL for the short link."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The QR code URL for the short link."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The custom link preview title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom link preview title."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the link is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the link is archived."
+              },
+              "clicks": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of recorded clicks."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of recorded clicks."
+              },
+              "leads": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated leads."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated leads."
+              },
+              "sales": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated sales."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated sales."
+              },
+              "saleAmount": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The total sales amount in cents."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total sales amount in cents."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was created."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was last updated."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub link payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub link returned by the connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link action result."
+      }
+    },
+    {
+      "id": "dub.create_tag",
+      "service": "dub",
+      "name": "create_tag",
+      "description": "Create a tag in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tag name."
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "red",
+              "yellow",
+              "green",
+              "blue",
+              "purple",
+              "brown",
+              "gray",
+              "pink"
+            ],
+            "description": "The Dub tag color."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating a Dub tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the tag."
+              },
+              "name": {
+                "type": "string",
+                "description": "The tag name."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The tag color."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tag color."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub tag payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub tag."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub tag action result."
+      }
+    },
+    {
+      "id": "dub.delete_folder",
+      "service": "dub",
+      "name": "delete_folder",
+      "description": "Delete a folder from the authenticated Dub workspace.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub folder ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifier for deleting a Dub folder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the connector completed the delete request."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "description": "The raw Dub deletion response, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Dub deletion response, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link deletion acknowledgement."
+      }
+    },
+    {
+      "id": "dub.delete_link",
+      "service": "dub",
+      "name": "delete_link",
+      "description": "Delete a short link from the authenticated Dub workspace.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub link ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifier for deleting a Dub link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the connector completed the delete request."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "description": "The raw Dub deletion response, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Dub deletion response, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link deletion acknowledgement."
+      }
+    },
+    {
+      "id": "dub.delete_tag",
+      "service": "dub",
+      "name": "delete_tag",
+      "description": "Delete a tag from the authenticated Dub workspace.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub tag ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifier for deleting a Dub tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the connector completed the delete request."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "description": "The raw Dub deletion response, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Dub deletion response, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link deletion acknowledgement."
+      }
+    },
+    {
+      "id": "dub.list_folders",
+      "service": "dub",
+      "name": "list_folders",
+      "description": "List folders in the authenticated Dub workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "description": "The number of folders to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Dub folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique ID of the folder."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The folder name."
+                },
+                "accessLevel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The folder access level returned by Dub."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The folder access level returned by Dub."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Dub folder payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Dub folder."
+            },
+            "description": "Dub folders returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of Dub folders."
+      }
+    },
+    {
+      "id": "dub.list_links",
+      "service": "dub",
+      "name": "list_links",
+      "description": "List short links in the authenticated Dub workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "Only return links for this domain."
+          },
+          "tagIds": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag ID."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag IDs.",
+                "minItems": 1
+              }
+            ],
+            "description": "Only return links with these tag IDs."
+          },
+          "tagNames": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag name."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag names.",
+                "minItems": 1
+              }
+            ],
+            "description": "Only return links with these tag names."
+          },
+          "folderId": {
+            "type": "string",
+            "description": "Only return links in this folder."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search against link slugs and destination URLs."
+          },
+          "userId": {
+            "type": "string",
+            "description": "Only return links created by this Dub user ID."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Only return links for this tenant ID."
+          },
+          "showArchived": {
+            "type": "boolean",
+            "description": "Whether archived links should be included."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "clicks",
+              "saleAmount",
+              "lastClicked"
+            ],
+            "description": "The field used to sort links."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "endingBefore": {
+            "type": "string",
+            "description": "Return links before this cursor."
+          },
+          "startingAfter": {
+            "type": "string",
+            "description": "Return links after this cursor."
+          },
+          "pageSize": {
+            "type": "integer",
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "description": "The number of links to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination options for listing Dub links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique ID of the Dub link."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain of the short link."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The short-link slug."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The destination URL of the link."
+                },
+                "shortLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The full short-link URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The full short-link URL."
+                },
+                "qrCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The QR code URL for the short link."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The QR code URL for the short link."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The custom link preview title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The custom link preview title."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the link is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the link is archived."
+                },
+                "clicks": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The number of recorded clicks."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of recorded clicks."
+                },
+                "leads": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The number of generated leads."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of generated leads."
+                },
+                "sales": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The number of generated sales."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of generated sales."
+                },
+                "saleAmount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The total sales amount in cents."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total sales amount in cents."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the link was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the link was created."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the link was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the link was last updated."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Dub link payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Dub link returned by the connector."
+            },
+            "description": "Dub links returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of Dub links."
+      }
+    },
+    {
+      "id": "dub.list_tags",
+      "service": "dub",
+      "name": "list_tags",
+      "description": "List tags in the authenticated Dub workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "description": "The number of tags to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Dub tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique ID of the tag."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The tag color."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The tag color."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Dub tag payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Dub tag."
+            },
+            "description": "Dub tags returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of Dub tags."
+      }
+    },
+    {
+      "id": "dub.retrieve_analytics",
+      "service": "dub",
+      "name": "retrieve_analytics",
+      "description": "Retrieve analytics for a Dub link, domain, or workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "clicks",
+              "leads",
+              "sales",
+              "composite"
+            ],
+            "description": "The event metric to retrieve from Dub analytics."
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "count",
+              "timeseries",
+              "continents",
+              "regions",
+              "countries",
+              "cities",
+              "devices",
+              "browsers",
+              "os",
+              "trigger",
+              "triggers",
+              "referers",
+              "referer_urls",
+              "top_folders",
+              "top_link_tags",
+              "top_domains",
+              "top_links",
+              "top_urls",
+              "top_base_urls",
+              "top_partners",
+              "top_groups",
+              "top_partner_tags",
+              "utm_sources",
+              "utm_mediums",
+              "utm_campaigns",
+              "utm_terms",
+              "utm_contents"
+            ],
+            "description": "The dimension used to group Dub analytics."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain filter for analytics."
+          },
+          "key": {
+            "type": "string",
+            "description": "The link slug used with a domain filter."
+          },
+          "linkId": {
+            "type": "string",
+            "description": "The Dub link ID filter."
+          },
+          "externalId": {
+            "type": "string",
+            "description": "The external link ID filter."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "The tenant ID filter."
+          },
+          "tagId": {
+            "type": "string",
+            "description": "The tag ID filter."
+          },
+          "folderId": {
+            "type": "string",
+            "description": "The folder ID filter."
+          },
+          "partnerTagId": {
+            "type": "string",
+            "description": "The partner tag ID filter."
+          },
+          "groupId": {
+            "type": "string",
+            "description": "The partner group ID filter."
+          },
+          "partnerId": {
+            "type": "string",
+            "description": "The partner ID filter."
+          },
+          "customerId": {
+            "type": "string",
+            "description": "The customer ID filter."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d",
+              "90d",
+              "1y",
+              "mtd",
+              "qtd",
+              "ytd",
+              "all"
+            ],
+            "description": "The analytics date range shortcut."
+          },
+          "start": {
+            "type": "string",
+            "description": "The start timestamp for the analytics range."
+          },
+          "end": {
+            "type": "string",
+            "description": "The end timestamp for the analytics range."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The IANA time zone used to align timeseries buckets."
+          },
+          "country": {
+            "type": "string",
+            "description": "The country filter using ISO 3166-1 alpha-2 codes."
+          },
+          "city": {
+            "type": "string",
+            "description": "The city filter."
+          },
+          "region": {
+            "type": "string",
+            "description": "The ISO 3166-2 region code filter."
+          },
+          "continent": {
+            "type": "string",
+            "description": "The continent filter."
+          },
+          "device": {
+            "type": "string",
+            "description": "The device filter."
+          },
+          "browser": {
+            "type": "string",
+            "description": "The browser filter."
+          },
+          "os": {
+            "type": "string",
+            "description": "The operating system filter."
+          },
+          "trigger": {
+            "type": "string",
+            "description": "The trigger filter."
+          },
+          "referer": {
+            "type": "string",
+            "description": "The referer hostname filter."
+          },
+          "refererUrl": {
+            "type": "string",
+            "description": "The full referer URL filter."
+          },
+          "url": {
+            "type": "string",
+            "description": "The destination URL filter."
+          },
+          "utm_source": {
+            "type": "string",
+            "description": "The UTM source filter."
+          },
+          "utm_medium": {
+            "type": "string",
+            "description": "The UTM medium filter."
+          },
+          "utm_campaign": {
+            "type": "string",
+            "description": "The UTM campaign filter."
+          },
+          "utm_term": {
+            "type": "string",
+            "description": "The UTM term filter."
+          },
+          "utm_content": {
+            "type": "string",
+            "description": "The UTM content filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for retrieving Dub analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The analytics data returned by Dub."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub analytics result."
+      }
+    },
+    {
+      "id": "dub.retrieve_link",
+      "service": "dub",
+      "name": "retrieve_link",
+      "description": "Retrieve a Dub short link by ID or by supported lookup fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "description": "The Dub link ID to retrieve."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The short-link domain used with key lookup."
+          },
+          "key": {
+            "type": "string",
+            "description": "The short-link slug used with domain lookup."
+          },
+          "externalId": {
+            "type": "string",
+            "description": "The external ID for the link. Prefix with ext_ when required by Dub."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifiers for retrieving a Dub link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the Dub link."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The domain of the short link."
+              },
+              "key": {
+                "type": "string",
+                "description": "The short-link slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The destination URL of the link."
+              },
+              "shortLink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The full short-link URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The full short-link URL."
+              },
+              "qrCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The QR code URL for the short link."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The QR code URL for the short link."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The custom link preview title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom link preview title."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the link is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the link is archived."
+              },
+              "clicks": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of recorded clicks."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of recorded clicks."
+              },
+              "leads": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated leads."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated leads."
+              },
+              "sales": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated sales."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated sales."
+              },
+              "saleAmount": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The total sales amount in cents."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total sales amount in cents."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was created."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was last updated."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub link payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub link returned by the connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link action result."
+      }
+    },
+    {
+      "id": "dub.update_folder",
+      "service": "dub",
+      "name": "update_folder",
+      "description": "Update a folder in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub folder ID to update."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated folder name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for updating a Dub folder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the folder."
+              },
+              "name": {
+                "type": "string",
+                "description": "The folder name."
+              },
+              "accessLevel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The folder access level returned by Dub."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The folder access level returned by Dub."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub folder payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub folder action result."
+      }
+    },
+    {
+      "id": "dub.update_link",
+      "service": "dub",
+      "name": "update_link",
+      "description": "Update a short link in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub link ID to update."
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 32000,
+            "description": "The destination URL of the short link.",
+            "format": "uri"
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 190,
+            "description": "The short-link domain without protocol."
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 190,
+            "description": "The short-link slug."
+          },
+          "keyLength": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 190,
+            "description": "The length of the generated short-link slug."
+          },
+          "externalId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The ID of the link in your database."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ID of the link in your database."
+          },
+          "tenantId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The tenant ID that created the link in your system."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tenant ID that created the link in your system."
+          },
+          "programId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The partner program ID associated with the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The partner program ID associated with the link."
+          },
+          "partnerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The partner ID associated with the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The partner ID associated with the link."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The prefix used for randomly generated slugs."
+          },
+          "trackConversion": {
+            "type": "boolean",
+            "description": "Whether Dub should track conversions for this link."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the link should be archived."
+          },
+          "tagIds": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag ID."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag IDs assigned to the link.",
+                "minItems": 1
+              }
+            ],
+            "description": "The tag IDs assigned to the link."
+          },
+          "tagNames": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Dub tag name."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub identifier or name."
+                },
+                "description": "Dub tag names assigned to the link.",
+                "minItems": 1
+              }
+            ],
+            "description": "The tag names assigned to the link."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The folder ID assigned to the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The folder ID assigned to the link."
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Comments for the link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comments for the link."
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when the link expires."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when the link expires."
+          },
+          "expiredUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The URL used when the short link has expired.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL used when the short link has expired."
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The password required to access the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The password required to access the destination URL."
+          },
+          "proxy": {
+            "type": "boolean",
+            "description": "Whether the link uses Dub custom link previews."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview description."
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview image URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview image URL."
+          },
+          "video": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The custom link preview video URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom link preview video URL."
+          },
+          "rewrite": {
+            "type": "boolean",
+            "description": "Whether the link uses link cloaking."
+          },
+          "ios": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The iOS destination URL for device targeting.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The iOS destination URL for device targeting."
+          },
+          "android": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32000,
+                "description": "The Android destination URL for device targeting.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android destination URL for device targeting."
+          },
+          "geo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 32000,
+                  "description": "The destination URL for this country.",
+                  "format": "uri"
+                },
+                "description": "Geo targeting destinations keyed by country code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Geo targeting destinations keyed by country code."
+          },
+          "doIndex": {
+            "type": "boolean",
+            "description": "Whether search engines may index the short link."
+          },
+          "utm_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM source to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM source to apply to the destination URL."
+          },
+          "utm_medium": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM medium to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM medium to apply to the destination URL."
+          },
+          "utm_campaign": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM campaign to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM campaign to apply to the destination URL."
+          },
+          "utm_term": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM term to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM term to apply to the destination URL."
+          },
+          "utm_content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTM content to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTM content to apply to the destination URL."
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The referral query parameter to apply to the destination URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The referral query parameter to apply to the destination URL."
+          },
+          "webhookIds": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Dub webhook ID."
+                },
+                "description": "Webhook IDs to trigger when the link is clicked."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Webhook IDs to trigger when the link is clicked."
+          },
+          "testVariants": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The variant destination URL.",
+                      "format": "uri"
+                    },
+                    "percentage": {
+                      "type": "integer",
+                      "minimum": 10,
+                      "maximum": 90,
+                      "description": "The traffic percentage for this variant."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An A/B test URL variant."
+                },
+                "description": "A/B test URL variants for the short link.",
+                "minItems": 2,
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A/B test URL variants for the short link."
+          },
+          "testStartedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when A/B testing started."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when A/B testing started."
+          },
+          "testCompletedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO-8601 timestamp when A/B testing completes."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO-8601 timestamp when A/B testing completes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "linkId"
+        ],
+        "description": "Input parameters for updating a Dub link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the Dub link."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The domain of the short link."
+              },
+              "key": {
+                "type": "string",
+                "description": "The short-link slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The destination URL of the link."
+              },
+              "shortLink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The full short-link URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The full short-link URL."
+              },
+              "qrCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The QR code URL for the short link."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The QR code URL for the short link."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The custom link preview title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom link preview title."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the link is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the link is archived."
+              },
+              "clicks": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of recorded clicks."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of recorded clicks."
+              },
+              "leads": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated leads."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated leads."
+              },
+              "sales": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The number of generated sales."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of generated sales."
+              },
+              "saleAmount": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The total sales amount in cents."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total sales amount in cents."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was created."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the link was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the link was last updated."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub link payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub link returned by the connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub link action result."
+      }
+    },
+    {
+      "id": "dub.update_tag",
+      "service": "dub",
+      "name": "update_tag",
+      "description": "Update a tag in the authenticated Dub workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dub tag ID to update."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated tag name."
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "red",
+              "yellow",
+              "green",
+              "blue",
+              "purple",
+              "brown",
+              "gray",
+              "pink"
+            ],
+            "description": "The Dub tag color."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating a Dub tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique ID of the tag."
+              },
+              "name": {
+                "type": "string",
+                "description": "The tag name."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The tag color."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tag color."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Dub tag payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Dub tag."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Dub tag action result."
+      }
+    }
+  ]
+}

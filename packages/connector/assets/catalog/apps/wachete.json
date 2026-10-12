@@ -1,0 +1,1395 @@
+{
+  "service": "wachete",
+  "displayName": "Wachete",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WACHETE_API_KEY",
+      "description": "Wachete API key used to create a short-lived API token. Copy it from your Wachete user profile: https://www.wachete.com/api.",
+      "extraFields": [
+        {
+          "key": "userId",
+          "label": "User ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "WACHETE_USER_ID",
+          "description": "Wachete user ID paired with the API key during API login. Copy it from your Wachete user profile: https://www.wachete.com/api."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.wachete.com/",
+  "actions": [
+    {
+      "id": "wachete.create_or_update_monitor",
+      "service": "wachete",
+      "name": "create_or_update_monitor",
+      "description": "Create a Wachete SinglePage monitor, or replace an existing monitor with a SinglePage definition when id is provided.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The existing monitor ID when updating.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The monitor name."
+          },
+          "url": {
+            "type": "string",
+            "description": "The public URL that Wachete should monitor.",
+            "format": "uri"
+          },
+          "xPath": {
+            "type": "string",
+            "description": "The XPath expression selecting monitored content."
+          },
+          "excludeXPath": {
+            "type": "string",
+            "description": "The XPath expression excluding content."
+          },
+          "regex": {
+            "type": "string",
+            "description": "The regular expression selecting monitored content."
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Wachete alert type, such as Error or NotEq."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The optional comparison value for the alert."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "A Wachete alert condition."
+            },
+            "description": "The alert conditions for the monitor.",
+            "minItems": 1
+          },
+          "recurrenceInSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The check interval in seconds."
+          },
+          "folderId": {
+            "type": "string",
+            "description": "The folder that should contain the monitor.",
+            "format": "uuid"
+          },
+          "notificationEndpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The destination type, such as Webhook or Email."
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The destination address or URL."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Wachete notification destination."
+            },
+            "description": "The notification destinations for the monitor.",
+            "minItems": 1
+          },
+          "dynamicContent": {
+            "type": "boolean",
+            "description": "Whether Wachete should render JavaScript content."
+          },
+          "scrollPage": {
+            "type": "boolean",
+            "description": "Whether Wachete should scroll the page while checking it."
+          },
+          "ignoreInvalidPages": {
+            "type": "boolean",
+            "description": "Whether invalid crawler pages should be ignored."
+          },
+          "collectRawHtml": {
+            "type": "boolean",
+            "description": "Whether Wachete should collect raw HTML."
+          },
+          "jobType": {
+            "const": "SinglePage",
+            "type": "string",
+            "description": "The supported Wachete monitor job type."
+          },
+          "note": {
+            "type": "string",
+            "description": "A note attached to the monitor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "url"
+        ],
+        "description": "The SinglePage monitor definition to create or update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor name."
+              },
+              "method": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The HTTP method used to check the monitored URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The HTTP method used to check the monitored URL."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitored URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitored URL."
+              },
+              "xPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The XPath expression selecting monitored content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The XPath expression selecting monitored content."
+              },
+              "excludeXPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The XPath expression excluding content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The XPath expression excluding content."
+              },
+              "regex": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The regular expression selecting monitored content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The regular expression selecting monitored content."
+              },
+              "alerts": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An alert."
+                    },
+                    "description": "The configured alert conditions."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The configured alert conditions."
+              },
+              "recurrenceInSeconds": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The check interval in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The check interval in seconds."
+              },
+              "folderId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The containing folder ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The containing folder ID."
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The latest monitoring result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest monitoring result."
+              },
+              "notificationEndpoints": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A destination."
+                    },
+                    "description": "The configured notification destinations."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The configured notification destinations."
+              },
+              "dynamicContent": {
+                "type": "boolean",
+                "description": "Whether JavaScript-rendered content is enabled."
+              },
+              "scrollPage": {
+                "type": "boolean",
+                "description": "Whether Wachete scrolls the page while checking it."
+              },
+              "ignoreInvalidPages": {
+                "type": "boolean",
+                "description": "Whether invalid crawler pages are ignored."
+              },
+              "collectRawHtml": {
+                "type": "boolean",
+                "description": "Whether raw HTML is collected."
+              },
+              "jobType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Wachete monitor job type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Wachete monitor job type."
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor note."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor note."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Wachete monitor definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitor"
+        ],
+        "description": "The created or updated monitor."
+      }
+    },
+    {
+      "id": "wachete.delete_monitor",
+      "service": "wachete",
+      "name": "delete_monitor",
+      "description": "Delete a Wachete monitor by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The monitor ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "A Wachete monitor identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the monitor was deleted."
+          },
+          "id": {
+            "type": "string",
+            "description": "The deleted monitor ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "id"
+        ],
+        "description": "The delete confirmation."
+      }
+    },
+    {
+      "id": "wachete.get_monitor",
+      "service": "wachete",
+      "name": "get_monitor",
+      "description": "Retrieve a Wachete monitor definition by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The monitor ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "A Wachete monitor identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor name."
+              },
+              "method": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The HTTP method used to check the monitored URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The HTTP method used to check the monitored URL."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitored URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitored URL."
+              },
+              "xPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The XPath expression selecting monitored content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The XPath expression selecting monitored content."
+              },
+              "excludeXPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The XPath expression excluding content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The XPath expression excluding content."
+              },
+              "regex": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The regular expression selecting monitored content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The regular expression selecting monitored content."
+              },
+              "alerts": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An alert."
+                    },
+                    "description": "The configured alert conditions."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The configured alert conditions."
+              },
+              "recurrenceInSeconds": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The check interval in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The check interval in seconds."
+              },
+              "folderId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The containing folder ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The containing folder ID."
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The latest monitoring result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest monitoring result."
+              },
+              "notificationEndpoints": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A destination."
+                    },
+                    "description": "The configured notification destinations."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The configured notification destinations."
+              },
+              "dynamicContent": {
+                "type": "boolean",
+                "description": "Whether JavaScript-rendered content is enabled."
+              },
+              "scrollPage": {
+                "type": "boolean",
+                "description": "Whether Wachete scrolls the page while checking it."
+              },
+              "ignoreInvalidPages": {
+                "type": "boolean",
+                "description": "Whether invalid crawler pages are ignored."
+              },
+              "collectRawHtml": {
+                "type": "boolean",
+                "description": "Whether raw HTML is collected."
+              },
+              "jobType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Wachete monitor job type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Wachete monitor job type."
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor note."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor note."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Wachete monitor definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitor"
+        ],
+        "description": "The requested monitor."
+      }
+    },
+    {
+      "id": "wachete.get_monitor_history",
+      "service": "wachete",
+      "name": "get_monitor_history",
+      "description": "Retrieve paginated check history for a Wachete monitor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The monitor ID.",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "description": "The inclusive start of the time interval.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "The inclusive end of the time interval.",
+            "format": "date-time"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of history items to return."
+          },
+          "returnDiff": {
+            "type": "boolean",
+            "description": "Whether to include the diff from the previous value."
+          },
+          "continuationToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Monitor history filters and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lastCheckTimestamp": {
+                  "type": "string",
+                  "description": "The time of the check.",
+                  "format": "date-time"
+                },
+                "valueChangedTimestamp": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time the monitored value changed.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time the monitored value changed."
+                },
+                "raw": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The captured monitored value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The captured monitored value."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The check error, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The check error, when present."
+                },
+                "diff": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operation": {
+                            "type": "integer",
+                            "description": "The Wachete diff operation code."
+                          },
+                          "text": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The changed text."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The changed text."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A diff element."
+                      },
+                      "description": "The changes from the previous value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The changes from the previous value."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Wachete monitor history item."
+            },
+            "description": "The monitor history items."
+          },
+          "continuationToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when complete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "history",
+          "continuationToken"
+        ],
+        "description": "The monitor history and pagination state."
+      }
+    },
+    {
+      "id": "wachete.list_folder_content",
+      "service": "wachete",
+      "name": "list_folder_content",
+      "description": "List monitors, subfolders, and the folder path for a Wachete folder or the root folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "description": "The folder ID. Omit it to list the root folder.",
+            "format": "uuid"
+          },
+          "continuationToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Folder listing and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subfolders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The folder ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The folder name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The folder name."
+                },
+                "parentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent folder ID."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "The number of monitors in the folder."
+                },
+                "failedCount": {
+                  "type": "integer",
+                  "description": "The number of failed monitors in the folder."
+                },
+                "pausedCount": {
+                  "type": "integer",
+                  "description": "The number of paused monitors in the folder."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Wachete folder."
+            },
+            "description": "The child folders."
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor name."
+                },
+                "method": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The HTTP method used to check the monitored URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The HTTP method used to check the monitored URL."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitored URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitored URL."
+                },
+                "xPath": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The XPath expression selecting monitored content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The XPath expression selecting monitored content."
+                },
+                "excludeXPath": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The XPath expression excluding content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The XPath expression excluding content."
+                },
+                "regex": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The regular expression selecting monitored content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The regular expression selecting monitored content."
+                },
+                "alerts": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "An alert."
+                      },
+                      "description": "The configured alert conditions."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The configured alert conditions."
+                },
+                "recurrenceInSeconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The check interval in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The check interval in seconds."
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The containing folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The containing folder ID."
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The latest monitoring result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The latest monitoring result."
+                },
+                "notificationEndpoints": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A destination."
+                      },
+                      "description": "The configured notification destinations."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The configured notification destinations."
+                },
+                "dynamicContent": {
+                  "type": "boolean",
+                  "description": "Whether JavaScript-rendered content is enabled."
+                },
+                "scrollPage": {
+                  "type": "boolean",
+                  "description": "Whether Wachete scrolls the page while checking it."
+                },
+                "ignoreInvalidPages": {
+                  "type": "boolean",
+                  "description": "Whether invalid crawler pages are ignored."
+                },
+                "collectRawHtml": {
+                  "type": "boolean",
+                  "description": "Whether raw HTML is collected."
+                },
+                "jobType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Wachete monitor job type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Wachete monitor job type."
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor note."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Wachete monitor definition."
+            },
+            "description": "The monitors in the folder."
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The folder ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The folder name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The folder name."
+                },
+                "parentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent folder ID."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "The number of monitors in the folder."
+                },
+                "failedCount": {
+                  "type": "integer",
+                  "description": "The number of failed monitors in the folder."
+                },
+                "pausedCount": {
+                  "type": "integer",
+                  "description": "The number of paused monitors in the folder."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Wachete folder."
+            },
+            "description": "The folder ancestry path."
+          },
+          "continuationToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when complete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subfolders",
+          "monitors",
+          "path",
+          "continuationToken"
+        ],
+        "description": "The folder content and pagination state."
+      }
+    },
+    {
+      "id": "wachete.list_notifications",
+      "service": "wachete",
+      "name": "list_notifications",
+      "description": "List Wachete notifications from newest to oldest.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The monitor ID used to filter notifications.",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "description": "The inclusive start of the time interval.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "The inclusive end of the time interval.",
+            "format": "date-time"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of notifications to return."
+          },
+          "continuationToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous request."
+          },
+          "html": {
+            "type": "boolean",
+            "description": "Whether to include HTML-formatted notification content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Notification filters and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The notification ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The notification ID."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alert type name."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "The alert type code."
+                    }
+                  ],
+                  "description": "The Wachete alert type."
+                },
+                "current": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current monitored value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current monitored value."
+                },
+                "comparand": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The comparison value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The comparison value."
+                },
+                "html": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional HTML notification body."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional HTML notification body."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The notification error, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The notification error, when present."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The notification timestamp.",
+                  "format": "date-time"
+                },
+                "serverTime": {
+                  "type": "string",
+                  "description": "The Wachete server timestamp.",
+                  "format": "date-time"
+                },
+                "taskId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The related monitor ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The related monitor ID."
+                },
+                "taskName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The related monitor name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The related monitor name."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitored URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitored URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Wachete notification."
+            },
+            "description": "The matching notifications."
+          },
+          "continuationToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when complete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notifications",
+          "continuationToken"
+        ],
+        "description": "The notifications and pagination state."
+      }
+    }
+  ]
+}

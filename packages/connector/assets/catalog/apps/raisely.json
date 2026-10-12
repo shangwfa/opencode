@@ -1,0 +1,816 @@
+{
+  "service": "raisely",
+  "displayName": "Raisely",
+  "categories": [
+    "Finance",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Campaign Secret Key",
+      "placeholder": "raisely-sk-...",
+      "description": "Raisely campaign secret key used as a Bearer token. Create or view it in Raisely admin, and see the official developer portal at https://raisely.com/developers."
+    }
+  ],
+  "homepageUrl": "https://raisely.com/",
+  "actions": [
+    {
+      "id": "raisely.create_webhook",
+      "service": "raisely",
+      "name": "create_webhook",
+      "description": "Create a Raisely webhook for account-wide or campaign-specific events.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign UUID to restrict events to, or omit it for account-wide events."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Raisely webhook event name such as donation.created."
+            },
+            "description": "The Raisely event names to forward to the webhook."
+          },
+          "secret": {
+            "type": "string",
+            "description": "The shared secret Raisely includes in webhook payloads."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Raisely should send webhook events to."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Create a Raisely webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook UUID."
+              },
+              "url": {
+                "type": "string",
+                "description": "The webhook destination URL.",
+                "format": "uri"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Raisely events delivered to the webhook."
+              },
+              "campaignUuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign UUID, or null for an account-wide webhook."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign UUID, or null for an account-wide webhook."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Raisely webhook returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "The created Raisely webhook response."
+      }
+    },
+    {
+      "id": "raisely.delete_webhook",
+      "service": "raisely",
+      "name": "delete_webhook",
+      "description": "Delete a Raisely webhook and return the deleted record.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely webhook UUID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Delete a Raisely webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook UUID."
+              },
+              "url": {
+                "type": "string",
+                "description": "The webhook destination URL.",
+                "format": "uri"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Raisely events delivered to the webhook."
+              },
+              "campaignUuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign UUID, or null for an account-wide webhook."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign UUID, or null for an account-wide webhook."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Raisely webhook returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "The deleted Raisely webhook response."
+      }
+    },
+    {
+      "id": "raisely.get_campaign",
+      "service": "raisely",
+      "name": "get_campaign",
+      "description": "Fetch one Raisely campaign by UUID, path, or domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign UUID, path, or domain."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private campaign fields."
+          },
+          "pruneConfig": {
+            "type": "boolean",
+            "description": "Whether to omit the large campaign config from the result."
+          },
+          "includeTags": {
+            "type": "boolean",
+            "description": "Whether to include tags attached to the campaign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "Fetch one Raisely campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The campaign UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The campaign name."
+              },
+              "path": {
+                "type": "string",
+                "description": "The campaign path."
+              },
+              "mode": {
+                "type": "string",
+                "description": "The campaign mode."
+              },
+              "status": {
+                "type": "string",
+                "description": "The campaign status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Raisely campaign returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "A Raisely campaign response."
+      }
+    },
+    {
+      "id": "raisely.get_profile",
+      "service": "raisely",
+      "name": "get_profile",
+      "description": "Fetch one Raisely fundraising profile by UUID or path.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profilePath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The profile UUID or path."
+          },
+          "campaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign UUID, path, or domain used for lookup context."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private profile fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profilePath"
+        ],
+        "description": "Fetch one Raisely fundraising profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The profile UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The profile name."
+              },
+              "path": {
+                "type": "string",
+                "description": "The profile path."
+              },
+              "campaignUuid": {
+                "type": "string",
+                "description": "The campaign UUID associated with the profile."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Raisely fundraising profile returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ],
+        "description": "A Raisely fundraising profile response."
+      }
+    },
+    {
+      "id": "raisely.list_campaigns",
+      "service": "raisely",
+      "name": "list_campaigns",
+      "description": "List Raisely campaigns with optional search, filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private record fields."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search query matched against Raisely records."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records to skip."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely record attribute to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The direction to sort records."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A campaign path to filter by."
+          },
+          "mode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A campaign mode to filter by."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A campaign status to filter by."
+          },
+          "pruneConfig": {
+            "type": "boolean",
+            "description": "Whether to omit the large campaign config from private results."
+          },
+          "includeTags": {
+            "type": "boolean",
+            "description": "Whether to include tags attached to each campaign."
+          }
+        },
+        "additionalProperties": false,
+        "description": "List Raisely campaigns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The campaign UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The campaign name."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The campaign path."
+                },
+                "mode": {
+                  "type": "string",
+                  "description": "The campaign mode."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The campaign status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Raisely campaign returned by the API."
+            },
+            "description": "The campaigns returned by Raisely."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of records in this page."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records skipped before this page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Raisely."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaigns",
+          "pagination"
+        ],
+        "description": "A paginated Raisely campaign collection."
+      }
+    },
+    {
+      "id": "raisely.list_profiles",
+      "service": "raisely",
+      "name": "list_profiles",
+      "description": "List fundraising profiles in a Raisely campaign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign UUID, path, or domain."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private record fields."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search query matched against Raisely records."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records to skip."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely record attribute to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The direction to sort records."
+          },
+          "rank": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely value used to rank profiles by total raised."
+          },
+          "rankDonors": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely value used to rank profiles by unique donors."
+          },
+          "rankActivityTotal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely value used to rank profiles by activity total."
+          },
+          "rankActivityTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely value used to rank profiles by activity time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "List fundraising profiles in one Raisely campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The profile UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The profile name."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The profile path."
+                },
+                "campaignUuid": {
+                  "type": "string",
+                  "description": "The campaign UUID associated with the profile."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Raisely fundraising profile returned by the API."
+            },
+            "description": "The fundraising profiles returned by Raisely."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of records in this page."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records skipped before this page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Raisely."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profiles",
+          "pagination"
+        ],
+        "description": "A paginated Raisely profile collection."
+      }
+    },
+    {
+      "id": "raisely.list_webhooks",
+      "service": "raisely",
+      "name": "list_webhooks",
+      "description": "List webhooks configured for a Raisely campaign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign UUID, path, or domain."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private record fields."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search query matched against Raisely records."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records to skip."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely record attribute to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The direction to sort records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "List webhooks configured for one Raisely campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The webhook UUID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The webhook destination URL.",
+                  "format": "uri"
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Raisely events delivered to the webhook."
+                },
+                "campaignUuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign UUID, or null for an account-wide webhook."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign UUID, or null for an account-wide webhook."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Raisely webhook returned by the API."
+            },
+            "description": "The webhooks returned by Raisely."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of records in this page."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records skipped before this page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Raisely."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhooks",
+          "pagination"
+        ],
+        "description": "A paginated Raisely webhook collection."
+      }
+    },
+    {
+      "id": "raisely.update_webhook",
+      "service": "raisely",
+      "name": "update_webhook",
+      "description": "Update a Raisely webhook's events, secret, or destination URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Raisely webhook UUID."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether Raisely should include private webhook fields."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Raisely webhook event name such as profile.updated."
+            },
+            "description": "The Raisely event names to forward to the webhook."
+          },
+          "secret": {
+            "type": "string",
+            "description": "The shared secret Raisely includes in webhook payloads."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Raisely should send webhook events to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Update a Raisely webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook UUID."
+              },
+              "url": {
+                "type": "string",
+                "description": "The webhook destination URL.",
+                "format": "uri"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Raisely events delivered to the webhook."
+              },
+              "campaignUuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign UUID, or null for an account-wide webhook."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign UUID, or null for an account-wide webhook."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Raisely webhook returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "The updated Raisely webhook response."
+      }
+    }
+  ]
+}

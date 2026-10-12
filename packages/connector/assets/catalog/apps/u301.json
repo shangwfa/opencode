@@ -1,0 +1,248 @@
+{
+  "service": "u301",
+  "displayName": "U301",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "uat_...",
+      "description": "U301 API key sent with the Authorization Bearer header. Create it in the U301 dashboard: https://u301.com/app/api-key",
+      "extraFields": [
+        {
+          "key": "workspaceId",
+          "label": "Workspace ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "0196684a-3b57-7000-805b-88c32c3c5dc7",
+          "description": "Workspace identifier required by U301 for multi-tenant routing. Copy it from the U301 dashboard or your API examples after creating a workspace: https://u301.com/docs/u301-js"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://u301.com",
+  "actions": [
+    {
+      "id": "u301.delete_link",
+      "service": "u301",
+      "name": "delete_link",
+      "description": "Delete one U301 short link by its domain/slug identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shortlink": {
+            "type": "string",
+            "minLength": 3,
+            "description": "The short link identifier in the form domain/slug, for example u301.co/abc123.",
+            "pattern": "^(?!https?://)[^/]+/.+"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shortlink"
+        ],
+        "description": "The input payload for deleting one U301 short link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether U301 confirmed the short link deletion."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream success message returned by U301."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream success message returned by U301."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "message"
+        ],
+        "description": "The result returned after deleting one U301 short link."
+      }
+    },
+    {
+      "id": "u301.list_domains",
+      "service": "u301",
+      "name": "list_domains",
+      "description": "List the U301 short-link domains available in the connected workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing U301 domains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The domain name."
+                },
+                "randomCodeLength": {
+                  "type": "integer",
+                  "description": "The random code length used when U301 generates a slug."
+                },
+                "isPrimary": {
+                  "type": "boolean",
+                  "description": "Whether this domain is the primary domain for the workspace."
+                },
+                "isGlobal": {
+                  "type": "boolean",
+                  "description": "Whether this domain is a global U301 domain."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A domain available for U301 short links."
+            },
+            "description": "The domains available in the workspace."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "The domains returned by U301."
+      }
+    },
+    {
+      "id": "u301.shorten_link",
+      "service": "u301",
+      "name": "shorten_link",
+      "description": "Create one U301 short link for a destination URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The destination URL to shorten.",
+            "format": "uri"
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain to use for the short link."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom slug to use instead of a random code."
+          },
+          "reuseExisting": {
+            "type": "boolean",
+            "description": "Whether U301 should reuse an existing short link when the destination URL already exists."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional password required before opening the short link."
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional note stored with the short link."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for creating one U301 short link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique U301 link identifier."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original destination URL."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The short path segment."
+          },
+          "isCustomSlug": {
+            "type": "boolean",
+            "description": "Whether the slug was provided by the user."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain used for the short link."
+          },
+          "isReused": {
+            "type": "boolean",
+            "description": "Whether U301 reused an existing short link for the same URL."
+          },
+          "shortLink": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The final short link in domain/slug form."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional comment stored with the short link."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional comment stored with the short link."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "url",
+          "slug",
+          "isCustomSlug",
+          "domain",
+          "isReused",
+          "shortLink",
+          "comment"
+        ],
+        "description": "The created U301 short link."
+      }
+    }
+  ]
+}

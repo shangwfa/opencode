@@ -1,0 +1,436 @@
+{
+  "service": "agility",
+  "displayName": "Agility CMS",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "AGILITY_CMS_API_KEY",
+      "description": "Agility CMS API key sent with the APIKey header. Find API keys and instance GUIDs in the API Keys section of your Agility CMS instance: https://agilitycms.com/docs/developers/content-fetch-api",
+      "extraFields": [
+        {
+          "key": "guid",
+          "label": "Instance GUID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "AGILITY_CMS_GUID",
+          "description": "Optional Agility CMS instance GUID used to validate the key against content models. Find it in the API Keys section of your Agility CMS instance: https://agilitycms.com/docs/developers/content-fetch-api"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://agilitycms.com/",
+  "actions": [
+    {
+      "id": "agility.get_content_item",
+      "service": "agility",
+      "name": "get_content_item",
+      "description": "Retrieve an Agility CMS content item by content ID for a locale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale code to retrieve content for."
+          },
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "The Agility CMS content ID of the requested item."
+          },
+          "contentLinkDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The maximum level to expand linked content."
+          },
+          "expandAllContentLinks": {
+            "type": "boolean",
+            "description": "Whether to expand entire linked content references, including lists and grid-linked items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guid",
+          "apiType",
+          "locale",
+          "id"
+        ],
+        "description": "Request parameters for retrieving an Agility CMS content item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "description": "Raw Agility CMS response payload."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS content item response."
+      }
+    },
+    {
+      "id": "agility.get_content_list",
+      "service": "agility",
+      "name": "get_content_list",
+      "description": "Retrieve an Agility CMS content list by reference name with optional pagination, filtering, sorting, and linked-content expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale code to retrieve content for."
+          },
+          "referenceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique reference name of the content list to retrieve in the current locale."
+          },
+          "contentLinkDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The maximum level to expand linked content."
+          },
+          "expandAllContentLinks": {
+            "type": "boolean",
+            "description": "Whether to expand entire linked content references, including lists and grid-linked items."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of fields to return."
+          },
+          "take": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of items to retrieve. Agility CMS allows up to 250."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip for pagination."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS list filter expression to apply."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field path to sort results by, such as fields.title or properties.created."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The direction to sort list results by."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guid",
+          "apiType",
+          "locale",
+          "referenceName"
+        ],
+        "description": "Request parameters for retrieving an Agility CMS content list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "description": "Raw Agility CMS response payload."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS content list response."
+      }
+    },
+    {
+      "id": "agility.get_flat_sitemap",
+      "service": "agility",
+      "name": "get_flat_sitemap",
+      "description": "Retrieve an Agility CMS flat sitemap keyed by page path for a channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale code to retrieve content for."
+          },
+          "channelName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reference name of the digital channel, such as website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for retrieving an Agility CMS flat sitemap."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sitemap": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Flat sitemap keyed by page path."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS flat sitemap response."
+      }
+    },
+    {
+      "id": "agility.get_nested_sitemap",
+      "service": "agility",
+      "name": "get_nested_sitemap",
+      "description": "Retrieve an Agility CMS nested sitemap for generating menus or navigation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale code to retrieve content for."
+          },
+          "channelName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reference name of the digital channel, such as website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for retrieving an Agility CMS nested sitemap."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sitemap": {
+            "type": "array",
+            "items": {
+              "description": "Raw Agility CMS response payload."
+            },
+            "description": "Nested sitemap entries returned by Agility CMS."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS nested sitemap response."
+      }
+    },
+    {
+      "id": "agility.get_page",
+      "service": "agility",
+      "name": "get_page",
+      "description": "Retrieve an Agility CMS page by page ID for a locale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The locale code to retrieve content for."
+          },
+          "id": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "The unique Agility CMS page ID to retrieve."
+          },
+          "contentLinkDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The maximum level to expand linked content."
+          },
+          "expandAllContentLinks": {
+            "type": "boolean",
+            "description": "Whether to expand entire linked content references, including lists and grid-linked items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guid",
+          "apiType",
+          "locale",
+          "id"
+        ],
+        "description": "Request parameters for retrieving an Agility CMS page by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "description": "Raw Agility CMS response payload."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS page response."
+      }
+    },
+    {
+      "id": "agility.list_content_models",
+      "service": "agility",
+      "name": "list_content_models",
+      "description": "List content models for an Agility CMS instance using the Content Fetch API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Agility CMS instance GUID from the API Keys section."
+          },
+          "apiType": {
+            "type": "string",
+            "enum": [
+              "fetch",
+              "preview"
+            ],
+            "description": "The Agility Content Fetch API type to query."
+          },
+          "lastModifiedDate": {
+            "type": "string",
+            "description": "Only return model updates after this last modified date and time.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guid",
+          "apiType"
+        ],
+        "description": "Request parameters for listing Agility CMS content models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "description": "Raw Agility CMS response payload."
+            },
+            "description": "Content models returned by Agility CMS."
+          },
+          "raw": {
+            "description": "Raw Agility CMS response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Agility CMS content models response."
+      }
+    }
+  ]
+}

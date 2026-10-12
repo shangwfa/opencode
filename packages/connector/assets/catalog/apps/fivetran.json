@@ -1,0 +1,880 @@
+{
+  "service": "fivetran",
+  "displayName": "Fivetran",
+  "description": "Query Fivetran transformation projects, external log services, and hybrid deployment agents.",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "FIVETRAN_API_KEY",
+          "description": "Scoped or System API key created in Fivetran. Fivetran authenticates REST API requests with an API key and API secret using HTTP Basic authentication: https://fivetran.com/docs/rest-api/getting-started."
+        },
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "FIVETRAN_API_SECRET",
+          "description": "Secret paired with the Fivetran Scoped or System API key. Store it securely because Fivetran only displays it when it is generated."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_transformation_projects",
+        "input": {
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://fivetran.com",
+  "actions": [
+    {
+      "id": "fivetran.get_hybrid_deployment_agent",
+      "service": "fivetran",
+      "name": "get_hybrid_deployment_agent",
+      "description": "Retrieve details and current connection usage for one Fivetran hybrid deployment agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Fivetran hybrid deployment agent identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "Identifier of the Fivetran hybrid deployment agent to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique Fivetran hybrid deployment agent identifier."
+              },
+              "version": {
+                "type": "string",
+                "description": "Installed hybrid deployment agent version."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the hybrid deployment agent is enabled."
+              },
+              "online": {
+                "type": "boolean",
+                "description": "Whether the hybrid deployment agent is online."
+              },
+              "display_name": {
+                "type": "string",
+                "description": "Display name of the hybrid deployment agent."
+              },
+              "group_id": {
+                "type": "string",
+                "description": "Fivetran group associated with the agent."
+              },
+              "registered_at": {
+                "type": "string",
+                "description": "Time when the agent was registered.",
+                "format": "date-time"
+              },
+              "created_by": {
+                "type": "string",
+                "description": "Actor that created the agent."
+              },
+              "deployment_type": {
+                "type": "string",
+                "enum": [
+                  "DOCKER",
+                  "PODMAN",
+                  "KUBERNETES",
+                  "SNOWPARK"
+                ],
+                "description": "Agent runtime environment."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "Time when the agent was last updated.",
+                "format": "date-time"
+              },
+              "last_used_at": {
+                "type": "string",
+                "description": "Time when the agent was last used.",
+                "format": "date-time"
+              },
+              "usage": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "schema": {
+                      "type": "string",
+                      "description": "Connection name and source schema name within the Fivetran group."
+                    },
+                    "service": {
+                      "type": "string",
+                      "description": "Fivetran connector type name."
+                    },
+                    "connection_id": {
+                      "type": "string",
+                      "description": "Unique Fivetran connection identifier."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "schema",
+                    "service",
+                    "connection_id"
+                  ],
+                  "description": "A connection using a hybrid deployment agent."
+                },
+                "description": "Connections currently using the hybrid deployment agent."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "version",
+              "enabled",
+              "online",
+              "display_name",
+              "group_id",
+              "registered_at",
+              "created_by",
+              "deployment_type",
+              "updated_at",
+              "last_used_at"
+            ],
+            "description": "A Fivetran hybrid deployment agent and its current usage."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Fivetran hybrid deployment agent result."
+      }
+    },
+    {
+      "id": "fivetran.get_log_service",
+      "service": "fivetran",
+      "name": "get_log_service",
+      "description": "Retrieve detailed information for one group-level Fivetran external log service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Fivetran log service identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "logId"
+        ],
+        "description": "Identifier of the Fivetran log service to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logService": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique Fivetran log service identifier."
+              },
+              "service": {
+                "type": "string",
+                "description": "Fivetran log service type, such as cloudwatch, datadog_log, grafana_loki, splunkLog, or stackdriver."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the log service is enabled."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "setup_state": {
+                    "type": "string",
+                    "enum": [
+                      "connected",
+                      "broken",
+                      "incomplete"
+                    ],
+                    "description": "Current log service setup state."
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Provider-defined alert code."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "Human-readable description of the issue."
+                        },
+                        "details": {
+                          "type": "string",
+                          "description": "Additional context for the alert."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An issue reported for a Fivetran log service."
+                    },
+                    "description": "Alerts describing log service configuration issues."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Current Fivetran log service setup status."
+              },
+              "setup_tests": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "Human-readable name of the setup test step."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PASSED",
+                        "SKIPPED",
+                        "WARNING",
+                        "FAILED",
+                        "JOB_FAILED"
+                      ],
+                      "description": "Result of the setup test step."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable result message for the setup test step."
+                    },
+                    "details": {
+                      "description": "Additional diagnostic information supplied by Fivetran."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "description": "A Fivetran setup test result."
+                },
+                "description": "Results from the most recent setup test run."
+              },
+              "config": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Service-specific logging configuration returned by Fivetran."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "service",
+              "enabled"
+            ],
+            "description": "A Fivetran external log service."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Fivetran external log service result."
+      }
+    },
+    {
+      "id": "fivetran.get_transformation_project",
+      "service": "fivetran",
+      "name": "get_transformation_project",
+      "description": "Retrieve detailed information for one Fivetran transformation project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Fivetran transformation project identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Identifier of the Fivetran transformation project to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique Fivetran transformation project identifier."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "DBT_CORE"
+                ],
+                "description": "Transformation project type."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "Time when the transformation project was created.",
+                "format": "date-time"
+              },
+              "created_by_id": {
+                "type": "string",
+                "description": "Identifier of the user or system key that created the project."
+              },
+              "group_id": {
+                "type": "string",
+                "description": "Identifier of the Fivetran group targeted by the project."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_READY",
+                  "READY",
+                  "ERROR"
+                ],
+                "description": "Current transformation project status."
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Errors reported while processing or setting up the project."
+              },
+              "setup_tests": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "Human-readable name of the setup test step."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "PASSED",
+                        "SKIPPED",
+                        "WARNING",
+                        "FAILED",
+                        "JOB_FAILED"
+                      ],
+                      "description": "Result of the setup test step."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable result message for the setup test step."
+                    },
+                    "details": {
+                      "description": "Additional diagnostic information supplied by Fivetran."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "description": "A Fivetran setup test result."
+                },
+                "description": "Results from the latest project setup tests."
+              },
+              "project_config": {
+                "type": "object",
+                "properties": {
+                  "dbt_version": {
+                    "type": "string",
+                    "description": "dbt version configured for the project."
+                  },
+                  "default_schema": {
+                    "type": "string",
+                    "description": "Default destination schema."
+                  },
+                  "git_remote_url": {
+                    "type": "string",
+                    "description": "Git remote URL containing the dbt project."
+                  },
+                  "folder_path": {
+                    "type": "string",
+                    "description": "Path to the dbt project within the repository."
+                  },
+                  "git_branch": {
+                    "type": "string",
+                    "description": "Git branch used by the dbt project."
+                  },
+                  "threads": {
+                    "type": "integer",
+                    "description": "Number of dbt execution threads."
+                  },
+                  "target_name": {
+                    "type": "string",
+                    "description": "Default dbt target name."
+                  },
+                  "environment_vars": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Environment variables configured for the dbt project."
+                  },
+                  "public_key": {
+                    "type": "string",
+                    "description": "Public key used to grant Fivetran SSH access to the Git repository."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "dbt Core project configuration returned by Fivetran."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Detailed Fivetran transformation project information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Fivetran transformation project result."
+      }
+    },
+    {
+      "id": "fivetran.list_hybrid_deployment_agents",
+      "service": "fivetran",
+      "name": "list_hybrid_deployment_agents",
+      "description": "List Fivetran hybrid deployment agents with their connection usage, optionally filtered by group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned as nextCursor by a previous Fivetran list action."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Number of records to return. Fivetran accepts values from 1 through 1000 and defaults to 100."
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return agents associated with this Fivetran group only."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Fivetran hybrid deployment agents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Fivetran hybrid deployment agent identifier."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Installed hybrid deployment agent version."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the hybrid deployment agent is enabled."
+                },
+                "online": {
+                  "type": "boolean",
+                  "description": "Whether the hybrid deployment agent is online."
+                },
+                "display_name": {
+                  "type": "string",
+                  "description": "Display name of the hybrid deployment agent."
+                },
+                "group_id": {
+                  "type": "string",
+                  "description": "Fivetran group associated with the agent."
+                },
+                "registered_at": {
+                  "type": "string",
+                  "description": "Time when the agent was registered.",
+                  "format": "date-time"
+                },
+                "created_by": {
+                  "type": "string",
+                  "description": "Actor that created the agent."
+                },
+                "deployment_type": {
+                  "type": "string",
+                  "enum": [
+                    "DOCKER",
+                    "PODMAN",
+                    "KUBERNETES",
+                    "SNOWPARK"
+                  ],
+                  "description": "Agent runtime environment."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Time when the agent was last updated.",
+                  "format": "date-time"
+                },
+                "last_used_at": {
+                  "type": "string",
+                  "description": "Time when the agent was last used.",
+                  "format": "date-time"
+                },
+                "usage": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "schema": {
+                        "type": "string",
+                        "description": "Connection name and source schema name within the Fivetran group."
+                      },
+                      "service": {
+                        "type": "string",
+                        "description": "Fivetran connector type name."
+                      },
+                      "connection_id": {
+                        "type": "string",
+                        "description": "Unique Fivetran connection identifier."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "schema",
+                      "service",
+                      "connection_id"
+                    ],
+                    "description": "A connection using a hybrid deployment agent."
+                  },
+                  "description": "Connections currently using the hybrid deployment agent."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "version",
+                "enabled",
+                "online",
+                "display_name",
+                "group_id",
+                "registered_at",
+                "created_by",
+                "deployment_type",
+                "updated_at",
+                "last_used_at"
+              ],
+              "description": "A Fivetran hybrid deployment agent and its current usage."
+            },
+            "description": "Hybrid deployment agents returned for this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Fivetran hybrid deployment agents."
+      },
+      "followUpActions": [
+        "fivetran.get_hybrid_deployment_agent"
+      ]
+    },
+    {
+      "id": "fivetran.list_log_services",
+      "service": "fivetran",
+      "name": "list_log_services",
+      "description": "List external log services accessible within the configured Fivetran account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned as nextCursor by a previous Fivetran list action."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Number of records to return. Fivetran accepts values from 1 through 1000 and defaults to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for listing Fivetran external log services."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logServices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Fivetran log service identifier."
+                },
+                "service": {
+                  "type": "string",
+                  "description": "Fivetran log service type, such as cloudwatch, datadog_log, grafana_loki, splunkLog, or stackdriver."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the log service is enabled."
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "setup_state": {
+                      "type": "string",
+                      "enum": [
+                        "connected",
+                        "broken",
+                        "incomplete"
+                      ],
+                      "description": "Current log service setup state."
+                    },
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "description": "Provider-defined alert code."
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Human-readable description of the issue."
+                          },
+                          "details": {
+                            "type": "string",
+                            "description": "Additional context for the alert."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "An issue reported for a Fivetran log service."
+                      },
+                      "description": "Alerts describing log service configuration issues."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Current Fivetran log service setup status."
+                },
+                "setup_tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "description": "Human-readable name of the setup test step."
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "PASSED",
+                          "SKIPPED",
+                          "WARNING",
+                          "FAILED",
+                          "JOB_FAILED"
+                        ],
+                        "description": "Result of the setup test step."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Human-readable result message for the setup test step."
+                      },
+                      "details": {
+                        "description": "Additional diagnostic information supplied by Fivetran."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "title",
+                      "status"
+                    ],
+                    "description": "A Fivetran setup test result."
+                  },
+                  "description": "Results from the most recent setup test run."
+                },
+                "config": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Service-specific logging configuration returned by Fivetran."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "service",
+                "enabled"
+              ],
+              "description": "A Fivetran external log service."
+            },
+            "description": "External log services returned for this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Fivetran external log services."
+      },
+      "followUpActions": [
+        "fivetran.get_log_service"
+      ]
+    },
+    {
+      "id": "fivetran.list_transformation_projects",
+      "service": "fivetran",
+      "name": "list_transformation_projects",
+      "description": "List transformation projects accessible to the configured Fivetran API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned as nextCursor by a previous Fivetran list action."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Number of records to return. Fivetran accepts values from 1 through 1000 and defaults to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for listing Fivetran transformation projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Fivetran transformation project identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "DBT_CORE"
+                  ],
+                  "description": "Transformation project type."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Time when the transformation project was created.",
+                  "format": "date-time"
+                },
+                "created_by_id": {
+                  "type": "string",
+                  "description": "Identifier of the user or system key that created the project."
+                },
+                "group_id": {
+                  "type": "string",
+                  "description": "Identifier of the Fivetran group targeted by the project."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Fivetran transformation project summary."
+            },
+            "description": "Transformation projects returned for this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Fivetran transformation projects."
+      },
+      "followUpActions": [
+        "fivetran.get_transformation_project"
+      ]
+    }
+  ]
+}

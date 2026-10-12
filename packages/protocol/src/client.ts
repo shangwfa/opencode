@@ -47,6 +47,7 @@ export const groupNames = {
   "server.integration": "integration",
   "server.websearch": "websearch",
   "server.credential": "credential",
+  "server.connector": "connector",
   "server.form": "form",
   "server.permission": "permission",
   "server.fs": "file",

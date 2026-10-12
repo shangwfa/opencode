@@ -1,0 +1,411 @@
+{
+  "service": "enormail",
+  "displayName": "Enormail",
+  "homepageUrl": "https://enormail.eu",
+  "iconUrl": "https://enormail.eu/icon.svg",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ENORMAIL_API_KEY",
+      "description": "Create an API key in your Enormail account at https://app.enormail.eu/account/api. The key authenticates requests using HTTP Basic authentication."
+    }
+  ],
+  "actions": [
+    {
+      "id": "enormail.get_account",
+      "service": "enormail",
+      "name": "get_account",
+      "description": "Get the authenticated Enormail account profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Account query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Account ID."
+          },
+          "firstname": {
+            "type": "string",
+            "description": "Account first name."
+          },
+          "lastname": {
+            "type": "string",
+            "description": "Account last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Account email address."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Account creation timestamp."
+          },
+          "lastlogin_at": {
+            "type": "string",
+            "description": "Last login timestamp."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Enormail account profile."
+      }
+    },
+    {
+      "id": "enormail.get_contact",
+      "service": "enormail",
+      "name": "get_contact",
+      "description": "Get an Enormail contact by mailing list and email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enormail mailing list ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "Contact email address.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listid",
+          "email"
+        ],
+        "description": "Contact lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "listid": {
+            "type": "string",
+            "description": "Mailing list ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "Contact email address."
+          },
+          "state": {
+            "type": "string",
+            "description": "Subscription state."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact profile with upstream custom fields preserved."
+      }
+    },
+    {
+      "id": "enormail.get_list",
+      "service": "enormail",
+      "name": "get_list",
+      "description": "Get an Enormail mailing list and its subscriber counts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enormail mailing list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listid"
+        ],
+        "description": "Mailing list identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "listid": {
+            "type": "string",
+            "description": "Mailing list ID."
+          },
+          "title": {
+            "type": "string",
+            "description": "Mailing list title."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mailing list details with upstream counts and timestamps."
+      }
+    },
+    {
+      "id": "enormail.get_mailing_stats",
+      "service": "enormail",
+      "name": "get_mailing_stats",
+      "description": "Get delivery, open, click, bounce, and unsubscribe statistics for a sent Enormail mailing.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailingid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enormail mailing ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mailingid"
+        ],
+        "description": "Sent mailing identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mailingid": {
+            "type": "string",
+            "description": "Mailing ID."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Delivery and engagement counters and ratios."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Sent mailing metadata and statistics."
+      }
+    },
+    {
+      "id": "enormail.list_contacts",
+      "service": "enormail",
+      "name": "list_contacts",
+      "description": "List one page of Enormail contacts in a mailing list by subscription state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Enormail mailing list ID."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "unconfirmed",
+              "unsubscribed",
+              "bounced"
+            ],
+            "description": "Subscription state to retrieve."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listid",
+          "state"
+        ],
+        "description": "Contact list query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Enormail resource with upstream fields preserved."
+            },
+            "description": "Resources on this page."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching resources."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of resources per page."
+          },
+          "number_of_pages": {
+            "type": "integer",
+            "description": "Total number of pages."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "Current page number."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One page of Enormail resources and pagination metadata."
+      }
+    },
+    {
+      "id": "enormail.list_lists",
+      "service": "enormail",
+      "name": "list_lists",
+      "description": "List one page of Enormail mailing lists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailing list query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Enormail resource with upstream fields preserved."
+            },
+            "description": "Mailing lists on this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lists"
+        ],
+        "description": "Mailing list collection."
+      }
+    },
+    {
+      "id": "enormail.list_mailings",
+      "service": "enormail",
+      "name": "list_mailings",
+      "description": "List one page of sent, draft, or scheduled Enormail mailings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "drafts",
+              "scheduled"
+            ],
+            "description": "Mailing state to retrieve."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "state"
+        ],
+        "description": "Mailing query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Enormail resource with upstream fields preserved."
+            },
+            "description": "Resources on this page."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching resources."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of resources per page."
+          },
+          "number_of_pages": {
+            "type": "integer",
+            "description": "Total number of pages."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "Current page number."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One page of Enormail resources and pagination metadata."
+      }
+    },
+    {
+      "id": "enormail.list_senders",
+      "service": "enormail",
+      "name": "list_senders",
+      "description": "List allowed sender email addresses for the Enormail account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Sender query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "senders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Sender email address."
+            },
+            "description": "Allowed sender addresses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "senders"
+        ],
+        "description": "Allowed senders."
+      }
+    }
+  ]
+}

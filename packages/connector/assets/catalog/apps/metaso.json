@@ -1,0 +1,1091 @@
+{
+  "service": "metaso",
+  "displayName": "Metaso",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "mk-xxxxxxxxxxxxxxxx",
+      "description": "Metaso API key used with the Authorization Bearer header. Create or copy it on the API Keys page: https://metaso.cn/search-api/api-keys"
+    }
+  ],
+  "homepageUrl": "https://metaso.cn",
+  "actions": [
+    {
+      "id": "metaso.create_chat_completion",
+      "service": "metaso",
+      "name": "create_chat_completion",
+      "description": "Create one non-streaming Metaso chat completion grounded by the requested Metaso scope.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "webpage",
+              "document",
+              "paper",
+              "scholar",
+              "image",
+              "video",
+              "podcast"
+            ],
+            "description": "The Metaso search scope."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "fast_thinking",
+              "ds-r1"
+            ],
+            "description": "The Metaso chat model identifier."
+          },
+          "conciseSnippet": {
+            "type": "boolean",
+            "description": "Whether to request concise snippets in grounding results."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The message author role."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The plain-text message content."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A chat message sent to Metaso."
+            },
+            "description": "The ordered chat messages.",
+            "minItems": 1
+          },
+          "message": {
+            "type": "string",
+            "description": "A convenience single user message that is converted into messages."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. Use the action that matches the desired mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for the Metaso non-streaming chat completion action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The object type returned by Metaso."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the response was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model identifier used for the response."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "description": "The assistant role returned by Metaso."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The assistant message content."
+                    },
+                    "citations": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "A JSON object returned by Metaso."
+                          },
+                          "description": "A list of JSON objects returned by Metaso."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A list of JSON objects returned by Metaso."
+                    },
+                    "highlights": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "A JSON object returned by Metaso."
+                          },
+                          "description": "A list of JSON objects returned by Metaso."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A list of JSON objects returned by Metaso."
+                    },
+                    "reasoning_content": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The optional reasoning content returned by Metaso."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The optional reasoning content returned by Metaso."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The assistant message payload returned by Metaso."
+                },
+                "delta": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "A JSON object returned by Metaso."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A JSON object returned by Metaso."
+                },
+                "finish_reason": {
+                  "type": "string",
+                  "description": "The reason why generation stopped."
+                },
+                "logprobs": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "A JSON object returned by Metaso."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A JSON object returned by Metaso."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "index"
+              ],
+              "description": "One chat completion choice returned by Metaso."
+            },
+            "description": "The completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "integer",
+                "description": "The credit cost reported by Metaso."
+              },
+              "prompt_tokens": {
+                "type": "integer",
+                "description": "The prompt token count."
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "The completion token count."
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "The total token count."
+              },
+              "prompt_tokens_details": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A JSON object returned by Metaso."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A JSON object returned by Metaso."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The usage payload returned by Metaso."
+          },
+          "result_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional result identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional result identifier."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "object",
+          "created",
+          "choices"
+        ],
+        "description": "The non-streaming response payload for Metaso chat completions."
+      }
+    },
+    {
+      "id": "metaso.create_chat_completion_stream",
+      "service": "metaso",
+      "name": "create_chat_completion_stream",
+      "description": "Consume a streamed Metaso chat completion and return the ordered chunks plus aggregated assistant content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "webpage",
+              "document",
+              "paper",
+              "scholar",
+              "image",
+              "video",
+              "podcast"
+            ],
+            "description": "The Metaso search scope."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "fast_thinking",
+              "ds-r1"
+            ],
+            "description": "The Metaso chat model identifier."
+          },
+          "conciseSnippet": {
+            "type": "boolean",
+            "description": "Whether to request concise snippets in grounding results."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The message author role."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The plain-text message content."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A chat message sent to Metaso."
+            },
+            "description": "The ordered chat messages.",
+            "minItems": 1
+          },
+          "message": {
+            "type": "string",
+            "description": "A convenience single user message that is converted into messages."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. Use the action that matches the desired mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for the Metaso streaming chat completion action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chunks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The chat completion identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by Metaso."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when the chunk was created."
+                },
+                "model": {
+                  "type": "string",
+                  "description": "The model identifier used for the response."
+                },
+                "choices": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer",
+                        "description": "The choice index."
+                      },
+                      "message": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "description": "The assistant role returned by Metaso."
+                          },
+                          "content": {
+                            "type": "string",
+                            "description": "The assistant message content."
+                          },
+                          "citations": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true,
+                                  "description": "A JSON object returned by Metaso."
+                                },
+                                "description": "A list of JSON objects returned by Metaso."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A list of JSON objects returned by Metaso."
+                          },
+                          "highlights": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": true,
+                                  "description": "A JSON object returned by Metaso."
+                                },
+                                "description": "A list of JSON objects returned by Metaso."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A list of JSON objects returned by Metaso."
+                          },
+                          "reasoning_content": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The optional reasoning content returned by Metaso."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The optional reasoning content returned by Metaso."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "The assistant message payload returned by Metaso."
+                      },
+                      "delta": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "A JSON object returned by Metaso."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A JSON object returned by Metaso."
+                      },
+                      "finish_reason": {
+                        "type": "string",
+                        "description": "The reason why generation stopped."
+                      },
+                      "logprobs": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "A JSON object returned by Metaso."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A JSON object returned by Metaso."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "index"
+                    ],
+                    "description": "One chat completion choice returned by Metaso."
+                  },
+                  "description": "The streamed completion choices."
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "credits": {
+                      "type": "integer",
+                      "description": "The credit cost reported by Metaso."
+                    },
+                    "prompt_tokens": {
+                      "type": "integer",
+                      "description": "The prompt token count."
+                    },
+                    "completion_tokens": {
+                      "type": "integer",
+                      "description": "The completion token count."
+                    },
+                    "total_tokens": {
+                      "type": "integer",
+                      "description": "The total token count."
+                    },
+                    "prompt_tokens_details": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "A JSON object returned by Metaso."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A JSON object returned by Metaso."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The usage payload returned by Metaso."
+                },
+                "result_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional result identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional result identifier."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "object",
+                "created",
+                "choices"
+              ],
+              "description": "One streamed Metaso chat completion chunk."
+            },
+            "description": "The ordered stream chunks."
+          },
+          "finalChunk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The chat completion identifier."
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "The object type returned by Metaso."
+                  },
+                  "created": {
+                    "type": "integer",
+                    "description": "The Unix timestamp when the chunk was created."
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "The model identifier used for the response."
+                  },
+                  "choices": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "index": {
+                          "type": "integer",
+                          "description": "The choice index."
+                        },
+                        "message": {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "description": "The assistant role returned by Metaso."
+                            },
+                            "content": {
+                              "type": "string",
+                              "description": "The assistant message content."
+                            },
+                            "citations": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "A JSON object returned by Metaso."
+                                  },
+                                  "description": "A list of JSON objects returned by Metaso."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "A list of JSON objects returned by Metaso."
+                            },
+                            "highlights": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "additionalProperties": true,
+                                    "description": "A JSON object returned by Metaso."
+                                  },
+                                  "description": "A list of JSON objects returned by Metaso."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "A list of JSON objects returned by Metaso."
+                            },
+                            "reasoning_content": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "The optional reasoning content returned by Metaso."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The optional reasoning content returned by Metaso."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The assistant message payload returned by Metaso."
+                        },
+                        "delta": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "description": "A JSON object returned by Metaso."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A JSON object returned by Metaso."
+                        },
+                        "finish_reason": {
+                          "type": "string",
+                          "description": "The reason why generation stopped."
+                        },
+                        "logprobs": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "description": "A JSON object returned by Metaso."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A JSON object returned by Metaso."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "index"
+                      ],
+                      "description": "One chat completion choice returned by Metaso."
+                    },
+                    "description": "The streamed completion choices."
+                  },
+                  "usage": {
+                    "type": "object",
+                    "properties": {
+                      "credits": {
+                        "type": "integer",
+                        "description": "The credit cost reported by Metaso."
+                      },
+                      "prompt_tokens": {
+                        "type": "integer",
+                        "description": "The prompt token count."
+                      },
+                      "completion_tokens": {
+                        "type": "integer",
+                        "description": "The completion token count."
+                      },
+                      "total_tokens": {
+                        "type": "integer",
+                        "description": "The total token count."
+                      },
+                      "prompt_tokens_details": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "A JSON object returned by Metaso."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "A JSON object returned by Metaso."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "The usage payload returned by Metaso."
+                  },
+                  "result_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The optional result identifier."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The optional result identifier."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "object",
+                  "created",
+                  "choices"
+                ],
+                "description": "One streamed Metaso chat completion chunk."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One streamed Metaso chat completion chunk."
+          },
+          "combinedContent": {
+            "type": "string",
+            "description": "The concatenated assistant content from stream deltas."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chunks",
+          "finalChunk",
+          "combinedContent"
+        ],
+        "description": "The aggregated streamed response payload for Metaso chat completions."
+      }
+    },
+    {
+      "id": "metaso.read_webpage",
+      "service": "metaso",
+      "name": "read_webpage",
+      "description": "Read one webpage with Metaso and return either the extracted markdown string or the structured JSON payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The webpage URL to read.",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "json"
+            ],
+            "description": "The output format returned by the Metaso reader."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "format"
+        ],
+        "description": "The input payload for the Metaso reader action."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "The markdown string returned when format is markdown."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "The webpage title extracted by Metaso."
+              },
+              "url": {
+                "type": "string",
+                "description": "The source URL that was read."
+              },
+              "author": {
+                "type": "string",
+                "description": "The author name extracted by Metaso."
+              },
+              "date": {
+                "type": "string",
+                "description": "The published date extracted by Metaso."
+              },
+              "markdown": {
+                "type": "string",
+                "description": "The extracted markdown body."
+              },
+              "credits": {
+                "type": "integer",
+                "description": "The credit cost reported by Metaso."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The JSON response payload for the Metaso reader action."
+          }
+        ],
+        "description": "The response payload for the Metaso webpage reader action."
+      }
+    },
+    {
+      "id": "metaso.search",
+      "service": "metaso",
+      "name": "search",
+      "description": "Search webpages, documents, papers, images, videos, or podcasts with the Metaso search API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "webpage",
+              "document",
+              "paper",
+              "scholar",
+              "image",
+              "video",
+              "podcast"
+            ],
+            "description": "The Metaso search scope."
+          },
+          "includeSummary": {
+            "type": "boolean",
+            "description": "Whether Metaso should use webpage summaries to improve recall."
+          },
+          "includeRawContent": {
+            "type": "boolean",
+            "description": "Whether Metaso should fetch raw webpage content."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based results page number to return."
+          },
+          "conciseSnippet": {
+            "type": "boolean",
+            "description": "Whether to return concise snippet matches."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for the Metaso search action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "integer",
+            "description": "The credit cost reported by Metaso."
+          },
+          "searchParameters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A JSON object returned by Metaso."
+          },
+          "webpages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The canonical result URL."
+                },
+                "score": {
+                  "type": "string",
+                  "description": "The relevance score label returned by Metaso."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The snippet returned by Metaso."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "The one-based result position."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One author name returned by Metaso."
+                  },
+                  "description": "The author list returned by Metaso."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The published date returned by Metaso."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "title",
+                "link"
+              ],
+              "description": "One Metaso search result item."
+            },
+            "description": "The webpage results returned by Metaso."
+          },
+          "scholars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The canonical result URL."
+                },
+                "score": {
+                  "type": "string",
+                  "description": "The relevance score label returned by Metaso."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The snippet returned by Metaso."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "The one-based result position."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One author name returned by Metaso."
+                  },
+                  "description": "The author list returned by Metaso."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The published date returned by Metaso."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "title",
+                "link"
+              ],
+              "description": "One Metaso search result item."
+            },
+            "description": "The scholar results returned by Metaso."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The canonical result URL."
+                },
+                "score": {
+                  "type": "string",
+                  "description": "The relevance score label returned by Metaso."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The snippet returned by Metaso."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "The one-based result position."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One author name returned by Metaso."
+                  },
+                  "description": "The author list returned by Metaso."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The published date returned by Metaso."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "title",
+                "link"
+              ],
+              "description": "One Metaso search result item."
+            },
+            "description": "The document results returned by Metaso."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by Metaso."
+            },
+            "description": "A list of JSON objects returned by Metaso."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by Metaso."
+            },
+            "description": "A list of JSON objects returned by Metaso."
+          },
+          "podcasts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by Metaso."
+            },
+            "description": "A list of JSON objects returned by Metaso."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matched results."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "credits",
+          "searchParameters"
+        ],
+        "description": "The response payload for the Metaso search action."
+      }
+    }
+  ]
+}

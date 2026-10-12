@@ -1,0 +1,631 @@
+{
+  "service": "unione",
+  "displayName": "UniOne",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "UniOne API key",
+      "description": "UniOne user or project API key used with the X-API-KEY header. Create or view keys in account settings or project settings: https://cp.unione.io/en/user/info/api."
+    }
+  ],
+  "homepageUrl": "https://unione.io",
+  "actions": [
+    {
+      "id": "unione.get_account_info",
+      "service": "unione",
+      "name": "get_account_info",
+      "description": "Get UniOne user or project information for the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API operation status."
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "Unique UniOne user identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "UniOne account email address.",
+            "format": "email"
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Project identifier when the API key belongs to a project."
+          },
+          "project_name": {
+            "type": "string",
+            "description": "Project name when the API key belongs to a project."
+          },
+          "project_accounting": {
+            "type": "object",
+            "properties": {
+              "email_counter": {
+                "type": "integer",
+                "description": "Number of emails sent by the project counter."
+              },
+              "email_counter_limit": {
+                "type": "integer",
+                "description": "Current project email counter limit."
+              },
+              "email_counter_mode": {
+                "type": "string",
+                "description": "Project email counter mode."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Project email counters returned by UniOne."
+          },
+          "accounting": {
+            "type": "object",
+            "properties": {
+              "period_start": {
+                "type": "string",
+                "description": "UTC start time of the accounting period."
+              },
+              "period_end": {
+                "type": "string",
+                "description": "UTC end time of the accounting period."
+              },
+              "emails_included": {
+                "type": "integer",
+                "description": "Number of emails included in the accounting period."
+              },
+              "emails_sent": {
+                "type": "integer",
+                "description": "Number of emails sent during the accounting period."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Accounting counters returned by UniOne."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "user_id",
+          "email"
+        ],
+        "description": "User or project information returned by UniOne."
+      }
+    },
+    {
+      "id": "unione.list_suppressions",
+      "service": "unione",
+      "name": "list_suppressions",
+      "description": "List UniOne suppressed recipients with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cause": {
+            "type": "string",
+            "enum": [
+              "unsubscribed",
+              "temporary_unavailable",
+              "permanent_unavailable",
+              "complained",
+              "blocked"
+            ],
+            "description": "Suppression cause filter."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "system",
+              "subscriber"
+            ],
+            "description": "Suppression source filter."
+          },
+          "start_time": {
+            "type": "string",
+            "description": "UTC datetime string in the \"YYYY-MM-DD hh:mm:ss\" format accepted by UniOne."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from the previous UniOne response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of suppression records to return. Defaults to 50."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination fields for listing UniOne suppressions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API operation status."
+          },
+          "suppressions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Suppressed email address.",
+                  "format": "email"
+                },
+                "cause": {
+                  "type": "string",
+                  "description": "Suppression cause."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Suppression source."
+                },
+                "is_deletable": {
+                  "type": "boolean",
+                  "description": "Whether the suppression can be removed."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "UTC timestamp when the suppression was created."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "cause",
+                "source",
+                "is_deletable",
+                "created"
+              ],
+              "description": "Suppression record returned by UniOne."
+            },
+            "description": "Suppression records returned by UniOne."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor for the next page of suppression records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "suppressions"
+        ],
+        "description": "Suppression list returned by UniOne."
+      }
+    },
+    {
+      "id": "unione.list_tags",
+      "service": "unione",
+      "name": "list_tags",
+      "description": "List UniOne user-defined tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API operation status."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag_id": {
+                  "type": "integer",
+                  "description": "Unique tag identifier."
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Tag name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "User-defined tag returned by UniOne."
+            },
+            "description": "User-defined tags returned by UniOne."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tag list returned by UniOne."
+      }
+    },
+    {
+      "id": "unione.list_templates",
+      "service": "unione",
+      "name": "list_templates",
+      "description": "List UniOne templates available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of templates to return. Defaults to 50."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Index of the first template to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination fields for listing UniOne templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API operation status."
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "UniOne template object."
+            },
+            "description": "Template objects returned by UniOne."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Template list returned by UniOne."
+      }
+    },
+    {
+      "id": "unione.send_email",
+      "service": "unione",
+      "name": "send_email",
+      "description": "Send a transactional email through UniOne without attachments.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Recipient email address.",
+                  "format": "email"
+                },
+                "substitutions": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "String value."
+                      },
+                      {
+                        "type": "integer",
+                        "description": "Integer value."
+                      }
+                    ],
+                    "description": "String or integer value accepted by UniOne."
+                  },
+                  "description": "String key-value object with string or integer values accepted by UniOne."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "String value."
+                      },
+                      {
+                        "type": "integer",
+                        "description": "Integer value."
+                      }
+                    ],
+                    "description": "String or integer value accepted by UniOne."
+                  },
+                  "description": "String key-value object with string or integer values accepted by UniOne."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "Recipient object accepted by UniOne email/send."
+            },
+            "description": "Recipients accepted by UniOne.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "html": {
+                "type": "string",
+                "description": "HTML body part of the email."
+              },
+              "plaintext": {
+                "type": "string",
+                "description": "Plain-text body part of the email."
+              },
+              "amp": {
+                "type": "string",
+                "description": "AMP4Email body part of the email."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Email body parts accepted by UniOne.",
+            "anyOf": [
+              {
+                "required": [
+                  "html"
+                ]
+              },
+              {
+                "required": [
+                  "plaintext"
+                ]
+              }
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject."
+          },
+          "from_email": {
+            "type": "string",
+            "description": "Sender email address.",
+            "format": "email"
+          },
+          "from_name": {
+            "type": "string",
+            "description": "Sender display name."
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "Reply-To email address.",
+            "format": "email"
+          },
+          "reply_to_name": {
+            "type": "string",
+            "description": "Reply-To display name."
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Template identifier created in UniOne.",
+            "format": "uuid"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Tag name."
+            },
+            "description": "Up to four tags attached to the message.",
+            "maxItems": 4
+          },
+          "skip_unsubscribe": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether UniOne should skip appending the default unsubscribe footer."
+          },
+          "global_language": {
+            "type": "string",
+            "enum": [
+              "be",
+              "de",
+              "en",
+              "es",
+              "fr",
+              "it",
+              "pl",
+              "pt",
+              "ru",
+              "ua",
+              "kz"
+            ],
+            "description": "Language used for the unsubscribe footer and page."
+          },
+          "template_engine": {
+            "type": "string",
+            "enum": [
+              "simple",
+              "velocity",
+              "liquid",
+              "none"
+            ],
+            "description": "Template engine used for substitutions."
+          },
+          "global_substitutions": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "String value."
+                },
+                {
+                  "type": "integer",
+                  "description": "Integer value."
+                }
+              ],
+              "description": "String or integer value accepted by UniOne."
+            },
+            "description": "String key-value object with string or integer values accepted by UniOne."
+          },
+          "global_metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "String value."
+                },
+                {
+                  "type": "integer",
+                  "description": "Integer value."
+                }
+              ],
+              "description": "String or integer value accepted by UniOne."
+            },
+            "description": "String key-value object with string or integer values accepted by UniOne."
+          },
+          "track_links": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether click tracking is enabled, where 1 is enabled and 0 is disabled."
+          },
+          "track_read": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether read tracking is enabled, where 1 is enabled and 0 is disabled."
+          },
+          "bypass_global": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether the global unavailability list should be ignored."
+          },
+          "bypass_unavailable": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether the current account or project unavailability list should be ignored."
+          },
+          "bypass_unsubscribed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether the current unsubscribed list should be ignored."
+          },
+          "bypass_complained": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether the current complaint list should be ignored."
+          },
+          "idempotence_key": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Unique message key used to prevent accidental duplicates."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Header value."
+            },
+            "description": "Custom email headers accepted by UniOne."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "send_at": {
+                "type": "string",
+                "description": "UTC datetime string in the \"YYYY-MM-DD hh:mm:ss\" format accepted by UniOne."
+              },
+              "unsubscribe_url": {
+                "type": "string",
+                "description": "Custom unsubscribe URL.",
+                "format": "uri"
+              },
+              "custom_backend_id": {
+                "type": "integer",
+                "description": "Backend-domain identifier used to send the message."
+              },
+              "smtp_pool_id": {
+                "type": "string",
+                "description": "SMTP pool identifier used to send the message.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional email sending options accepted by UniOne."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recipients",
+          "body",
+          "subject",
+          "from_email"
+        ],
+        "description": "Message fields for sending a UniOne email. The provider runtime wraps these fields in the official message object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "API operation status."
+          },
+          "job_id": {
+            "type": "string",
+            "description": "UniOne job identifier for the accepted send request."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Accepted recipient email address.",
+              "format": "email"
+            },
+            "description": "Recipient email addresses accepted for sending."
+          },
+          "failed_emails": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "UniOne rejection reason."
+            },
+            "description": "Recipient email addresses rejected by UniOne with rejection reasons."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "job_id"
+        ],
+        "description": "Submission result returned by UniOne email/send."
+      }
+    }
+  ]
+}

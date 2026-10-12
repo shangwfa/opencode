@@ -1,0 +1,669 @@
+{
+  "service": "opencage",
+  "displayName": "OpenCage",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OPENCAGE_API_KEY",
+      "description": "OpenCage API key sent as the key query parameter. Find it in the Geocoding tab of your account dashboard: https://opencagedata.com/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://opencagedata.com",
+  "actions": [
+    {
+      "id": "opencage.geocode_forward",
+      "service": "opencage",
+      "name": "geocode_forward",
+      "description": "Convert an address or place name into OpenCage geocoding results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address or free-form query string to geocode."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return, from 1 to 100."
+          },
+          "bounds": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounding box bias formatted as west,south,east,north."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred response language code."
+          },
+          "proximity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bias results near a latitude,longitude point."
+          },
+          "countrycode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated ISO 3166-1 alpha-2 country codes used to restrict results."
+          },
+          "abbrv": {
+            "type": "boolean",
+            "description": "Whether to abbreviate road and route names."
+          },
+          "add_request": {
+            "type": "boolean",
+            "description": "Whether to include the original request in the response."
+          },
+          "no_annotations": {
+            "type": "boolean",
+            "description": "Whether to omit annotations such as timezone or currency details."
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "Whether to pretty-print the JSON response."
+          },
+          "min_confidence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Minimum confidence score allowed for returned results, from 1 to 10."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for forward geocoding an address or place name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Documentation URL for the OpenCage API response."
+          },
+          "licenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License name for the returned data."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License URL for the returned data."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A license entry describing result attribution requirements."
+            },
+            "description": "License entries attached to the response."
+          },
+          "rate": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of requests allowed in the current window."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "Remaining number of requests in the current window."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "Unix timestamp when the rate window resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Rate limit information for the current API key."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formatted": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Formatted address string returned for the matched result."
+                },
+                "confidence": {
+                  "type": "integer",
+                  "description": "Confidence score assigned by OpenCage for this result."
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "description": "Latitude in decimal degrees."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "description": "Longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Coordinates for the matched result."
+                },
+                "components": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Component value."
+                  },
+                  "description": "Structured address components keyed by upstream field name."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Annotation value."
+                  },
+                  "description": "Additional annotations returned by OpenCage."
+                },
+                "bounds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Bounds value."
+                  },
+                  "description": "Bounding box metadata for the matched result."
+                },
+                "distance_from_q": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Distance value."
+                  },
+                  "description": "Distance metadata between the query point and the matched result."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A single OpenCage geocoding result."
+            },
+            "description": "Geocoding results returned by OpenCage."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "OpenCage status code for the request."
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Human-readable status message from OpenCage."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Status information returned by OpenCage."
+          },
+          "thanks": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attribution or thank-you message returned by OpenCage."
+          },
+          "timestamp": {
+            "type": "object",
+            "properties": {
+              "created_http": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTTP date when the response was generated."
+              },
+              "created_unix": {
+                "type": "integer",
+                "description": "Unix timestamp when the response was generated."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Creation time metadata for the response."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard JSON geocoding response returned by OpenCage."
+      }
+    },
+    {
+      "id": "opencage.geocode_geojson",
+      "service": "opencage",
+      "name": "geocode_geojson",
+      "description": "Return OpenCage geocoding results in GeoJSON FeatureCollection format.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address or free-form query string to geocode."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return, from 1 to 100."
+          },
+          "bounds": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounding box bias formatted as west,south,east,north."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred response language code."
+          },
+          "proximity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bias results near a latitude,longitude point."
+          },
+          "countrycode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated ISO 3166-1 alpha-2 country codes used to restrict results."
+          },
+          "abbrv": {
+            "type": "boolean",
+            "description": "Whether to abbreviate road and route names."
+          },
+          "add_request": {
+            "type": "boolean",
+            "description": "Whether to include the original request in the response."
+          },
+          "no_annotations": {
+            "type": "boolean",
+            "description": "Whether to omit annotations such as timezone or currency details."
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "Whether to pretty-print the JSON response."
+          },
+          "min_confidence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Minimum confidence score allowed for returned results, from 1 to 10."
+          },
+          "roadinfo": {
+            "type": "boolean",
+            "description": "Whether to include road information in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for returning geocoding results in GeoJSON format."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "const": "FeatureCollection",
+            "type": "string",
+            "description": "GeoJSON type returned by OpenCage."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "Feature",
+                  "type": "string",
+                  "description": "GeoJSON feature type."
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "GeoJSON geometry type."
+                    },
+                    "coordinates": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "Coordinate number in the GeoJSON tuple."
+                      },
+                      "description": "GeoJSON coordinates for the feature."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "GeoJSON geometry payload."
+                },
+                "properties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "GeoJSON property value."
+                  },
+                  "description": "GeoJSON properties returned by OpenCage."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single GeoJSON feature returned by OpenCage."
+            },
+            "description": "GeoJSON features returned by OpenCage."
+          },
+          "licenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License name for the returned data."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License URL for the returned data."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A license entry describing result attribution requirements."
+            },
+            "description": "License entries attached to the response."
+          },
+          "rate": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of requests allowed in the current window."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "Remaining number of requests in the current window."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "Unix timestamp when the rate window resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Rate limit information for the current API key."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "OpenCage status code for the request."
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Human-readable status message from OpenCage."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Status information returned by OpenCage."
+          },
+          "timestamp": {
+            "type": "object",
+            "properties": {
+              "created_http": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTTP date when the response was generated."
+              },
+              "created_unix": {
+                "type": "integer",
+                "description": "Unix timestamp when the response was generated."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Creation time metadata for the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "GeoJSON geocoding response returned by OpenCage."
+      }
+    },
+    {
+      "id": "opencage.geocode_reverse",
+      "service": "opencage",
+      "name": "geocode_reverse",
+      "description": "Convert a latitude and longitude pair into OpenCage reverse geocoding results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Latitude and longitude formatted as latitude,longitude."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred response language code."
+          },
+          "roadinfo": {
+            "type": "boolean",
+            "description": "Whether to include road information in the response."
+          },
+          "abbrv": {
+            "type": "boolean",
+            "description": "Whether to abbreviate road and route names."
+          },
+          "add_request": {
+            "type": "boolean",
+            "description": "Whether to include the original request in the response."
+          },
+          "no_annotations": {
+            "type": "boolean",
+            "description": "Whether to omit annotations such as timezone or currency details."
+          },
+          "pretty": {
+            "type": "boolean",
+            "description": "Whether to pretty-print the JSON response."
+          },
+          "min_confidence": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Minimum confidence score allowed for returned results, from 1 to 10."
+          },
+          "normalizecity": {
+            "type": "boolean",
+            "description": "Whether to normalize city names in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for reverse geocoding a latitude,longitude pair."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Documentation URL for the OpenCage API response."
+          },
+          "licenses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License name for the returned data."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "License URL for the returned data."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A license entry describing result attribution requirements."
+            },
+            "description": "License entries attached to the response."
+          },
+          "rate": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of requests allowed in the current window."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "Remaining number of requests in the current window."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "Unix timestamp when the rate window resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Rate limit information for the current API key."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formatted": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Formatted address string returned for the matched result."
+                },
+                "confidence": {
+                  "type": "integer",
+                  "description": "Confidence score assigned by OpenCage for this result."
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "description": "Latitude in decimal degrees."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "description": "Longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Coordinates for the matched result."
+                },
+                "components": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Component value."
+                  },
+                  "description": "Structured address components keyed by upstream field name."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Annotation value."
+                  },
+                  "description": "Additional annotations returned by OpenCage."
+                },
+                "bounds": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Bounds value."
+                  },
+                  "description": "Bounding box metadata for the matched result."
+                },
+                "distance_from_q": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Distance value."
+                  },
+                  "description": "Distance metadata between the query point and the matched result."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A single OpenCage geocoding result."
+            },
+            "description": "Geocoding results returned by OpenCage."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "OpenCage status code for the request."
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Human-readable status message from OpenCage."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Status information returned by OpenCage."
+          },
+          "thanks": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attribution or thank-you message returned by OpenCage."
+          },
+          "timestamp": {
+            "type": "object",
+            "properties": {
+              "created_http": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTTP date when the response was generated."
+              },
+              "created_unix": {
+                "type": "integer",
+                "description": "Unix timestamp when the response was generated."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Creation time metadata for the response."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard JSON geocoding response returned by OpenCage."
+      }
+    }
+  ]
+}

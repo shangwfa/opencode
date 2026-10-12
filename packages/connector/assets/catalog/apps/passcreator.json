@@ -1,0 +1,472 @@
+{
+  "service": "passcreator",
+  "displayName": "Passcreator",
+  "categories": [
+    "Design & Media",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "PASSCREATOR_API_KEY",
+      "description": "Passcreator API key sent in the Authorization header without a prefix. Create or manage API keys at https://app.passcreator.com/customeruser/apikeys."
+    }
+  ],
+  "homepageUrl": "https://www.passcreator.com/",
+  "actions": [
+    {
+      "id": "passcreator.create_pass",
+      "service": "passcreator",
+      "name": "create_pass",
+      "description": "Create one Passcreator wallet pass synchronously from template-specific JSON data.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "templateId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The identifier of the pass template to use.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "templateId"
+            ],
+            "description": "The pass data to submit. Fields other than templateId depend on the selected template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The input payload for creating a pass."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Passcreator completed the request successfully."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The status code reported by Passcreator."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned result objects."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "string",
+                "description": "The unique identifier of the created pass."
+              },
+              "downloadPage": {
+                "type": "string",
+                "description": "The device-aware download page for the created pass.",
+                "format": "uri"
+              },
+              "iPhoneUri": {
+                "type": "string",
+                "description": "The pkpass download URL used by Apple Wallet.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "identifier",
+              "downloadPage",
+              "iPhoneUri"
+            ],
+            "description": "The created pass metadata returned by Passcreator."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The response description returned by Passcreator."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response description returned by Passcreator."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An error value returned by Passcreator."
+            },
+            "description": "Errors returned by Passcreator."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "statusCode",
+          "data"
+        ],
+        "description": "The native Passcreator response for a synchronously created pass."
+      }
+    },
+    {
+      "id": "passcreator.get_pass_template_fields",
+      "service": "passcreator",
+      "name": "get_pass_template_fields",
+      "description": "Inspect the dynamic fields configured on a Passcreator pass template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the pass template to inspect.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "The input payload for inspecting pass template fields."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "The field key used when creating a pass."
+            },
+            "label": {
+              "type": "string",
+              "description": "The human-readable field label."
+            },
+            "type": {
+              "type": "string",
+              "description": "The Passcreator field type."
+            },
+            "required": {
+              "type": "boolean",
+              "description": "Whether the template requires this field."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "key",
+            "label",
+            "type",
+            "required"
+          ],
+          "description": "A dynamic field configured on a pass template."
+        },
+        "description": "The dynamic fields configured on the pass template."
+      }
+    },
+    {
+      "id": "passcreator.list_pass_templates",
+      "service": "passcreator",
+      "name": "list_pass_templates",
+      "description": "List all pass templates available to the connected Passcreator account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing pass templates."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The unique identifier of the pass template.",
+              "pattern": "\\S"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The name of the pass template.",
+              "pattern": "\\S"
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "identifier",
+            "name"
+          ],
+          "description": "A pass template returned by Passcreator."
+        },
+        "description": "The pass templates returned by Passcreator."
+      }
+    },
+    {
+      "id": "passcreator.list_passes",
+      "service": "passcreator",
+      "name": "list_passes",
+      "description": "List or search Passcreator wallet passes and continue through documented next-page links.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of passes to request for one page."
+          },
+          "formatKeyAdditionalProperties": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name"
+            ],
+            "description": "Choose whether additional pass properties use their field identifiers or field names as keys."
+          },
+          "segmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The segment identifier used to filter passes.",
+            "pattern": "\\S"
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "An optional title stored with the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "An optional title stored with the query."
+              },
+              "templateId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Return passes created from this template.",
+                "pattern": "\\S"
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Return passes that belong to this project.",
+                "pattern": "\\S"
+              },
+              "searchPhrase": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Search for this phrase across the pass data fields.",
+                "pattern": "\\S"
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The pass field to compare.",
+                        "pattern": "\\S"
+                      },
+                      "operator": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Passcreator Query Language comparison operator.",
+                        "pattern": "\\S"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string comparison value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric comparison value."
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "description": "A comparison value."
+                            },
+                            "description": "Comparison values combined with OR."
+                          }
+                        ],
+                        "description": "The string, number, or array value to compare against."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "field",
+                      "operator",
+                      "value"
+                    ],
+                    "description": "One condition in a Passcreator Query Language group."
+                  },
+                  "description": "Conditions combined with AND.",
+                  "minItems": 1
+                },
+                "description": "Condition groups combined with OR.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Passcreator Query Language object. The provider encodes this object as base64url."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Passcreator pass field name.",
+              "pattern": "\\S"
+            },
+            "description": "The pass fields to include in each result.",
+            "minItems": 1
+          },
+          "nextPage": {
+            "type": "string",
+            "description": "The next-page URL returned by a previous list_passes response.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing or searching passes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Passcreator completed the request successfully."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The status code reported by Passcreator."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of passes returned on this page."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A pass returned by Passcreator."
+            },
+            "description": "The passes returned by Passcreator."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The response description returned by Passcreator."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response description returned by Passcreator."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An error value returned by Passcreator."
+            },
+            "description": "Errors returned by Passcreator."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL for the next result page.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Passcreator."
+          },
+          "responseMetaData": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resultsTotal": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total number of matching passes."
+                  },
+                  "resultsThisPage": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The number of passes returned on this page."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "resultsTotal",
+                  "resultsThisPage"
+                ],
+                "description": "Pagination result counts returned by Passcreator."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination result counts returned by Passcreator."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "statusCode",
+          "data"
+        ],
+        "description": "The native Passcreator response for a pass list or search request."
+      }
+    }
+  ]
+}

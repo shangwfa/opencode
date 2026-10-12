@@ -1,0 +1,148 @@
+{
+  "service": "mcdonalds_cn_mcp",
+  "displayName": "McDonald's China MCP",
+  "description": "Discover and use McDonald's China tools for stores, menus, ordering, coupons, campaigns, points, and the points mall through the official MCP service.",
+  "categories": [
+    "Location",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "MCP Token",
+      "placeholder": "Paste your McDonald's China MCP Token",
+      "description": "The MCP Token sent to https://mcp.mcd.cn as an Authorization Bearer token. Sign in and activate MCP access at https://open.mcd.cn/mcp/doc, then copy the token from the console. Keep it private because it is linked to your McDonald's China account."
+    }
+  ],
+  "homepageUrl": "https://open.mcd.cn/mcp/doc",
+  "actions": [
+    {
+      "id": "mcdonalds_cn_mcp.call_tool",
+      "service": "mcdonalds_cn_mcp",
+      "name": "call_tool",
+      "description": "Call a current McDonald's China MCP tool with JSON arguments. Discover the tool first and confirm the user's intent before actions that create an address, claim coupons, redeem points, or create an order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current McDonald's China MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the McDonald's China MCP tool."
+      },
+      "followUpActions": [
+        "mcdonalds_cn_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "mcdonalds_cn_mcp.list_tools",
+      "service": "mcdonalds_cn_mcp",
+      "name": "list_tools",
+      "description": "Discover the current McDonald's China ordering, coupon, campaign, and points-mall MCP tools with their live input schemas and behavior annotations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact McDonald's China MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by McDonald's China MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify McDonald's China data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform a destructive operation."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to have no additional effect."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside McDonald's China."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by McDonald's China."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by McDonald's China MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected McDonald's China MCP account."
+            },
+            "description": "Tools currently exposed to the connected McDonald's China account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current McDonald's China MCP tool catalog."
+      },
+      "followUpActions": [
+        "mcdonalds_cn_mcp.call_tool"
+      ]
+    }
+  ]
+}

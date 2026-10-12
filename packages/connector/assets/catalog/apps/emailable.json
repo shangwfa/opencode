@@ -1,0 +1,415 @@
+{
+  "service": "emailable",
+  "displayName": "Emailable",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "EMAILABLE_API_KEY",
+      "description": "Emailable API key sent with the Authorization Bearer header. Create or roll it from your Emailable dashboard API settings: https://emailable.com/docs/api."
+    }
+  ],
+  "homepageUrl": "https://emailable.com",
+  "actions": [
+    {
+      "id": "emailable.get_account_info",
+      "service": "emailable",
+      "name": "get_account_info",
+      "description": "Retrieve Emailable account information including owner email and available credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "owner_email": {
+            "type": "string",
+            "description": "The email address of the Emailable account owner.",
+            "format": "email"
+          },
+          "available_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of verification credits currently available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "owner_email",
+          "available_credits"
+        ],
+        "description": "The Emailable account information returned by the account endpoint."
+      }
+    },
+    {
+      "id": "emailable.get_batch_status",
+      "service": "emailable",
+      "name": "get_batch_status",
+      "description": "Retrieve the latest Emailable status and results for an existing batch verification job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique batch identifier returned by Emailable batch creation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "batch_id"
+        ],
+        "description": "Input payload for retrieving the status of an Emailable batch verification job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique batch identifier returned by Emailable batch creation."
+          },
+          "message": {
+            "type": "string",
+            "description": "The current status message for the Emailable batch."
+          },
+          "processed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of emails processed so far in the batch."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of emails submitted in the batch."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The normalized email address verified by Emailable.",
+                  "format": "email"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "deliverable",
+                    "undeliverable",
+                    "risky",
+                    "unknown"
+                  ],
+                  "description": "The verification state returned by Emailable."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "The provider reason returned by Emailable for the verification result."
+                },
+                "score": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The Emailable deliverability score from 0 to 100."
+                },
+                "user": {
+                  "type": "string",
+                  "description": "The local part of the verified email address."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain part of the verified email address."
+                },
+                "free": {
+                  "type": "boolean",
+                  "description": "Whether the email is hosted by a free email provider."
+                },
+                "role": {
+                  "type": "boolean",
+                  "description": "Whether the email is a role-based address such as support@ or info@."
+                },
+                "accept_all": {
+                  "type": "boolean",
+                  "description": "Whether the domain appears to accept all inbound email addresses."
+                },
+                "disposable": {
+                  "type": "boolean",
+                  "description": "Whether the email belongs to a disposable or temporary email provider."
+                },
+                "did_you_mean": {
+                  "type": "string",
+                  "description": "Suggested corrected email address when Emailable detects a likely typo."
+                },
+                "mx_record": {
+                  "type": "string",
+                  "description": "The MX record used during verification."
+                },
+                "smtp_provider": {
+                  "type": "string",
+                  "description": "The SMTP provider identified for the email domain."
+                },
+                "no_reply": {
+                  "type": "boolean",
+                  "description": "Whether the address is a no-reply address."
+                },
+                "mailbox_full": {
+                  "type": "boolean",
+                  "description": "Whether the mailbox appears to be full."
+                },
+                "first_name": {
+                  "type": "string",
+                  "description": "The first name inferred from the email address, when available."
+                },
+                "last_name": {
+                  "type": "string",
+                  "description": "The last name inferred from the email address, when available."
+                },
+                "full_name": {
+                  "type": "string",
+                  "description": "The full name inferred from the email address, when available."
+                },
+                "gender": {
+                  "type": "string",
+                  "description": "The gender inferred from the email address, when available."
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "The tag portion of the email address, such as the value after a plus sign."
+                },
+                "duration": {
+                  "type": "number",
+                  "description": "The verification duration in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "email",
+                "state",
+                "reason"
+              ],
+              "description": "The single-email verification result returned by Emailable."
+            },
+            "description": "The individual email verification results when Emailable returns inline batch results."
+          },
+          "download_file": {
+            "type": "string",
+            "description": "The download URL for large batch result exports, when Emailable returns one.",
+            "format": "uri"
+          },
+          "total_counts": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Summary counts grouped by verification state or provider reason for the Emailable batch."
+          },
+          "reason_counts": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Summary counts grouped by verification state or provider reason for the Emailable batch."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "message"
+        ],
+        "description": "The batch status payload returned by Emailable."
+      }
+    },
+    {
+      "id": "emailable.verify_batch_emails",
+      "service": "emailable",
+      "name": "verify_batch_emails",
+      "description": "Create an Emailable batch verification job for a list of email addresses.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An email address included in the batch verification request.",
+              "format": "email"
+            },
+            "description": "The list of email addresses to verify in the Emailable batch request.",
+            "minItems": 2,
+            "maxItems": 50000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emails"
+        ],
+        "description": "Input payload for creating an Emailable batch verification job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique batch identifier returned by Emailable batch creation."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message returned after Emailable creates the batch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "message"
+        ],
+        "description": "The response returned after Emailable creates a batch verification job."
+      }
+    },
+    {
+      "id": "emailable.verify_email",
+      "service": "emailable",
+      "name": "verify_email",
+      "description": "Verify a single email address and return Emailable deliverability signals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to verify with Emailable.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input payload for verifying a single email address with Emailable."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The normalized email address verified by Emailable.",
+            "format": "email"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "deliverable",
+              "undeliverable",
+              "risky",
+              "unknown"
+            ],
+            "description": "The verification state returned by Emailable."
+          },
+          "reason": {
+            "type": "string",
+            "description": "The provider reason returned by Emailable for the verification result."
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Emailable deliverability score from 0 to 100."
+          },
+          "user": {
+            "type": "string",
+            "description": "The local part of the verified email address."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain part of the verified email address."
+          },
+          "free": {
+            "type": "boolean",
+            "description": "Whether the email is hosted by a free email provider."
+          },
+          "role": {
+            "type": "boolean",
+            "description": "Whether the email is a role-based address such as support@ or info@."
+          },
+          "accept_all": {
+            "type": "boolean",
+            "description": "Whether the domain appears to accept all inbound email addresses."
+          },
+          "disposable": {
+            "type": "boolean",
+            "description": "Whether the email belongs to a disposable or temporary email provider."
+          },
+          "did_you_mean": {
+            "type": "string",
+            "description": "Suggested corrected email address when Emailable detects a likely typo."
+          },
+          "mx_record": {
+            "type": "string",
+            "description": "The MX record used during verification."
+          },
+          "smtp_provider": {
+            "type": "string",
+            "description": "The SMTP provider identified for the email domain."
+          },
+          "no_reply": {
+            "type": "boolean",
+            "description": "Whether the address is a no-reply address."
+          },
+          "mailbox_full": {
+            "type": "boolean",
+            "description": "Whether the mailbox appears to be full."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name inferred from the email address, when available."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name inferred from the email address, when available."
+          },
+          "full_name": {
+            "type": "string",
+            "description": "The full name inferred from the email address, when available."
+          },
+          "gender": {
+            "type": "string",
+            "description": "The gender inferred from the email address, when available."
+          },
+          "tag": {
+            "type": "string",
+            "description": "The tag portion of the email address, such as the value after a plus sign."
+          },
+          "duration": {
+            "type": "number",
+            "description": "The verification duration in seconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "email",
+          "state",
+          "reason"
+        ],
+        "description": "The single-email verification result returned by Emailable."
+      }
+    }
+  ]
+}

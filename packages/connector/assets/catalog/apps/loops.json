@@ -1,0 +1,667 @@
+{
+  "service": "loops",
+  "displayName": "Loops",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "d2d561f5ff80136f69b4b5a31b9fb3c9",
+      "description": "Loops API key used with the Authorization Bearer header. Generate or manage keys in Settings > API at https://app.loops.so/settings?page=api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://loops.so",
+  "actions": [
+    {
+      "id": "loops.create_contact",
+      "service": "loops",
+      "name": "create_contact",
+      "description": "Create a Loops contact with default and custom contact properties.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact's email address.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's last name."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A custom source value that replaces the default \"API\" source."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether the contact receives campaign and workflow emails."
+          },
+          "userGroup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user group used to segment the contact."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user ID from an external application."
+          },
+          "mailingLists": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "description": "Whether the contact should be subscribed to this mailing list."
+            },
+            "description": "Mailing list subscription changes keyed by Loops mailing list ID."
+          },
+          "customProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string custom property value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric custom property value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean custom property value."
+                },
+                {
+                  "type": "null",
+                  "description": "A null value used to clear a property."
+                }
+              ],
+              "description": "A custom property value accepted by Loops."
+            },
+            "description": "Custom contact or event properties keyed by their Loops property name."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for creating a Loops contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Loops accepted the request."
+          },
+          "id": {
+            "type": "string",
+            "description": "The internal Loops contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Loops contact mutation response."
+      }
+    },
+    {
+      "id": "loops.create_contact_property",
+      "service": "loops",
+      "name": "create_contact_property",
+      "description": "Create a custom contact property in Loops.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The camelCase contact property name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean",
+              "date"
+            ],
+            "description": "The Loops contact property type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Loops contact property."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Loops accepted the request."
+          },
+          "name": {
+            "type": "string",
+            "description": "The contact property name."
+          },
+          "type": {
+            "type": "string",
+            "description": "The contact property type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Loops contact property mutation response."
+      }
+    },
+    {
+      "id": "loops.delete_contact",
+      "service": "loops",
+      "name": "delete_contact",
+      "description": "Delete a Loops contact by email or userId.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact's email address.",
+            "format": "email"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user ID from an external application."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for finding or deleting a Loops contact.",
+        "oneOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Loops accepted the request."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by Loops."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Loops operation response."
+      }
+    },
+    {
+      "id": "loops.find_contact",
+      "service": "loops",
+      "name": "find_contact",
+      "description": "Find Loops contacts by email or userId.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact's email address.",
+            "format": "email"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user ID from an external application."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for finding or deleting a Loops contact.",
+        "oneOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The contact's Loops-assigned ID."
+            },
+            "email": {
+              "type": "string",
+              "description": "The contact's email address."
+            },
+            "firstName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The contact's first name."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The contact's first name."
+            },
+            "lastName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The contact's last name."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The contact's last name."
+            },
+            "source": {
+              "type": "string",
+              "description": "The source the contact was created from."
+            },
+            "subscribed": {
+              "type": "boolean",
+              "description": "Whether the contact receives campaign and workflow emails."
+            },
+            "userGroup": {
+              "type": "string",
+              "description": "The contact's user group."
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The contact's unique user ID."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The contact's unique user ID."
+            },
+            "mailingLists": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean",
+                "description": "Whether the contact is subscribed to the mailing list."
+              },
+              "description": "Mailing lists the contact is subscribed to, keyed by mailing list ID."
+            },
+            "optInStatus": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The contact's double opt-in status, when double opt-in applies."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The contact's double opt-in status, when double opt-in applies."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A Loops contact with default and custom properties."
+        },
+        "description": "Contacts returned by Loops."
+      }
+    },
+    {
+      "id": "loops.list_contact_properties",
+      "service": "loops",
+      "name": "list_contact_properties",
+      "description": "List default or custom Loops contact properties.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "enum": [
+              "all",
+              "custom"
+            ],
+            "description": "Which contact properties to list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Loops contact properties."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "The contact property key."
+            },
+            "label": {
+              "type": "string",
+              "description": "The contact property label."
+            },
+            "type": {
+              "type": "string",
+              "description": "The contact property type."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A Loops contact property."
+        },
+        "description": "Contact properties returned by Loops."
+      }
+    },
+    {
+      "id": "loops.list_mailing_lists",
+      "service": "loops",
+      "name": "list_mailing_lists",
+      "description": "List Loops mailing lists available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Loops mailing lists."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The Loops mailing list ID."
+            },
+            "name": {
+              "type": "string",
+              "description": "The mailing list name."
+            },
+            "description": {
+              "type": "string",
+              "description": "The mailing list description."
+            },
+            "isPublic": {
+              "type": "boolean",
+              "description": "Whether the mailing list is public."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A Loops mailing list."
+        },
+        "description": "Mailing lists returned by Loops."
+      }
+    },
+    {
+      "id": "loops.send_event",
+      "service": "loops",
+      "name": "send_event",
+      "description": "Send a Loops event to trigger workflows for a contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Loops event name to trigger."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact's email address.",
+            "format": "email"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user ID from an external application."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional idempotency key sent as the Idempotency-Key header."
+          },
+          "eventProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string custom property value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric custom property value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean custom property value."
+                },
+                {
+                  "type": "null",
+                  "description": "A null value used to clear a property."
+                }
+              ],
+              "description": "A custom property value accepted by Loops."
+            },
+            "description": "Custom contact or event properties keyed by their Loops property name."
+          },
+          "contactProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string custom property value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric custom property value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean custom property value."
+                },
+                {
+                  "type": "null",
+                  "description": "A null value used to clear a property."
+                }
+              ],
+              "description": "A custom property value accepted by Loops."
+            },
+            "description": "Custom contact or event properties keyed by their Loops property name."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The input payload for sending a Loops event.",
+        "required": [
+          "eventName"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Loops accepted the request."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by Loops."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Loops operation response."
+      }
+    },
+    {
+      "id": "loops.update_contact",
+      "service": "loops",
+      "name": "update_contact",
+      "description": "Update or create a Loops contact by email or userId.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact's email address.",
+            "format": "email"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user ID from an external application."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's last name."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A custom source value that replaces the default \"API\" source."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether the contact receives campaign and workflow emails."
+          },
+          "userGroup": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user group used to segment the contact."
+          },
+          "mailingLists": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "description": "Whether the contact should be subscribed to this mailing list."
+            },
+            "description": "Mailing list subscription changes keyed by Loops mailing list ID."
+          },
+          "customProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string custom property value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric custom property value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean custom property value."
+                },
+                {
+                  "type": "null",
+                  "description": "A null value used to clear a property."
+                }
+              ],
+              "description": "A custom property value accepted by Loops."
+            },
+            "description": "Custom contact or event properties keyed by their Loops property name."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The input payload for updating or creating a Loops contact.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "userId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Loops accepted the request."
+          },
+          "id": {
+            "type": "string",
+            "description": "The internal Loops contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Loops contact mutation response."
+      }
+    }
+  ]
+}

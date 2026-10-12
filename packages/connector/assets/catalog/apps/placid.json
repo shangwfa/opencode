@@ -1,0 +1,732 @@
+{
+  "service": "placid",
+  "displayName": "Placid",
+  "categories": [
+    "Design & Media",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "placid_xxx",
+      "description": "Placid project API token used with the Authorization Bearer header. Sign in, open your project, then copy the token from API Tokens: https://placid.app/app/projects"
+    }
+  ],
+  "homepageUrl": "https://placid.app",
+  "actions": [
+    {
+      "id": "placid.create_image",
+      "service": "placid",
+      "name": "create_image",
+      "description": "Queue one Placid image generation request from a template UUID and dynamic layer payload, then return the image handle for polling.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Placid template UUID to render."
+          },
+          "webhook_success": {
+            "type": "string",
+            "description": "Optional webhook URL that Placid should call after the image is generated.",
+            "format": "uri"
+          },
+          "create_now": {
+            "type": "boolean",
+            "description": "Whether Placid should try to render the image immediately instead of queueing it."
+          },
+          "passthrough": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string passthrough value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One passthrough item."
+                }
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "An object passthrough value."
+              }
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional error handling flags forwarded to Placid."
+          },
+          "layers": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The dynamic layer values keyed by template layer name and forwarded to Placid as-is."
+          },
+          "modifications": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested output width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested output height in pixels."
+              },
+              "filename": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The output filename to use for the generated image."
+              },
+              "image_format": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The output image format."
+              },
+              "dpi": {
+                "type": "integer",
+                "description": "The output DPI used by Placid when supported."
+              },
+              "color_mode": {
+                "type": "string",
+                "enum": [
+                  "rgb",
+                  "cmyk"
+                ],
+                "description": "The output color mode."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional export modifications for the generated image."
+          },
+          "transfer": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transfer target type such as `s3`."
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The storage access key."
+              },
+              "secret": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The storage secret key."
+              },
+              "region": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The storage region."
+              },
+              "bucket": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The destination bucket name."
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "public",
+                  "private"
+                ],
+                "description": "The transferred object visibility."
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The destination file path including filename."
+              },
+              "endpoint": {
+                "type": "string",
+                "description": "The custom storage endpoint URL when one is required.",
+                "format": "uri"
+              },
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The optional temporary security token."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional transfer settings used to copy the generated image into external storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template_uuid"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The unique Placid image identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "finished",
+                  "error"
+                ],
+                "description": "The current Placid image generation status."
+              },
+              "image_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The generated image URL when the render has finished.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The generated image URL when the render has finished."
+              },
+              "polling_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Placid polling URL for retrieving the image status.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Placid polling URL for retrieving the image status."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw image object returned by Placid."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "One Placid image generation object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image"
+        ],
+        "description": "Action output."
+      },
+      "asyncLifecycle": {
+        "startActionId": "placid.create_image",
+        "statusActionId": "placid.get_image"
+      }
+    },
+    {
+      "id": "placid.delete_image",
+      "service": "placid",
+      "name": "delete_image",
+      "description": "Delete one Placid image request by identifier and return whether the delete succeeded.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "image_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Placid image identifier to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "placid.get_image",
+      "service": "placid",
+      "name": "get_image",
+      "description": "Get the current Placid image generation status for one image identifier and return the finished image URL when available.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "image_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Placid image identifier returned by create_image."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The unique Placid image identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "finished",
+                  "error"
+                ],
+                "description": "The current Placid image generation status."
+              },
+              "image_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The generated image URL when the render has finished.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The generated image URL when the render has finished."
+              },
+              "polling_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Placid polling URL for retrieving the image status.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Placid polling URL for retrieving the image status."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw image object returned by Placid."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "One Placid image generation object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image"
+        ],
+        "description": "Action output."
+      },
+      "asyncLifecycle": {
+        "startActionId": "placid.create_image",
+        "statusActionId": "placid.get_image"
+      }
+    },
+    {
+      "id": "placid.get_template",
+      "service": "placid",
+      "name": "get_template",
+      "description": "Get one Placid template by UUID and return its dynamic layer metadata for downstream image generation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Placid template UUID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template_uuid"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Placid template UUID."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The template title."
+              },
+              "thumbnail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The thumbnail URL when Placid has generated one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail URL when Placid has generated one."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The tags assigned to the template."
+              },
+              "layers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The layer name used when filling data into the template."
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The dynamic layer type returned by Placid."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "name",
+                    "type"
+                  ],
+                  "description": "One dynamic template layer returned by Placid."
+                },
+                "description": "The dynamic layers available on the template."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw template object returned by Placid."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "uuid",
+              "title"
+            ],
+            "description": "One Placid template summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "placid.list_templates",
+      "service": "placid",
+      "name": "list_templates",
+      "description": "List Placid templates for the connected project with optional collection, title, tag, ordering, or next-page URL filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional collection UUID used to filter templates."
+          },
+          "title_filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional title filter applied by Placid."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional tag filter applied by Placid."
+          },
+          "order_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional sort string such as `created_at-asc`, `updated_at-desc`, or `title-asc`."
+          },
+          "page_url": {
+            "type": "string",
+            "description": "Optional pagination URL previously returned by Placid links; when provided it overrides the base list path.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Placid template UUID."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The template title."
+                },
+                "thumbnail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The thumbnail URL when Placid has generated one.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The thumbnail URL when Placid has generated one."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The tags assigned to the template."
+                },
+                "layers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The layer name used when filling data into the template."
+                      },
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The dynamic layer type returned by Placid."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "name",
+                      "type"
+                    ],
+                    "description": "One dynamic template layer returned by Placid."
+                  },
+                  "description": "The dynamic layers available on the template."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw template object returned by Placid."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "uuid",
+                "title"
+              ],
+              "description": "One Placid template summary."
+            },
+            "description": "The templates returned by Placid."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The first page URL when Placid returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The first page URL when Placid returns one."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last page URL when Placid returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last page URL when Placid returns one."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The previous page URL when Placid returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page URL when Placid returns one."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next page URL when Placid returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page URL when Placid returns one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "first",
+              "last",
+              "prev",
+              "next"
+            ],
+            "description": "Action output."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The API path echoed by Placid when available.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The API path echoed by Placid when available."
+              },
+              "per_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of templates included per page when Placid returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of templates included per page when Placid returns it."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw pagination metadata returned by Placid."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination metadata returned by the Placid template list endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates",
+          "links",
+          "meta"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

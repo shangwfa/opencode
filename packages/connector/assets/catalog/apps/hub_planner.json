@@ -1,0 +1,1125 @@
+{
+  "service": "hub_planner",
+  "displayName": "Resource Flow (Hub Planner)",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HUB_PLANNER_API_KEY",
+      "description": "Hub Planner API key sent directly in the Authorization header without a Bearer prefix. Account owners can enable API access and generate a read-only or read-write key from Settings > API; see the official guide: https://api-docs.hubplanner.com/."
+    }
+  ],
+  "homepageUrl": "https://www.milientsoftware.com/hub-planner",
+  "actions": [
+    {
+      "id": "hub_planner.create_project",
+      "service": "hub_planner",
+      "name": "create_project",
+      "description": "Create a Hub Planner project with core scheduling and budget fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project name."
+          },
+          "note": {
+            "type": "string",
+            "description": "Free-form project notes."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "STATUS_ACTIVE",
+              "STATUS_ARCHIVED",
+              "STATUS_PENDING",
+              "STATUS_PLANNED",
+              "STATUS_FLOATING"
+            ],
+            "description": "The current Hub Planner project status."
+          },
+          "projectCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique project code."
+          },
+          "metadata": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Custom project metadata with at most 255 characters."
+          },
+          "backgroundColor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project display color."
+          },
+          "useStatusColor": {
+            "type": "boolean",
+            "description": "Whether to use the default status color."
+          },
+          "useProjectDuration": {
+            "type": "boolean",
+            "description": "Whether project display dates are enabled."
+          },
+          "start": {
+            "type": "string",
+            "description": "The project display start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "The project display end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "budgetHours": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The number of budgeted project hours."
+          },
+          "budgetCashAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The cash budget amount."
+          },
+          "budgetCurrency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The currency code for the cash budget."
+          },
+          "timeEntryEnabled": {
+            "type": "boolean",
+            "description": "Whether time entry is enabled for the project."
+          },
+          "timeEntryLocked": {
+            "type": "boolean",
+            "description": "Whether time entry is locked for the project."
+          },
+          "timeEntryApproval": {
+            "type": "boolean",
+            "description": "Whether project time entries require approval."
+          },
+          "timeEntryNoteRequired": {
+            "type": "boolean",
+            "description": "Whether project time entries require notes."
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Hub Planner resource ID."
+            },
+            "description": "Resource IDs to assign to the project."
+          },
+          "projectManagers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Hub Planner project manager resource ID."
+            },
+            "description": "Resource IDs to assign as project managers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Core fields for creating a Hub Planner project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique project ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The project name."
+              },
+              "note": {
+                "type": "string",
+                "description": "The project notes."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The project creation timestamp."
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The project update timestamp."
+              },
+              "projectCode": {
+                "type": "string",
+                "description": "The unique project code."
+              },
+              "status": {
+                "type": "string",
+                "description": "The project status returned by Hub Planner."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "The project metadata value."
+              },
+              "backgroundColor": {
+                "type": "string",
+                "description": "The project display color."
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project display start date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project display start date."
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project display end date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project display end date."
+              },
+              "useProjectDuration": {
+                "type": "boolean",
+                "description": "Whether project display dates are enabled."
+              },
+              "timeEntryEnabled": {
+                "type": "boolean",
+                "description": "Whether time entry is enabled for the project."
+              },
+              "timeEntryLocked": {
+                "type": "boolean",
+                "description": "Whether time entry is locked for the project."
+              },
+              "timeEntryApproval": {
+                "type": "boolean",
+                "description": "Whether project time entries require approval."
+              },
+              "timeEntryNoteRequired": {
+                "type": "boolean",
+                "description": "Whether project time entries require notes."
+              },
+              "budgetHours": {
+                "type": "number",
+                "description": "The number of budgeted project hours."
+              },
+              "budgetCashAmount": {
+                "type": "number",
+                "description": "The cash budget amount."
+              },
+              "budgetCurrency": {
+                "type": "string",
+                "description": "The cash budget currency code."
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A resource ID."
+                },
+                "description": "Resource IDs assigned to the project."
+              },
+              "projectManagers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A project manager resource ID."
+                },
+                "description": "Resource IDs assigned as project managers."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-defined project links."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A project tag."
+                },
+                "description": "Tags assigned to the project."
+              },
+              "customFields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A project custom field."
+                },
+                "description": "Custom fields assigned to the project."
+              },
+              "projectRate": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The project billing-rate configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A project returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "Hub Planner project creation response."
+      }
+    },
+    {
+      "id": "hub_planner.create_resource",
+      "service": "hub_planner",
+      "name": "create_resource",
+      "description": "Create a Hub Planner resource and optionally send an invitation email.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The resource last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The unique resource email address.",
+            "format": "email"
+          },
+          "note": {
+            "type": "string",
+            "description": "Free-form resource notes."
+          },
+          "role": {
+            "type": "string",
+            "description": "The resource role."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "STATUS_ACTIVE",
+              "STATUS_ARCHIVED",
+              "STATUS_NON_BOOKABLE",
+              "STATUS_PARKED"
+            ],
+            "description": "The current Hub Planner resource status."
+          },
+          "metadata": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Custom resource metadata with at most 255 characters."
+          },
+          "sendInviteEmail": {
+            "type": "boolean",
+            "description": "Whether to email an invitation to the resource."
+          },
+          "useCustomAvailability": {
+            "type": "boolean",
+            "description": "Whether the resource uses custom availability."
+          },
+          "calendarIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Hub Planner calendar ID."
+            },
+            "description": "Calendar IDs to associate with the resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "firstName"
+        ],
+        "description": "Core fields for creating a Hub Planner resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique resource ID."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The resource first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The resource last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The resource email address."
+              },
+              "note": {
+                "type": "string",
+                "description": "The resource notes."
+              },
+              "role": {
+                "type": "string",
+                "description": "The resource role."
+              },
+              "status": {
+                "type": "string",
+                "description": "The resource status returned by Hub Planner."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "The resource metadata value."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The resource creation timestamp."
+              },
+              "updatedDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The resource update timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The resource update timestamp."
+              },
+              "useCustomAvailability": {
+                "type": "boolean",
+                "description": "Whether the resource uses custom availability."
+              },
+              "isProjectManager": {
+                "type": "boolean",
+                "description": "Whether the resource can manage projects."
+              },
+              "calendarIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A calendar ID."
+                },
+                "description": "Calendar IDs associated with the resource."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-defined resource links."
+              },
+              "customFields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A resource custom field."
+                },
+                "description": "Custom fields assigned to the resource."
+              },
+              "resourceRates": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The resource billing-rate configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A resource returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resource"
+        ],
+        "description": "Hub Planner resource creation response."
+      }
+    },
+    {
+      "id": "hub_planner.get_project",
+      "service": "hub_planner",
+      "name": "get_project",
+      "description": "Get one Hub Planner project by its unique ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Hub Planner project ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Input for retrieving one Hub Planner project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique project ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The project name."
+              },
+              "note": {
+                "type": "string",
+                "description": "The project notes."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The project creation timestamp."
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The project update timestamp."
+              },
+              "projectCode": {
+                "type": "string",
+                "description": "The unique project code."
+              },
+              "status": {
+                "type": "string",
+                "description": "The project status returned by Hub Planner."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "The project metadata value."
+              },
+              "backgroundColor": {
+                "type": "string",
+                "description": "The project display color."
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project display start date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project display start date."
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project display end date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project display end date."
+              },
+              "useProjectDuration": {
+                "type": "boolean",
+                "description": "Whether project display dates are enabled."
+              },
+              "timeEntryEnabled": {
+                "type": "boolean",
+                "description": "Whether time entry is enabled for the project."
+              },
+              "timeEntryLocked": {
+                "type": "boolean",
+                "description": "Whether time entry is locked for the project."
+              },
+              "timeEntryApproval": {
+                "type": "boolean",
+                "description": "Whether project time entries require approval."
+              },
+              "timeEntryNoteRequired": {
+                "type": "boolean",
+                "description": "Whether project time entries require notes."
+              },
+              "budgetHours": {
+                "type": "number",
+                "description": "The number of budgeted project hours."
+              },
+              "budgetCashAmount": {
+                "type": "number",
+                "description": "The cash budget amount."
+              },
+              "budgetCurrency": {
+                "type": "string",
+                "description": "The cash budget currency code."
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A resource ID."
+                },
+                "description": "Resource IDs assigned to the project."
+              },
+              "projectManagers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A project manager resource ID."
+                },
+                "description": "Resource IDs assigned as project managers."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-defined project links."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A project tag."
+                },
+                "description": "Tags assigned to the project."
+              },
+              "customFields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A project custom field."
+                },
+                "description": "Custom fields assigned to the project."
+              },
+              "projectRate": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The project billing-rate configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A project returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "Hub Planner project detail response."
+      }
+    },
+    {
+      "id": "hub_planner.get_resource",
+      "service": "hub_planner",
+      "name": "get_resource",
+      "description": "Get one Hub Planner resource by its unique ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Hub Planner resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Input for retrieving one Hub Planner resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique resource ID."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The resource first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The resource last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The resource email address."
+              },
+              "note": {
+                "type": "string",
+                "description": "The resource notes."
+              },
+              "role": {
+                "type": "string",
+                "description": "The resource role."
+              },
+              "status": {
+                "type": "string",
+                "description": "The resource status returned by Hub Planner."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "The resource metadata value."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The resource creation timestamp."
+              },
+              "updatedDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The resource update timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The resource update timestamp."
+              },
+              "useCustomAvailability": {
+                "type": "boolean",
+                "description": "Whether the resource uses custom availability."
+              },
+              "isProjectManager": {
+                "type": "boolean",
+                "description": "Whether the resource can manage projects."
+              },
+              "calendarIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A calendar ID."
+                },
+                "description": "Calendar IDs associated with the resource."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-defined resource links."
+              },
+              "customFields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A resource custom field."
+                },
+                "description": "Custom fields assigned to the resource."
+              },
+              "resourceRates": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The resource billing-rate configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A resource returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resource"
+        ],
+        "description": "Hub Planner resource detail response."
+      }
+    },
+    {
+      "id": "hub_planner.list_projects",
+      "service": "hub_planner",
+      "name": "list_projects",
+      "description": "List Hub Planner projects with optional zero-based pagination and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results to return, from 1 to 1000."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A sortable Hub Planner field, optionally prefixed with -."
+            },
+            "description": "Sort fields in priority order. Prefix a field with - for descending order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for a Hub Planner collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The unique project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project name."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The project notes."
+                },
+                "createdDate": {
+                  "type": "string",
+                  "description": "The project creation timestamp."
+                },
+                "updatedDate": {
+                  "type": "string",
+                  "description": "The project update timestamp."
+                },
+                "projectCode": {
+                  "type": "string",
+                  "description": "The unique project code."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The project status returned by Hub Planner."
+                },
+                "metadata": {
+                  "type": "string",
+                  "description": "The project metadata value."
+                },
+                "backgroundColor": {
+                  "type": "string",
+                  "description": "The project display color."
+                },
+                "start": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project display start date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project display start date."
+                },
+                "end": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project display end date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project display end date."
+                },
+                "useProjectDuration": {
+                  "type": "boolean",
+                  "description": "Whether project display dates are enabled."
+                },
+                "timeEntryEnabled": {
+                  "type": "boolean",
+                  "description": "Whether time entry is enabled for the project."
+                },
+                "timeEntryLocked": {
+                  "type": "boolean",
+                  "description": "Whether time entry is locked for the project."
+                },
+                "timeEntryApproval": {
+                  "type": "boolean",
+                  "description": "Whether project time entries require approval."
+                },
+                "timeEntryNoteRequired": {
+                  "type": "boolean",
+                  "description": "Whether project time entries require notes."
+                },
+                "budgetHours": {
+                  "type": "number",
+                  "description": "The number of budgeted project hours."
+                },
+                "budgetCashAmount": {
+                  "type": "number",
+                  "description": "The cash budget amount."
+                },
+                "budgetCurrency": {
+                  "type": "string",
+                  "description": "The cash budget currency code."
+                },
+                "resources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A resource ID."
+                  },
+                  "description": "Resource IDs assigned to the project."
+                },
+                "projectManagers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A project manager resource ID."
+                  },
+                  "description": "Resource IDs assigned as project managers."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined project links."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A project tag."
+                  },
+                  "description": "Tags assigned to the project."
+                },
+                "customFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A project custom field."
+                  },
+                  "description": "Custom fields assigned to the project."
+                },
+                "projectRate": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The project billing-rate configuration."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A project returned by Hub Planner."
+            },
+            "description": "Projects returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projects"
+        ],
+        "description": "Hub Planner project list response."
+      }
+    },
+    {
+      "id": "hub_planner.list_resources",
+      "service": "hub_planner",
+      "name": "list_resources",
+      "description": "List Hub Planner resources with optional zero-based pagination and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results to return, from 1 to 1000."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A sortable Hub Planner field, optionally prefixed with -."
+            },
+            "description": "Sort fields in priority order. Prefix a field with - for descending order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for a Hub Planner collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The unique resource ID."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The resource first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The resource last name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The resource email address."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The resource notes."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The resource role."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The resource status returned by Hub Planner."
+                },
+                "metadata": {
+                  "type": "string",
+                  "description": "The resource metadata value."
+                },
+                "createdDate": {
+                  "type": "string",
+                  "description": "The resource creation timestamp."
+                },
+                "updatedDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource update timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource update timestamp."
+                },
+                "useCustomAvailability": {
+                  "type": "boolean",
+                  "description": "Whether the resource uses custom availability."
+                },
+                "isProjectManager": {
+                  "type": "boolean",
+                  "description": "Whether the resource can manage projects."
+                },
+                "calendarIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A calendar ID."
+                  },
+                  "description": "Calendar IDs associated with the resource."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined resource links."
+                },
+                "customFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A resource custom field."
+                  },
+                  "description": "Custom fields assigned to the resource."
+                },
+                "resourceRates": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The resource billing-rate configuration."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A resource returned by Hub Planner."
+            },
+            "description": "Resources returned by Hub Planner."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resources"
+        ],
+        "description": "Hub Planner resource list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,752 @@
+{
+  "service": "ozon",
+  "displayName": "Ozon",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "inputType": "text",
+          "label": "Client ID",
+          "required": true,
+          "secret": false,
+          "placeholder": "OZON_CLIENT_ID",
+          "description": "Ozon seller Client ID sent in the Client-Id header. Find it under Seller Settings > API keys: https://seller.ozon.ru/app/settings/api-keys."
+        },
+        {
+          "key": "apiKey",
+          "inputType": "password",
+          "label": "API Key",
+          "required": true,
+          "secret": true,
+          "placeholder": "OZON_API_KEY",
+          "description": "Ozon Seller API key sent in the Api-Key header. Create it under Seller Settings > API keys: https://seller.ozon.ru/app/settings/api-keys."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.ozon.ru",
+  "actions": [
+    {
+      "id": "ozon.get_fbs_posting",
+      "service": "ozon",
+      "name": "get_fbs_posting",
+      "description": "Retrieve one Ozon FBS or rFBS posting by posting number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "posting_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ozon posting number."
+          },
+          "with": {
+            "type": "object",
+            "properties": {
+              "analytics_data": {
+                "type": "boolean",
+                "description": "Whether to include analytics data."
+              },
+              "barcodes": {
+                "type": "boolean",
+                "description": "Whether to include posting barcodes."
+              },
+              "financial_data": {
+                "type": "boolean",
+                "description": "Whether to include financial data."
+              },
+              "legal_info": {
+                "type": "boolean",
+                "description": "Whether to include legal information."
+              },
+              "product_exemplars": {
+                "type": "boolean",
+                "description": "Whether to include product exemplar data."
+              },
+              "related_postings": {
+                "type": "boolean",
+                "description": "Whether to include related posting numbers."
+              },
+              "translit": {
+                "type": "boolean",
+                "description": "Whether Ozon should transliterate returned values."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional posting data to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "posting_number"
+        ],
+        "description": "The input payload for retrieving one Ozon FBS or rFBS posting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Ozon result payload."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon FBS posting detail response."
+      }
+    },
+    {
+      "id": "ozon.get_product_info",
+      "service": "ozon",
+      "name": "get_product_info",
+      "description": "Retrieve detailed Ozon product information by offer, product, or SKU identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offer_id": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Ozon identifier."
+            },
+            "description": "Seller-defined offer identifiers to retrieve.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "product_id": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Ozon identifier."
+            },
+            "description": "Ozon product identifiers to retrieve.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "sku": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Ozon identifier."
+            },
+            "description": "Ozon SKUs to retrieve.",
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifiers for retrieving detailed Ozon product information.",
+        "anyOf": [
+          {
+            "required": [
+              "offer_id"
+            ]
+          },
+          {
+            "required": [
+              "product_id"
+            ]
+          },
+          {
+            "required": [
+              "sku"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Ozon resource."
+            },
+            "description": "The returned Ozon resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon product information response."
+      }
+    },
+    {
+      "id": "ozon.get_seller_info",
+      "service": "ozon",
+      "name": "get_seller_info",
+      "description": "Retrieve information about the authenticated Ozon seller account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The seller company information."
+          },
+          "ratings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Ozon seller rating."
+            },
+            "description": "The seller ratings."
+          },
+          "subscription": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The seller subscription information."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Ozon seller account information."
+      }
+    },
+    {
+      "id": "ozon.list_fbs_postings",
+      "service": "ozon",
+      "name": "list_fbs_postings",
+      "description": "List Ozon FBS and rFBS postings for a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "since": {
+                "type": "string",
+                "description": "The inclusive beginning of the posting period in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "to": {
+                "type": "string",
+                "description": "The inclusive end of the posting period in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "delivery_method_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Delivery method identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "integration_type_flow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One integration processing flow."
+                },
+                "description": "Integration processing flows to include."
+              },
+              "is_blr_traceable": {
+                "type": "boolean",
+                "description": "Whether to include only traceable Belarus products."
+              },
+              "order_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Ozon order identifier."
+              },
+              "order_numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon order number."
+                },
+                "description": "Order numbers to include.",
+                "minItems": 1,
+                "maxItems": 100
+              },
+              "provider_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Delivery provider identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "statuses": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon posting status."
+                },
+                "description": "Posting statuses to include.",
+                "minItems": 1
+              },
+              "warehouse_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Warehouse identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "since",
+              "to"
+            ],
+            "description": "Filters Ozon FBS and rFBS postings."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of postings to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The cursor returned by the previous page."
+          },
+          "sort_dir": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The posting sort direction."
+          },
+          "translit": {
+            "type": "boolean",
+            "description": "Whether Ozon should transliterate returned addresses."
+          },
+          "with": {
+            "type": "object",
+            "properties": {
+              "analytics_data": {
+                "type": "boolean",
+                "description": "Whether to include analytics data."
+              },
+              "barcodes": {
+                "type": "boolean",
+                "description": "Whether to include posting barcodes."
+              },
+              "financial_data": {
+                "type": "boolean",
+                "description": "Whether to include financial data."
+              },
+              "legal_info": {
+                "type": "boolean",
+                "description": "Whether to include legal information."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional posting data to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter",
+          "limit"
+        ],
+        "description": "The input payload for listing Ozon FBS and rFBS postings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The cursor for the next page."
+          },
+          "has_next": {
+            "type": "boolean",
+            "description": "Whether more postings are available."
+          },
+          "postings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Ozon posting."
+            },
+            "description": "The returned Ozon postings."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon FBS posting list response."
+      }
+    },
+    {
+      "id": "ozon.list_product_prices",
+      "service": "ozon",
+      "name": "list_product_prices",
+      "description": "List prices for products in the authenticated Ozon seller account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "offer_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Seller-defined offer identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "product_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Ozon product identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "ALL",
+                  "VISIBLE",
+                  "INVISIBLE",
+                  "EMPTY_STOCK",
+                  "NOT_MODERATED",
+                  "MODERATED",
+                  "DISABLED",
+                  "STATE_FAILED",
+                  "READY_TO_SUPPLY",
+                  "VALIDATION_STATE_PENDING",
+                  "VALIDATION_STATE_FAIL",
+                  "VALIDATION_STATE_SUCCESS",
+                  "TO_SUPPLY",
+                  "IN_SALE",
+                  "REMOVED_FROM_SALE",
+                  "OVERPRICED",
+                  "CRITICALLY_OVERPRICED",
+                  "EMPTY_BARCODE",
+                  "BARCODE_EXISTS",
+                  "QUARANTINE",
+                  "ARCHIVED",
+                  "OVERPRICED_WITH_STOCK",
+                  "PARTIAL_APPROVED",
+                  "AUTO_ARCHIVED",
+                  "MANUAL_ARCHIVED",
+                  "SEASONAL_AUTO_ARCHIVED",
+                  "VISIBLE_WITH_FBO_STOCK"
+                ],
+                "description": "The Ozon product visibility filter."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Filters Ozon products by identifiers or visibility."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of products to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter",
+          "limit"
+        ],
+        "description": "The input payload for listing Ozon product prices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Ozon resource."
+            },
+            "description": "The returned Ozon resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon product price list response."
+      }
+    },
+    {
+      "id": "ozon.list_product_stocks",
+      "service": "ozon",
+      "name": "list_product_stocks",
+      "description": "List stock quantities for products in the authenticated Ozon seller account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "offer_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Seller-defined offer identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "product_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Ozon product identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "ALL",
+                  "VISIBLE",
+                  "INVISIBLE",
+                  "EMPTY_STOCK",
+                  "NOT_MODERATED",
+                  "MODERATED",
+                  "DISABLED",
+                  "STATE_FAILED",
+                  "READY_TO_SUPPLY",
+                  "VALIDATION_STATE_PENDING",
+                  "VALIDATION_STATE_FAIL",
+                  "VALIDATION_STATE_SUCCESS",
+                  "TO_SUPPLY",
+                  "IN_SALE",
+                  "REMOVED_FROM_SALE",
+                  "OVERPRICED",
+                  "CRITICALLY_OVERPRICED",
+                  "EMPTY_BARCODE",
+                  "BARCODE_EXISTS",
+                  "QUARANTINE",
+                  "ARCHIVED",
+                  "OVERPRICED_WITH_STOCK",
+                  "PARTIAL_APPROVED",
+                  "AUTO_ARCHIVED",
+                  "MANUAL_ARCHIVED",
+                  "SEASONAL_AUTO_ARCHIVED",
+                  "VISIBLE_WITH_FBO_STOCK",
+                  "BANNED"
+                ],
+                "description": "The Ozon stock visibility filter."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Filters Ozon products by identifiers or visibility."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of products to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter",
+          "limit"
+        ],
+        "description": "The input payload for listing Ozon product stocks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Ozon resource."
+            },
+            "description": "The returned Ozon resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon product stock list response."
+      }
+    },
+    {
+      "id": "ozon.list_products",
+      "service": "ozon",
+      "name": "list_products",
+      "description": "List products in the authenticated Ozon seller account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "offer_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Seller-defined offer identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "product_id": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Ozon product identifiers to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "skus": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Ozon identifier."
+                },
+                "description": "Ozon SKUs to include.",
+                "minItems": 1,
+                "maxItems": 1000
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "ALL",
+                  "VISIBLE",
+                  "INVISIBLE",
+                  "EMPTY_STOCK",
+                  "NOT_MODERATED",
+                  "MODERATED",
+                  "DISABLED",
+                  "STATE_FAILED",
+                  "READY_TO_SUPPLY",
+                  "VALIDATION_STATE_PENDING",
+                  "VALIDATION_STATE_FAIL",
+                  "VALIDATION_STATE_SUCCESS",
+                  "TO_SUPPLY",
+                  "IN_SALE",
+                  "REMOVED_FROM_SALE",
+                  "OVERPRICED",
+                  "CRITICALLY_OVERPRICED",
+                  "EMPTY_BARCODE",
+                  "BARCODE_EXISTS",
+                  "QUARANTINE",
+                  "ARCHIVED",
+                  "OVERPRICED_WITH_STOCK",
+                  "PARTIAL_APPROVED",
+                  "AUTO_ARCHIVED",
+                  "MANUAL_ARCHIVED",
+                  "SEASONAL_AUTO_ARCHIVED",
+                  "VISIBLE_WITH_FBO_STOCK"
+                ],
+                "description": "The Ozon product visibility filter."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Filters Ozon products by identifiers, SKUs, or visibility."
+          },
+          "last_id": {
+            "type": "string",
+            "description": "The last_id cursor returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of products to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Ozon products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Ozon result payload."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ozon product list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,2330 @@
+{
+  "service": "weixin_store",
+  "displayName": "WeChat Store",
+  "description": "Run a WeChat Store (微信小店) through the WeChat Store Open Platform APIs: upload product images, create and update products, list and delist them, manage stock, query and ship orders, look up freight templates and addresses, and process after-sale requests. If the store has an IP whitelist configured in the WeChat Store admin console (微信小店后台 → 服务市场 → 经营工具 → 自研 → IP 白名单), the runtime's public egress IP must be added to it, otherwise every call fails with HTTP 403.",
+  "categories": [
+    "E-commerce"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "description": "The AppID and AppSecret of the WeChat Store (微信小店), found in the WeChat Store admin console (微信小店后台 → 服务市场 → 经营工具 → 自研). If the store has an IP whitelist configured there (自研 → IP 白名单), add this runtime's public egress IP to it first, otherwise every API call fails with HTTP 403.",
+      "fields": [
+        {
+          "key": "appId",
+          "label": "AppID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "description": "The AppID of the WeChat Store. Find it in the WeChat Store admin console (微信小店后台) under 服务市场 → 经营工具 → 自研."
+        },
+        {
+          "key": "appSecret",
+          "label": "AppSecret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "description": "The AppSecret of the same WeChat Store, shown next to the AppID under 服务市场 → 经营工具 → 自研. If the store has an IP whitelist configured (自研 → IP 白名单), this runtime's public egress IP must be added to it first."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://channels.weixin.qq.com/shop",
+  "actions": [
+    {
+      "id": "weixin_store.accept_aftersale",
+      "service": "weixin_store",
+      "name": "accept_aftersale",
+      "description": "Accept a buyer's after-sale request. Accepting a return needs a merchant address id from list_addresses; acceptType chooses between accepting the return (1) and accepting the refund (2), and is chosen automatically when omitted.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the after-sale orders of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "afterSaleOrderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The after_sale_order_id to accept."
+          },
+          "addressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant return address id from list_addresses; inspect candidates with get_address. Required when accepting a return."
+          },
+          "acceptType": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              }
+            ],
+            "description": "1 = accept the return (return-and-refund or exchange), 2 = accept the refund. Chosen automatically from the after-sale order's state when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "afterSaleOrderId"
+        ],
+        "description": "The after-sale acceptance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.add_product",
+      "service": "weixin_store",
+      "name": "add_product",
+      "description": "Create a product. All image fields must be WeChat-hosted URLs from upload_image. By default the product is saved as a draft; pass listing 1 to submit it for review and list it directly. Nested objects and arrays keep their WeChat snake_case fields as documented per field.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The product title, at most 60 characters."
+          },
+          "headImgs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A WeChat-hosted product image URL.",
+              "format": "uri"
+            },
+            "description": "The product head images: 3 to 9 image URLs returned by upload_image.",
+            "minItems": 3,
+            "maxItems": 9
+          },
+          "catsV2": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cat_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The category id as a number."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The category id as a string."
+                    }
+                  ],
+                  "description": "A category id from list_categories. WeChat documents cat_id as a number on some endpoints and a string on others; both forms are accepted."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One level of the multi-level category path, ordered from the top category down to the leaf category."
+            },
+            "description": "The multi-level category path of the product, ordered down to a leaf category.",
+            "minItems": 1
+          },
+          "deliverMethod": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number"
+              },
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 3,
+                "type": "number"
+              }
+            ],
+            "description": "The delivery method: 0 = express delivery, 1 = virtual goods delivered to a phone number, 3 = virtual goods delivered to an account chosen by the buyer."
+          },
+          "deliverAcctType": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "const": 1,
+                  "type": "number"
+                },
+                {
+                  "const": 2,
+                  "type": "number"
+                },
+                {
+                  "const": 3,
+                  "type": "number"
+                },
+                {
+                  "const": 4,
+                  "type": "number"
+                }
+              ],
+              "description": "One delivery account type."
+            },
+            "description": "The account types buyers may receive virtual goods through: 1 = WeChat openid, 2 = QQ, 3 = phone number, 4 = email. Required when deliverMethod is 3.",
+            "minItems": 1
+          },
+          "extraService": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The after-sale services of the product in WeChat snake_case: seven_day_return and freight_insurance, each 0 or 1."
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One SKU in WeChat snake_case: stock_num (required, integer), sale_price (required, integer, the price in 分), sku_attrs ([{attr_key, attr_value}]), out_sku_id, thumb_img, and any other WeChat SKU field passed through unchanged."
+            },
+            "description": "The SKUs of the product, between 1 and 500.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "outProductId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-side product id, for joining with an external system."
+          },
+          "descInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The product detail description in WeChat snake_case: imgs (image URLs from upload_image) and desc (text)."
+          },
+          "attrs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product attribute in WeChat snake_case: attr_key and attr_value. Which attributes a category requires is listed by get_category."
+            },
+            "description": "The product attributes required by its category."
+          },
+          "brandId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The brand_id from list_valid_brands. Pass 2100000000 for a brandless product; required when the category limits brands."
+          },
+          "expressInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The express settings in WeChat snake_case: template_id (a freight template id from list_freight_templates; inspect one with get_freight_template) and weight."
+          },
+          "listing": {
+            "const": 1,
+            "type": "number",
+            "description": "Pass 1 to submit the product for review and list it directly instead of saving a draft."
+          },
+          "aftersaleDesc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The after-sale description shown to buyers."
+          },
+          "limitedInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The purchase-limit settings in WeChat snake_case, passed through unchanged."
+          },
+          "sizeChart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The size chart in WeChat snake_case, passed through unchanged."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "headImgs",
+          "catsV2",
+          "deliverMethod",
+          "extraService",
+          "skus"
+        ],
+        "description": "The product to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "product_id": {
+                "type": "string",
+                "description": "The id of the created product."
+              },
+              "create_time": {
+                "type": "string",
+                "description": "The creation time, formatted as YYYY-MM-DD hh:mm:ss."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The creation result."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat response carrying the created product."
+      },
+      "followUpActions": [
+        "weixin_store.listing_product"
+      ]
+    },
+    {
+      "id": "weixin_store.apply_category",
+      "service": "weixin_store",
+      "name": "apply_category",
+      "description": "Apply for permission to sell in a leaf category using the new category tree and certificate groups. Returns an audit id; check the audit and effective permission before publishing products.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Apply for categories in the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryInfo": {
+            "type": "object",
+            "properties": {
+              "cats_v2": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "cat_id": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "The id as a number."
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "description": "The id as a numeric string."
+                        }
+                      ],
+                      "description": "One category id in the path."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "cat_id"
+                  ],
+                  "description": "One category in the path."
+                },
+                "description": "The category path from root to leaf, using cat_id values from list_categories.",
+                "minItems": 1
+              },
+              "license_group_list": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "license_group_id": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "The id as a number."
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "description": "The id as a numeric string."
+                        }
+                      ],
+                      "description": "The required certificate group id."
+                    },
+                    "license": {
+                      "type": "object",
+                      "properties": {
+                        "license_id": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 1,
+                              "description": "The id as a number."
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]*$",
+                              "description": "The id as a numeric string."
+                            }
+                          ],
+                          "description": "One permitted license id in the group."
+                        },
+                        "file_id_list": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": "Qualification image file ids from upload_qualification_image."
+                        },
+                        "license_field_list": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The license field key."
+                              },
+                              "value": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The license field value."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "description": "One license field."
+                          },
+                          "description": "The required license fields for this certificate."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "license_id",
+                        "file_id_list",
+                        "license_field_list"
+                      ],
+                      "description": "The selected license."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "license_group_id",
+                    "license"
+                  ],
+                  "description": "One certificate group selection."
+                },
+                "description": "One selected license for each required certificate group from list_categories; empty when no licenses are required."
+              },
+              "brand_list": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "brand_id": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "The id as a number."
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$",
+                          "description": "The id as a numeric string."
+                        }
+                      ],
+                      "description": "An approved brand id from list_valid_brands."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "brand_id"
+                  ],
+                  "description": "An approved brand."
+                },
+                "description": "Approved brand ids, required when get_category reports attr.is_limit_brand=true.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "cats_v2",
+              "license_group_list"
+            ],
+            "description": "The new category application, using WeChat field names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categoryInfo"
+        ],
+        "description": "The category application. The new certificate-group protocol is used automatically."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The audit id to pass to get_category_application."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The created category audit application."
+      },
+      "followUpActions": [
+        "weixin_store.get_category_application"
+      ]
+    },
+    {
+      "id": "weixin_store.delete_product",
+      "service": "weixin_store",
+      "name": "delete_product",
+      "description": "Permanently delete a product by product_id. A product under review cannot be deleted. This cannot be undone.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The product to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.delisting_product",
+      "service": "weixin_store",
+      "name": "delisting_product",
+      "description": "Take a listed product off the shelf.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The product to delist."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.get_address",
+      "service": "weixin_store",
+      "name": "get_address",
+      "description": "Get one merchant address by address_id, including its contact, region, and send/recv flags. Accepting an after-sale return needs one of these address ids.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "addressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address_id returned by list_addresses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "addressId"
+        ],
+        "description": "The address to get."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address_detail": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The address, with its send/recv flags and the address_info object (user_name, tel_number, province_name, city_name, county_name, detail_info, postal_code, national_code, house_number, lat, lng)."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat address detail."
+      }
+    },
+    {
+      "id": "weixin_store.get_aftersale_order",
+      "service": "weixin_store",
+      "name": "get_aftersale_order",
+      "description": "Get one after-sale order by its id, including its status, type, products, and refund details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "afterSaleOrderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The after_sale_order_id returned by list_aftersale_orders."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "afterSaleOrderId"
+        ],
+        "description": "The after-sale order to get."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "after_sale_order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The after-sale order, with status, type (REFUND, RETURN, EXCHANGE, or RESHIP), order_id, product_info, refund_info, return_info, and reason_text."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat after-sale order data."
+      }
+    },
+    {
+      "id": "weixin_store.get_category",
+      "service": "weixin_store",
+      "name": "get_category",
+      "description": "Get the publishing rules of one leaf category: required product and sale attributes, brand restrictions, deposit, and qualifications.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "catId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The id as a number."
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "The id as a numeric string."
+              }
+            ],
+            "description": "The id of a leaf category from list_categories."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "catId"
+        ],
+        "description": "The category to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The category identity, with cat_id and name."
+          },
+          "attr": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The category attributes: brand requirements, deposit, product_attr_list and sale_attr_list publishing attributes, and more."
+          },
+          "product_qua_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One qualification."
+            },
+            "description": "The qualifications required to publish in this category."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat category detail."
+      }
+    },
+    {
+      "id": "weixin_store.get_category_application",
+      "service": "weixin_store",
+      "name": "get_category_application",
+      "description": "Get the status and any rejection reason of a category application by audit id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "auditId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The audit_id returned by apply_category."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "auditId"
+        ],
+        "description": "The category application to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "info": {
+            "type": "object",
+            "properties": {
+              "audit_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The audit id."
+              },
+              "cat_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The leaf category id."
+              },
+              "status": {
+                "type": "integer",
+                "description": "1 = in review, 2 = rejected, 3 = approved, 4 = canceled."
+              },
+              "audit_reason": {
+                "type": "string",
+                "description": "The rejection reason, when rejected."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The audit status and submitted materials."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The category audit application."
+      }
+    },
+    {
+      "id": "weixin_store.get_category_product_rule",
+      "service": "weixin_store",
+      "name": "get_category_product_rule",
+      "description": "Get the category's product attribute, sale attribute, qualification, price, and other publishing rules for the chosen release mode.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "catId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The id as a number."
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "The id as a numeric string."
+              }
+            ],
+            "description": "The leaf category id."
+          },
+          "releaseMode": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number"
+              },
+              {
+                "const": 1,
+                "type": "number"
+              }
+            ],
+            "description": "0 = normal, 1 = simplified."
+          },
+          "brandId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The id as a number."
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "The id as a numeric string."
+              }
+            ],
+            "description": "An approved brand id when publishing a branded product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "catId",
+          "releaseMode"
+        ],
+        "description": "The category publishing rules to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product_attr_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product attribute rule."
+            },
+            "description": "Product attribute requirements."
+          },
+          "sale_attr_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sale attribute rule."
+            },
+            "description": "SKU attribute requirements."
+          },
+          "product_qua_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One qualification rule."
+            },
+            "description": "Product qualification requirements."
+          },
+          "floor_price": {
+            "type": "integer",
+            "description": "The lowest allowed sale price, in cents."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The category's product publishing rules."
+      }
+    },
+    {
+      "id": "weixin_store.get_freight_template",
+      "service": "weixin_store",
+      "name": "get_freight_template",
+      "description": "Get one freight template by template_id, including its valuation type, shipping method, sender address, and freight rules. Freight templates bind to products through expressInfo on add_product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template_id returned by list_freight_templates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "The freight template to get."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "freight_template": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The freight template, with name, valuation_type, shipping_method, delivery_type, send_time, the sender address_info, and its freight rules."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat freight template detail."
+      }
+    },
+    {
+      "id": "weixin_store.get_order",
+      "service": "weixin_store",
+      "name": "get_order",
+      "description": "Get one order by order_id, including its products, payment, price, and delivery details. Buyer address fields are masked.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The order_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The order_id as a number."
+              }
+            ],
+            "description": "The order_id returned by list_orders. WeChat documents it as a number in some endpoints and a string in others; both forms are accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "The order to get."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The order, with status, order_detail (product_infos, pay_info, price_info, delivery_info, ext_info), and aftersale_detail."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat order data."
+      }
+    },
+    {
+      "id": "weixin_store.get_product",
+      "service": "weixin_store",
+      "name": "get_product",
+      "description": "Get one product by product_id. Products keep a draft and an online copy; dataType selects which.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          },
+          "dataType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "Which copy to read: 1 = the online product (default), 2 = the draft, 3 = both."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The product to get."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The product, with its skus, category path, attrs, and audit state."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat product data."
+      }
+    },
+    {
+      "id": "weixin_store.get_shop_info",
+      "service": "weixin_store",
+      "name": "get_shop_info",
+      "description": "Get the basic information of the connected WeChat Store: name, avatar, subject type, and status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "info": {
+            "type": "object",
+            "properties": {
+              "nickname": {
+                "type": "string",
+                "description": "The shop name."
+              },
+              "headimg_url": {
+                "type": "string",
+                "description": "The shop avatar URL."
+              },
+              "subject_type": {
+                "type": "string",
+                "description": "The shop subject type, e.g. 企业 or 个体工商户."
+              },
+              "status": {
+                "type": "string",
+                "description": "The shop status: opening, open_finished, closing, or close_finished."
+              },
+              "username": {
+                "type": "string",
+                "description": "The shop's original id."
+              },
+              "open_timestamp": {
+                "type": "integer",
+                "description": "The shop opening time as a Unix timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The shop's basic information."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat shop information."
+      }
+    },
+    {
+      "id": "weixin_store.list_addresses",
+      "service": "weixin_store",
+      "name": "list_addresses",
+      "description": "List the merchant address ids of the store. After-sale returns need one of these address ids when accepting a return.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset of the first address to return. Defaults to 0.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of addresses to return. Defaults to 10.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "The address page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address_id_list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One address id."
+            },
+            "description": "The address ids in this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat address page."
+      }
+    },
+    {
+      "id": "weixin_store.list_aftersale_orders",
+      "service": "weixin_store",
+      "name": "list_aftersale_orders",
+      "description": "List the after-sale order ids of the store, paginated by cursor. At least one time range pair is required, as Unix timestamps in seconds spanning at most 24 hours.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "createTimeStart": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The start of the after-sale creation time range, as a Unix timestamp in seconds."
+          },
+          "createTimeEnd": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The end of the after-sale creation time range, as a Unix timestamp in seconds."
+          },
+          "updateTimeStart": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The start of the after-sale update time range, as a Unix timestamp in seconds."
+          },
+          "updateTimeEnd": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The end of the after-sale update time range, as a Unix timestamp in seconds."
+          },
+          "nextKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous call. Omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The after-sale page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "after_sale_order_id_list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One after-sale order id."
+            },
+            "description": "The after-sale order ids in this page."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more after-sale orders follow this page."
+          },
+          "next_key": {
+            "type": "string",
+            "description": "The pagination cursor for the next page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat after-sale page."
+      }
+    },
+    {
+      "id": "weixin_store.list_categories",
+      "service": "weixin_store",
+      "name": "list_categories",
+      "description": "Get the full category tree of the store, including the qualifications each category requires. Use the leaf cat_id values from cats_v2 for add_product and get_category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One category node."
+            },
+            "description": "The legacy three-level category tree."
+          },
+          "cats_v2": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One category node."
+            },
+            "description": "The multi-level category tree whose nodes carry a leaf flag; use the leaf cat_id values for add_product and get_category."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat category trees."
+      }
+    },
+    {
+      "id": "weixin_store.list_category_permissions",
+      "service": "weixin_store",
+      "name": "list_category_permissions",
+      "description": "List the store's category permissions. Filter to status 1 to find categories currently allowed for sale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              }
+            ],
+            "description": "1 = effective, 2 = expired; omit for both."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The category permissions to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The leaf category id."
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "1 = effective, 2 = expired."
+                },
+                "uneffective_reason": {
+                  "type": "string",
+                  "description": "Why an expired permission is no longer effective."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One category permission."
+            },
+            "description": "The category permissions."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The store's current category permissions."
+      }
+    },
+    {
+      "id": "weixin_store.list_delivery_companies",
+      "service": "weixin_store",
+      "name": "list_delivery_companies",
+      "description": "List the delivery companies the store can ship with, including each company's delivery_id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ewaybillOnly": {
+            "type": "boolean",
+            "description": "Whether to return only companies that support electronic waybills. Defaults to false.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "The delivery company filter."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company_list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "delivery_id": {
+                  "type": "string",
+                  "description": "The delivery company id to pass to send_delivery, e.g. SF, ZTO, YTO, JD, EMS, or OTHER."
+                },
+                "delivery_name": {
+                  "type": "string",
+                  "description": "The delivery company name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One delivery company."
+            },
+            "description": "The supported delivery companies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat delivery company list."
+      }
+    },
+    {
+      "id": "weixin_store.list_freight_templates",
+      "service": "weixin_store",
+      "name": "list_freight_templates",
+      "description": "List the freight template ids of the store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset of the first template to return. Defaults to 0.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of templates to return. Defaults to 10.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "The freight template page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template_id_list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One freight template id."
+            },
+            "description": "The freight template ids in this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat freight template page."
+      }
+    },
+    {
+      "id": "weixin_store.list_orders",
+      "service": "weixin_store",
+      "name": "list_orders",
+      "description": "List the order ids of the store, paginated by cursor. At least one time range is required, as a pair of Unix timestamps in seconds spanning at most 7 days.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "createTimeStart": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The start of the order creation time range, as a Unix timestamp in seconds."
+          },
+          "createTimeEnd": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The end of the order creation time range, as a Unix timestamp in seconds."
+          },
+          "updateTimeStart": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The start of the order update time range, as a Unix timestamp in seconds."
+          },
+          "updateTimeEnd": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The end of the order update time range, as a Unix timestamp in seconds."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": 10,
+                "type": "number"
+              },
+              {
+                "const": 12,
+                "type": "number"
+              },
+              {
+                "const": 13,
+                "type": "number"
+              },
+              {
+                "const": 20,
+                "type": "number"
+              },
+              {
+                "const": 21,
+                "type": "number"
+              },
+              {
+                "const": 30,
+                "type": "number"
+              },
+              {
+                "const": 100,
+                "type": "number"
+              },
+              {
+                "const": 250,
+                "type": "number"
+              }
+            ],
+            "description": "Filter by order status: 10 = pending payment, 12 = pending gift receipt, 13 = pending group buy, 20 = pending shipment, 21 = partially shipped, 30 = shipped, 100 = completed, 250 = cancelled."
+          },
+          "openid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by the buyer's openid."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of orders per page, at most 100."
+          },
+          "nextKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous call. Omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The order page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id_list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One order id."
+            },
+            "description": "The order ids in this page."
+          },
+          "next_key": {
+            "type": "string",
+            "description": "The pagination cursor for the next page."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more orders follow this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat order page."
+      }
+    },
+    {
+      "id": "weixin_store.list_products",
+      "service": "weixin_store",
+      "name": "list_products",
+      "description": "List the product ids of the store, paginated by cursor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number"
+              },
+              {
+                "const": 5,
+                "type": "number"
+              },
+              {
+                "const": 11,
+                "type": "number"
+              },
+              {
+                "const": 6,
+                "type": "number"
+              }
+            ],
+            "description": "Filter by product status: 0 = initial, 5 = listed, 11 = delisted, 6 = recycled. Omit to list every status except drafts and recycled products."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of products per page, at most 30. Defaults to 10.",
+            "default": 10
+          },
+          "nextKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous call. Omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The product page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One product id."
+            },
+            "description": "The product ids in this page."
+          },
+          "next_key": {
+            "type": "string",
+            "description": "The pagination cursor for the next page."
+          },
+          "total_num": {
+            "type": "integer",
+            "description": "The total number of products matching the filter."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat product page."
+      }
+    },
+    {
+      "id": "weixin_store.list_valid_brands",
+      "service": "weixin_store",
+      "name": "list_valid_brands",
+      "description": "List the brand qualifications currently in effect for the store, paginated by cursor. Use a returned brand_id when adding a product in a brand-restricted category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of brands per page, at most 50. Defaults to 10.",
+            "default": 10
+          },
+          "nextKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous call. Omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The brand page to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One brand qualification."
+            },
+            "description": "The effective brand qualifications of the shop."
+          },
+          "total_num": {
+            "type": "integer",
+            "description": "The total number of effective brand qualifications."
+          },
+          "next_key": {
+            "type": "string",
+            "description": "The pagination cursor; an empty value means the last page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat brand page."
+      }
+    },
+    {
+      "id": "weixin_store.listing_product",
+      "service": "weixin_store",
+      "name": "listing_product",
+      "description": "Submit a product for review and list it once approved.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The product to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.precheck_product_category",
+      "service": "weixin_store",
+      "name": "precheck_product_category",
+      "description": "Check whether the store may publish in a leaf category, including category permission, deposit, freight insurance, and store restrictions. Omit catId for store-wide checks only.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "catId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The id as a number."
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$",
+                "description": "The id as a numeric string."
+              }
+            ],
+            "description": "The leaf category id to check; omit for a store-wide check."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The category to check before publishing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "all_pass": {
+            "type": "boolean",
+            "description": "Whether the store may publish in the category."
+          },
+          "fail_reasons": {
+            "type": "array",
+            "items": {
+              "description": "One failure reason."
+            },
+            "description": "Reasons publishing is blocked."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The product publishing readiness check."
+      }
+    },
+    {
+      "id": "weixin_store.reject_aftersale",
+      "service": "weixin_store",
+      "name": "reject_aftersale",
+      "description": "Reject a buyer's after-sale request with a reason.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the after-sale orders of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "afterSaleOrderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The after_sale_order_id to reject."
+          },
+          "rejectReasonType": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The rejection reason type, from the reason enum of the after-sale order."
+          },
+          "rejectReason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A custom rejection description; a default description is used when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "afterSaleOrderId",
+          "rejectReasonType"
+        ],
+        "description": "The after-sale rejection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.send_delivery",
+      "service": "weixin_store",
+      "name": "send_delivery",
+      "description": "Ship an order, in one or more packages. Each package either ships by express with a waybill (deliverType 1, needs waybillId and deliveryId from list_delivery_companies, or OTHER when the company is not listed) or delivers virtual goods without logistics (deliverType 3, only for orders whose products use the phone-number delivery method).",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the orders of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The order_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The order_id as a number."
+              }
+            ],
+            "description": "The order_id returned by list_orders. WeChat documents it as a number in some endpoints and a string in others; both forms are accepted."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deliverType": {
+                  "anyOf": [
+                    {
+                      "const": 1,
+                      "type": "number"
+                    },
+                    {
+                      "const": 3,
+                      "type": "number"
+                    }
+                  ],
+                  "description": "1 = ship by express with a waybill, 3 = virtual goods without logistics."
+                },
+                "waybillId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The waybill number. Required when deliverType is 1."
+                },
+                "deliveryId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The delivery company id from list_delivery_companies, or OTHER. Required when deliverType is 1."
+                },
+                "productInfos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "productId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The product_id of the shipped product."
+                      },
+                      "skuId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The sku_id of the shipped product."
+                      },
+                      "productCnt": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The shipped quantity."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "productId",
+                      "skuId",
+                      "productCnt"
+                    ],
+                    "description": "One shipped product."
+                  },
+                  "description": "The products in this package.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "deliverType",
+                "productInfos"
+              ],
+              "description": "One shipped package."
+            },
+            "description": "The packages to ship for this order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "deliveries"
+        ],
+        "description": "The delivery to send."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.update_order_merchant_notes",
+      "service": "weixin_store",
+      "name": "update_order_merchant_notes",
+      "description": "Replace the merchant note of one order, optionally with a tag color.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the orders of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The order_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The order_id as a number."
+              }
+            ],
+            "description": "The order_id returned by list_orders. WeChat documents it as a number in some endpoints and a string in others; both forms are accepted."
+          },
+          "merchantNotes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant note to set on the order."
+          },
+          "tagColor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "The note tag color: 0 = gray, 1 = red, 2 = orange, 3 = green, 4 = blue."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "merchantNotes"
+        ],
+        "description": "The merchant note update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.update_product",
+      "service": "weixin_store",
+      "name": "update_product",
+      "description": "Replace a product's editable data. This is a full overwrite: every field of add_product applies, SKUs that carry an existing sku_id are updated, SKUs without one are added, and previously existing SKUs missing from the list are deleted.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The product title, at most 60 characters."
+          },
+          "headImgs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A WeChat-hosted product image URL.",
+              "format": "uri"
+            },
+            "description": "The product head images: 3 to 9 image URLs returned by upload_image.",
+            "minItems": 3,
+            "maxItems": 9
+          },
+          "catsV2": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cat_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The category id as a number."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The category id as a string."
+                    }
+                  ],
+                  "description": "A category id from list_categories. WeChat documents cat_id as a number on some endpoints and a string on others; both forms are accepted."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One level of the multi-level category path, ordered from the top category down to the leaf category."
+            },
+            "description": "The multi-level category path of the product, ordered down to a leaf category.",
+            "minItems": 1
+          },
+          "deliverMethod": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number"
+              },
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 3,
+                "type": "number"
+              }
+            ],
+            "description": "The delivery method: 0 = express delivery, 1 = virtual goods delivered to a phone number, 3 = virtual goods delivered to an account chosen by the buyer."
+          },
+          "deliverAcctType": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "const": 1,
+                  "type": "number"
+                },
+                {
+                  "const": 2,
+                  "type": "number"
+                },
+                {
+                  "const": 3,
+                  "type": "number"
+                },
+                {
+                  "const": 4,
+                  "type": "number"
+                }
+              ],
+              "description": "One delivery account type."
+            },
+            "description": "The account types buyers may receive virtual goods through: 1 = WeChat openid, 2 = QQ, 3 = phone number, 4 = email. Required when deliverMethod is 3.",
+            "minItems": 1
+          },
+          "extraService": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The after-sale services of the product in WeChat snake_case: seven_day_return and freight_insurance, each 0 or 1."
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One SKU in WeChat snake_case: stock_num (required, integer), sale_price (required, integer, the price in 分), sku_attrs ([{attr_key, attr_value}]), out_sku_id, thumb_img, and any other WeChat SKU field passed through unchanged."
+            },
+            "description": "The SKUs of the product, between 1 and 500.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "outProductId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-side product id, for joining with an external system."
+          },
+          "descInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The product detail description in WeChat snake_case: imgs (image URLs from upload_image) and desc (text)."
+          },
+          "attrs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product attribute in WeChat snake_case: attr_key and attr_value. Which attributes a category requires is listed by get_category."
+            },
+            "description": "The product attributes required by its category."
+          },
+          "brandId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The brand_id from list_valid_brands. Pass 2100000000 for a brandless product; required when the category limits brands."
+          },
+          "expressInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The express settings in WeChat snake_case: template_id (a freight template id from list_freight_templates; inspect one with get_freight_template) and weight."
+          },
+          "listing": {
+            "const": 1,
+            "type": "number",
+            "description": "Pass 1 to submit the product for review and list it directly instead of saving a draft."
+          },
+          "aftersaleDesc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The after-sale description shown to buyers."
+          },
+          "limitedInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The purchase-limit settings in WeChat snake_case, passed through unchanged."
+          },
+          "sizeChart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The size chart in WeChat snake_case, passed through unchanged."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId",
+          "title",
+          "headImgs",
+          "catsV2",
+          "deliverMethod",
+          "extraService",
+          "skus"
+        ],
+        "description": "The product replacement."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "product_id": {
+                "type": "string",
+                "description": "The id of the updated product."
+              },
+              "update_time": {
+                "type": "string",
+                "description": "The update time, formatted as YYYY-MM-DD hh:mm:ss."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The update result."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat response carrying the updated product."
+      }
+    },
+    {
+      "id": "weixin_store.update_product_stock",
+      "service": "weixin_store",
+      "name": "update_product_stock",
+      "description": "Update the stock of a product's SKUs. This does not consume the product review quota.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Manage the products of the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product_id as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The product_id as a number."
+              }
+            ],
+            "description": "The product_id returned by add_product or list_products. WeChat documents it as a number in some responses and a string in others; both forms are accepted."
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One SKU stock update: sku_id and stock_num."
+            },
+            "description": "The SKU stock updates in WeChat snake_case: [{sku_id, stock_num}].",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId",
+          "skus"
+        ],
+        "description": "The stock update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The upstream WeChat response. It carries no fields on success."
+      }
+    },
+    {
+      "id": "weixin_store.upload_image",
+      "service": "weixin_store",
+      "name": "upload_image",
+      "description": "Upload an image to the store and get back its WeChat-hosted URL (mmecimage.cn), the only URL form accepted by product image fields. Provide either imageUrl for WeChat to fetch, or a local transit file with its pixel size. At most 10 MB per image.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Upload images to the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "description": "A publicly accessible image URL that WeChat fetches and re-hosts. Exactly one of imageUrl and file is required.",
+            "format": "uri"
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The image file previously uploaded to the local transit file API. Exactly one of imageUrl and file is required."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The image width in pixels. Required when file is used."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The image height in pixels. Required when file is used."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The image to upload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pic_file": {
+            "type": "object",
+            "properties": {
+              "img_url": {
+                "type": "string",
+                "description": "The WeChat-hosted image URL (mmecimage.cn) accepted by every product image field."
+              },
+              "media_id": {
+                "type": "string",
+                "description": "The media_id of the uploaded image."
+              },
+              "pay_media_id": {
+                "type": "string",
+                "description": "The pay_media_id of the uploaded image."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The uploaded image file descriptors."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The upstream WeChat image upload response."
+      }
+    },
+    {
+      "id": "weixin_store.upload_qualification_image",
+      "service": "weixin_store",
+      "name": "upload_qualification_image",
+      "description": "Upload a qualification image (up to 2 MB) and return the file_id required for category and brand applications. Product images from upload_image cannot be used here.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Upload qualification images to the connected WeChat Store"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The qualification image previously uploaded to the local transit file API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The qualification image to upload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "file_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file id to use in a category or brand qualification application."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The uploaded file reference."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The uploaded qualification image."
+      }
+    }
+  ]
+}

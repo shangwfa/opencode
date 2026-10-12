@@ -52,6 +52,14 @@ export const authorizationLayer = Layer.effect(
         // credential checks here; the connect handler consumes and validates the ticket.
         const url = new URL(request.url, "http://localhost")
         if (hasPtyConnectTicketURL(url) || hasPersistentPtyConnectTicketURL(url)) return yield* effect
+        // The connector MCP passthrough authenticates with a session-scoped engine token
+        // forwarded to the embedded engine; Basic auth does not apply to this endpoint.
+        if (url.pathname === "/api/connector/mcp") return yield* effect
+        // The OAuth provider callback is public in the engine (state-validated there).
+        if (url.pathname === "/connector/oauth/callback") return yield* effect
+        // Trigger webhook ingress is a public provider callback; the engine validates the
+        // subscription nonce and the provider signature before any state advances.
+        if (url.pathname.startsWith("/connector/webhook/")) return yield* effect
         if (yield* authorizedRequest(request, config)) return yield* effect
         yield* HttpEffect.appendPreResponseHandler((_request, response) =>
           Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),

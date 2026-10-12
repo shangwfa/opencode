@@ -1,0 +1,566 @@
+{
+  "service": "zipcodebase",
+  "displayName": "Zipcodebase",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ZIPCODEBASE_API_KEY",
+      "description": "Zipcodebase API key sent with the apikey header. Get one from the Zipcodebase developer portal: https://app.zipcodebase.com/register."
+    }
+  ],
+  "homepageUrl": "https://zipcodebase.com/",
+  "actions": [
+    {
+      "id": "zipcodebase.calculate_distance",
+      "service": "zipcodebase",
+      "name": "calculate_distance",
+      "description": "Calculate distance from one postal code to one or more comparison postal codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal code to query."
+          },
+          "compare": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A postal code to include in the request."
+            },
+            "description": "The postal codes to query.",
+            "minItems": 1
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code, such as us or nl."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "km",
+              "mile"
+            ],
+            "description": "Optional distance unit returned by Zipcodebase."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "compare",
+          "country"
+        ],
+        "description": "The input payload for calculating postal code distances."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The compared postal code."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the origin postal code."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A distance result returned by Zipcodebase."
+            },
+            "description": "The distance results returned by Zipcodebase."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The distance payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.get_status",
+      "service": "zipcodebase",
+      "name": "get_status",
+      "description": "Return Zipcodebase account status and remaining request credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for checking Zipcodebase account status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requests_remaining": {
+            "type": "integer",
+            "description": "The number of remaining requests reported by Zipcodebase."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The status payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.list_postal_codes_by_city",
+      "service": "zipcodebase",
+      "name": "list_postal_codes_by_city",
+      "description": "List postal codes associated with a city and optional state or province.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name to search for."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code, such as us or nl."
+          },
+          "state_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state or province name to search for."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "city",
+          "country"
+        ],
+        "description": "The input payload for listing postal codes by city."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The postal code."
+                },
+                "city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The city name associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The city name associated with the postal code."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The state or region associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The state or region associated with the postal code."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country code associated with the postal code."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The latitude coordinate."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The longitude coordinate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A postal code record returned by Zipcodebase."
+            },
+            "description": "The postal codes returned for the city."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The city lookup payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.list_postal_codes_by_state",
+      "service": "zipcodebase",
+      "name": "list_postal_codes_by_state",
+      "description": "List postal codes associated with a state or province.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state or province name to search for."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code, such as us or nl."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing postal codes by state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The postal code."
+                },
+                "city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The city name associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The city name associated with the postal code."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The state or region associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The state or region associated with the postal code."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country code associated with the postal code."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The latitude coordinate."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The longitude coordinate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A postal code record returned by Zipcodebase."
+            },
+            "description": "The postal codes returned for the state."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The state lookup payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.list_postal_codes_within_radius",
+      "service": "zipcodebase",
+      "name": "list_postal_codes_within_radius",
+      "description": "List postal codes located within a radius of a postal code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal code to query."
+          },
+          "radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The positive distance or radius value."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code, such as us or nl."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "km",
+              "mile"
+            ],
+            "description": "Optional distance unit returned by Zipcodebase."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "radius",
+          "country"
+        ],
+        "description": "The input payload for finding postal codes within a radius."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The postal code."
+                },
+                "city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The city name associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The city name associated with the postal code."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The state or region associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The state or region associated with the postal code."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country code associated with the postal code."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The latitude coordinate."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The longitude coordinate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A postal code record returned by Zipcodebase."
+            },
+            "description": "The postal codes found within the requested radius."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The radius search payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.match_postal_codes_by_distance",
+      "service": "zipcodebase",
+      "name": "match_postal_codes_by_distance",
+      "description": "Find submitted postal code pairs that are within a given distance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A postal code to include in the request."
+            },
+            "description": "The postal codes to query.",
+            "minItems": 1
+          },
+          "distance": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The positive distance or radius value."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code, such as us or nl."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "km",
+              "mile"
+            ],
+            "description": "Optional distance unit returned by Zipcodebase."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "codes",
+          "distance",
+          "country"
+        ],
+        "description": "The input payload for matching postal codes by distance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A postal code match result."
+            },
+            "description": "The postal code pairs within the requested distance."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The postal code match payload returned by Zipcodebase."
+      }
+    },
+    {
+      "id": "zipcodebase.search_postal_codes",
+      "service": "zipcodebase",
+      "name": "search_postal_codes",
+      "description": "Look up location information for one or more postal codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A postal code to include in the request."
+            },
+            "description": "The postal codes to query.",
+            "minItems": 1
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Optional ISO 3166-1 alpha-2 country code used to narrow the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "codes"
+        ],
+        "description": "The input payload for looking up postal code location information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The postal code."
+                },
+                "city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The city name associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The city name associated with the postal code."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The state or region associated with the postal code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The state or region associated with the postal code."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country code associated with the postal code."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The latitude coordinate."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The longitude coordinate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A postal code record returned by Zipcodebase."
+            },
+            "description": "Postal code records keyed by submitted code."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The postal code search payload returned by Zipcodebase."
+      }
+    }
+  ]
+}

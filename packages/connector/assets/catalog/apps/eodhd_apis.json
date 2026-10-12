@@ -1,0 +1,1382 @@
+{
+  "service": "eodhd_apis",
+  "displayName": "EODHD APIs",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "EODHD_API_TOKEN",
+      "description": "EODHD API token sent as the api_token query parameter. Manage API access from your EODHD dashboard: https://eodhd.com/cp/settings/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://eodhd.com",
+  "actions": [
+    {
+      "id": "eodhd_apis.get_eod",
+      "service": "eodhd_apis",
+      "name": "get_eod",
+      "description": "Get historical end-of-day price data for an EODHD ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ticker with exchange code, such as AAPL.US."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "d",
+              "w",
+              "m"
+            ],
+            "description": "EODHD historical price period."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "last_date",
+              "last_open",
+              "last_high",
+              "last_low",
+              "last_close",
+              "last_volume"
+            ],
+            "description": "EODHD last-value filter for historical price data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticker"
+        ],
+        "description": "Input parameters for retrieving EODHD historical end-of-day price rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Price row date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Price row date."
+                },
+                "open": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Open price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Open price."
+                },
+                "high": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "High price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "High price."
+                },
+                "low": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Low price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Low price."
+                },
+                "close": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Close price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Close price."
+                },
+                "adjusted_close": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Adjusted close price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Adjusted close price."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Trading volume."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Trading volume."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A historical EOD price row returned by EODHD."
+            },
+            "description": "Historical price rows returned by EODHD."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "String scalar returned by EODHD."
+                  },
+                  {
+                    "type": "number",
+                    "description": "Numeric scalar returned by EODHD."
+                  }
+                ],
+                "description": "Scalar last-value response returned when an EOD filter is used."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scalar last-value response returned when an EOD filter is used."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by EODHD."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw object returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Historical EOD response returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.get_id_mapping",
+      "service": "eodhd_apis",
+      "name": "get_id_mapping",
+      "description": "Map between EODHD ticker symbols and security identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filterSymbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ticker symbol filter, such as AAPL.US."
+          },
+          "filterExchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exchange code filter, such as US."
+          },
+          "filterIsin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISIN identifier filter."
+          },
+          "filterFigi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "FIGI identifier filter."
+          },
+          "filterLei": {
+            "type": "string",
+            "minLength": 1,
+            "description": "LEI identifier filter."
+          },
+          "filterCusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CUSIP identifier filter."
+          },
+          "filterCik": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CIK identifier filter."
+          },
+          "pageLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of records per page."
+          },
+          "pageOffset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pagination offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for mapping EODHD security identifiers. At least one identifier filter is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mappings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Ticker symbol."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ticker symbol."
+                },
+                "Exchange": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange code."
+                },
+                "Name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Company or instrument name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Company or instrument name."
+                },
+                "ISIN": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISIN identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISIN identifier."
+                },
+                "FIGI": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "FIGI identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "FIGI identifier."
+                },
+                "LEI": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "LEI identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "LEI identifier."
+                },
+                "CUSIP": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "CUSIP identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "CUSIP identifier."
+                },
+                "CIK": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "CIK identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "CIK identifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A security identifier mapping returned by EODHD."
+            },
+            "description": "Security identifier mappings returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifier mappings returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.get_macro_indicators",
+      "service": "eodhd_apis",
+      "name": "get_macro_indicators",
+      "description": "Get macroeconomic indicator time series for a country from EODHD.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "ISO 3166-1 alpha-3 country code, such as USA."
+          },
+          "indicator": {
+            "type": "string",
+            "enum": [
+              "real_interest_rate",
+              "population_total",
+              "population_growth_annual",
+              "inflation_consumer_prices_annual",
+              "consumer_price_index",
+              "gdp_current_usd",
+              "gdp_per_capita_usd",
+              "gdp_growth_annual",
+              "debt_percent_gdp",
+              "net_trades_goods_services",
+              "inflation_gdp_deflator_annual",
+              "agriculture_value_added_percent_gdp",
+              "industry_value_added_percent_gdp",
+              "services_value_added_percent_gdp",
+              "exports_of_goods_services_percent_gdp",
+              "imports_of_goods_services_percent_gdp",
+              "gross_capital_formation_percent_gdp",
+              "net_migration",
+              "gni_usd",
+              "gni_per_capita_usd",
+              "gni_ppp_usd",
+              "gni_per_capita_ppp_usd",
+              "income_share_lowest_twenty",
+              "life_expectancy",
+              "fertility_rate",
+              "prevalence_hiv_total",
+              "co2_emissions_tons_per_capita",
+              "surface_area_km",
+              "poverty_poverty_lines_percent_population",
+              "revenue_excluding_grants_percent_gdp",
+              "cash_surplus_deficit_percent_gdp",
+              "startup_procedures_register",
+              "market_cap_domestic_companies_percent_gdp",
+              "mobile_subscriptions_per_hundred",
+              "internet_users_per_hundred",
+              "high_technology_exports_percent_total",
+              "merchandise_trade_percent_gdp",
+              "total_debt_service_percent_gni",
+              "unemployment_total_percent"
+            ],
+            "description": "Macroeconomic indicator code supported by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "country"
+        ],
+        "description": "Input parameters for retrieving EODHD macro indicator data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indicators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "CountryCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO alpha-3 country code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO alpha-3 country code."
+                },
+                "CountryName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Country name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Country name."
+                },
+                "Indicator": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Indicator display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Indicator display name."
+                },
+                "Date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Observation date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Observation date."
+                },
+                "Period": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Observation period."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Observation period."
+                },
+                "Value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Observed indicator value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Observed indicator value."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A macro indicator row returned by EODHD."
+            },
+            "description": "Macro indicator rows returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Macroeconomic indicator rows returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.get_real_time_quote",
+      "service": "eodhd_apis",
+      "name": "get_real_time_quote",
+      "description": "Get delayed real-time quote data for one or more EODHD symbols.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Primary ticker with exchange code, such as AAPL.US."
+          },
+          "additionalTickers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Additional ticker with exchange code, such as MSFT.US."
+            },
+            "description": "Additional ticker symbols to include in the quote request.",
+            "minItems": 1
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exchange code filter, such as US."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticker"
+        ],
+        "description": "Input parameters for retrieving delayed real-time EODHD quote data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "quotes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Ticker code returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ticker code returned by EODHD."
+                },
+                "timestamp": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Unix timestamp for the quote."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Unix timestamp for the quote."
+                },
+                "gmtoffset": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "GMT offset reported by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "GMT offset reported by EODHD."
+                },
+                "open": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Open price returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Open price returned by EODHD."
+                },
+                "high": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "High price returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "High price returned by EODHD."
+                },
+                "low": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Low price returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Low price returned by EODHD."
+                },
+                "close": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Close price returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Close price returned by EODHD."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Volume returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Volume returned by EODHD."
+                },
+                "previousClose": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Previous close value returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Previous close value returned by EODHD."
+                },
+                "change": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Absolute price change returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Absolute price change returned by EODHD."
+                },
+                "change_p": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Percentage price change returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Percentage price change returned by EODHD."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A delayed real-time quote returned by EODHD."
+            },
+            "description": "Quote rows returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Delayed real-time quotes returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.get_user_info",
+      "service": "eodhd_apis",
+      "name": "get_user_info",
+      "description": "Get EODHD account details and API usage for the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the EODHD authenticated user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User name returned by EODHD."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User name returned by EODHD."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User email returned by EODHD."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User email returned by EODHD."
+              },
+              "subscriptionType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Subscription plan type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Subscription plan type."
+              },
+              "paymentMethod": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Payment method summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Payment method summary."
+              },
+              "apiRequests": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "API requests used in the current period."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "API requests used in the current period."
+              },
+              "apiRequestsDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Date of the current API request count."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date of the current API request count."
+              },
+              "dailyRateLimit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Daily API request limit."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Daily API request limit."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "email",
+              "subscriptionType",
+              "paymentMethod",
+              "apiRequests",
+              "apiRequestsDate",
+              "dailyRateLimit"
+            ],
+            "description": "Authenticated EODHD user details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Authenticated user details returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.get_ust_yield_rates",
+      "service": "eodhd_apis",
+      "name": "get_ust_yield_rates",
+      "description": "Get US Treasury yield curve rates from EODHD.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateFrom": {
+            "type": "string",
+            "description": "Inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "filterYear": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Year filter for Treasury yield rates."
+          },
+          "pageLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of records per page."
+          },
+          "pageOffset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pagination offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving EODHD US Treasury yield rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Yield rate date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Yield rate date."
+                },
+                "1_month": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One-month constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "One-month constant maturity rate."
+                },
+                "2_months": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Two-month constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Two-month constant maturity rate."
+                },
+                "3_months": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Three-month constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Three-month constant maturity rate."
+                },
+                "4_months": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Four-month constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Four-month constant maturity rate."
+                },
+                "6_months": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Six-month constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Six-month constant maturity rate."
+                },
+                "1_year": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "One-year constant maturity rate."
+                },
+                "2_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Two-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Two-year constant maturity rate."
+                },
+                "3_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Three-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Three-year constant maturity rate."
+                },
+                "5_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Five-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Five-year constant maturity rate."
+                },
+                "7_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Seven-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Seven-year constant maturity rate."
+                },
+                "10_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Ten-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ten-year constant maturity rate."
+                },
+                "20_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Twenty-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Twenty-year constant maturity rate."
+                },
+                "30_years": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Thirty-year constant maturity rate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Thirty-year constant maturity rate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A US Treasury yield rate row returned by EODHD."
+            },
+            "description": "US Treasury yield curve rows returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "US Treasury yield rate rows returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.list_exchanges",
+      "service": "eodhd_apis",
+      "name": "list_exchanges",
+      "description": "List exchanges supported by EODHD.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing EODHD exchanges."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "exchanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange display name."
+                },
+                "Code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange code."
+                },
+                "OperatingMIC": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Operating market identifier code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Operating market identifier code."
+                },
+                "Country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange country."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange country."
+                },
+                "Currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange currency."
+                },
+                "CountryISO2": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO 3166-1 alpha-2 country code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO 3166-1 alpha-2 country code."
+                },
+                "CountryISO3": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO 3166-1 alpha-3 country code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO 3166-1 alpha-3 country code."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A supported exchange returned by EODHD."
+            },
+            "description": "Supported exchange rows returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supported exchanges returned by EODHD."
+      }
+    },
+    {
+      "id": "eodhd_apis.search_instruments",
+      "service": "eodhd_apis",
+      "name": "search_instruments",
+      "description": "Search EODHD instruments by ticker, company name, or ISIN.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query such as a ticker, company name, or ISIN."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "stock",
+              "etf",
+              "fund",
+              "bond",
+              "index",
+              "crypto"
+            ],
+            "description": "Security type used to filter EODHD instrument search results."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exchange code used to filter search results."
+          },
+          "bondsOnly": {
+            "type": "boolean",
+            "description": "Whether to return only bond results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of search results to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching EODHD instruments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Ticker code returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ticker code returned by EODHD."
+                },
+                "Exchange": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange code returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange code returned by EODHD."
+                },
+                "Name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Instrument or company name returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Instrument or company name returned by EODHD."
+                },
+                "Type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Instrument type returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Instrument type returned by EODHD."
+                },
+                "Country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Country returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Country returned by EODHD."
+                },
+                "Currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Currency returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Currency returned by EODHD."
+                },
+                "ISIN": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISIN identifier returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISIN identifier returned by EODHD."
+                },
+                "previousClose": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Previous close value returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Previous close value returned by EODHD."
+                },
+                "previousCloseDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Previous close date returned by EODHD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Previous close date returned by EODHD."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An instrument search result returned by EODHD."
+            },
+            "description": "Instrument search results returned by EODHD."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search results returned by EODHD."
+      }
+    }
+  ]
+}

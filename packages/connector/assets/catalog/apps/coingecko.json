@@ -1,0 +1,3870 @@
+{
+  "service": "coingecko",
+  "displayName": "CoinGecko",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CoinGecko API key",
+      "description": "Create a Demo or Pro API key in the CoinGecko Developer Dashboard: https://www.coingecko.com/en/developers/dashboard#api-keys. Select the matching plan below.",
+      "extraFields": [
+        {
+          "key": "plan",
+          "label": "API Plan",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "demo or pro",
+          "description": "Use demo for the free Demo API or pro for any paid API plan. The plan selects the API host and authentication header."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.coingecko.com",
+  "actions": [
+    {
+      "id": "coingecko.get_coin",
+      "service": "coingecko",
+      "name": "get_coin",
+      "description": "Get coin metadata and optional market data, tickers and seven-day sparkline.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)"
+          },
+          "localization": {
+            "type": "boolean",
+            "description": "Include all localized languages in the response. \nDefault: true"
+          },
+          "tickers": {
+            "type": "boolean",
+            "description": "Include tickers data. \nDefault: true"
+          },
+          "market_data": {
+            "type": "boolean",
+            "description": "Include market data. \nDefault: true"
+          },
+          "sparkline": {
+            "type": "boolean",
+            "description": "Include sparkline 7-day data. \nDefault: false"
+          },
+          "include_categories_details": {
+            "type": "boolean",
+            "description": "Include categories details. \nDefault: false"
+          },
+          "dex_pair_format": {
+            "type": "string",
+            "enum": [
+              "contract_address",
+              "symbol"
+            ],
+            "description": "Set to `symbol` to display DEX pair base and target as symbols. \nDefault: `contract_address`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for get_coin."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "CoinGecko coin ID."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Coin ticker symbol."
+          },
+          "name": {
+            "type": "string",
+            "description": "Coin name."
+          },
+          "market_data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Market prices, capitalization, volume and other metrics."
+          },
+          "tickers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Ticker data."
+            },
+            "description": "Coin trading pairs."
+          },
+          "description": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Localized description, potentially containing HTML."
+            },
+            "description": "Localized coin descriptions by language."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "symbol",
+          "name"
+        ],
+        "description": "Coin metadata and the requested optional data sections."
+      }
+    },
+    {
+      "id": "coingecko.get_coin_by_contract",
+      "service": "coingecko",
+      "name": "get_coin_by_contract",
+      "description": "Resolve CoinGecko coin details and coin ID from an asset platform ID and token contract address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_platform_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CoinGecko asset platform ID, such as ethereum. Use list_asset_platforms; this is not an onchain network ID."
+          },
+          "contract_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contract address of token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asset_platform_id",
+          "contract_address"
+        ],
+        "description": "Input parameters for get_coin_by_contract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "CoinGecko coin ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Coin name."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Coin ticker symbol."
+          },
+          "detail_platforms": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Platform contract addresses and decimal precision."
+          },
+          "market_data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Coin market metrics across currencies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Coin details resolved from an asset platform and contract address."
+      }
+    },
+    {
+      "id": "coingecko.get_coin_history",
+      "service": "coingecko",
+      "name": "get_coin_history",
+      "description": "Get a coin market snapshot at 00:00 UTC on a specified date, not that day's closing price. Demo history is limited to 365 days; paid historical access depends on plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)."
+          },
+          "date": {
+            "type": "string",
+            "description": "The date of data snapshot. \nFormat: `YYYY-MM-DD`",
+            "format": "date"
+          },
+          "localization": {
+            "type": "boolean",
+            "description": "Include all the localized languages in response. \nDefault: true"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "date"
+        ],
+        "description": "Input parameters for get_coin_history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "CoinGecko coin ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Coin name."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Coin ticker symbol."
+          },
+          "market_data": {
+            "type": "object",
+            "properties": {
+              "current_price": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Price in the quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Price in the quote currency."
+                },
+                "description": "Historical price by currency."
+              },
+              "market_cap": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Market capitalization in the quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Market capitalization in the quote currency."
+                },
+                "description": "Historical market capitalization by currency."
+              },
+              "total_volume": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Volume in the quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Volume in the quote currency."
+                },
+                "description": "Historical 24-hour volume by currency."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Historical market metrics by currency when available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "symbol"
+        ],
+        "description": "Historical coin snapshot at 00:00 UTC on the requested date."
+      }
+    },
+    {
+      "id": "coingecko.get_coin_ohlc",
+      "service": "coingecko",
+      "name": "get_coin_ohlc",
+      "description": "Get coin OHLC candles without volume. Timestamps are candle close times in UNIX milliseconds. Demo supports up to 365 days with automatic granularity; max and explicit hourly/daily intervals require paid access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)."
+          },
+          "vs_currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of price data. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)."
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  7,
+                  14,
+                  30,
+                  90,
+                  180,
+                  365
+                ],
+                "description": "Number of days of OHLC history."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "max"
+                ],
+                "description": "Request all available OHLC history."
+              }
+            ],
+            "description": "Data up to number of days ago."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "hourly"
+            ],
+            "description": "Data interval, leave empty for auto granularity."
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal place for currency price value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "vs_currency",
+          "days"
+        ],
+        "description": "Input parameters for get_coin_ohlc.",
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "interval"
+              ],
+              "properties": {
+                "interval": {
+                  "const": "daily"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "days": {
+                  "enum": [
+                    1,
+                    7,
+                    14,
+                    30,
+                    90,
+                    180
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "interval"
+              ],
+              "properties": {
+                "interval": {
+                  "const": "hourly"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "days": {
+                  "enum": [
+                    1,
+                    7,
+                    14,
+                    30,
+                    90
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candles": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "integer",
+                  "description": "Candle close timestamp in UNIX milliseconds."
+                },
+                {
+                  "type": "number",
+                  "description": "Opening price."
+                },
+                {
+                  "type": "number",
+                  "description": "Highest price."
+                },
+                {
+                  "type": "number",
+                  "description": "Lowest price."
+                },
+                {
+                  "type": "number",
+                  "description": "Closing price."
+                }
+              ],
+              "minItems": 5,
+              "maxItems": 5,
+              "description": "Candle close timestamp in UNIX milliseconds, open, high, low and close."
+            },
+            "description": "OHLC candles without per-candle volume."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Coin OHLC candles; timestamps represent candle close times."
+      }
+    },
+    {
+      "id": "coingecko.get_global_market_data",
+      "service": "coingecko",
+      "name": "get_global_market_data",
+      "description": "Get global cryptocurrency market capitalization, trading volume and market share.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for get_global_market_data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "active_cryptocurrencies": {
+                "type": "integer",
+                "description": "Number of active cryptocurrencies."
+              },
+              "markets": {
+                "type": "integer",
+                "description": "Number of active markets."
+              },
+              "total_market_cap": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number",
+                  "description": "Market capitalization."
+                },
+                "description": "Market capitalization by quote currency."
+              },
+              "total_volume": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number",
+                  "description": "Trading volume."
+                },
+                "description": "Trading volume by quote currency."
+              },
+              "market_cap_percentage": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number",
+                  "description": "Market share percentage."
+                },
+                "description": "Market share percentage by cryptocurrency symbol."
+              },
+              "updated_at": {
+                "type": "integer",
+                "description": "Last update time as a UNIX timestamp in seconds."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Global market metrics."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Global cryptocurrency market data response."
+      }
+    },
+    {
+      "id": "coingecko.get_market_chart",
+      "service": "coingecko",
+      "name": "get_market_chart",
+      "description": "Get historical price, market capitalization and volume series by number of days. Historical access and interval availability depend on your CoinGecko plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)."
+          },
+          "vs_currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of market data. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)."
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of days of history."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "max"
+                ],
+                "description": "Request all history available to your plan."
+              }
+            ],
+            "description": "Data up to number of days ago. \nYou may use any integer or `max` for number of days."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "5m",
+              "hourly",
+              "daily"
+            ],
+            "description": "Data interval, leave empty for auto granularity."
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal place for currency price value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "vs_currency",
+          "days"
+        ],
+        "description": "Input parameters for get_market_chart."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical prices in the quote currency."
+          },
+          "market_caps": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical market capitalizations in the quote currency."
+          },
+          "total_volumes": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical 24-hour trading volumes in the quote currency."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Historical series with timestamps in UNIX milliseconds."
+      }
+    },
+    {
+      "id": "coingecko.get_market_chart_range",
+      "service": "coingecko",
+      "name": "get_market_chart_range",
+      "description": "Get historical price, market capitalization and volume series within a date or UNIX timestamp range. Historical access and interval availability depend on your CoinGecko plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)."
+          },
+          "vs_currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of market data. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Starting date in ISO date string (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`) or UNIX timestamp. \n**Use ISO date string for best compatibility.**"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ending date in ISO date string (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`) or UNIX timestamp. \n**Use ISO date string for best compatibility.**"
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "5m",
+              "hourly",
+              "daily"
+            ],
+            "description": "Data interval, leave empty for auto granularity."
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal place for currency price value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "vs_currency",
+          "from",
+          "to"
+        ],
+        "description": "Input parameters for get_market_chart_range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prices": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical prices in the quote currency."
+          },
+          "market_caps": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical market capitalizations in the quote currency."
+          },
+          "total_volumes": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Timestamp or metric value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timestamp or metric value."
+              },
+              "description": "Timestamp in UNIX milliseconds followed by the metric value.",
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Historical 24-hour trading volumes in the quote currency."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Historical series with timestamps in UNIX milliseconds."
+      }
+    },
+    {
+      "id": "coingecko.get_onchain_pool",
+      "service": "coingecko",
+      "name": "get_onchain_pool",
+      "description": "Get prices, reserves and activity for one explicitly selected DEX pool, with optional token and DEX resources, composition and volume breakdown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "pool_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pool address."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attributes to include, comma-separated if more than one. \nAvailable values: `base_token`, `quote_token`, `dex`"
+          },
+          "include_volume_breakdown": {
+            "type": "boolean",
+            "description": "Include volume breakdown. \nDefault: `false`"
+          },
+          "include_composition": {
+            "type": "boolean",
+            "description": "Include pool composition. \nDefault: `false`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "pool_address"
+        ],
+        "description": "Input parameters for get_onchain_pool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Resource identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Pool contract address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Pool name."
+                  },
+                  "pool_created_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Pool creation time."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Pool creation time."
+                  },
+                  "base_token_price_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Base token USD price as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Base token USD price as a decimal string."
+                  },
+                  "quote_token_price_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Quote token USD price as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Quote token USD price as a decimal string."
+                  },
+                  "reserve_in_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Pool reserve value in USD as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Pool reserve value in USD as a decimal string."
+                  },
+                  "fdv_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Fully diluted valuation in USD as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Fully diluted valuation in USD as a decimal string."
+                  },
+                  "market_cap_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                  },
+                  "volume_usd": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "USD volume as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "USD volume as a decimal string."
+                    },
+                    "description": "USD trading volume by timeframe."
+                  },
+                  "price_change_percentage": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Percentage change as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage change as a decimal string."
+                    },
+                    "description": "Price percentage changes by timeframe."
+                  },
+                  "transactions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Buy, sell, buyer and seller counts."
+                    },
+                    "description": "Trade counts by timeframe."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "address",
+                  "name"
+                ],
+                "description": "Pool prices, liquidity and activity; decimal strings are preserved."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "type",
+              "attributes"
+            ],
+            "description": "GeckoTerminal JSON:API resource."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.get_onchain_token",
+      "service": "coingecko",
+      "name": "get_onchain_token",
+      "description": "Get token price, supply, volume and token reserve value across pools, with optional top pools. Prices follow the upstream selected pool; unavailable market capitalization remains null.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "token_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token contract address."
+          },
+          "include": {
+            "type": "string",
+            "enum": [
+              "top_pools"
+            ],
+            "description": "Attributes to include."
+          },
+          "include_composition": {
+            "type": "boolean",
+            "description": "Include pool composition. \nDefault: `false`"
+          },
+          "include_inactive_source": {
+            "type": "boolean",
+            "description": "Include token data from inactive pools using the most recent swap. \nDefault: `false`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "token_address"
+        ],
+        "description": "Input parameters for get_onchain_token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Resource identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Token contract address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Token name."
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "description": "Token symbol."
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "description": "Token decimal precision."
+                  },
+                  "coingecko_coin_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "CoinGecko coin ID if the token is listed."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "CoinGecko coin ID if the token is listed."
+                  },
+                  "total_supply": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Raw total token supply as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Raw total token supply as a decimal string."
+                  },
+                  "normalized_total_supply": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Total supply adjusted for token decimals."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Total supply adjusted for token decimals."
+                  },
+                  "price_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Token USD price from the upstream selected pool as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Token USD price from the upstream selected pool as a decimal string."
+                  },
+                  "fdv_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Fully diluted valuation in USD as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Fully diluted valuation in USD as a decimal string."
+                  },
+                  "market_cap_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                  },
+                  "total_reserve_in_usd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "USD value of this token's reserves across pools, not the sum of both sides of every pool."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "USD value of this token's reserves across pools, not the sum of both sides of every pool."
+                  },
+                  "volume_usd": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "USD volume as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "USD volume as a decimal string."
+                    },
+                    "description": "USD trading volume by timeframe."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "address",
+                  "name",
+                  "symbol"
+                ],
+                "description": "Token market attributes from GeckoTerminal."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "type",
+              "attributes"
+            ],
+            "description": "GeckoTerminal JSON:API resource."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.get_onchain_token_info",
+      "service": "coingecko",
+      "name": "get_onchain_token_info",
+      "description": "Get token project metadata and available GeckoTerminal verification, holder and authority signals. Field availability varies by network and does not constitute a safety assessment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "token_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token contract address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "token_address"
+        ],
+        "description": "Input parameters for get_onchain_token_info."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Resource identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Token contract address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Token name."
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "description": "Token symbol."
+                  },
+                  "coingecko_coin_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "CoinGecko coin ID if the token is listed."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "CoinGecko coin ID if the token is listed."
+                  },
+                  "websites": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "Project website URL; not fetched by the connector."
+                    },
+                    "description": "Project website URLs supplied by upstream metadata."
+                  },
+                  "description": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Upstream token description."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Upstream token description."
+                  },
+                  "gt_score": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "GeckoTerminal score, not a safety guarantee."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "GeckoTerminal score, not a safety guarantee."
+                  },
+                  "gt_verified": {
+                    "type": "boolean",
+                    "description": "Whether GeckoTerminal marks this token as verified."
+                  },
+                  "holders": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Available holder counts and distribution, which may include exchange and treasury wallets."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Available holder counts and distribution, which may include exchange and treasury wallets."
+                  },
+                  "mint_authority": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Upstream mint authority status."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Upstream mint authority status."
+                  },
+                  "freeze_authority": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Upstream freeze authority status."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Upstream freeze authority status."
+                  },
+                  "is_honeypot": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Detected honeypot status."
+                      },
+                      {
+                        "type": "string",
+                        "description": "Unknown or other upstream signal."
+                      },
+                      {
+                        "type": "null",
+                        "description": "Unavailable upstream signal."
+                      }
+                    ],
+                    "description": "Upstream honeypot signal; unknown is not equivalent to false."
+                  },
+                  "developer_address": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Developer wallet address when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Developer wallet address when available."
+                  },
+                  "developer_holding_percentage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Developer percentage of total supply as a decimal string."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Developer percentage of total supply as a decimal string."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "address",
+                  "name",
+                  "symbol"
+                ],
+                "description": "Token metadata and upstream verification signals; availability varies by network."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "type",
+              "attributes"
+            ],
+            "description": "GeckoTerminal JSON:API resource."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.get_pool_ohlcv",
+      "service": "coingecko",
+      "name": "get_pool_ohlcv",
+      "description": "Get OHLCV candles for an explicit pool and token direction. Timestamps are UNIX seconds. Empty intervals are omitted unless requested. Each request covers at most six months; accessible history depends on plan and pool tracking. Second timeframes require eligible paid access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "pool_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pool contract address."
+          },
+          "timeframe": {
+            "type": "string",
+            "enum": [
+              "day",
+              "hour",
+              "minute",
+              "second"
+            ],
+            "description": "Timeframe of the OHLCV chart."
+          },
+          "aggregate": {
+            "type": "integer",
+            "enum": [
+              1,
+              4,
+              5,
+              12,
+              15,
+              30
+            ],
+            "description": "Time period to aggregate each OHLCV. \nAvailable values (day): `1` \nAvailable values (hour): `1`, `4`, `12` \nAvailable values (minute): `1`, `5`, `15` \nAvailable values (second): `1`, `15`, `30` \nDefault value: 1"
+          },
+          "before_timestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Return OHLCV data before this timestamp (integer seconds since epoch)."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Number of OHLCV results to return, maximum 1000. \nDefault value: 100"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "usd",
+              "token"
+            ],
+            "description": "Return OHLCV in USD or quote token. \nDefault: `usd`"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return OHLCV for token, use this to invert the chart. \nAvailable values: `base`, `quote`, or token address. \nDefault: `base`"
+          },
+          "include_empty_intervals": {
+            "type": "boolean",
+            "description": "Include empty intervals with no trade data. \nDefault: `false`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "pool_address",
+          "timeframe"
+        ],
+        "description": "Input parameters for get_pool_ohlcv.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "timeframe": {
+                  "const": "day"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "aggregate": {
+                  "enum": [
+                    1
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "timeframe": {
+                  "const": "hour"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "aggregate": {
+                  "enum": [
+                    1,
+                    4,
+                    12
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "timeframe": {
+                  "const": "minute"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "aggregate": {
+                  "enum": [
+                    1,
+                    5,
+                    15
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "timeframe": {
+                  "const": "second"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "aggregate": {
+                  "enum": [
+                    1,
+                    15,
+                    30
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Resource identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "ohlcv_list": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "integer",
+                          "description": "Candle timestamp in UNIX seconds."
+                        },
+                        {
+                          "type": "number",
+                          "description": "Opening price."
+                        },
+                        {
+                          "type": "number",
+                          "description": "Highest price."
+                        },
+                        {
+                          "type": "number",
+                          "description": "Lowest price."
+                        },
+                        {
+                          "type": "number",
+                          "description": "Closing price."
+                        },
+                        {
+                          "type": "number",
+                          "description": "Candle trading volume."
+                        }
+                      ],
+                      "minItems": 6,
+                      "maxItems": 6,
+                      "description": "UNIX seconds, open, high, low, close and volume."
+                    },
+                    "description": "Pool candles, retaining the upstream order and empty-interval behavior."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "OHLCV response attributes."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "type",
+              "attributes"
+            ],
+            "description": "GeckoTerminal JSON:API resource."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.get_prices",
+      "service": "coingecko",
+      "name": "get_prices",
+      "description": "Get current coin prices by ID, name or symbol, with optional market metrics. At least one selector is required; CoinGecko prioritizes IDs, then names, then symbols.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vs_currencies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of coins, comma-separated if querying more than 1 currency. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)"
+          },
+          "ids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' IDs, comma-separated if querying more than 1 coin. \n*refers to [`/coins/list`](/reference/coins-list)"
+          },
+          "names": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' names, comma-separated if querying more than 1 coin."
+          },
+          "symbols": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' symbols, comma-separated if querying more than 1 coin."
+          },
+          "include_tokens": {
+            "type": "string",
+            "enum": [
+              "top",
+              "all"
+            ],
+            "description": "For `symbols` lookups, specify `all` to include all matching tokens. \nDefault `top` returns top-ranked tokens by market cap or volume."
+          },
+          "include_market_cap": {
+            "type": "boolean",
+            "description": "Include market capitalization. \nDefault: false"
+          },
+          "include_24hr_vol": {
+            "type": "boolean",
+            "description": "Include 24-hour trading volume. \nDefault: false"
+          },
+          "include_24hr_change": {
+            "type": "boolean",
+            "description": "Include 24-hour change percentage. \nDefault: false"
+          },
+          "include_last_updated_at": {
+            "type": "boolean",
+            "description": "Include last updated price time as a UNIX timestamp. \nDefault: false"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal places for currency price value"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vs_currencies"
+        ],
+        "description": "Input parameters for get_prices.",
+        "anyOf": [
+          {
+            "required": [
+              "ids"
+            ]
+          },
+          {
+            "required": [
+              "names"
+            ]
+          },
+          {
+            "required": [
+              "symbols"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Quote currency prices and optional market metrics. Keys are currency IDs, metric suffixes and optional last_updated_at; values may be null when unavailable."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Quote currency prices and optional market metrics. Keys are currency IDs, metric suffixes and optional last_updated_at; values may be null when unavailable."
+                  },
+                  "description": "Matching token quotes."
+                }
+              ],
+              "description": "One coin quote or multiple token quotes."
+            },
+            "description": "Coin selectors mapped to quotes; include_tokens=all may return an array of token quotes for each symbol."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Prices keyed by the selected coin ID, name or symbol."
+      }
+    },
+    {
+      "id": "coingecko.get_token_prices",
+      "service": "coingecko",
+      "name": "get_token_prices",
+      "description": "Get global average prices and optional metrics for CoinGecko-listed tokens by asset platform and contract addresses. Supports up to 515 addresses per request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_platform_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CoinGecko asset platform ID, such as ethereum. Use list_asset_platforms; this is not an onchain network ID."
+          },
+          "contract_addresses": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token contract addresses, comma-separated if querying more than 1 token"
+          },
+          "vs_currencies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of coins, comma-separated if querying more than 1 currency. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)"
+          },
+          "include_market_cap": {
+            "type": "boolean",
+            "description": "Include market capitalization. \nDefault: false"
+          },
+          "include_24hr_vol": {
+            "type": "boolean",
+            "description": "Include 24-hour trading volume. \nDefault: false"
+          },
+          "include_24hr_change": {
+            "type": "boolean",
+            "description": "Include 24-hour change percentage. \nDefault: false"
+          },
+          "include_last_updated_at": {
+            "type": "boolean",
+            "description": "Include last updated price time as a UNIX timestamp. \nDefault: false"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal places for currency price value"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asset_platform_id",
+          "contract_addresses",
+          "vs_currencies"
+        ],
+        "description": "Input parameters for get_token_prices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Currency price and metric map; unavailable metrics may be null."
+            },
+            "description": "Contract addresses mapped to currency prices and optional metrics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Global market prices for CoinGecko-listed tokens."
+      }
+    },
+    {
+      "id": "coingecko.get_trending",
+      "service": "coingecko",
+      "name": "get_trending",
+      "description": "Get trending coins, NFTs and categories by CoinGecko search volume over the last 24 hours. The show_max option requires an eligible plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "show_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Show max number of results available for the given type. \nAvailable values: `coins`, `nfts`, `categories` \ne.g. `coins` or `coins,nfts,categories`"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for get_trending."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Trending coin data."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Trending coin entry."
+            },
+            "description": "Trending coins, each wrapped in an item field."
+          },
+          "nfts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Trending NFT data."
+            },
+            "description": "Trending NFT collections."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Trending category data."
+            },
+            "description": "Trending categories."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Trending search results."
+      }
+    },
+    {
+      "id": "coingecko.list_asset_platforms",
+      "service": "coingecko",
+      "name": "list_asset_platforms",
+      "description": "List CoinGecko asset platform IDs for contract-address lookups. These differ from onchain network IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "nft"
+            ],
+            "description": "Apply relevant filters to results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for list_asset_platforms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "CoinGecko asset platform ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Platform name."
+                },
+                "chain_identifier": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Chainlist numeric chain ID, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Chainlist numeric chain ID, when available."
+                },
+                "native_coin_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "CoinGecko ID of the platform native coin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "CoinGecko ID of the platform native coin."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Asset platform metadata."
+            },
+            "description": "Asset platforms for contract-address queries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CoinGecko asset platform directory."
+      }
+    },
+    {
+      "id": "coingecko.list_category_markets",
+      "service": "coingecko",
+      "name": "list_category_markets",
+      "description": "List CoinGecko category market capitalization, 24-hour changes and volume. Use returned category IDs with list_coin_markets.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "string",
+            "enum": [
+              "market_cap_desc",
+              "market_cap_asc",
+              "name_desc",
+              "name_asc",
+              "market_cap_change_24h_desc",
+              "market_cap_change_24h_asc"
+            ],
+            "description": "Sort results by field. \nDefault: `market_cap_desc`"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for list_category_markets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Category ID accepted by list_coin_markets."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Category name."
+                },
+                "market_cap": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Category market capitalization in USD."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Category market capitalization in USD."
+                },
+                "market_cap_change_24h": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Category market capitalization percentage change in 24 hours."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Category market capitalization percentage change in 24 hours."
+                },
+                "volume_24h": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Category trading volume in USD over 24 hours."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Category trading volume in USD over 24 hours."
+                },
+                "top_3_coins_id": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "CoinGecko coin ID."
+                  },
+                  "description": "Coin IDs of the top three coins."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Time the category metrics were updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Time the category metrics were updated."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "market_cap",
+                "market_cap_change_24h",
+                "volume_24h",
+                "updated_at"
+              ],
+              "description": "Category market record."
+            },
+            "description": "Categories ordered as requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CoinGecko category market data."
+      }
+    },
+    {
+      "id": "coingecko.list_coin_markets",
+      "service": "coingecko",
+      "name": "list_coin_markets",
+      "description": "List paginated coin prices, market capitalization, volume and price changes. Plan-specific filters are enforced by CoinGecko.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vs_currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency of coins and market data. \n*refers to [`/simple/supported_vs_currencies`](/reference/simple-supported-currencies)"
+          },
+          "ids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' IDs, comma-separated if querying more than 1 coin. \n*refers to [`/coins/list`](/reference/coins-list)"
+          },
+          "names": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' names, comma-separated if querying more than 1 coin."
+          },
+          "symbols": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coins' symbols, comma-separated if querying more than 1 coin."
+          },
+          "include_tokens": {
+            "type": "string",
+            "enum": [
+              "top",
+              "all"
+            ],
+            "description": "For `symbols` lookups, specify `all` to include all matching tokens. \nDefault `top` returns top-ranked tokens by market cap or volume."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter based on coins' category. \n*refers to [`/coins/categories/list`](/reference/coins-categories-list)"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "market_cap_asc",
+              "market_cap_desc",
+              "volume_asc",
+              "volume_desc",
+              "id_asc",
+              "id_desc"
+            ],
+            "description": "Sort result by field. \nDefault: market_cap_desc"
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "Total results per page. \nDefault: 100 \nValid values: 1...250"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page through results. \nDefault: 1"
+          },
+          "sparkline": {
+            "type": "boolean",
+            "description": "Include sparkline 7-day data. \nDefault: false"
+          },
+          "price_change_percentage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Include price change percentage timeframe, comma-separated if querying more than 1 timeframe. \nValid values: `1h`, `24h`, `7d`, `14d`, `30d`, `200d`, `1y`"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "ar",
+              "bg",
+              "cs",
+              "da",
+              "de",
+              "el",
+              "en",
+              "es",
+              "fi",
+              "fr",
+              "he",
+              "hi",
+              "hr",
+              "hu",
+              "id",
+              "it",
+              "ja",
+              "ko",
+              "lt",
+              "nl",
+              "no",
+              "pl",
+              "pt",
+              "ro",
+              "ru",
+              "sk",
+              "sl",
+              "sv",
+              "th",
+              "tr",
+              "uk",
+              "vi",
+              "zh",
+              "zh-tw"
+            ],
+            "description": "Language background. \nDefault: en"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "full",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "10",
+              "11",
+              "12",
+              "13",
+              "14",
+              "15",
+              "16",
+              "17",
+              "18"
+            ],
+            "description": "Decimal places for currency price value"
+          },
+          "include_rehypothecated": {
+            "type": "boolean",
+            "description": "Include rehypothecated tokens in results. When true, returns `market_cap_rank_with_rehypothecated` field. \nDefault: false"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vs_currency"
+        ],
+        "description": "Input parameters for list_coin_markets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "CoinGecko coin ID."
+                },
+                "symbol": {
+                  "type": "string",
+                  "description": "Coin ticker symbol."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Coin name."
+                },
+                "current_price": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Current price in the requested quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Current price in the requested quote currency."
+                },
+                "market_cap": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Market capitalization in the quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Market capitalization in the quote currency."
+                },
+                "market_cap_rank": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Market capitalization rank."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Market capitalization rank."
+                },
+                "total_volume": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Trading volume in the quote currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Trading volume in the quote currency."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "symbol",
+                "name"
+              ],
+              "description": "Coin market record with optional upstream metrics."
+            },
+            "description": "Coin markets in the requested order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of coin market data."
+      }
+    },
+    {
+      "id": "coingecko.list_coin_tickers",
+      "service": "coingecko",
+      "name": "list_coin_tickers",
+      "description": "List a page of up to 100 CEX and DEX tickers for a coin, with exchange filters and optional 2-percent orderbook depth. Quotes are market observations, not execution guarantees.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Coin ID. \n*refers to [`/coins/list`](/reference/coins-list)"
+          },
+          "exchange_ids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exchange ID. \n*refers to [`/exchanges/list`](/reference/exchanges-list)"
+          },
+          "include_exchange_logo": {
+            "type": "boolean",
+            "description": "Include exchange logo. \nDefault: false"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page through results"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "trust_score_desc",
+              "trust_score_asc",
+              "volume_desc",
+              "volume_asc"
+            ],
+            "description": "Sort the order of responses. \nDefault: trust_score_desc"
+          },
+          "depth": {
+            "type": "boolean",
+            "description": "Include 2% orderbook depth, i.e. `cost_to_move_up_usd` and `cost_to_move_down_usd`. \nDefault: false"
+          },
+          "dex_pair_format": {
+            "type": "string",
+            "enum": [
+              "contract_address",
+              "symbol"
+            ],
+            "description": "Set to `symbol` to display DEX pair base and target as symbols. \nDefault: `contract_address`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for list_coin_tickers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Coin name."
+          },
+          "tickers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "base": {
+                  "type": "string",
+                  "description": "Base token symbol or contract address."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Quote token symbol or contract address."
+                },
+                "market": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Exchange name, identifier and market metadata."
+                },
+                "last": {
+                  "type": "number",
+                  "description": "Last traded price in the target currency."
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Trading volume reported for this ticker."
+                },
+                "bid_ask_spread_percentage": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Bid-ask spread percentage."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Bid-ask spread percentage."
+                },
+                "trust_score": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "CoinGecko ticker trust score."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "CoinGecko ticker trust score."
+                },
+                "is_anomaly": {
+                  "type": "boolean",
+                  "description": "Whether the ticker is anomalous."
+                },
+                "is_stale": {
+                  "type": "boolean",
+                  "description": "Whether the ticker is stale."
+                },
+                "last_traded_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Time of the last trade."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Time of the last trade."
+                },
+                "cost_to_move_up_usd": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "USD cost to move the orderbook up by 2 percent when depth is requested."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "USD cost to move the orderbook up by 2 percent when depth is requested."
+                },
+                "cost_to_move_down_usd": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "USD cost to move the orderbook down by 2 percent when depth is requested."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "USD cost to move the orderbook down by 2 percent when depth is requested."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "base",
+                "target",
+                "market",
+                "last",
+                "volume"
+              ],
+              "description": "Trading pair quote and market metadata."
+            },
+            "description": "Up to 100 tickers in the requested page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A page of coin tickers from CEX and DEX markets."
+      }
+    },
+    {
+      "id": "coingecko.list_coins",
+      "service": "coingecko",
+      "name": "list_coins",
+      "description": "List CoinGecko coin IDs, symbols and names, optionally including platform contract addresses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include_platform": {
+            "type": "boolean",
+            "description": "Include platform and token's contract addresses. \nDefault: false"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "Filter by status of coins. \nDefault: active"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for list_coins."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "CoinGecko coin ID."
+                },
+                "symbol": {
+                  "type": "string",
+                  "description": "Coin ticker symbol."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Coin name."
+                },
+                "platforms": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Token contract address."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Token contract address."
+                  },
+                  "description": "Asset platform IDs mapped to contract addresses."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "symbol",
+                "name"
+              ],
+              "description": "Coin identifier and display metadata."
+            },
+            "description": "Supported coins."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CoinGecko coin directory."
+      }
+    },
+    {
+      "id": "coingecko.list_onchain_networks",
+      "service": "coingecko",
+      "name": "list_onchain_networks",
+      "description": "List a page of GeckoTerminal network IDs and their CoinGecko asset platform mappings. Use network IDs such as eth for onchain actions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page through results. \nDefault value: 1"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for list_onchain_networks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Network name."
+                    },
+                    "coingecko_asset_platform_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Corresponding CoinGecko asset platform ID, distinct from the onchain network ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Corresponding CoinGecko asset platform ID, distinct from the onchain network ID."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Network identifiers and names."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Networks in the requested page."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.list_pool_trades",
+      "service": "coingecko",
+      "name": "list_pool_trades",
+      "description": "List the latest 300 trades within the past 24 hours for a pool, optionally filtered by USD volume and token direction. This is not complete transaction history or a complete capital-flow dataset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "pool_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pool contract address."
+          },
+          "trade_volume_in_usd_greater_than": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Filter trades by trade volume in USD greater than this value. \nDefault value: 0"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return trades for token, use this to invert the chart. \nAvailable values: `base`, `quote`, or token address. \nDefault: `base`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "pool_address"
+        ],
+        "description": "Input parameters for list_pool_trades."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "block_number": {
+                      "type": "integer",
+                      "description": "Block number."
+                    },
+                    "tx_hash": {
+                      "type": "string",
+                      "description": "Transaction hash."
+                    },
+                    "tx_from_address": {
+                      "type": "string",
+                      "description": "Transaction sender address."
+                    },
+                    "from_token_address": {
+                      "type": "string",
+                      "description": "Sent token contract address."
+                    },
+                    "to_token_address": {
+                      "type": "string",
+                      "description": "Received token contract address."
+                    },
+                    "from_token_amount": {
+                      "type": "string",
+                      "description": "Sent token amount as a decimal string."
+                    },
+                    "to_token_amount": {
+                      "type": "string",
+                      "description": "Received token amount as a decimal string."
+                    },
+                    "volume_in_usd": {
+                      "type": "string",
+                      "description": "Trade volume in USD as a decimal string."
+                    },
+                    "block_timestamp": {
+                      "type": "string",
+                      "description": "Trade block time as an ISO timestamp."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Trade direction, buy or sell, relative to the requested token."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Recent pool trade, preserving original token amounts and prices."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Recent pool trades, limited by upstream retention."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.list_supported_currencies",
+      "service": "coingecko",
+      "name": "list_supported_currencies",
+      "description": "List supported quote currencies for CoinGecko price and market queries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for list_supported_currencies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Quote currency ID."
+            },
+            "description": "Currency IDs accepted by price endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supported quote currencies."
+      }
+    },
+    {
+      "id": "coingecko.list_token_pools",
+      "service": "coingecko",
+      "name": "list_token_pools",
+      "description": "List up to 20 pools for a token per page, with sorting and related resources. The default sort combines 24-hour volume and liquidity; pages beyond 10 require Analyst or above.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "token_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token contract address."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attributes to include, comma-separated if more than one. \nAvailable values: `base_token`, `quote_token`, `dex`"
+          },
+          "include_inactive_source": {
+            "type": "boolean",
+            "description": "Include tokens from inactive pools using the most recent swap. \nDefault: `false`"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page through results. \nDefault value: 1"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "h24_volume_usd_liquidity_desc",
+              "h24_tx_count_desc",
+              "h24_volume_usd_desc"
+            ],
+            "description": "Sort the pools by field. \nDefault: `h24_volume_usd_liquidity_desc`"
+          },
+          "include_gt_community_data": {
+            "type": "boolean",
+            "description": "Include GeckoTerminal community data (sentiment votes, suspicious reports). \nDefault: `false`"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "token_address"
+        ],
+        "description": "Input parameters for list_token_pools."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "description": "Pool contract address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Pool name."
+                    },
+                    "pool_created_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Pool creation time."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pool creation time."
+                    },
+                    "base_token_price_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Base token USD price as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Base token USD price as a decimal string."
+                    },
+                    "quote_token_price_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Quote token USD price as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quote token USD price as a decimal string."
+                    },
+                    "reserve_in_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Pool reserve value in USD as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pool reserve value in USD as a decimal string."
+                    },
+                    "fdv_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Fully diluted valuation in USD as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fully diluted valuation in USD as a decimal string."
+                    },
+                    "market_cap_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                    },
+                    "volume_usd": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "USD volume as a decimal string."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "USD volume as a decimal string."
+                      },
+                      "description": "USD trading volume by timeframe."
+                    },
+                    "price_change_percentage": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Percentage change as a decimal string."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage change as a decimal string."
+                      },
+                      "description": "Price percentage changes by timeframe."
+                    },
+                    "transactions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Buy, sell, buyer and seller counts."
+                      },
+                      "description": "Trade counts by timeframe."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "address",
+                    "name"
+                  ],
+                  "description": "Pool prices, liquidity and activity; decimal strings are preserved."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Pools for the requested token."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    },
+    {
+      "id": "coingecko.search",
+      "service": "coingecko",
+      "name": "search",
+      "description": "Search coins, categories, exchanges and NFTs listed on CoinGecko.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Coin search result."
+            },
+            "description": "Matching coins."
+          },
+          "exchanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Exchange search result."
+            },
+            "description": "Matching exchanges."
+          },
+          "icos": {
+            "type": "array",
+            "items": {
+              "description": "ICO result."
+            },
+            "description": "Legacy ICO search results."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Category search result."
+            },
+            "description": "Matching categories."
+          },
+          "nfts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "NFT search result."
+            },
+            "description": "Matching NFTs."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "coins",
+          "exchanges",
+          "categories",
+          "nfts"
+        ],
+        "description": "CoinGecko search results."
+      }
+    },
+    {
+      "id": "coingecko.search_onchain_pools",
+      "service": "coingecko",
+      "name": "search_onchain_pools",
+      "description": "Search DEX pools by pool address, token address, name or symbol, optionally filtered by network. Returns up to 20 pools per page; pages beyond 10 require Analyst or above.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query: pool contract address, token name, token symbol, or token contract address."
+          },
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GeckoTerminal network ID, such as eth. Use list_onchain_networks; this is not a CoinGecko asset platform ID."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attributes to include, comma-separated if more than one. \nAvailable values: `base_token`, `quote_token`, `dex`"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page through results. \nDefault value: 1"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for search_onchain_pools."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "description": "Pool contract address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Pool name."
+                    },
+                    "pool_created_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Pool creation time."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pool creation time."
+                    },
+                    "base_token_price_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Base token USD price as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Base token USD price as a decimal string."
+                    },
+                    "quote_token_price_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Quote token USD price as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quote token USD price as a decimal string."
+                    },
+                    "reserve_in_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Pool reserve value in USD as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Pool reserve value in USD as a decimal string."
+                    },
+                    "fdv_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Fully diluted valuation in USD as a decimal string."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fully diluted valuation in USD as a decimal string."
+                    },
+                    "market_cap_usd": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Verified market capitalization in USD; may be null and is never replaced with FDV."
+                    },
+                    "volume_usd": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "USD volume as a decimal string."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "USD volume as a decimal string."
+                      },
+                      "description": "USD trading volume by timeframe."
+                    },
+                    "price_change_percentage": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Percentage change as a decimal string."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage change as a decimal string."
+                      },
+                      "description": "Price percentage changes by timeframe."
+                    },
+                    "transactions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Buy, sell, buyer and seller counts."
+                      },
+                      "description": "Trade counts by timeframe."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "address",
+                    "name"
+                  ],
+                  "description": "Pool prices, liquidity and activity; decimal strings are preserved."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Pools matching the search."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Included resource attributes."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Related resource identifiers, such as tokens, pools, networks and DEXes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "GeckoTerminal JSON:API resource."
+            },
+            "description": "Related resources requested using include."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream response links, when provided."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "GeckoTerminal response with original related resources and metadata."
+      }
+    }
+  ]
+}

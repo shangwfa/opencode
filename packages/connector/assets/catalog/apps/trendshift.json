@@ -1,0 +1,1241 @@
+{
+  "service": "trendshift",
+  "displayName": "Trendshift",
+  "description": "Query current and historical repository trends from the Trendshift Signal API.",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "ts_live_...",
+      "description": "Trendshift Signal API token sent with the Authorization Bearer header. Subscribe and obtain access from the official Signal page: https://trendshift.io/signal"
+    }
+  ],
+  "homepageUrl": "https://trendshift.io/",
+  "actions": [
+    {
+      "id": "trendshift.get_github_trending_by_date",
+      "service": "trendshift",
+      "name": "get_github_trending_by_date",
+      "description": "Get Trendshift's captured GitHub Trending list for a specific scrape date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "The scrape date and optional language for a captured GitHub Trending list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "trend_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The local scrape date in YYYY-MM-DD format."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The local scrape date in YYYY-MM-DD format."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The lowercased list language, or null for all languages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The lowercased list language, or null for all languages."
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rank": {
+                      "type": "integer",
+                      "description": "GitHub's rank for the repository in the captured list."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a captured GitHub Trending list."
+                },
+                "description": "The repositories in GitHub's captured rank order."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The repositories in GitHub's captured rank order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A captured GitHub Trending list."
+      }
+    },
+    {
+      "id": "trendshift.get_trending_daily_by_date",
+      "service": "trendshift",
+      "name": "get_trending_daily_by_date",
+      "description": "Get Trendshift's daily trending ranking for a specific UTC date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "The date, filters, and pagination for a historical daily Trendshift ranking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.get_trending_monthly_by_period",
+      "service": "trendshift",
+      "name": "get_trending_monthly_by_period",
+      "description": "Get Trendshift's trending ranking for a specific calendar year and month.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999,
+            "description": "The calendar year, from 1 through 9999."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "The calendar month, from 1 through 12."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "year",
+          "month"
+        ],
+        "description": "The month, filters, and pagination for a historical monthly ranking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.get_trending_weekly_by_period",
+      "service": "trendshift",
+      "name": "get_trending_weekly_by_period",
+      "description": "Get Trendshift's trending ranking for a specific ISO year and week.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999,
+            "description": "The calendar year, from 1 through 9999."
+          },
+          "week": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 53,
+            "description": "The ISO 8601 week number, from 1 through 53."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "year",
+          "week"
+        ],
+        "description": "The ISO week, filters, and pagination for a historical weekly ranking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.get_trending_yearly_by_period",
+      "service": "trendshift",
+      "name": "get_trending_yearly_by_period",
+      "description": "Get Trendshift's trending ranking for a specific calendar year.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9999,
+            "description": "The calendar year, from 1 through 9999."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "year"
+        ],
+        "description": "The year, filters, and pagination for a historical yearly ranking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.list_engagement_spikes",
+      "service": "trendshift",
+      "name": "list_engagement_spikes",
+      "description": "List repositories whose engagement increased within a requested date window.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "stars",
+              "forks",
+              "merged_prs",
+              "issues",
+              "closed_issues"
+            ],
+            "description": "The engagement metric used to rank repositories."
+          },
+          "minGain": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The inclusive minimum engagement gain."
+          },
+          "maxGain": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The inclusive maximum engagement gain."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metric"
+        ],
+        "description": "Filters and pagination for finding Trendshift engagement spikes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "gain": {
+                      "type": "integer",
+                      "description": "The engagement gain during the requested window."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository whose engagement increased in the requested window."
+                },
+                "description": "The repositories ranked by engagement gain, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The repositories ranked by engagement gain, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated list of repository engagement spikes."
+      }
+    },
+    {
+      "id": "trendshift.list_github_trending",
+      "service": "trendshift",
+      "name": "list_github_trending",
+      "description": "Get Trendshift's latest captured GitHub Trending list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional language for the latest captured GitHub Trending list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "trend_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The local scrape date in YYYY-MM-DD format."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The local scrape date in YYYY-MM-DD format."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The lowercased list language, or null for all languages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The lowercased list language, or null for all languages."
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rank": {
+                      "type": "integer",
+                      "description": "GitHub's rank for the repository in the captured list."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a captured GitHub Trending list."
+                },
+                "description": "The repositories in GitHub's captured rank order."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The repositories in GitHub's captured rank order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A captured GitHub Trending list."
+      }
+    },
+    {
+      "id": "trendshift.list_trending_daily",
+      "service": "trendshift",
+      "name": "list_trending_daily",
+      "description": "List repositories in Trendshift's current daily trending ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for the current Trendshift ranking period."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.list_trending_monthly",
+      "service": "trendshift",
+      "name": "list_trending_monthly",
+      "description": "List repositories in Trendshift's current monthly trending ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for the current Trendshift ranking period."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.list_trending_weekly",
+      "service": "trendshift",
+      "name": "list_trending_weekly",
+      "description": "List repositories in Trendshift's current weekly trending ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for the current Trendshift ranking period."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    },
+    {
+      "id": "trendshift.list_trending_yearly",
+      "service": "trendshift",
+      "name": "list_trending_yearly",
+      "description": "List repositories in Trendshift's current yearly trending ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A repository language filter, or all to include every language."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of repositories to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for the current Trendshift ranking period."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Trendshift's internal repository identifier."
+                    },
+                    "ghr_id": {
+                      "type": "integer",
+                      "description": "The GitHub repository identifier."
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "description": "The GitHub repository name in owner/repository form."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The repository's primary language as reported by GitHub."
+                    },
+                    "stars_now": {
+                      "type": "integer",
+                      "description": "The repository's total star count at query time."
+                    },
+                    "forks_now": {
+                      "type": "integer",
+                      "description": "The repository's total fork count at query time."
+                    },
+                    "stars_gained": {
+                      "type": "integer",
+                      "description": "The stars gained during the ranking period."
+                    },
+                    "forks_gained": {
+                      "type": "integer",
+                      "description": "The forks gained during the ranking period."
+                    },
+                    "score": {
+                      "type": "integer",
+                      "description": "Trendshift's trending score for the period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A repository in a Trendshift trending list."
+                },
+                "description": "The ranked repositories, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ranked repositories, or null when unavailable."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A cursor-paginated Trendshift trending list."
+      }
+    }
+  ]
+}

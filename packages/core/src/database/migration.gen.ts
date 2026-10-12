@@ -68,6 +68,11 @@ import m65 from "./migration/20261009075500_flimsy_harpoon.js"
 import m66 from "./migration/20261010015324_session_permission_approval.js"
 import m67 from "./migration/20261010022744_session_execution_lease.js"
 import m68 from "./migration/20261010025311_hitl_request.js"
+import m69 from "./migration/20261010065601_connector_connection.js"
+import m70 from "./migration/20261010093947_connector_trigger_schedule.js"
+import m71 from "./migration/20261010140025_connector_trigger_token_crypto.js"
+import m72 from "./migration/20261010141236_connector_oauth_request.js"
+import m73 from "./migration/20261010142023_connector_trigger_receipt_event.js"
 
 export const migrations = [
   m00,
@@ -139,4 +144,9 @@ export const migrations = [
   m66,
   m67,
   m68,
+  m69,
+  m70,
+  m71,
+  m72,
+  m73,
 ] satisfies DatabaseMigration.Migration[]

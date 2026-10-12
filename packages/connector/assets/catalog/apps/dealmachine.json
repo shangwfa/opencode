@@ -1,0 +1,901 @@
+{
+  "service": "dealmachine",
+  "displayName": "DealMachine",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "dm_sk_live_xxx",
+      "description": "DealMachine API key sent as a Bearer token. Create or view keys at https://dealmachine.com/settings/developer."
+    }
+  ],
+  "homepageUrl": "https://dealmachine.com",
+  "actions": [
+    {
+      "id": "dealmachine.count_properties",
+      "service": "dealmachine",
+      "name": "count_properties",
+      "description": "Count properties and people matching DealMachine search criteria without consuming data credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "state",
+                        "county",
+                        "city",
+                        "zip_code"
+                      ],
+                      "description": "The named geographic area type."
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The state, county, city, or ZIP identifier for the location."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A state, county, city, or ZIP area included in the property search."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "radius",
+                      "type": "string",
+                      "description": "The radius geographic area type."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "The center latitude for a radius search."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "The center longitude for a radius search."
+                    },
+                    "radius_miles": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "description": "The radius in miles for a radius search."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A radius area included in the property search."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "polygon",
+                      "type": "string",
+                      "description": "The polygon geographic area type."
+                    },
+                    "coordinates": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "description": "The longitude coordinate."
+                          },
+                          {
+                            "type": "number",
+                            "description": "The latitude coordinate."
+                          }
+                        ],
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "description": "A longitude and latitude coordinate pair."
+                      },
+                      "description": "The boundary points for a polygon search as longitude and latitude pairs.",
+                      "minItems": 3
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A polygon area included in the property search."
+                }
+              ],
+              "description": "A geographic area included in the property search."
+            },
+            "description": "The geographic areas included in the search.",
+            "minItems": 1,
+            "maxItems": 15
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filter_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The filter slug returned by list_filters."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An operator allowed by the selected filter."
+                },
+                "value": {
+                  "description": "The filter value in the shape required by the selected operator."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filter_id",
+                "value"
+              ],
+              "description": "A DealMachine filter applied to the search."
+            },
+            "description": "The property or people filters combined with AND logic."
+          },
+          "include_lists": {
+            "type": "object",
+            "properties": {
+              "property_list_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A DealMachine property list ID."
+                },
+                "description": "The DealMachine property list IDs.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Property list IDs used to include or exclude records."
+          },
+          "exclude_lists": {
+            "type": "object",
+            "properties": {
+              "property_list_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A DealMachine property list ID."
+                },
+                "description": "The DealMachine property list IDs.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Property list IDs used to include or exclude records."
+          },
+          "exclude_previously_exported": {
+            "description": "Whether or how to exclude records previously exported by the organization."
+          },
+          "anchor": {
+            "type": "string",
+            "enum": [
+              "properties",
+              "people"
+            ],
+            "description": "The primary entity represented by each result."
+          },
+          "contact_audience": {
+            "type": "string",
+            "enum": [
+              "owners",
+              "owners_and_family",
+              "renters",
+              "residents"
+            ],
+            "description": "The relationship group used to select contacts included in the count."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters and geographic criteria used to count matching properties or people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total_properties": {
+            "type": "integer",
+            "description": "The number of matching properties."
+          },
+          "total_people": {
+            "type": "integer",
+            "description": "The number of matching people."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "The count for the selected anchor entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The entity counts matching the property search criteria."
+      }
+    },
+    {
+      "id": "dealmachine.get_account",
+      "service": "dealmachine",
+      "name": "get_account",
+      "description": "Get the DealMachine organization, authentication identity, and plan details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get the connected DealMachine account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The organization ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The organization name."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The organization creation timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "createdAt"
+            ],
+            "description": "The DealMachine organization associated with the key."
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID, or null for an organization API key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID, or null for an organization API key."
+              },
+              "authType": {
+                "type": "string",
+                "description": "The upstream authentication type."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "authType"
+            ],
+            "description": "The identity represented by the credential."
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The DealMachine plan name."
+              },
+              "is_paid": {
+                "type": "boolean",
+                "description": "Whether the organization has a paid plan."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "is_paid"
+            ],
+            "description": "The organization's current DealMachine plan and credit details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connected DealMachine account details."
+      }
+    },
+    {
+      "id": "dealmachine.get_property",
+      "service": "dealmachine",
+      "name": "get_property",
+      "description": "Get one DealMachine property and optionally enrich its fields and contacts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DealMachine property ID."
+          },
+          "enrich": {
+            "type": "boolean",
+            "description": "Whether to return enriched property data and consume property credits."
+          },
+          "contact_audience": {
+            "type": "string",
+            "enum": [
+              "owners",
+              "owners_and_family",
+              "renters",
+              "residents",
+              "all",
+              "none"
+            ],
+            "description": "The relationship group used to select contacts associated with the property."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A property field ID returned by list_fields."
+            },
+            "description": "The property field IDs to include in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The DealMachine property lookup options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "dm_property_id": {
+                "type": "string",
+                "description": "The DealMachine property ID."
+              },
+              "full_address": {
+                "type": "string",
+                "description": "The complete formatted property address."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "dm_property_id",
+              "full_address"
+            ],
+            "description": "The DealMachine property and any requested dynamic fields."
+          },
+          "credits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The credits consumed by this property lookup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A property response returned by DealMachine."
+      }
+    },
+    {
+      "id": "dealmachine.list_fields",
+      "service": "dealmachine",
+      "name": "list_fields",
+      "description": "Discover DealMachine property and people fields available for search results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "properties",
+              "people"
+            ],
+            "description": "The record family whose metadata should be returned."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text used to search metadata names and descriptions."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based results page to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of metadata entries to return per page."
+          },
+          "group_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field group ID used to limit returned fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional filters and pagination for a DealMachine field discovery request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One DealMachine field or filter metadata entry."
+            },
+            "description": "The returned metadata entries."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "The number of entries requested per page."
+              },
+              "total_results": {
+                "type": "integer",
+                "description": "The total number of matching entries."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of available pages."
+              },
+              "has_next_page": {
+                "type": "boolean",
+                "description": "Whether another page follows this page."
+              },
+              "has_previous_page": {
+                "type": "boolean",
+                "description": "Whether a page precedes this page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by DealMachine."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of DealMachine field or filter metadata."
+      }
+    },
+    {
+      "id": "dealmachine.list_filters",
+      "service": "dealmachine",
+      "name": "list_filters",
+      "description": "Discover DealMachine property and people filters and their allowed operators.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "properties",
+              "people"
+            ],
+            "description": "The record family whose metadata should be returned."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text used to search metadata names and descriptions."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based results page to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of metadata entries to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional filters and pagination for a DealMachine filter discovery request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One DealMachine field or filter metadata entry."
+            },
+            "description": "The returned metadata entries."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "The number of entries requested per page."
+              },
+              "total_results": {
+                "type": "integer",
+                "description": "The total number of matching entries."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of available pages."
+              },
+              "has_next_page": {
+                "type": "boolean",
+                "description": "Whether another page follows this page."
+              },
+              "has_previous_page": {
+                "type": "boolean",
+                "description": "Whether a page precedes this page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by DealMachine."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of DealMachine field or filter metadata."
+      }
+    },
+    {
+      "id": "dealmachine.search_properties",
+      "service": "dealmachine",
+      "name": "search_properties",
+      "description": "Search DealMachine property data or estimate the credit cost of a search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "state",
+                        "county",
+                        "city",
+                        "zip_code"
+                      ],
+                      "description": "The named geographic area type."
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The state, county, city, or ZIP identifier for the location."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A state, county, city, or ZIP area included in the property search."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "radius",
+                      "type": "string",
+                      "description": "The radius geographic area type."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "The center latitude for a radius search."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "The center longitude for a radius search."
+                    },
+                    "radius_miles": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "description": "The radius in miles for a radius search."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A radius area included in the property search."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "polygon",
+                      "type": "string",
+                      "description": "The polygon geographic area type."
+                    },
+                    "coordinates": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "description": "The longitude coordinate."
+                          },
+                          {
+                            "type": "number",
+                            "description": "The latitude coordinate."
+                          }
+                        ],
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "description": "A longitude and latitude coordinate pair."
+                      },
+                      "description": "The boundary points for a polygon search as longitude and latitude pairs.",
+                      "minItems": 3
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A polygon area included in the property search."
+                }
+              ],
+              "description": "A geographic area included in the property search."
+            },
+            "description": "The geographic areas included in the search.",
+            "minItems": 1,
+            "maxItems": 15
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filter_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The filter slug returned by list_filters."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An operator allowed by the selected filter."
+                },
+                "value": {
+                  "description": "The filter value in the shape required by the selected operator."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filter_id",
+                "value"
+              ],
+              "description": "A DealMachine filter applied to the search."
+            },
+            "description": "The property or people filters combined with AND logic."
+          },
+          "include_lists": {
+            "type": "object",
+            "properties": {
+              "property_list_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A DealMachine property list ID."
+                },
+                "description": "The DealMachine property list IDs.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Property list IDs used to include or exclude records."
+          },
+          "exclude_lists": {
+            "type": "object",
+            "properties": {
+              "property_list_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A DealMachine property list ID."
+                },
+                "description": "The DealMachine property list IDs.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Property list IDs used to include or exclude records."
+          },
+          "exclude_previously_exported": {
+            "description": "Whether or how to exclude records previously exported by the organization."
+          },
+          "anchor": {
+            "type": "string",
+            "enum": [
+              "properties",
+              "people"
+            ],
+            "description": "The primary entity represented by each result."
+          },
+          "contact_audience": {
+            "type": "string",
+            "enum": [
+              "owners",
+              "owners_and_family",
+              "renters",
+              "residents",
+              "none"
+            ],
+            "description": "The relationship group used to select contacts associated with matching properties."
+          },
+          "bigquery_data_environment": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The Query Builder dataset environment identifier."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A field ID returned by list_fields."
+            },
+            "description": "The property and people field IDs to include in each result."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based results page to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of results to return per page."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sortable field ID returned by list_fields."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One property search sort rule."
+            },
+            "description": "The fields used to sort results in priority order.",
+            "minItems": 1
+          },
+          "estimate_cost": {
+            "type": "boolean",
+            "description": "Whether to return a credit estimate without returning records or consuming credits."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters, fields, and pagination used to search DealMachine property data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One property or person record with requested dynamic fields."
+            },
+            "description": "The returned property- or people-anchored records."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The total matching property and people counts."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "The number of entries requested per page."
+              },
+              "total_results": {
+                "type": "integer",
+                "description": "The total number of matching entries."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of available pages."
+              },
+              "has_next_page": {
+                "type": "boolean",
+                "description": "Whether another page follows this page."
+              },
+              "has_previous_page": {
+                "type": "boolean",
+                "description": "Whether a page precedes this page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by DealMachine."
+          },
+          "credits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The credits consumed by this search page."
+          },
+          "estimated_credits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The estimated credit cost when estimate_cost is enabled."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "totals",
+          "pagination"
+        ],
+        "description": "The DealMachine property search results or cost estimate."
+      }
+    }
+  ]
+}

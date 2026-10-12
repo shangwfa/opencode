@@ -1,0 +1,501 @@
+{
+  "service": "search_api",
+  "displayName": "SearchApi",
+  "categories": [
+    "Data",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SEARCHAPI_API_KEY",
+      "description": "SearchApi API key passed as the api_key query parameter. Find it on the SearchApi homepage after signing in: https://www.searchapi.io/."
+    }
+  ],
+  "homepageUrl": "https://www.searchapi.io",
+  "actions": [
+    {
+      "id": "search_api.get_account_info",
+      "service": "search_api",
+      "name": "get_account_info",
+      "description": "Retrieve account usage statistics for the connected SearchApi API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving SearchApi account usage."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "monthly_allowance": {
+                "type": "integer",
+                "description": "Maximum allowable searches per month."
+              },
+              "remaining_credits": {
+                "type": "integer",
+                "description": "Search credits available for the current period."
+              },
+              "current_month_usage": {
+                "type": "integer",
+                "description": "Total searches performed in the current month."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Account usage information returned by SearchApi."
+          },
+          "api_usage": {
+            "type": "object",
+            "properties": {
+              "hourly_rate_limit": {
+                "type": "integer",
+                "description": "Maximum searches permitted per hour."
+              },
+              "searches_this_hour": {
+                "type": "integer",
+                "description": "Count of searches made within the current hour."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Hourly API usage information returned by SearchApi."
+          },
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "period_start": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Subscription period start timestamp."
+              },
+              "period_end": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Subscription period end timestamp."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "period_start",
+              "period_end"
+            ],
+            "description": "Subscription period information returned by SearchApi."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account",
+          "api_usage"
+        ],
+        "description": "Account information payload returned by SearchApi."
+      }
+    },
+    {
+      "id": "search_api.get_cached_search_html",
+      "service": "search_api",
+      "name": "get_cached_search_html",
+      "description": "Retrieve one cached SearchApi search result in HTML format by search identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search identifier returned by SearchApi.",
+            "pattern": "^search_"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one cached SearchApi result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "search_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search identifier that was retrieved."
+          },
+          "html_content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cached HTML content returned by SearchApi."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cached HTML payload returned by SearchApi."
+      }
+    },
+    {
+      "id": "search_api.get_cached_search_json",
+      "service": "search_api",
+      "name": "get_cached_search_json",
+      "description": "Retrieve one cached SearchApi search result in JSON format by search identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search identifier returned by SearchApi.",
+            "pattern": "^search_"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one cached SearchApi result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "search_metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Search metadata returned by SearchApi."
+          },
+          "search_parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Search parameters returned by SearchApi."
+          },
+          "search_information": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional search information returned by SearchApi."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible value returned by SearchApi."
+            },
+            "description": "Engine-specific result payload returned by SearchApi."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search_metadata",
+          "search_parameters",
+          "data"
+        ],
+        "description": "Normalized search result payload returned by SearchApi."
+      }
+    },
+    {
+      "id": "search_api.get_locations",
+      "service": "search_api",
+      "name": "get_locations",
+      "description": "Look up canonical SearchApi locations for geo-targeted search queries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query used to match locations."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of location matches to return."
+          },
+          "zeroRetention": {
+            "type": "boolean",
+            "description": "Whether SearchApi should disable logging for the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for retrieving SearchApi locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Common display name of the location."
+                },
+                "canonical_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Canonical location string accepted by SearchApi."
+                },
+                "target_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Location target type returned by SearchApi."
+                },
+                "country_code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Two-letter country code returned by SearchApi."
+                },
+                "google_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Integer google location identifier."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "String google location identifier."
+                    }
+                  ],
+                  "description": "Google location identifier returned by SearchApi."
+                },
+                "google_parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Integer parent location identifier."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "String parent location identifier."
+                    }
+                  ],
+                  "description": "Google parent location identifier returned by SearchApi."
+                },
+                "reach": {
+                  "type": "integer",
+                  "description": "Reach estimate returned by SearchApi."
+                },
+                "lat": {
+                  "type": "number",
+                  "description": "Latitude coordinate of the location."
+                },
+                "lon": {
+                  "type": "number",
+                  "description": "Longitude coordinate of the location."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "canonical_name",
+                "target_type",
+                "country_code",
+                "google_id"
+              ],
+              "description": "One location match returned by SearchApi."
+            },
+            "description": "Location matches returned by SearchApi."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Location lookup payload returned by SearchApi."
+      }
+    },
+    {
+      "id": "search_api.search",
+      "service": "search_api",
+      "name": "search",
+      "description": "Run one SearchApi search request with the first-pass common query parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search engine identifier accepted by SearchApi."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query sent to SearchApi."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Canonical search location accepted by SearchApi."
+          },
+          "gl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter country code used for localized results."
+          },
+          "hl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter language code used for localized results."
+          },
+          "lr": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document language restriction sent to SearchApi."
+          },
+          "cr": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country restriction sent to SearchApi."
+          },
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to request."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Result page number for pagination."
+          },
+          "safe": {
+            "type": "string",
+            "enum": [
+              "active",
+              "blur",
+              "off"
+            ],
+            "description": "Safe search mode sent to SearchApi."
+          },
+          "uule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google encoded location parameter sent to SearchApi."
+          },
+          "kgmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge Graph identifier sent to SearchApi."
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile",
+              "tablet"
+            ],
+            "description": "Device type used for the search request."
+          },
+          "filter": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Duplicate filtering mode sent to SearchApi."
+          },
+          "nfpr": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Whether to exclude auto-corrected results."
+          },
+          "googleDomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google domain override sent to SearchApi."
+          },
+          "timePeriod": {
+            "type": "string",
+            "enum": [
+              "last_hour",
+              "last_day",
+              "last_week",
+              "last_month",
+              "last_year"
+            ],
+            "description": "Relative date filter sent to SearchApi."
+          },
+          "timePeriodMin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom date range start in MM/DD/YYYY format."
+          },
+          "timePeriodMax": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom date range end in MM/DD/YYYY format."
+          },
+          "optimizationStrategy": {
+            "type": "string",
+            "enum": [
+              "performance",
+              "ads"
+            ],
+            "description": "Optimization strategy sent to SearchApi."
+          },
+          "zeroRetention": {
+            "type": "boolean",
+            "description": "Whether SearchApi should disable logging for the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "engine",
+          "q"
+        ],
+        "description": "Input parameters for executing a SearchApi search request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "search_metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Search metadata returned by SearchApi."
+          },
+          "search_parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Search parameters returned by SearchApi."
+          },
+          "search_information": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional search information returned by SearchApi."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible value returned by SearchApi."
+            },
+            "description": "Engine-specific result payload returned by SearchApi."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search_metadata",
+          "search_parameters",
+          "data"
+        ],
+        "description": "Normalized search result payload returned by SearchApi."
+      }
+    }
+  ]
+}

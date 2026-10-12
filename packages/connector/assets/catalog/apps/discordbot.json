@@ -1,0 +1,3326 @@
+{
+  "service": "discordbot",
+  "displayName": "Discord Bot",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Bot Token",
+      "placeholder": "Discord bot token",
+      "description": "Discord bot token sent as Authorization: Bot <token>. Create a bot in the Discord Developer Portal and invite it to the guilds you want to manage.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://discord.com/developers/docs",
+  "actions": [
+    {
+      "id": "discordbot.add_guild_member",
+      "service": "discordbot",
+      "name": "add_guild_member",
+      "description": "Add a user to a Discord guild using an OAuth2 access token that user granted to this bot's application with the guilds.join scope.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "access_token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's OAuth2 access token with the guilds.join scope."
+          },
+          "nick": {
+            "type": "string",
+            "description": "The nickname to give the member. Requires MANAGE_NICKNAMES."
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Discord snowflake identifier.",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "The role ids to assign. Requires MANAGE_ROLES."
+          },
+          "mute": {
+            "type": "boolean",
+            "description": "Whether the member is muted in voice channels. Requires MUTE_MEMBERS."
+          },
+          "deaf": {
+            "type": "boolean",
+            "description": "Whether the member is deafened in voice channels. Requires DEAFEN_MEMBERS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id",
+          "access_token"
+        ],
+        "description": "Input parameters for adding a guild member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "already_member": {
+            "type": "boolean",
+            "description": "Whether the user was already a member of the guild."
+          },
+          "member": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw Discord API object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A raw Discord API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "already_member",
+          "member"
+        ],
+        "description": "The add guild member response."
+      }
+    },
+    {
+      "id": "discordbot.add_guild_member_role",
+      "service": "discordbot",
+      "name": "add_guild_member_role",
+      "description": "Add a role to a Discord guild member. Requires the MANAGE_ROLES permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id",
+          "role_id"
+        ],
+        "description": "Input parameters for adding a role to a guild member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.begin_guild_prune",
+      "service": "discordbot",
+      "name": "begin_guild_prune",
+      "description": "Remove inactive members from a Discord guild. Requires the MANAGE_GUILD and KICK_MEMBERS permissions. Set compute_prune_count to false for large guilds.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of days of inactivity that qualifies a member for pruning. Discord defaults to 7."
+          },
+          "compute_prune_count": {
+            "type": "boolean",
+            "description": "Whether Discord returns the number of pruned members. Discord defaults to true."
+          },
+          "include_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Discord snowflake identifier.",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Role ids whose holders may also be pruned. By default members with any role are skipped."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for pruning members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pruned": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of members removed, or null when compute_prune_count is false."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of members removed, or null when compute_prune_count is false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pruned"
+        ],
+        "description": "The prune response."
+      }
+    },
+    {
+      "id": "discordbot.bulk_guild_ban",
+      "service": "discordbot",
+      "name": "bulk_guild_ban",
+      "description": "Ban up to 200 users from a Discord guild at once. Requires the BAN_MEMBERS and MANAGE_GUILD permissions.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Discord snowflake identifier.",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "The user ids to ban.",
+            "minItems": 1,
+            "maxItems": 200
+          },
+          "delete_message_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 604800,
+            "description": "How many seconds of the banned user's recent messages to delete, from 0 to 604800 (7 days)."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_ids"
+        ],
+        "description": "Input parameters for banning several users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "banned_users": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The user ids that were banned."
+          },
+          "failed_users": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The user ids that could not be banned or were already banned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "banned_users",
+          "failed_users"
+        ],
+        "description": "The bulk ban result."
+      }
+    },
+    {
+      "id": "discordbot.create_guild_ban",
+      "service": "discordbot",
+      "name": "create_guild_ban",
+      "description": "Ban a user from a Discord guild and optionally delete their recent messages. Requires the BAN_MEMBERS permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "delete_message_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 604800,
+            "description": "How many seconds of the banned user's recent messages to delete, from 0 to 604800 (7 days)."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters for banning a user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.create_guild_channel",
+      "service": "discordbot",
+      "name": "create_guild_channel",
+      "description": "Create a channel in a Discord guild. Requires the MANAGE_CHANNELS permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The channel name."
+          },
+          "type": {
+            "type": "integer",
+            "description": "The channel type, such as 0 for text, 2 for voice, 4 for category, or 15 for forum."
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "The channel topic. Forum and media channels allow up to 4096 characters; other channel types allow up to 1024."
+          },
+          "bitrate": {
+            "type": "integer",
+            "minimum": 8000,
+            "description": "The bitrate in bits per second for voice and stage channels."
+          },
+          "user_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The user limit for voice and stage channels."
+          },
+          "rate_limit_per_user": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 21600,
+            "description": "The slowmode delay in seconds."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The sorting position of the channel."
+          },
+          "permission_overwrites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The channel permission overwrites."
+          },
+          "parent_id": {
+            "type": "string",
+            "description": "The parent category id."
+          },
+          "nsfw": {
+            "type": "boolean",
+            "description": "Whether the channel is age-restricted."
+          },
+          "rtc_region": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The voice region id for voice and stage channels, or null for automatic."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The voice region id for voice and stage channels, or null for automatic."
+          },
+          "video_quality_mode": {
+            "type": "integer",
+            "description": "The camera video quality mode for voice and stage channels."
+          },
+          "default_auto_archive_duration": {
+            "type": "integer",
+            "description": "The default thread auto-archive duration in minutes.",
+            "enum": [
+              60,
+              1440,
+              4320,
+              10080
+            ]
+          },
+          "default_reaction_emoji": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Discord API object."
+          },
+          "available_tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The tags available in forum and media channels."
+          },
+          "default_sort_order": {
+            "type": "integer",
+            "description": "The default sort order for forum and media posts."
+          },
+          "default_forum_layout": {
+            "type": "integer",
+            "description": "The default forum layout view."
+          },
+          "default_thread_rate_limit_per_user": {
+            "type": "integer",
+            "description": "The initial slowmode delay in seconds for new threads."
+          },
+          "flags": {
+            "type": "integer",
+            "description": "The channel flags bitfield."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "name"
+        ],
+        "description": "Input parameters for creating a guild channel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Discord API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel"
+        ],
+        "description": "The created channel response."
+      }
+    },
+    {
+      "id": "discordbot.create_guild_role",
+      "service": "discordbot",
+      "name": "create_guild_role",
+      "description": "Create a role in a Discord guild. Requires the MANAGE_ROLES permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The role name."
+          },
+          "permissions": {
+            "type": "string",
+            "description": "The role permissions as a bitwise value encoded as a string."
+          },
+          "color": {
+            "type": "integer",
+            "description": "The deprecated RGB color value. Prefer colors."
+          },
+          "colors": {
+            "type": "object",
+            "properties": {
+              "primary_color": {
+                "type": "integer",
+                "description": "The primary RGB color value."
+              },
+              "secondary_color": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The secondary RGB color value for a gradient role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The secondary RGB color value for a gradient role."
+              },
+              "tertiary_color": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The tertiary RGB color value for a holographic role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tertiary RGB color value for a holographic role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The role colors object with primary_color, secondary_color, and tertiary_color."
+          },
+          "hoist": {
+            "type": "boolean",
+            "description": "Whether members with the role are displayed separately in the member list."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The role icon image, for guilds with the ROLE_ICONS feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role icon image, for guilds with the ROLE_ICONS feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "unicode_emoji": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The role's standard unicode emoji, for guilds with the ROLE_ICONS feature."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role's standard unicode emoji, for guilds with the ROLE_ICONS feature."
+          },
+          "mentionable": {
+            "type": "boolean",
+            "description": "Whether anyone can mention the role."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for creating a role. Omitted fields use Discord defaults."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.create_message",
+      "service": "discordbot",
+      "name": "create_message",
+      "description": "Create a Discord message in a channel.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "The message content."
+          },
+          "embeds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The embeds to include.",
+            "maxItems": 10
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The components to include.",
+            "maxItems": 5
+          },
+          "allowed_mentions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Discord API object."
+          },
+          "message_reference": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Discord API object."
+          },
+          "tts": {
+            "type": "boolean",
+            "description": "Whether the message is a text-to-speech message."
+          },
+          "flags": {
+            "type": "integer",
+            "description": "The message flags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input parameters for creating a message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Discord API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "The created message response."
+      }
+    },
+    {
+      "id": "discordbot.delete_guild_integration",
+      "service": "discordbot",
+      "name": "delete_guild_integration",
+      "description": "Delete an integration from a Discord guild, removing its webhooks and kicking its bot. Requires the MANAGE_GUILD permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "integration_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "integration_id"
+        ],
+        "description": "Input parameters for deleting a guild integration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.delete_guild_role",
+      "service": "discordbot",
+      "name": "delete_guild_role",
+      "description": "Delete a role from a Discord guild. Requires the MANAGE_ROLES permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "role_id"
+        ],
+        "description": "Input parameters for deleting a role."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.delete_message",
+      "service": "discordbot",
+      "name": "delete_message",
+      "description": "Delete a Discord message from a channel.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "message_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "message_id"
+        ],
+        "description": "Input parameters containing a channel id and message id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.get_application",
+      "service": "discordbot",
+      "name": "get_application",
+      "description": "Get a Discord application by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "application_id"
+        ],
+        "description": "Input parameters containing an application id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_bot_gateway",
+      "service": "discordbot",
+      "name": "get_bot_gateway",
+      "description": "Get the recommended Discord Gateway URL and sharding metadata for the bot.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_channel",
+      "service": "discordbot",
+      "name": "get_channel",
+      "description": "Get a Discord channel by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input parameters containing a channel id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_gateway",
+      "service": "discordbot",
+      "name": "get_gateway",
+      "description": "Get the public Discord Gateway URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public gateway URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The gateway URL response."
+      }
+    },
+    {
+      "id": "discordbot.get_guild",
+      "service": "discordbot",
+      "name": "get_guild",
+      "description": "Get a Discord guild by ID, optionally including approximate member and presence counts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "with_counts": {
+            "type": "boolean",
+            "description": "Whether to include approximate_member_count and approximate_presence_count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for getting a guild."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_ban",
+      "service": "discordbot",
+      "name": "get_guild_ban",
+      "description": "Get the ban for a user in a Discord guild. Requires the BAN_MEMBERS permission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters containing a guild id and user id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_member",
+      "service": "discordbot",
+      "name": "get_guild_member",
+      "description": "Get a member of a Discord guild by user ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters containing a guild id and user id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_onboarding",
+      "service": "discordbot",
+      "name": "get_guild_onboarding",
+      "description": "Get the onboarding configuration of a Discord guild.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_preview",
+      "service": "discordbot",
+      "name": "get_guild_preview",
+      "description": "Get the public preview of a Discord guild. The bot must be in the guild unless the guild is discoverable.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_prune_count",
+      "service": "discordbot",
+      "name": "get_guild_prune_count",
+      "description": "Count how many inactive members a prune would remove from a Discord guild. Requires the MANAGE_GUILD and KICK_MEMBERS permissions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of days of inactivity that qualifies a member for pruning. Discord defaults to 7."
+          },
+          "include_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Discord snowflake identifier.",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "Role ids whose holders may also be pruned. By default members with any role are skipped.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for counting prunable members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pruned": {
+            "type": "integer",
+            "description": "The number of members that would be removed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pruned"
+        ],
+        "description": "The prune count response."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_role",
+      "service": "discordbot",
+      "name": "get_guild_role",
+      "description": "Get a role in a Discord guild by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "role_id"
+        ],
+        "description": "Input parameters containing a guild id and role id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_role_member_counts",
+      "service": "discordbot",
+      "name": "get_guild_role_member_counts",
+      "description": "Get the number of members holding each role in a Discord guild, excluding @everyone.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member_counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "description": "The number of members with the role."
+            },
+            "description": "Member counts keyed by role id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member_counts"
+        ],
+        "description": "The role member counts response."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_vanity_url",
+      "service": "discordbot",
+      "name": "get_guild_vanity_url",
+      "description": "Get the vanity invite code and its use count for a Discord guild. Requires the MANAGE_GUILD permission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The vanity invite code, or null when none is set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The vanity invite code, or null when none is set."
+          },
+          "uses": {
+            "type": "integer",
+            "description": "The number of times the vanity invite was used."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "uses"
+        ],
+        "description": "The vanity URL response."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_welcome_screen",
+      "service": "discordbot",
+      "name": "get_guild_welcome_screen",
+      "description": "Get the welcome screen of a Discord guild. Requires the MANAGE_GUILD permission when the welcome screen is disabled.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_widget",
+      "service": "discordbot",
+      "name": "get_guild_widget",
+      "description": "Get the public widget JSON of a Discord guild, including online members and voice channels.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_widget_png",
+      "service": "discordbot",
+      "name": "get_guild_widget_png",
+      "description": "Get a Discord guild widget PNG.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "shield",
+              "banner1",
+              "banner2",
+              "banner3",
+              "banner4"
+            ],
+            "description": "The visual style to use for the guild widget PNG."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input for retrieving a Discord guild widget PNG."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "The file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The MIME type."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "The file size in bytes."
+          },
+          "dataBase64": {
+            "type": "string",
+            "description": "The file contents encoded as base64."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "mimeType",
+          "sizeBytes",
+          "dataBase64"
+        ],
+        "description": "A binary file payload encoded for transport."
+      }
+    },
+    {
+      "id": "discordbot.get_guild_widget_settings",
+      "service": "discordbot",
+      "name": "get_guild_widget_settings",
+      "description": "Get the widget settings of a Discord guild. Requires the MANAGE_GUILD permission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_my_application",
+      "service": "discordbot",
+      "name": "get_my_application",
+      "description": "Get the Discord application associated with the configured bot token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.get_public_keys",
+      "service": "discordbot",
+      "name": "get_public_keys",
+      "description": "Get Discord OAuth2 public keys.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The public keys returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keys"
+        ],
+        "description": "The public key response payload."
+      }
+    },
+    {
+      "id": "discordbot.get_user",
+      "service": "discordbot",
+      "name": "get_user",
+      "description": "Get a Discord user by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "Input parameters containing a user id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.list_active_guild_threads",
+      "service": "discordbot",
+      "name": "list_active_guild_threads",
+      "description": "List all active public and private threads in a Discord guild.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The active thread channels."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "A thread member object for each returned thread the bot has joined."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "threads",
+          "members"
+        ],
+        "description": "The active threads response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_bans",
+      "service": "discordbot",
+      "name": "list_guild_bans",
+      "description": "List bans in a Discord guild in ascending user ID order. Requires the BAN_MEMBERS permission. If both before and after are set, Discord only uses before.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of bans to return. Discord defaults to 1000."
+          },
+          "before": {
+            "type": "string",
+            "description": "Return bans for user ids lower than this id."
+          },
+          "after": {
+            "type": "string",
+            "description": "Return bans for user ids greater than this id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for listing guild bans."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The ban objects returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bans"
+        ],
+        "description": "The guild bans response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_channels",
+      "service": "discordbot",
+      "name": "list_guild_channels",
+      "description": "List channels in a Discord guild. Threads are not included.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The channels returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels"
+        ],
+        "description": "The guild channels response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_integrations",
+      "service": "discordbot",
+      "name": "list_guild_integrations",
+      "description": "List integrations attached to a Discord guild, up to 50. Requires the MANAGE_GUILD permission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "integrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The integration objects returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "integrations"
+        ],
+        "description": "The guild integrations response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_invites",
+      "service": "discordbot",
+      "name": "list_guild_invites",
+      "description": "List invites for a Discord guild. Requires the MANAGE_GUILD or VIEW_AUDIT_LOG permission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The invite objects returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invites"
+        ],
+        "description": "The guild invites response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_members",
+      "service": "discordbot",
+      "name": "list_guild_members",
+      "description": "List members of a Discord guild in ascending user ID order. Requires the GUILD_MEMBERS privileged intent. Pass the last user id as after to fetch the next page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of members to return. Discord defaults to 1."
+          },
+          "after": {
+            "type": "string",
+            "description": "Return members with a user id greater than this id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for listing guild members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The guild members returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "members"
+        ],
+        "description": "The guild members response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_roles",
+      "service": "discordbot",
+      "name": "list_guild_roles",
+      "description": "List roles in a Discord guild.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The roles returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roles"
+        ],
+        "description": "The guild roles response."
+      }
+    },
+    {
+      "id": "discordbot.list_guild_voice_regions",
+      "service": "discordbot",
+      "name": "list_guild_voice_regions",
+      "description": "List voice regions available to a Discord guild, including VIP regions when the guild has them.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters containing a guild id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The voice region objects returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "regions"
+        ],
+        "description": "The voice regions response."
+      }
+    },
+    {
+      "id": "discordbot.list_messages",
+      "service": "discordbot",
+      "name": "list_messages",
+      "description": "List messages from a Discord channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "around": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "before": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "after": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of messages to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input parameters for listing channel messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The messages returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The messages response."
+      }
+    },
+    {
+      "id": "discordbot.modify_current_member",
+      "service": "discordbot",
+      "name": "modify_current_member",
+      "description": "Update the bot's own member profile in a Discord guild.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "nick": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The bot's nickname in the guild, or null to reset it. Requires CHANGE_NICKNAME."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bot's nickname in the guild, or null to reset it. Requires CHANGE_NICKNAME."
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The bot's guild-specific avatar. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bot's guild-specific avatar. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "banner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The bot's guild-specific banner. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bot's guild-specific banner. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The bot's guild-specific bio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bot's guild-specific bio."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating the bot's guild member profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild",
+      "service": "discordbot",
+      "name": "modify_guild",
+      "description": "Update a Discord guild's settings. Requires the MANAGE_GUILD permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "description": "The guild name."
+          },
+          "verification_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "description": "The verification level."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The verification level."
+          },
+          "default_message_notifications": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "The default message notification level."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default message notification level."
+          },
+          "explicit_content_filter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "The explicit content filter level."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The explicit content filter level."
+          },
+          "afk_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The AFK voice channel id, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The AFK voice channel id, or null to clear it."
+          },
+          "afk_timeout": {
+            "type": "integer",
+            "description": "The AFK timeout in seconds.",
+            "enum": [
+              60,
+              300,
+              900,
+              1800,
+              3600
+            ]
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The guild icon. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The guild icon. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "splash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The invite splash image, for guilds with the INVITE_SPLASH feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The invite splash image, for guilds with the INVITE_SPLASH feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "discovery_splash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The discovery splash image, for guilds with the DISCOVERABLE feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The discovery splash image, for guilds with the DISCOVERABLE feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "banner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The guild banner, for guilds with the BANNER feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The guild banner, for guilds with the BANNER feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "system_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The channel id for system messages such as welcomes, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The channel id for system messages such as welcomes, or null to clear it."
+          },
+          "system_channel_flags": {
+            "type": "integer",
+            "description": "The system channel flags bitfield."
+          },
+          "rules_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The rules channel id for Community guilds, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rules channel id for Community guilds, or null to clear it."
+          },
+          "public_updates_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The channel id where Community guild moderators receive Discord notices, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The channel id where Community guild moderators receive Discord notices, or null to clear it."
+          },
+          "safety_alerts_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The channel id where Community guild moderators receive safety alerts, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The channel id where Community guild moderators receive safety alerts, or null to clear it."
+          },
+          "preferred_locale": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The preferred locale of a Community guild, such as en-US."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The preferred locale of a Community guild, such as en-US."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The complete list of enabled guild feature strings."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The guild description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The guild description."
+          },
+          "premium_progress_bar_enabled": {
+            "type": "boolean",
+            "description": "Whether the boost progress bar is shown."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating a guild. Only the provided fields are changed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_channel_positions",
+      "service": "discordbot",
+      "name": "modify_guild_channel_positions",
+      "description": "Reorder or re-parent channels in a Discord guild. Requires the MANAGE_CHANNELS permission. Only one entry per request may change parent_id.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "A Discord snowflake identifier.",
+                  "pattern": "^[0-9]+$"
+                },
+                "position": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The new sorting position."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The new sorting position."
+                },
+                "lock_permissions": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether to sync permission overwrites with the new parent category."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether to sync permission overwrites with the new parent category."
+                },
+                "parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The new parent category id, or null to move the channel out of a category."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The new parent category id, or null to move the channel out of a category."
+                },
+                "flags": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The channel flags bitfield."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The channel flags bitfield."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A channel position change."
+            },
+            "description": "The channels to move.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "positions"
+        ],
+        "description": "Input parameters for changing channel positions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_incident_actions",
+      "service": "discordbot",
+      "name": "modify_guild_incident_actions",
+      "description": "Pause invites or direct messages in a Discord guild for up to 24 hours. Requires the MANAGE_GUILD permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "invites_disabled_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When invites are enabled again, up to 24 hours in the future. Null re-enables them now.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When invites are enabled again, up to 24 hours in the future. Null re-enables them now."
+          },
+          "dms_disabled_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When direct messages are enabled again, up to 24 hours in the future. Null re-enables them now.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When direct messages are enabled again, up to 24 hours in the future. Null re-enables them now."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating guild incident actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_member",
+      "service": "discordbot",
+      "name": "modify_guild_member",
+      "description": "Update a Discord guild member's nickname, roles, voice state, or timeout. Each field requires its own permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "nick": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The member nickname, or null to reset it. Requires MANAGE_NICKNAMES."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The member nickname, or null to reset it. Requires MANAGE_NICKNAMES."
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Discord snowflake identifier.",
+                  "pattern": "^[0-9]+$"
+                },
+                "description": "The complete list of role ids for the member. Requires MANAGE_ROLES."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The complete list of role ids for the member. Requires MANAGE_ROLES."
+          },
+          "mute": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the member is muted in voice channels. Requires MUTE_MEMBERS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the member is muted in voice channels. Requires MUTE_MEMBERS."
+          },
+          "deaf": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the member is deafened in voice channels. Requires DEAFEN_MEMBERS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the member is deafened in voice channels. Requires DEAFEN_MEMBERS."
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The voice channel id to move the member to, or null to disconnect them from voice. Requires MOVE_MEMBERS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The voice channel id to move the member to, or null to disconnect them from voice. Requires MOVE_MEMBERS."
+          },
+          "communication_disabled_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the member's timeout ends, up to 28 days in the future. Requires MODERATE_MEMBERS.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the member's timeout ends, up to 28 days in the future. Requires MODERATE_MEMBERS."
+          },
+          "flags": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The guild member flags bitfield."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The guild member flags bitfield."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters for updating a guild member. Only the provided fields are changed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The updated guild member, or null only if Discord answers 204 No Content."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated guild member, or null only if Discord answers 204 No Content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member"
+        ],
+        "description": "The modify guild member response."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_onboarding",
+      "service": "discordbot",
+      "name": "modify_guild_onboarding",
+      "description": "Replace the onboarding configuration of a Discord guild. Requires the MANAGE_GUILD and MANAGE_ROLES permissions.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "prompts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The onboarding prompt objects."
+          },
+          "default_channel_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Discord snowflake identifier.",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "The channel ids members are opted into automatically."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether onboarding is enabled."
+          },
+          "mode": {
+            "type": "integer",
+            "description": "The onboarding mode: 0 counts only default channels, 1 also counts questions.",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating guild onboarding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_role",
+      "service": "discordbot",
+      "name": "modify_guild_role",
+      "description": "Update a role in a Discord guild. Requires the MANAGE_ROLES permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The role name."
+          },
+          "permissions": {
+            "type": "string",
+            "description": "The role permissions as a bitwise value encoded as a string."
+          },
+          "color": {
+            "type": "integer",
+            "description": "The deprecated RGB color value. Prefer colors."
+          },
+          "colors": {
+            "type": "object",
+            "properties": {
+              "primary_color": {
+                "type": "integer",
+                "description": "The primary RGB color value."
+              },
+              "secondary_color": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The secondary RGB color value for a gradient role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The secondary RGB color value for a gradient role."
+              },
+              "tertiary_color": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The tertiary RGB color value for a holographic role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tertiary RGB color value for a holographic role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The role colors object with primary_color, secondary_color, and tertiary_color."
+          },
+          "hoist": {
+            "type": "boolean",
+            "description": "Whether members with the role are displayed separately in the member list."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The role icon image, for guilds with the ROLE_ICONS feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role icon image, for guilds with the ROLE_ICONS feature. Pass a data URI such as data:image/png;base64,..., or null to remove it."
+          },
+          "unicode_emoji": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The role's standard unicode emoji, for guilds with the ROLE_ICONS feature."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role's standard unicode emoji, for guilds with the ROLE_ICONS feature."
+          },
+          "mentionable": {
+            "type": "boolean",
+            "description": "Whether anyone can mention the role."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "role_id"
+        ],
+        "description": "Input parameters for updating a role. Only the provided fields are changed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_role_positions",
+      "service": "discordbot",
+      "name": "modify_guild_role_positions",
+      "description": "Reorder roles in a Discord guild. Requires the MANAGE_ROLES permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "A Discord snowflake identifier.",
+                  "pattern": "^[0-9]+$"
+                },
+                "position": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The new sorting position."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The new sorting position."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A role position change."
+            },
+            "description": "The roles to move.",
+            "minItems": 1
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "positions"
+        ],
+        "description": "Input parameters for changing role positions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "All roles in the guild."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roles"
+        ],
+        "description": "The guild roles after reordering."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_welcome_screen",
+      "service": "discordbot",
+      "name": "modify_guild_welcome_screen",
+      "description": "Update the welcome screen of a Discord guild. Requires the MANAGE_GUILD permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the welcome screen is enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the welcome screen is enabled."
+          },
+          "welcome_channels": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A raw Discord API object."
+                },
+                "description": "The channels shown on the welcome screen, each with channel_id, description, emoji_id, and emoji_name.",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The channels shown on the welcome screen, each with channel_id, description, emoji_id, and emoji_name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The server description shown on the welcome screen."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The server description shown on the welcome screen."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating the welcome screen. Only the provided fields are changed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.modify_guild_widget",
+      "service": "discordbot",
+      "name": "modify_guild_widget",
+      "description": "Update the widget settings of a Discord guild. Requires the MANAGE_GUILD permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the widget is enabled."
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The channel the widget invite points to, or null for none."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The channel the widget invite points to, or null for none."
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id"
+        ],
+        "description": "Input parameters for updating guild widget settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw Discord API object."
+      }
+    },
+    {
+      "id": "discordbot.remove_guild_ban",
+      "service": "discordbot",
+      "name": "remove_guild_ban",
+      "description": "Lift a user's ban from a Discord guild. Requires the BAN_MEMBERS permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters for removing a ban."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.remove_guild_member",
+      "service": "discordbot",
+      "name": "remove_guild_member",
+      "description": "Kick a member from a Discord guild. Requires the KICK_MEMBERS permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id"
+        ],
+        "description": "Input parameters for removing a guild member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.remove_guild_member_role",
+      "service": "discordbot",
+      "name": "remove_guild_member_role",
+      "description": "Remove a role from a Discord guild member. Requires the MANAGE_ROLES permission.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "role_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "audit_log_reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The reason recorded in the guild audit log for this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "user_id",
+          "role_id"
+        ],
+        "description": "Input parameters for removing a role from a guild member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "The success flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The success response returned by the action."
+      }
+    },
+    {
+      "id": "discordbot.search_guild_members",
+      "service": "discordbot",
+      "name": "search_guild_members",
+      "description": "Search members of a Discord guild whose username or nickname starts with a query string.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "description": "A Discord snowflake identifier.",
+            "pattern": "^[0-9]+$"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The prefix to match against usernames and nicknames."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of members to return. Discord defaults to 1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "guild_id",
+          "query"
+        ],
+        "description": "Input parameters for searching guild members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Discord API object."
+            },
+            "description": "The guild members returned by Discord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "members"
+        ],
+        "description": "The matching guild members response."
+      }
+    },
+    {
+      "id": "discordbot.test_auth",
+      "service": "discordbot",
+      "name": "test_auth",
+      "description": "Check whether the configured Discord bot token can call the current application endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "auth_ok": {
+            "type": "boolean",
+            "description": "Whether authentication succeeded."
+          },
+          "status_code": {
+            "type": "integer",
+            "description": "The HTTP status code returned by the test request."
+          },
+          "error_body": {
+            "type": "string",
+            "description": "The error body returned by the test request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "auth_ok",
+          "status_code",
+          "error_body"
+        ],
+        "description": "The authentication test result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,685 @@
+{
+  "service": "mx",
+  "displayName": "MX",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MX_API_KEY",
+      "description": "MX Platform API key used as the Basic Auth password. View or copy keys from MX Client Dashboard > API keys: https://docs.mx.com/resources/client-dashboard/manage-api-keys.",
+      "extraFields": [
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "MX_CLIENT_ID",
+          "description": "MX Platform API client_id used as the Basic Auth username. It is issued with and paired to the API key."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.mx.com",
+  "actions": [
+    {
+      "id": "mx.create_user",
+      "service": "mx",
+      "name": "create_user",
+      "description": "Create an MX Platform API user and return the newly-created user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique partner-defined identifier for the user."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address associated with the user.",
+                "format": "email"
+              },
+              "isDisabled": {
+                "type": "boolean",
+                "description": "Whether the user is disabled in MX."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "Additional non-sensitive metadata to store on the MX user."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The user fields accepted by MX user create and update requests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Input parameters for creating an MX user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique identifier for the user, defined by MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique identifier for the user, defined by MX."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique partner-defined identifier for the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique partner-defined identifier for the user."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The email address associated with the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The email address associated with the user."
+              },
+              "isDisabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is disabled in MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is disabled in MX."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional information stored on the MX user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional information stored on the MX user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw MX user object returned by the Platform API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "guid",
+              "id",
+              "email",
+              "isDisabled",
+              "metadata",
+              "raw"
+            ],
+            "description": "A normalized MX Platform API user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The normalized MX user result."
+      }
+    },
+    {
+      "id": "mx.delete_user",
+      "service": "mx",
+      "name": "delete_user",
+      "description": "Permanently delete one MX Platform API user by MX guid or partner-defined id.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MX-defined user guid or partner-defined user id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userIdentifier"
+        ],
+        "description": "Input parameters for reading one MX user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether MX accepted the user deletion request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by MX for the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "status"
+        ],
+        "description": "The normalized MX delete-user result."
+      }
+    },
+    {
+      "id": "mx.list_users",
+      "service": "mx",
+      "name": "list_users",
+      "description": "List users created in the MX Platform API with pagination and simple filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "recordsPerPage": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1000,
+            "description": "The number of users to request per page."
+          },
+          "id": {
+            "type": "string",
+            "description": "Filter users by partner-defined user id."
+          },
+          "email": {
+            "type": "string",
+            "description": "Filter users by email address.",
+            "format": "email"
+          },
+          "isDisabled": {
+            "type": "boolean",
+            "description": "Filter users by disabled status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing MX users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "guid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique identifier for the user, defined by MX."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique identifier for the user, defined by MX."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique partner-defined identifier for the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique partner-defined identifier for the user."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address associated with the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address associated with the user."
+                },
+                "isDisabled": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is disabled in MX."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is disabled in MX."
+                },
+                "metadata": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Additional information stored on the MX user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Additional information stored on the MX user."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw MX user object returned by the Platform API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "guid",
+                "id",
+                "email",
+                "isDisabled",
+                "metadata",
+                "raw"
+              ],
+              "description": "A normalized MX Platform API user."
+            },
+            "description": "The users returned by MX."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page delivered by the current response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page delivered by the current response."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records delivered with each page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records delivered with each page."
+              },
+              "totalEntries": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of records available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of records available."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of pages available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of pages available."
+              },
+              "raw": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw pagination object returned by MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw pagination object returned by MX."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "currentPage",
+              "perPage",
+              "totalEntries",
+              "totalPages",
+              "raw"
+            ],
+            "description": "Pagination metadata returned by MX list endpoints."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw MX list-users response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "pagination",
+          "raw"
+        ],
+        "description": "The normalized MX list-users result."
+      }
+    },
+    {
+      "id": "mx.read_user",
+      "service": "mx",
+      "name": "read_user",
+      "description": "Read one MX Platform API user by MX guid or partner-defined id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MX-defined user guid or partner-defined user id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userIdentifier"
+        ],
+        "description": "Input parameters for reading one MX user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique identifier for the user, defined by MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique identifier for the user, defined by MX."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique partner-defined identifier for the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique partner-defined identifier for the user."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The email address associated with the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The email address associated with the user."
+              },
+              "isDisabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is disabled in MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is disabled in MX."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional information stored on the MX user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional information stored on the MX user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw MX user object returned by the Platform API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "guid",
+              "id",
+              "email",
+              "isDisabled",
+              "metadata",
+              "raw"
+            ],
+            "description": "A normalized MX Platform API user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The normalized MX user result."
+      }
+    },
+    {
+      "id": "mx.update_user",
+      "service": "mx",
+      "name": "update_user",
+      "description": "Update an MX Platform API user by MX guid or partner-defined id.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MX-defined user guid or partner-defined user id."
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique partner-defined identifier for the user."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address associated with the user.",
+                "format": "email"
+              },
+              "isDisabled": {
+                "type": "boolean",
+                "description": "Whether the user is disabled in MX."
+              },
+              "metadata": {
+                "type": "string",
+                "description": "Additional non-sensitive metadata to store on the MX user."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The user fields accepted by MX user create and update requests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userIdentifier",
+          "user"
+        ],
+        "description": "Input parameters for updating an MX user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique identifier for the user, defined by MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique identifier for the user, defined by MX."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique partner-defined identifier for the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique partner-defined identifier for the user."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The email address associated with the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The email address associated with the user."
+              },
+              "isDisabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is disabled in MX."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is disabled in MX."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional information stored on the MX user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional information stored on the MX user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw MX user object returned by the Platform API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "guid",
+              "id",
+              "email",
+              "isDisabled",
+              "metadata",
+              "raw"
+            ],
+            "description": "A normalized MX Platform API user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The normalized MX user result."
+      }
+    }
+  ]
+}

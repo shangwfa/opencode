@@ -1,0 +1,1522 @@
+{
+  "service": "demodesk",
+  "displayName": "Demodesk",
+  "categories": [
+    "Productivity",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DEMODESK_API_KEY",
+      "description": "Demodesk API key sent as a Bearer token. Generate one in Demodesk under Settings > Integrations > Other, as described in the official API reference: https://demodesk.com/api/docs/index.html"
+    }
+  ],
+  "homepageUrl": "https://demodesk.com",
+  "actions": [
+    {
+      "id": "demodesk.batch_get_recording_transcripts",
+      "service": "demodesk",
+      "name": "batch_get_recording_transcripts",
+      "description": "Get transcripts for up to 100 Demodesk recording tokens in one request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordingTokens": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One public Demodesk recording token."
+            },
+            "description": "Public Demodesk recording tokens.",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true
+          },
+          "lang": {
+            "type": "string",
+            "description": "Language code used to request an on-the-fly translation.",
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "plaintext"
+            ],
+            "description": "Transcript response format to request from Demodesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordingTokens"
+        ],
+        "description": "Input parameters for retrieving Demodesk recording transcripts in batch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recordingToken": {
+                  "type": "string",
+                  "description": "Public Demodesk recording token."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "processing",
+                    "not_requested",
+                    "empty",
+                    "not_found"
+                  ],
+                  "description": "Per-recording transcript status."
+                },
+                "transcript": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "language": {
+                              "type": "string",
+                              "description": "Transcript language code."
+                            },
+                            "paragraphs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "startInSeconds": {
+                                    "type": "number",
+                                    "description": "Paragraph start time in seconds."
+                                  },
+                                  "endInSeconds": {
+                                    "type": "number",
+                                    "description": "Paragraph end time in seconds."
+                                  },
+                                  "speaker": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "displayName": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "description": "Speaker display name when available."
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "description": "Speaker display name when available."
+                                          }
+                                        },
+                                        "additionalProperties": false,
+                                        "required": [
+                                          "displayName"
+                                        ],
+                                        "description": "A transcript speaker."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "A transcript speaker."
+                                  },
+                                  "sentences": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "startInSeconds": {
+                                          "type": "number",
+                                          "description": "Sentence start time in seconds."
+                                        },
+                                        "endInSeconds": {
+                                          "type": "number",
+                                          "description": "Sentence end time in seconds."
+                                        },
+                                        "text": {
+                                          "type": "string",
+                                          "description": "Sentence text."
+                                        }
+                                      },
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "startInSeconds",
+                                        "endInSeconds",
+                                        "text"
+                                      ],
+                                      "description": "A transcript sentence."
+                                    },
+                                    "description": "Sentences in the paragraph."
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                  "startInSeconds",
+                                  "endInSeconds",
+                                  "speaker",
+                                  "sentences"
+                                ],
+                                "description": "A transcript paragraph."
+                              },
+                              "description": "Transcript paragraphs."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "language",
+                            "paragraphs"
+                          ],
+                          "description": "A structured Demodesk transcript."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "language": {
+                              "type": "string",
+                              "description": "Transcript language code."
+                            },
+                            "text": {
+                              "type": "string",
+                              "description": "Transcript text."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "language",
+                            "text"
+                          ],
+                          "description": "A plaintext Demodesk transcript."
+                        }
+                      ],
+                      "description": "A structured or plaintext transcript payload."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A structured or plaintext transcript payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "recordingToken",
+                "status",
+                "transcript"
+              ],
+              "description": "One Demodesk batch transcript result."
+            },
+            "description": "Per-recording transcript results."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "requestedCount": {
+                "type": "integer",
+                "description": "Number of recording tokens requested."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requestedCount"
+            ],
+            "description": "Demodesk transcript batch metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "meta"
+        ],
+        "description": "The Demodesk transcript batch response."
+      }
+    },
+    {
+      "id": "demodesk.get_current_user",
+      "service": "demodesk",
+      "name": "get_current_user",
+      "description": "Get the Demodesk user represented by the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for getting the current Demodesk user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Internal Demodesk user ID."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "First name of the user."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "Last name of the user."
+              },
+              "email": {
+                "type": "string",
+                "description": "Primary email address of the user.",
+                "format": "email"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "manager",
+                  "company_admin"
+                ],
+                "description": "Role of the user within the company."
+              },
+              "locale": {
+                "type": "string",
+                "description": "Locale of the user."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "IANA time zone of the user."
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "description": "Internal Demodesk group ID."
+                    },
+                    "groupName": {
+                      "type": "string",
+                      "description": "Human-readable Demodesk group name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Demodesk group."
+                },
+                "description": "Groups the current user belongs to when returned by Demodesk."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Demodesk user profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The current Demodesk user response."
+      }
+    },
+    {
+      "id": "demodesk.get_recording",
+      "service": "demodesk",
+      "name": "get_recording",
+      "description": "Get one Demodesk recording by public recording token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public Demodesk recording token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "A Demodesk recording token input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "object",
+            "properties": {
+              "recordingToken": {
+                "type": "string",
+                "description": "Public recording token identifier."
+              },
+              "recordingId": {
+                "type": "string",
+                "description": "Internal recording ID as a string."
+              },
+              "demoId": {
+                "type": "string",
+                "description": "Internal demo ID as a string."
+              },
+              "userId": {
+                "type": "integer",
+                "description": "ID of the demo host user."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Recording name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Recording name when present."
+              },
+              "recordingWebUrl": {
+                "type": "string",
+                "description": "URL to the recording view in Demodesk.",
+                "format": "uri"
+              },
+              "temporaryDirectUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Temporary direct video file URL when available.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Temporary direct video file URL when available."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "ready",
+                  "failure",
+                  "cancelled",
+                  "expired"
+                ],
+                "description": "Demodesk recording status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Timestamp when the recording was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Timestamp when the recording was last updated.",
+                "format": "date-time"
+              },
+              "demoStartDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Meeting start timestamp when available.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Meeting start timestamp when available."
+              },
+              "durationMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Recording duration in milliseconds when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Recording duration in milliseconds when available."
+              },
+              "postprocessingStatus": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "done",
+                      "failed",
+                      "too_short"
+                    ],
+                    "description": "Demodesk post-processing status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Demodesk post-processing status."
+              },
+              "access": {
+                "type": "string",
+                "enum": [
+                  "company_wide",
+                  "selected_groups",
+                  "host_and_participants",
+                  "host_only"
+                ],
+                "description": "Demodesk recording access permission level."
+              },
+              "groupIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A group ID."
+                },
+                "description": "Group IDs assigned to the demo in list responses."
+              },
+              "host": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Resolved recording host when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Resolved recording host when present."
+              },
+              "audioOnly": {
+                "type": "boolean",
+                "description": "Whether the recording is audio-only."
+              },
+              "attendeeClassification": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Demodesk attendee classification when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Demodesk attendee classification when present."
+              },
+              "meetingLocation": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Meeting location metadata returned by Demodesk."
+              },
+              "participants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Demodesk recording participant."
+                },
+                "description": "Participants returned on a recording detail response."
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "description": "Internal Demodesk group ID."
+                    },
+                    "groupName": {
+                      "type": "string",
+                      "description": "Human-readable Demodesk group name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Demodesk group."
+                },
+                "description": "Groups assigned to the recording in detail responses."
+              },
+              "statistics": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Demodesk recording statistics."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Demodesk recording."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recording"
+        ],
+        "description": "The Demodesk recording detail response."
+      }
+    },
+    {
+      "id": "demodesk.get_recording_transcript",
+      "service": "demodesk",
+      "name": "get_recording_transcript",
+      "description": "Get the transcript for one Demodesk recording token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public Demodesk recording token."
+          },
+          "lang": {
+            "type": "string",
+            "description": "Language code used to request an on-the-fly translation.",
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "plaintext"
+            ],
+            "description": "Transcript response format to request from Demodesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "Input parameters for retrieving a Demodesk recording transcript."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "processing",
+              "empty"
+            ],
+            "description": "Transcript retrieval status."
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "description": "Transcript language code."
+                  },
+                  "paragraphs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "startInSeconds": {
+                          "type": "number",
+                          "description": "Paragraph start time in seconds."
+                        },
+                        "endInSeconds": {
+                          "type": "number",
+                          "description": "Paragraph end time in seconds."
+                        },
+                        "speaker": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "displayName": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "description": "Speaker display name when available."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Speaker display name when available."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "required": [
+                                "displayName"
+                              ],
+                              "description": "A transcript speaker."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A transcript speaker."
+                        },
+                        "sentences": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "startInSeconds": {
+                                "type": "number",
+                                "description": "Sentence start time in seconds."
+                              },
+                              "endInSeconds": {
+                                "type": "number",
+                                "description": "Sentence end time in seconds."
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "Sentence text."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "startInSeconds",
+                              "endInSeconds",
+                              "text"
+                            ],
+                            "description": "A transcript sentence."
+                          },
+                          "description": "Sentences in the paragraph."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "startInSeconds",
+                        "endInSeconds",
+                        "speaker",
+                        "sentences"
+                      ],
+                      "description": "A transcript paragraph."
+                    },
+                    "description": "Transcript paragraphs."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "language",
+                  "paragraphs"
+                ],
+                "description": "A structured Demodesk transcript."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A structured Demodesk transcript."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plaintext transcript when plaintext format was requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plaintext transcript when plaintext format was requested."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream Demodesk status payload for non-ready states."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream Demodesk status payload for non-ready states."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "transcript",
+          "text",
+          "error"
+        ],
+        "description": "The Demodesk recording transcript response."
+      }
+    },
+    {
+      "id": "demodesk.list_recording_scorecards",
+      "service": "demodesk",
+      "name": "list_recording_scorecards",
+      "description": "List scorecards linked to a Demodesk recording.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public Demodesk recording token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "A Demodesk recording token input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scorecards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scorecardId": {
+                  "type": "string",
+                  "description": "Scorecard ID."
+                },
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Scorecard template ID when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Scorecard template ID when available."
+                },
+                "templateName": {
+                  "type": "string",
+                  "description": "Scorecard template name."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Overall score when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Overall score when available."
+                },
+                "comment": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Overall scorecard comment when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Overall scorecard comment when available."
+                },
+                "languageCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Scorecard language code when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Scorecard language code when available."
+                },
+                "giverUserId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "User ID of the score giver when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User ID of the score giver when available."
+                },
+                "receiverUserId": {
+                  "type": "integer",
+                  "description": "User ID of the score receiver."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the scorecard was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the scorecard was last updated.",
+                  "format": "date-time"
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string",
+                        "description": "Question ID."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "description": "Question position."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Question name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Question name when available."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "Question text."
+                      },
+                      "criteria": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Scoring criteria when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Scoring criteria when available."
+                      },
+                      "score": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "Question score when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Question score when available."
+                      },
+                      "comment": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Question comment when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Question comment when available."
+                      },
+                      "rawTimestamps": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Raw timestamp references when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Raw timestamp references when available."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Demodesk scorecard question result."
+                  },
+                  "description": "Question-level scorecard results."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Demodesk scorecard result."
+            },
+            "description": "Scorecards returned by Demodesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scorecards"
+        ],
+        "description": "The Demodesk recording scorecards response."
+      }
+    },
+    {
+      "id": "demodesk.list_recording_summaries",
+      "service": "demodesk",
+      "name": "list_recording_summaries",
+      "description": "List AI-generated summaries attached to a Demodesk recording.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public Demodesk recording token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "A Demodesk recording token input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summaries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "summaryId": {
+                  "type": "string",
+                  "description": "Summary ID."
+                },
+                "promptId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Prompt ID when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Prompt ID when available."
+                },
+                "promptName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Prompt name when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Prompt name when available."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "Summary language code."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Plaintext summary content."
+                },
+                "htmlContent": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "HTML summary content when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "HTML summary content when available."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the summary was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the summary was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Demodesk AI-generated recording summary."
+            },
+            "description": "Summaries returned by Demodesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summaries"
+        ],
+        "description": "The Demodesk recording summaries response."
+      }
+    },
+    {
+      "id": "demodesk.list_recordings",
+      "service": "demodesk",
+      "name": "list_recordings",
+      "description": "List Demodesk recordings with cursor pagination and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Demodesk list response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return. Demodesk allows 1 to 100."
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A single filter value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One filter value."
+                  },
+                  "description": "Multiple filter values for an in-style recording filter.",
+                  "minItems": 1
+                }
+              ],
+              "description": "A Demodesk recording filter value."
+            },
+            "description": "Demodesk recording filters keyed by documented Ransack-style names, such as host_eq or status_in."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Demodesk recordings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recordingToken": {
+                  "type": "string",
+                  "description": "Public recording token identifier."
+                },
+                "recordingId": {
+                  "type": "string",
+                  "description": "Internal recording ID as a string."
+                },
+                "demoId": {
+                  "type": "string",
+                  "description": "Internal demo ID as a string."
+                },
+                "userId": {
+                  "type": "integer",
+                  "description": "ID of the demo host user."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Recording name when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recording name when present."
+                },
+                "recordingWebUrl": {
+                  "type": "string",
+                  "description": "URL to the recording view in Demodesk.",
+                  "format": "uri"
+                },
+                "temporaryDirectUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Temporary direct video file URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Temporary direct video file URL when available."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "ready",
+                    "failure",
+                    "cancelled",
+                    "expired"
+                  ],
+                  "description": "Demodesk recording status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the recording was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the recording was last updated.",
+                  "format": "date-time"
+                },
+                "demoStartDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Meeting start timestamp when available.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting start timestamp when available."
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Recording duration in milliseconds when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recording duration in milliseconds when available."
+                },
+                "postprocessingStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "done",
+                        "failed",
+                        "too_short"
+                      ],
+                      "description": "Demodesk post-processing status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Demodesk post-processing status."
+                },
+                "access": {
+                  "type": "string",
+                  "enum": [
+                    "company_wide",
+                    "selected_groups",
+                    "host_and_participants",
+                    "host_only"
+                  ],
+                  "description": "Demodesk recording access permission level."
+                },
+                "groupIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A group ID."
+                  },
+                  "description": "Group IDs assigned to the demo in list responses."
+                },
+                "host": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Resolved recording host when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Resolved recording host when present."
+                },
+                "audioOnly": {
+                  "type": "boolean",
+                  "description": "Whether the recording is audio-only."
+                },
+                "attendeeClassification": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Demodesk attendee classification when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Demodesk attendee classification when present."
+                },
+                "meetingLocation": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Meeting location metadata returned by Demodesk."
+                },
+                "participants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Demodesk recording participant."
+                  },
+                  "description": "Participants returned on a recording detail response."
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "groupId": {
+                        "type": "string",
+                        "description": "Internal Demodesk group ID."
+                      },
+                      "groupName": {
+                        "type": "string",
+                        "description": "Human-readable Demodesk group name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Demodesk group."
+                  },
+                  "description": "Groups assigned to the recording in detail responses."
+                },
+                "statistics": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Demodesk recording statistics."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Demodesk recording."
+            },
+            "description": "Recordings returned by Demodesk."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "hasNext": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "Page size used by Demodesk."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasNext",
+              "limit",
+              "nextCursor"
+            ],
+            "description": "Demodesk pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordings",
+          "meta"
+        ],
+        "description": "The Demodesk recordings list response."
+      }
+    },
+    {
+      "id": "demodesk.list_users",
+      "service": "demodesk",
+      "name": "list_users",
+      "description": "List active Demodesk users visible to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Case-insensitive search across user full name and email."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Demodesk list response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return. Demodesk allows 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Demodesk users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Internal Demodesk user ID."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "First name of the user."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "Last name of the user."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Primary email address of the user.",
+                  "format": "email"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "manager",
+                    "company_admin"
+                  ],
+                  "description": "Role of the user within the company."
+                },
+                "locale": {
+                  "type": "string",
+                  "description": "Locale of the user."
+                },
+                "timeZone": {
+                  "type": "string",
+                  "description": "IANA time zone of the user."
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "groupId": {
+                        "type": "string",
+                        "description": "Internal Demodesk group ID."
+                      },
+                      "groupName": {
+                        "type": "string",
+                        "description": "Human-readable Demodesk group name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Demodesk group."
+                  },
+                  "description": "Groups the current user belongs to when returned by Demodesk."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Demodesk user profile."
+            },
+            "description": "Users returned by Demodesk."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "hasNext": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "Page size used by Demodesk."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasNext",
+              "limit",
+              "nextCursor"
+            ],
+            "description": "Demodesk pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "meta"
+        ],
+        "description": "The Demodesk users list response."
+      }
+    }
+  ]
+}

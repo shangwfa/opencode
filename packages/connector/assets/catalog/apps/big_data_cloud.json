@@ -1,0 +1,495 @@
+{
+  "service": "big_data_cloud",
+  "displayName": "BigDataCloud",
+  "categories": [
+    "Location",
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BIGDATACLOUD_API_KEY",
+      "description": "BigDataCloud API key passed with the key query parameter. Create your account and get a key here: https://www.bigdatacloud.com/docs/getting-started"
+    }
+  ],
+  "homepageUrl": "https://www.bigdatacloud.com",
+  "actions": [
+    {
+      "id": "big_data_cloud.get_country_by_ip",
+      "service": "big_data_cloud",
+      "name": "get_country_by_ip",
+      "description": "Get country-level BigDataCloud geolocation data for an IP address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An IPv4 address.",
+                "format": "ipv4"
+              },
+              {
+                "type": "string",
+                "description": "An IPv6 address.",
+                "format": "ipv6"
+              }
+            ],
+            "description": "Optional IPv4 or IPv6 address to query. If omitted, BigDataCloud uses the connector server IP."
+          },
+          "localityLanguage": {
+            "type": "string",
+            "description": "Optional ISO 639-1 language code used to localize locality names, or `default` for the first administrative language.",
+            "pattern": "^([A-Za-z]{2}|default)$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for BigDataCloud country lookup by IP address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "The resolved IP address."
+          },
+          "localityLanguageRequested": {
+            "type": "string",
+            "description": "The locality language that BigDataCloud applied to this response."
+          },
+          "isReachableGlobally": {
+            "type": "boolean",
+            "description": "Whether the IP address is globally routable on the public Internet."
+          },
+          "country": {
+            "type": "object",
+            "properties": {
+              "isoAlpha2": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code."
+              },
+              "isoAlpha3": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-3 country code."
+              },
+              "name": {
+                "type": "string",
+                "description": "The localized country name."
+              },
+              "countryFlagEmoji": {
+                "type": "string",
+                "description": "The Unicode flag emoji for the country."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "isoAlpha2",
+              "isoAlpha3",
+              "name"
+            ],
+            "description": "The country details returned for the IP address."
+          },
+          "lastUpdated": {
+            "type": "string",
+            "description": "The UTC timestamp when BigDataCloud last updated this IP."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Country-level geolocation payload returned by BigDataCloud."
+      }
+    },
+    {
+      "id": "big_data_cloud.get_network_by_ip",
+      "service": "big_data_cloud",
+      "name": "get_network_by_ip",
+      "description": "Get BigDataCloud network and ASN details for an IP address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An IPv4 address.",
+                "format": "ipv4"
+              },
+              {
+                "type": "string",
+                "description": "An IPv6 address.",
+                "format": "ipv6"
+              }
+            ],
+            "description": "Optional IPv4 or IPv6 address to query. If omitted, BigDataCloud uses the connector server IP."
+          },
+          "localityLanguage": {
+            "type": "string",
+            "description": "Optional ISO 639-1 language code used to localize locality names, or `default` for the first administrative language.",
+            "pattern": "^([A-Za-z]{2}|default)$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for BigDataCloud network lookup by IP address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "The resolved IP address."
+          },
+          "registry": {
+            "type": "string",
+            "description": "The regional internet registry that manages the network block."
+          },
+          "registryStatus": {
+            "type": "string",
+            "description": "The allocation status of the network block."
+          },
+          "registeredCountry": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code registered for the network."
+          },
+          "registeredCountryName": {
+            "type": "string",
+            "description": "The localized country name registered for the network."
+          },
+          "organisation": {
+            "type": "string",
+            "description": "The organization that the network block is registered to."
+          },
+          "isReachableGlobally": {
+            "type": "boolean",
+            "description": "Whether the network is reachable on the public Internet."
+          },
+          "isBogon": {
+            "type": "boolean",
+            "description": "Whether the IP belongs to a bogon range announced on the global table."
+          },
+          "bgpPrefix": {
+            "type": "string",
+            "description": "The detected BGP prefix for the network."
+          },
+          "carriers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asn": {
+                  "type": "string",
+                  "description": "The autonomous system number in prefixed string form."
+                },
+                "asnNumeric": {
+                  "type": "integer",
+                  "description": "The autonomous system number as an integer."
+                },
+                "organisation": {
+                  "type": "string",
+                  "description": "The organization registered for the autonomous system."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The short network name of the autonomous system."
+                },
+                "rank": {
+                  "type": "integer",
+                  "description": "The global rank of the autonomous system."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "asn",
+                "asnNumeric",
+                "organisation",
+                "name"
+              ],
+              "description": "One autonomous system entry returned by BigDataCloud."
+            },
+            "description": "The autonomous systems announcing the network."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ip",
+          "registry",
+          "registryStatus",
+          "registeredCountry",
+          "registeredCountryName",
+          "isReachableGlobally",
+          "isBogon"
+        ],
+        "description": "Network intelligence payload returned by BigDataCloud."
+      }
+    },
+    {
+      "id": "big_data_cloud.get_timezone_by_ip",
+      "service": "big_data_cloud",
+      "name": "get_timezone_by_ip",
+      "description": "Get BigDataCloud timezone data for an IP address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An IPv4 address.",
+                "format": "ipv4"
+              },
+              {
+                "type": "string",
+                "description": "An IPv6 address.",
+                "format": "ipv6"
+              }
+            ],
+            "description": "Optional IPv4 or IPv6 address to query. If omitted, BigDataCloud uses the connector server IP."
+          },
+          "utcReference": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional Unix time reference in seconds used to evaluate timezone and DST state."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for BigDataCloud timezone lookup by IP address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ianaTimeId": {
+            "type": "string",
+            "description": "The IANA timezone identifier."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The human-readable timezone display name."
+          },
+          "effectiveTimeZoneFull": {
+            "type": "string",
+            "description": "The full timezone name adjusted for daylight saving time."
+          },
+          "effectiveTimeZoneShort": {
+            "type": "string",
+            "description": "The abbreviated timezone name adjusted for daylight saving time."
+          },
+          "utcOffsetSeconds": {
+            "type": "integer",
+            "description": "The timezone offset from UTC in seconds."
+          },
+          "utcOffset": {
+            "type": "string",
+            "description": "The timezone offset from UTC as a string."
+          },
+          "isDaylightSavingTime": {
+            "type": "boolean",
+            "description": "Whether daylight saving time is currently in effect."
+          },
+          "localTime": {
+            "type": "string",
+            "description": "The local time in ISO 8601 format."
+          },
+          "utcTime": {
+            "type": "string",
+            "description": "The UTC time in ISO 8601 format when a valid UTC reference is supplied."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ianaTimeId",
+          "displayName",
+          "effectiveTimeZoneFull",
+          "effectiveTimeZoneShort",
+          "utcOffsetSeconds",
+          "utcOffset",
+          "isDaylightSavingTime",
+          "localTime"
+        ],
+        "description": "BigDataCloud timezone payload."
+      }
+    },
+    {
+      "id": "big_data_cloud.reverse_geocode_with_timezone",
+      "service": "big_data_cloud",
+      "name": "reverse_geocode_with_timezone",
+      "description": "Reverse geocode coordinates and return timezone data from BigDataCloud.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude coordinate in WGS84 decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude coordinate in WGS84 decimal degrees."
+          },
+          "localityLanguage": {
+            "type": "string",
+            "description": "Optional ISO 639-1 language code used to localize locality names, or `default` for the first administrative language.",
+            "pattern": "^([A-Za-z]{2}|default)$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "description": "Input parameters for BigDataCloud reverse geocoding with timezone."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "description": "The requested latitude."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "The requested longitude."
+          },
+          "localityLanguageRequested": {
+            "type": "string",
+            "description": "The locality language that BigDataCloud applied to this response."
+          },
+          "continent": {
+            "type": "string",
+            "description": "The localized continent name."
+          },
+          "continentCode": {
+            "type": "string",
+            "description": "The ISO continent code."
+          },
+          "countryName": {
+            "type": "string",
+            "description": "The localized country name."
+          },
+          "countryCode": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code."
+          },
+          "principalSubdivision": {
+            "type": "string",
+            "description": "The localized principal subdivision name."
+          },
+          "principalSubdivisionCode": {
+            "type": "string",
+            "description": "The ISO 3166-2 principal subdivision code."
+          },
+          "city": {
+            "type": "string",
+            "description": "The most significant populated place for the coordinates."
+          },
+          "locality": {
+            "type": "string",
+            "description": "The most granular named locality for the coordinates."
+          },
+          "postcode": {
+            "type": "string",
+            "description": "The postcode for the coordinates when available."
+          },
+          "plusCode": {
+            "type": "string",
+            "description": "The Open Location Code for the coordinates."
+          },
+          "localityInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The locality hierarchy returned by BigDataCloud."
+          },
+          "timeZone": {
+            "type": "object",
+            "properties": {
+              "ianaTimeId": {
+                "type": "string",
+                "description": "The IANA timezone identifier."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The human-readable timezone display name."
+              },
+              "effectiveTimeZoneFull": {
+                "type": "string",
+                "description": "The full timezone name adjusted for daylight saving time."
+              },
+              "effectiveTimeZoneShort": {
+                "type": "string",
+                "description": "The abbreviated timezone name adjusted for daylight saving time."
+              },
+              "utcOffsetSeconds": {
+                "type": "integer",
+                "description": "The timezone offset from UTC in seconds."
+              },
+              "utcOffset": {
+                "type": "string",
+                "description": "The timezone offset from UTC as a string."
+              },
+              "isDaylightSavingTime": {
+                "type": "boolean",
+                "description": "Whether daylight saving time is currently in effect."
+              },
+              "localTime": {
+                "type": "string",
+                "description": "The local time in ISO 8601 format."
+              },
+              "utcTime": {
+                "type": "string",
+                "description": "The UTC time in ISO 8601 format when a valid UTC reference is supplied."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ianaTimeId",
+              "displayName",
+              "effectiveTimeZoneFull",
+              "effectiveTimeZoneShort",
+              "utcOffsetSeconds",
+              "utcOffset",
+              "isDaylightSavingTime",
+              "localTime"
+            ],
+            "description": "The timezone object returned for the coordinates."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "latitude",
+          "longitude",
+          "localityLanguageRequested",
+          "continent",
+          "continentCode",
+          "countryName",
+          "countryCode",
+          "principalSubdivision",
+          "principalSubdivisionCode",
+          "city",
+          "locality",
+          "plusCode",
+          "localityInfo",
+          "timeZone"
+        ],
+        "description": "Reverse geocoding payload with embedded timezone returned by BigDataCloud."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1585 @@
+{
+  "service": "survey_monkey",
+  "displayName": "SurveyMonkey",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://api.surveymonkey.com/oauth/authorize",
+      "tokenUrl": "https://api.surveymonkey.com/oauth/token",
+      "scopes": [
+        "users_read",
+        "surveys_read",
+        "surveys_write",
+        "responses_read",
+        "responses_read_detail",
+        "collectors_read",
+        "collectors_write",
+        "contacts_read",
+        "contacts_write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    },
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "SurveyMonkey access token",
+      "description": "A SurveyMonkey access token used as a Bearer token."
+    }
+  ],
+  "homepageUrl": "https://www.surveymonkey.com",
+  "actions": [
+    {
+      "id": "survey_monkey.create_contact",
+      "service": "survey_monkey",
+      "name": "create_contact",
+      "description": "Create a SurveyMonkey contact for use in survey invitations.",
+      "operationType": "write",
+      "requiredScopes": [
+        "survey_monkey.contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact last name."
+          },
+          "phoneNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact phone number."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom field value."
+            },
+            "description": "Custom contact field values keyed by SurveyMonkey field identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMonkey contact to create.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "phoneNumber"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact identifier."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact email address when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact email address when available."
+              },
+              "first_name": {
+                "type": "string",
+                "description": "The contact first name."
+              },
+              "last_name": {
+                "type": "string",
+                "description": "The contact last name."
+              },
+              "phone_number": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact phone number when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact phone number when available."
+              },
+              "href": {
+                "type": "string",
+                "description": "The API URL of the contact."
+              },
+              "custom_fields": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "description": "A custom field value."
+                    },
+                    "description": "The custom field values keyed by SurveyMonkey field identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom field values keyed by SurveyMonkey field identifier."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The contact created by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created SurveyMonkey contact response."
+      }
+    },
+    {
+      "id": "survey_monkey.create_contact_list",
+      "service": "survey_monkey",
+      "name": "create_contact_list",
+      "description": "Create a SurveyMonkey contact list for survey recipients.",
+      "operationType": "write",
+      "requiredScopes": [
+        "survey_monkey.contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact list name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMonkey contact list to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactList": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact list identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The contact list name."
+              },
+              "href": {
+                "type": "string",
+                "description": "The API URL of the contact list."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The contact list created by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created SurveyMonkey contact list response."
+      }
+    },
+    {
+      "id": "survey_monkey.create_survey",
+      "service": "survey_monkey",
+      "name": "create_survey",
+      "description": "Create a blank SurveyMonkey survey with one empty page.",
+      "operationType": "write",
+      "requiredScopes": [
+        "survey_monkey.surveys.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title of the new survey."
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An internal nickname for the survey."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The survey language code, such as `en`."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder identifier where the survey will be created."
+          },
+          "footer": {
+            "type": "boolean",
+            "description": "Whether to display the SurveyMonkey footer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "The blank SurveyMonkey survey to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "survey": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The survey identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The survey title."
+              },
+              "nickname": {
+                "type": "string",
+                "description": "The internal survey nickname."
+              },
+              "language": {
+                "type": "string",
+                "description": "The survey language code."
+              },
+              "href": {
+                "type": "string",
+                "description": "The API URL of the survey."
+              },
+              "date_created": {
+                "type": "string",
+                "description": "The timestamp when the survey was created."
+              },
+              "date_modified": {
+                "type": "string",
+                "description": "The timestamp when the survey was last modified."
+              },
+              "response_count": {
+                "type": "integer",
+                "description": "The number of survey responses."
+              },
+              "question_count": {
+                "type": "integer",
+                "description": "The number of survey questions."
+              },
+              "page_count": {
+                "type": "integer",
+                "description": "The number of survey pages."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The survey created by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created SurveyMonkey survey response."
+      }
+    },
+    {
+      "id": "survey_monkey.create_weblink_collector",
+      "service": "survey_monkey",
+      "name": "create_weblink_collector",
+      "description": "Create a public weblink collector for a SurveyMonkey survey.",
+      "operationType": "write",
+      "requiredScopes": [
+        "survey_monkey.collectors.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The collector name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "surveyId"
+        ],
+        "description": "The SurveyMonkey weblink collector to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collector": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The collector identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The collector name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The collector type."
+              },
+              "status": {
+                "type": "string",
+                "description": "The collector status."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public collector URL, when available."
+              },
+              "href": {
+                "type": "string",
+                "description": "The API URL of the collector."
+              },
+              "response_count": {
+                "type": "integer",
+                "description": "The number of responses received by the collector."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The weblink collector created by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created SurveyMonkey collector response."
+      }
+    },
+    {
+      "id": "survey_monkey.get_current_user",
+      "service": "survey_monkey",
+      "name": "get_current_user",
+      "description": "Get the SurveyMonkey user and plan associated with the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.users.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The SurveyMonkey user identifier."
+              },
+              "username": {
+                "type": "string",
+                "description": "The SurveyMonkey username."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user email address."
+              },
+              "first_name": {
+                "type": "string",
+                "description": "The user first name."
+              },
+              "last_name": {
+                "type": "string",
+                "description": "The user last name."
+              },
+              "account_type": {
+                "type": "string",
+                "description": "The SurveyMonkey account plan type."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The authenticated SurveyMonkey user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current SurveyMonkey user response."
+      }
+    },
+    {
+      "id": "survey_monkey.get_survey_details",
+      "service": "survey_monkey",
+      "name": "get_survey_details",
+      "description": "Get a survey with its pages, questions, and answer choices.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.surveys.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMonkey survey to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "survey": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The survey identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The survey title."
+              },
+              "nickname": {
+                "type": "string",
+                "description": "The internal survey nickname."
+              },
+              "language": {
+                "type": "string",
+                "description": "The survey language code."
+              },
+              "href": {
+                "type": "string",
+                "description": "The API URL of the survey."
+              },
+              "date_created": {
+                "type": "string",
+                "description": "The timestamp when the survey was created."
+              },
+              "date_modified": {
+                "type": "string",
+                "description": "The timestamp when the survey was last modified."
+              },
+              "response_count": {
+                "type": "integer",
+                "description": "The number of survey responses."
+              },
+              "question_count": {
+                "type": "integer",
+                "description": "The number of survey questions."
+              },
+              "page_count": {
+                "type": "integer",
+                "description": "The number of survey pages."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The expanded survey returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The expanded SurveyMonkey survey response."
+      }
+    },
+    {
+      "id": "survey_monkey.get_survey_response_details",
+      "service": "survey_monkey",
+      "name": "get_survey_response_details",
+      "description": "Get one SurveyMonkey response including its question answers.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.response_details.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "responseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey response identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The survey response to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The response identifier."
+              },
+              "survey_id": {
+                "type": "string",
+                "description": "The survey identifier associated with the response."
+              },
+              "collector_id": {
+                "type": "string",
+                "description": "The collector identifier associated with the response."
+              },
+              "response_status": {
+                "type": "string",
+                "description": "The response status."
+              },
+              "date_created": {
+                "type": "string",
+                "description": "The timestamp when the response was created."
+              },
+              "date_modified": {
+                "type": "string",
+                "description": "The timestamp when the response was last modified."
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One response page with provider-defined answer fields."
+                },
+                "description": "The response pages and answers returned by SurveyMonkey."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The requested detailed survey response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The detailed SurveyMonkey response."
+      }
+    },
+    {
+      "id": "survey_monkey.get_survey_rollups",
+      "service": "survey_monkey",
+      "name": "get_survey_rollups",
+      "description": "Get aggregate answer counts and basic statistics for every question in a SurveyMonkey survey.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.response_details.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "collectorIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A SurveyMonkey collector identifier."
+            },
+            "description": "Limit the aggregation to responses from these collector identifiers.",
+            "minItems": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "partial",
+              "overquota",
+              "disqualified"
+            ],
+            "description": "Limit the aggregation to responses with this status."
+          },
+          "startCreatedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Include responses created at or after this SurveyMonkey datetime value."
+          },
+          "endCreatedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Include responses created at or before this SurveyMonkey datetime value."
+          },
+          "startModifiedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Include responses last modified at or after this SurveyMonkey datetime value."
+          },
+          "endModifiedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Include responses last modified at or before this SurveyMonkey datetime value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "surveyId"
+        ],
+        "description": "Filters for aggregating SurveyMonkey responses by question."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rollups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SurveyMonkey question identifier."
+                },
+                "href": {
+                  "type": "string",
+                  "description": "The API URL of the question rollup.",
+                  "format": "uri"
+                },
+                "family": {
+                  "type": "string",
+                  "description": "The SurveyMonkey question family."
+                },
+                "subtype": {
+                  "type": "string",
+                  "description": "The SurveyMonkey question subtype."
+                },
+                "summary": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "answered": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The number of respondents who answered the question."
+                      },
+                      "skipped": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The number of respondents who skipped the question."
+                      },
+                      "other_answered": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The number of respondents who selected an other-answer option."
+                      },
+                      "stats": {
+                        "description": "Provider-defined basic statistics for supported closed-ended questions."
+                      },
+                      "choices": {
+                        "description": "Provider-defined answer choice identifiers and aggregate counts."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "The aggregate response summary for one SurveyMonkey question."
+                  },
+                  "description": "The aggregate answer counts and statistics returned for the question."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "The aggregate result for one SurveyMonkey question."
+            },
+            "description": "The aggregate results returned for the survey questions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMonkey question rollups."
+      }
+    },
+    {
+      "id": "survey_monkey.list_collectors",
+      "service": "survey_monkey",
+      "name": "list_collectors",
+      "description": "List collectors and distribution URLs for a SurveyMonkey survey.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.collectors.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return on this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "surveyId"
+        ],
+        "description": "Pagination for listing survey collectors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The collector identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The collector name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The collector type."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The collector status."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public collector URL, when available."
+                },
+                "href": {
+                  "type": "string",
+                  "description": "The API URL of the collector."
+                },
+                "response_count": {
+                  "type": "integer",
+                  "description": "The number of responses received by the collector."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey survey collector."
+            },
+            "description": "The collectors returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated collector list."
+      }
+    },
+    {
+      "id": "survey_monkey.list_contact_lists",
+      "service": "survey_monkey",
+      "name": "list_contact_lists",
+      "description": "List contact lists in the connected SurveyMonkey account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return on this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for this resource list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact list identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The contact list name."
+                },
+                "href": {
+                  "type": "string",
+                  "description": "The API URL of the contact list."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey contact list."
+            },
+            "description": "The contact lists returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated contact list collection."
+      }
+    },
+    {
+      "id": "survey_monkey.list_contacts",
+      "service": "survey_monkey",
+      "name": "list_contacts",
+      "description": "List, filter, and search contacts in the connected SurveyMonkey account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return on this page."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "optout",
+              "bounced"
+            ],
+            "description": "The contact delivery status to include."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The contact sort direction."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text used to search contacts."
+          },
+          "searchBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact field used for searching."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing SurveyMonkey contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact identifier."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact email address when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact email address when available."
+                },
+                "first_name": {
+                  "type": "string",
+                  "description": "The contact first name."
+                },
+                "last_name": {
+                  "type": "string",
+                  "description": "The contact last name."
+                },
+                "phone_number": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact phone number when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact phone number when available."
+                },
+                "href": {
+                  "type": "string",
+                  "description": "The API URL of the contact."
+                },
+                "custom_fields": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "A custom field value."
+                      },
+                      "description": "The custom field values keyed by SurveyMonkey field identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The custom field values keyed by SurveyMonkey field identifier."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey contact."
+            },
+            "description": "The contacts returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated SurveyMonkey contact list."
+      }
+    },
+    {
+      "id": "survey_monkey.list_survey_response_details",
+      "service": "survey_monkey",
+      "name": "list_survey_response_details",
+      "description": "List detailed SurveyMonkey responses including question answers.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.response_details.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return on this page."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "partial",
+              "overquota",
+              "disqualified"
+            ],
+            "description": "The response status to include."
+          },
+          "startCreatedAt": {
+            "type": "string",
+            "description": "Return responses created at or after this SurveyMonkey datetime value."
+          },
+          "endCreatedAt": {
+            "type": "string",
+            "description": "Return responses created at or before this SurveyMonkey datetime value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "surveyId"
+        ],
+        "description": "Filters for listing detailed survey responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The response identifier."
+                },
+                "survey_id": {
+                  "type": "string",
+                  "description": "The survey identifier associated with the response."
+                },
+                "collector_id": {
+                  "type": "string",
+                  "description": "The collector identifier associated with the response."
+                },
+                "response_status": {
+                  "type": "string",
+                  "description": "The response status."
+                },
+                "date_created": {
+                  "type": "string",
+                  "description": "The timestamp when the response was created."
+                },
+                "date_modified": {
+                  "type": "string",
+                  "description": "The timestamp when the response was last modified."
+                },
+                "pages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One response page with provider-defined answer fields."
+                  },
+                  "description": "The response pages and answers returned by SurveyMonkey."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey survey response."
+            },
+            "description": "The detailed survey responses returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated detailed response list."
+      }
+    },
+    {
+      "id": "survey_monkey.list_survey_responses",
+      "service": "survey_monkey",
+      "name": "list_survey_responses",
+      "description": "List response metadata for a SurveyMonkey survey.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.responses.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMonkey survey identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return on this page."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "partial",
+              "overquota",
+              "disqualified"
+            ],
+            "description": "The response status to include."
+          },
+          "startCreatedAt": {
+            "type": "string",
+            "description": "Return responses created at or after this SurveyMonkey datetime value."
+          },
+          "endCreatedAt": {
+            "type": "string",
+            "description": "Return responses created at or before this SurveyMonkey datetime value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "surveyId"
+        ],
+        "description": "Filters for listing survey responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The response identifier."
+                },
+                "survey_id": {
+                  "type": "string",
+                  "description": "The survey identifier associated with the response."
+                },
+                "collector_id": {
+                  "type": "string",
+                  "description": "The collector identifier associated with the response."
+                },
+                "response_status": {
+                  "type": "string",
+                  "description": "The response status."
+                },
+                "date_created": {
+                  "type": "string",
+                  "description": "The timestamp when the response was created."
+                },
+                "date_modified": {
+                  "type": "string",
+                  "description": "The timestamp when the response was last modified."
+                },
+                "pages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One response page with provider-defined answer fields."
+                  },
+                  "description": "The response pages and answers returned by SurveyMonkey."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey survey response."
+            },
+            "description": "The survey responses returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated survey response list."
+      }
+    },
+    {
+      "id": "survey_monkey.list_surveys",
+      "service": "survey_monkey",
+      "name": "list_surveys",
+      "description": "List surveys available to the connected SurveyMonkey account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "survey_monkey.surveys.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return on this page."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A partial survey title to search for."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder identifier used to filter surveys."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "title",
+              "date_modified",
+              "num_responses"
+            ],
+            "description": "The field used to sort surveys."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The survey sort direction."
+          },
+          "startModifiedAt": {
+            "type": "string",
+            "description": "Return surveys modified at or after this SurveyMonkey datetime value."
+          },
+          "endModifiedAt": {
+            "type": "string",
+            "description": "Return surveys modified at or before this SurveyMonkey datetime value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing SurveyMonkey surveys."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The survey identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The survey title."
+                },
+                "nickname": {
+                  "type": "string",
+                  "description": "The internal survey nickname."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The survey language code."
+                },
+                "href": {
+                  "type": "string",
+                  "description": "The API URL of the survey."
+                },
+                "date_created": {
+                  "type": "string",
+                  "description": "The timestamp when the survey was created."
+                },
+                "date_modified": {
+                  "type": "string",
+                  "description": "The timestamp when the survey was last modified."
+                },
+                "response_count": {
+                  "type": "integer",
+                  "description": "The number of survey responses."
+                },
+                "question_count": {
+                  "type": "integer",
+                  "description": "The number of survey questions."
+                },
+                "page_count": {
+                  "type": "integer",
+                  "description": "The number of survey pages."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A SurveyMonkey survey."
+            },
+            "description": "The surveys returned on this page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The number of resources requested per page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "The URL of the current page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL of the next page, when available."
+              },
+              "prev": {
+                "type": "string",
+                "description": "The URL of the previous page, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The pagination links returned by SurveyMonkey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized paginated survey list."
+      }
+    }
+  ]
+}

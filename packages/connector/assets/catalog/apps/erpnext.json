@@ -1,0 +1,515 @@
+{
+  "service": "erpnext",
+  "displayName": "ERPNext",
+  "categories": [
+    "Productivity",
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "api_key",
+      "description": "ERPNext API key used with token authentication. Generate it from the user record's API Access section as described in the Frappe REST API docs: https://docs.frappe.io/framework/user/en/api/rest",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://demo.erpnext.com",
+          "description": "Base URL of your ERPNext or Frappe instance."
+        },
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "api_secret",
+          "description": "ERPNext API secret paired with the API key for token authentication. Frappe shows it in the Generate Keys popup in the user record's API Access section: https://docs.frappe.io/framework/user/en/api/rest"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://erpnext.com",
+  "actions": [
+    {
+      "id": "erpnext.create_document",
+      "service": "erpnext",
+      "name": "create_document",
+      "description": "Create one ERPNext document for the specified DocType.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One ERPNext document field value."
+            },
+            "description": "The document fields to create or update in ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating an ERPNext document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An ERPNext document or nested payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created ERPNext document."
+      }
+    },
+    {
+      "id": "erpnext.delete_document",
+      "service": "erpnext",
+      "name": "delete_document",
+      "description": "Delete one ERPNext document by DocType and name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique name of the ERPNext document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting one ERPNext document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether ERPNext confirmed the document deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion status returned by ERPNext."
+      }
+    },
+    {
+      "id": "erpnext.get_document",
+      "service": "erpnext",
+      "name": "get_document",
+      "description": "Get one ERPNext document by DocType and name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique name of the ERPNext document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one ERPNext document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An ERPNext document or nested payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ERPNext document returned by the request."
+      }
+    },
+    {
+      "id": "erpnext.get_document_count",
+      "service": "erpnext",
+      "name": "get_document_count",
+      "description": "Get the count of ERPNext documents that match an optional filter.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A filter value."
+                },
+                "description": "A field-to-value filter object accepted by ERPNext."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "description": "A filter tuple value."
+                  },
+                  "description": "A positional filter tuple accepted by ERPNext.",
+                  "minItems": 1
+                },
+                "description": "An array of positional filter tuples accepted by ERPNext.",
+                "minItems": 1
+              }
+            ],
+            "description": "Filters passed through to ERPNext as JSON."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doctype"
+        ],
+        "description": "The input payload for counting ERPNext documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The count returned by ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ERPNext document count."
+      }
+    },
+    {
+      "id": "erpnext.get_document_value",
+      "service": "erpnext",
+      "name": "get_document_value",
+      "description": "Get one ERPNext field value or a group of field values without loading the full document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique name of the ERPNext document."
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A filter value."
+                },
+                "description": "A field-to-value filter object accepted by ERPNext."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "description": "A filter tuple value."
+                  },
+                  "description": "A positional filter tuple accepted by ERPNext.",
+                  "minItems": 1
+                },
+                "description": "An array of positional filter tuples accepted by ERPNext.",
+                "minItems": 1
+              }
+            ],
+            "description": "Filters passed through to ERPNext as JSON."
+          },
+          "fieldname": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "One field name to request from ERPNext."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field name to request from ERPNext."
+                },
+                "description": "Field names to request from ERPNext.",
+                "minItems": 1
+              }
+            ],
+            "description": "One field name or an array of field names to request from ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doctype",
+          "fieldname"
+        ],
+        "description": "The input payload for reading one or more ERPNext field values. Provide exactly one of name or filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "description": "The field value or object returned by ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ERPNext field value or value object returned by the request."
+      }
+    },
+    {
+      "id": "erpnext.get_logged_user",
+      "service": "erpnext",
+      "name": "get_logged_user",
+      "description": "Get the currently authenticated ERPNext user for the configured connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for fetching the current ERPNext user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "description": "The authenticated ERPNext user identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated ERPNext user returned by the server."
+      }
+    },
+    {
+      "id": "erpnext.list_documents",
+      "service": "erpnext",
+      "name": "list_documents",
+      "description": "List ERPNext documents for a DocType with optional field selection, filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A document field to include in the list response."
+            },
+            "description": "The ERPNext document fields to include in the response.",
+            "minItems": 1
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A filter value."
+                },
+                "description": "A field-to-value filter object accepted by ERPNext."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "description": "A filter tuple value."
+                  },
+                  "description": "A positional filter tuple accepted by ERPNext.",
+                  "minItems": 1
+                },
+                "description": "An array of positional filter tuples accepted by ERPNext.",
+                "minItems": 1
+              }
+            ],
+            "description": "Filters passed through to ERPNext as JSON."
+          },
+          "order_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext order_by expression such as modified desc."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based ERPNext list offset."
+          },
+          "page_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of ERPNext documents to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doctype"
+        ],
+        "description": "The input payload for listing ERPNext documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An ERPNext document or nested payload."
+            },
+            "description": "The ERPNext documents returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ERPNext documents returned by the list query."
+      }
+    },
+    {
+      "id": "erpnext.set_document_value",
+      "service": "erpnext",
+      "name": "set_document_value",
+      "description": "Set one field value on an ERPNext document and return the updated document.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique name of the ERPNext document."
+          },
+          "fieldname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext field name to update."
+          },
+          "value": {
+            "description": "The field value or object returned by ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for updating one ERPNext field value."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An ERPNext document or nested payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ERPNext document returned after the update."
+      }
+    },
+    {
+      "id": "erpnext.update_document",
+      "service": "erpnext",
+      "name": "update_document",
+      "description": "Update selected fields on one ERPNext document.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ERPNext DocType name to operate on."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique name of the ERPNext document."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One ERPNext document field value."
+            },
+            "description": "The document fields to create or update in ERPNext."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for updating an ERPNext document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An ERPNext document or nested payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated ERPNext document."
+      }
+    }
+  ]
+}

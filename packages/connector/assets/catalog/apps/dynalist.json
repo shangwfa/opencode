@@ -1,0 +1,880 @@
+{
+  "service": "dynalist",
+  "displayName": "Dynalist",
+  "homepageUrl": "https://dynalist.io/",
+  "iconUrl": "https://dynalist.io/assets/icon/android-chrome-192x192.png",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API secret token",
+      "placeholder": "Dynalist API secret token",
+      "description": "Get your API secret token from https://dynalist.io/developer. It grants access to your Dynalist account."
+    }
+  ],
+  "actions": [
+    {
+      "id": "dynalist.add_to_inbox",
+      "service": "dynalist",
+      "name": "add_to_inbox",
+      "description": "Add a node to the configured Dynalist inbox. Configure an inbox before calling this action.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": -1,
+            "description": "The zero-based position; -1 appends at the end."
+          },
+          "content": {
+            "type": "string",
+            "description": "The node title."
+          },
+          "note": {
+            "type": "string",
+            "description": "The node note."
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "Whether the node is checked."
+          },
+          "checkbox": {
+            "type": "boolean",
+            "description": "Whether the node has a checkbox."
+          },
+          "heading": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "The heading level; 0 disables headings."
+          },
+          "color": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "The color label; 0 removes the label."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          },
+          "node_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          },
+          "index": {
+            "type": "integer",
+            "minimum": -1,
+            "description": "The zero-based position; -1 appends at the end."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.check_for_updates",
+      "service": "dynalist",
+      "name": "check_for_updates",
+      "description": "Get Dynalist document versions. Inaccessible or missing documents are omitted.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Dynalist ID."
+            },
+            "description": "The document IDs to check."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file_ids"
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "description": "The document version."
+            },
+            "description": "Document IDs mapped to current versions."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.edit_document",
+      "service": "dynalist",
+      "name": "edit_document",
+      "description": "Insert, edit, move, or delete Dynalist nodes in a batch. Content edits replace the supplied fields.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "insert",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "parent_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "description": "The zero-based position; -1 appends at the end."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The node title."
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "The node note."
+                    },
+                    "checked": {
+                      "type": "boolean",
+                      "description": "Whether the node is checked."
+                    },
+                    "checkbox": {
+                      "type": "boolean",
+                      "description": "Whether the node has a checkbox."
+                    },
+                    "heading": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3,
+                      "description": "The heading level; 0 disables headings."
+                    },
+                    "color": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6,
+                      "description": "The color label; 0 removes the label."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "parent_id",
+                    "index",
+                    "content"
+                  ],
+                  "description": "Insert a node."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "edit",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "node_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The node title."
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "The node note."
+                    },
+                    "checked": {
+                      "type": "boolean",
+                      "description": "Whether the node is checked."
+                    },
+                    "checkbox": {
+                      "type": "boolean",
+                      "description": "Whether the node has a checkbox."
+                    },
+                    "heading": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 3,
+                      "description": "The heading level; 0 disables headings."
+                    },
+                    "color": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 6,
+                      "description": "The color label; 0 removes the label."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "node_id"
+                  ],
+                  "description": "Edit a node."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "move",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "node_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "parent_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "description": "The zero-based position; -1 appends at the end."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "node_id",
+                    "parent_id",
+                    "index"
+                  ],
+                  "description": "Move a node."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "delete",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "node_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "node_id"
+                  ],
+                  "description": "Delete a node."
+                }
+              ],
+              "description": "A node change."
+            },
+            "description": "The changes in execution order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file_id",
+          "changes"
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "boolean",
+              "description": "Whether this change succeeded."
+            },
+            "description": "Whether each requested change succeeded, in request order."
+          },
+          "new_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Dynalist ID."
+            },
+            "description": "The newly inserted node IDs in request order."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.edit_files",
+      "service": "dynalist",
+      "name": "edit_files",
+      "description": "Create, rename, or move Dynalist documents and folders in a batch. Inspect results for partial failures.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "create",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "document",
+                        "folder"
+                      ],
+                      "description": "The file type."
+                    },
+                    "parent_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "description": "The zero-based position; -1 appends at the end."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "The file title."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "type",
+                    "parent_id",
+                    "index"
+                  ],
+                  "description": "Create a document or folder."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "edit",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "document",
+                        "folder"
+                      ],
+                      "description": "The file type."
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "The file title."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "type",
+                    "file_id",
+                    "title"
+                  ],
+                  "description": "Rename a document or folder."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "move",
+                      "type": "string",
+                      "description": "The change operation."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "document",
+                        "folder"
+                      ],
+                      "description": "The file type."
+                    },
+                    "file_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "parent_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Dynalist ID."
+                    },
+                    "index": {
+                      "type": "integer",
+                      "minimum": -1,
+                      "description": "The zero-based position; -1 appends at the end."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "type",
+                    "file_id",
+                    "parent_id",
+                    "index"
+                  ],
+                  "description": "Move a document or folder."
+                }
+              ],
+              "description": "A file change."
+            },
+            "description": "The changes in execution order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "changes"
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "boolean",
+              "description": "Whether this change succeeded."
+            },
+            "description": "Whether each requested change succeeded, in request order."
+          },
+          "created": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Dynalist ID."
+            },
+            "description": "The successfully created file IDs in request order."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.get_preference",
+      "service": "dynalist",
+      "name": "get_preference",
+      "description": "Read a Dynalist inbox preference.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "inbox_location",
+              "inbox_move_position"
+            ],
+            "description": "The preference key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "key": {
+            "type": "string",
+            "enum": [
+              "inbox_location",
+              "inbox_move_position"
+            ],
+            "description": "The preference key."
+          },
+          "value": {
+            "type": "string",
+            "description": "The preference value."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.list_files",
+      "service": "dynalist",
+      "name": "list_files",
+      "description": "List all Dynalist documents and folders.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "root_file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Dynalist ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The file title."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "document",
+                    "folder"
+                  ],
+                  "description": "The file type."
+                },
+                "permission": {
+                  "type": "integer",
+                  "description": "The permission level: 0 none, 1 read, 2 edit, 3 manage, 4 owner."
+                },
+                "collapsed": {
+                  "type": "boolean",
+                  "description": "Whether the folder is collapsed."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Dynalist ID."
+                  },
+                  "description": "The child IDs."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A document or folder."
+            },
+            "description": "The documents and folders."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.read_document",
+      "service": "dynalist",
+      "name": "read_document",
+      "description": "Read a Dynalist document and its nodes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file_id"
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          },
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Dynalist ID."
+          },
+          "title": {
+            "type": "string",
+            "description": "The file title."
+          },
+          "version": {
+            "type": "integer",
+            "description": "The document version."
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Dynalist ID."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The node title."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The node note."
+                },
+                "checked": {
+                  "type": "boolean",
+                  "description": "Whether the node is checked."
+                },
+                "checkbox": {
+                  "type": "boolean",
+                  "description": "Whether the node has a checkbox."
+                },
+                "heading": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3,
+                  "description": "The heading level; 0 disables headings."
+                },
+                "color": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 6,
+                  "description": "The color label; 0 removes the label."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Dynalist ID."
+                  },
+                  "description": "The child IDs."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "The creation time in Unix milliseconds."
+                },
+                "modified": {
+                  "type": "integer",
+                  "description": "The modification time in Unix milliseconds."
+                },
+                "collapsed": {
+                  "type": "boolean",
+                  "description": "Whether the node is collapsed."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A document node."
+            },
+            "description": "The document nodes."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    },
+    {
+      "id": "dynalist.set_preference",
+      "service": "dynalist",
+      "name": "set_preference",
+      "description": "Set the Dynalist inbox location or insertion position.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "const": "inbox_location",
+                "type": "string",
+                "description": "The preference key."
+              },
+              "value": {
+                "type": "string",
+                "description": "The inbox file ID, optionally followed by /node ID."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value"
+            ],
+            "description": "Set the inbox location."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "const": "inbox_move_position",
+                "type": "string",
+                "description": "The preference key."
+              },
+              "value": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "The insertion position."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value"
+            ],
+            "description": "Set the inbox insertion position."
+          }
+        ],
+        "description": "The request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_code": {
+            "type": "string",
+            "description": "The Dynalist result code; OK indicates success."
+          },
+          "_msg": {
+            "type": "string",
+            "description": "The Dynalist result message."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Dynalist response."
+      }
+    }
+  ]
+}

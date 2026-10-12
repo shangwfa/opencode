@@ -1,0 +1,950 @@
+{
+  "service": "screendesk",
+  "displayName": "Screendesk",
+  "description": "Manage Screendesk recordings, transcripts, and workspace users.",
+  "categories": [
+    "Developer Tools",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "SCREENDESK_API_TOKEN",
+      "description": "Screendesk personal access token sent with HTTP Bearer authentication. Create or view tokens under Profile → API: https://app.screendesk.io/profile/api. API access requires an Enterprise plan."
+    }
+  ],
+  "homepageUrl": "https://screendesk.io",
+  "actions": [
+    {
+      "id": "screendesk.get_recording",
+      "service": "screendesk",
+      "name": "get_recording",
+      "description": "Get one Screendesk recording by UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordingUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UUID of the Screendesk recording."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Screendesk recording."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The recording UUID.",
+            "format": "uuid"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording title."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording summary."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording description."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Recording timestamps, type, source, URL, and helpdesk metadata."
+          },
+          "technical_details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Technical details captured with the recording."
+          },
+          "console_logs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Raw console log output captured during the recording."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw console log output captured during the recording."
+          },
+          "customer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Customer details associated with the recording."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The Screendesk user who owns the recording."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Screendesk user who owns the recording."
+          },
+          "room_insights": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Live call session insights when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Live call session insights when available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uuid"
+        ],
+        "description": "A Screendesk recording."
+      }
+    },
+    {
+      "id": "screendesk.get_recording_transcript",
+      "service": "screendesk",
+      "name": "get_recording_transcript",
+      "description": "Get one page of the timestamped transcript for a Screendesk recording.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordingUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UUID of the Screendesk recording."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based Screendesk page number to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordingUuid"
+        ],
+        "description": "Input parameters for retrieving a Screendesk recording transcript."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recording_uuid": {
+            "type": "string",
+            "description": "The recording UUID.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "processing",
+              "unavailable"
+            ],
+            "description": "The current transcript availability status."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The detected BCP 47 language code when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The detected BCP 47 language code when available."
+          },
+          "speaker_map": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The known speaker display name."
+            },
+            "description": "A mapping from diarization speaker indices to known display names."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "The total number of records."
+              },
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "items": {
+                "type": "integer",
+                "description": "The number of records per page."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The next page number, or null on the last page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number, or null on the last page."
+              },
+              "prev_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The previous page number, or null on the first page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number, or null on the first page."
+              },
+              "last_page": {
+                "type": "integer",
+                "description": "The last page number."
+              },
+              "from": {
+                "type": "integer",
+                "description": "The index of the first record on this page."
+              },
+              "to": {
+                "type": "integer",
+                "description": "The index of the last record on this page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "count",
+              "page",
+              "items",
+              "pages",
+              "last_page",
+              "from",
+              "to"
+            ],
+            "description": "Screendesk pagination metadata."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start_seconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The segment start time in seconds."
+                },
+                "end_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The segment end time in seconds when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The segment end time in seconds when available."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The transcript segment text."
+                },
+                "sentences": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Sentence timing and diarization metadata."
+                  },
+                  "description": "Sentence timing and diarization metadata when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "start_seconds",
+                "text",
+                "sentences"
+              ],
+              "description": "A timestamped Screendesk transcript segment."
+            },
+            "description": "The timestamped transcript segments on this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "recording_uuid",
+          "status",
+          "speaker_map",
+          "pagination",
+          "segments"
+        ],
+        "description": "The Screendesk recording transcript response."
+      }
+    },
+    {
+      "id": "screendesk.list_recordings",
+      "service": "screendesk",
+      "name": "list_recordings",
+      "description": "List Screendesk recordings visible to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based Screendesk page number to fetch."
+          },
+          "ticketId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact helpdesk ticket, conversation, issue, or object ID to filter by."
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "zendesk",
+              "intercom",
+              "freshdesk",
+              "freshdesk_chat",
+              "freshchat",
+              "freshservice",
+              "helpscout",
+              "hubspot",
+              "jira"
+            ],
+            "description": "The helpdesk provider used with the ticket ID filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Screendesk recordings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "The total number of records."
+              },
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "items": {
+                "type": "integer",
+                "description": "The number of records per page."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The next page number, or null on the last page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number, or null on the last page."
+              },
+              "prev_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The previous page number, or null on the first page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number, or null on the first page."
+              },
+              "last_page": {
+                "type": "integer",
+                "description": "The last page number."
+              },
+              "from": {
+                "type": "integer",
+                "description": "The index of the first record on this page."
+              },
+              "to": {
+                "type": "integer",
+                "description": "The index of the last record on this page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "count",
+              "page",
+              "items",
+              "pages",
+              "last_page",
+              "from",
+              "to"
+            ],
+            "description": "Screendesk pagination metadata."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The recording UUID.",
+                  "format": "uuid"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording title."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording summary."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording description."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Recording timestamps, type, source, URL, and helpdesk metadata."
+                },
+                "technical_details": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Technical details captured with the recording."
+                },
+                "console_logs": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Raw console log output captured during the recording."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Raw console log output captured during the recording."
+                },
+                "customer": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Customer details associated with the recording."
+                },
+                "user": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The Screendesk user who owns the recording."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Screendesk user who owns the recording."
+                },
+                "room_insights": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Live call session insights when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Live call session insights when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "uuid"
+              ],
+              "description": "A Screendesk recording."
+            },
+            "description": "The recordings on this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The paginated Screendesk recordings response."
+      }
+    },
+    {
+      "id": "screendesk.list_users",
+      "service": "screendesk",
+      "name": "list_users",
+      "description": "List Screendesk workspace users. This action requires an admin token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based Screendesk page number to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Screendesk workspace users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "The total number of records."
+              },
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "items": {
+                "type": "integer",
+                "description": "The number of records per page."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The next page number, or null on the last page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number, or null on the last page."
+              },
+              "prev_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The previous page number, or null on the first page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number, or null on the first page."
+              },
+              "last_page": {
+                "type": "integer",
+                "description": "The last page number."
+              },
+              "from": {
+                "type": "integer",
+                "description": "The index of the first record on this page."
+              },
+              "to": {
+                "type": "integer",
+                "description": "The index of the last record on this page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "count",
+              "page",
+              "items",
+              "pages",
+              "last_page",
+              "from",
+              "to"
+            ],
+            "description": "Screendesk pagination metadata."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The user's display name."
+                },
+                "has_profile_picture": {
+                  "type": "boolean",
+                  "description": "Whether the user has a profile picture."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the user was created.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the user was last updated.",
+                  "format": "date-time"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "admin",
+                    "member"
+                  ],
+                  "description": "The user's workspace role."
+                },
+                "notifications": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The user's Screendesk notification settings."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "email"
+              ],
+              "description": "A Screendesk workspace user."
+            },
+            "description": "The users on this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The paginated Screendesk users response."
+      }
+    },
+    {
+      "id": "screendesk.search_user",
+      "service": "screendesk",
+      "name": "search_user",
+      "description": "Find a Screendesk workspace user by email. This action requires an admin token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The exact email address to search for.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for finding a Screendesk user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The user's email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "description": "The user's display name."
+          },
+          "has_profile_picture": {
+            "type": "boolean",
+            "description": "Whether the user has a profile picture."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the user was created.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When the user was last updated.",
+            "format": "date-time"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "description": "The user's workspace role."
+          },
+          "notifications": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The user's Screendesk notification settings."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "email"
+        ],
+        "description": "A Screendesk workspace user."
+      }
+    },
+    {
+      "id": "screendesk.update_recording",
+      "service": "screendesk",
+      "name": "update_recording",
+      "description": "Update the title, summary, or description of a Screendesk recording.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordingUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UUID of the Screendesk recording."
+          },
+          "title": {
+            "type": "string",
+            "description": "The new recording title."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new recording summary, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new recording summary, or null to clear it."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new recording description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new recording description, or null to clear it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordingUuid"
+        ],
+        "description": "Input parameters for updating a Screendesk recording.",
+        "anyOf": [
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "summary"
+            ]
+          },
+          {
+            "required": [
+              "description"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The recording UUID.",
+            "format": "uuid"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording title."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording summary."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The recording description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The recording description."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Recording timestamps, type, source, URL, and helpdesk metadata."
+          },
+          "technical_details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Technical details captured with the recording."
+          },
+          "console_logs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Raw console log output captured during the recording."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw console log output captured during the recording."
+          },
+          "customer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Customer details associated with the recording."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The Screendesk user who owns the recording."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Screendesk user who owns the recording."
+          },
+          "room_insights": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Live call session insights when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Live call session insights when available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uuid"
+        ],
+        "description": "A Screendesk recording."
+      }
+    }
+  ]
+}

@@ -1,0 +1,718 @@
+{
+  "service": "plausible_analytics",
+  "displayName": "Plausible Analytics",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Stats API Key",
+      "placeholder": "plausible_stats_api_key",
+      "description": "Plausible Stats API key used with the Authorization Bearer header. Create it in Settings > API Keys and choose Stats API: https://plausible.io/docs/stats-api.",
+      "extraFields": [
+        {
+          "key": "siteId",
+          "label": "Site ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "example.com",
+          "description": "Default Plausible site identifier to validate and use when actions omit site_id or domain."
+        },
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://plausible.io",
+          "description": "Optional Plausible instance base URL. Leave empty to use https://plausible.io."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://plausible.io",
+  "actions": [
+    {
+      "id": "plausible_analytics.get_breakdown_stats",
+      "service": "plausible_analytics",
+      "name": "get_breakdown_stats",
+      "description": "Query Plausible analytics grouped by a single dimension such as source, page, country, or browser.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site identifier in Plausible. When omitted, the provider falls back to the default site configured on the connection."
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A relative date range such as 7d, 30d, or month."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One date boundary."
+                },
+                "description": "A custom [from, to] ISO date tuple.",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            ],
+            "description": "Date range to query, such as '7d', '30d', 'month', or a custom [from, to] ISO date tuple."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metrics to calculate for the query.",
+            "minItems": 1
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "description": "One filter expression."
+            },
+            "description": "Plausible filter expression array passed through to the Stats API."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "description": "One order expression."
+            },
+            "description": "Plausible order_by expression array passed through to the Stats API."
+          },
+          "include": {
+            "type": "object",
+            "properties": {
+              "imports": {
+                "type": "boolean",
+                "description": "Whether imported stats should be included when supported."
+              },
+              "time_labels": {
+                "type": "boolean",
+                "description": "Whether the response should include rendered time_labels."
+              },
+              "total_rows": {
+                "type": "boolean",
+                "description": "Whether the response should include total_rows metadata."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional include flags supported by the Plausible Stats API."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum number of rows to return."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based offset for paginated queries."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination options passed through to the Plausible Stats API."
+          },
+          "dimension": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dimension identifier accepted by the Plausible Stats API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date_range",
+          "metrics",
+          "dimension"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimensions": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Dimension values returned for this row, in the same order as the query dimensions."
+                },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Metric values returned for this row, in the same order as the query metrics."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "dimensions",
+                "metrics"
+              ],
+              "description": "Single Plausible stats result row."
+            },
+            "description": "Ordered result rows returned by the query."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by the Plausible Stats API."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Resolved query payload returned by the Plausible Stats API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Plausible Stats API query response."
+      }
+    },
+    {
+      "id": "plausible_analytics.get_timeseries_stats",
+      "service": "plausible_analytics",
+      "name": "get_timeseries_stats",
+      "description": "Query Plausible analytics as a timeseries grouped by a time dimension such as day or hour.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site identifier in Plausible. When omitted, the provider falls back to the default site configured on the connection."
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A relative date range such as 7d, 30d, or month."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One date boundary."
+                },
+                "description": "A custom [from, to] ISO date tuple.",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            ],
+            "description": "Date range to query, such as '7d', '30d', 'month', or a custom [from, to] ISO date tuple."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metrics to calculate for the query.",
+            "minItems": 1
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "description": "One filter expression."
+            },
+            "description": "Plausible filter expression array passed through to the Stats API."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "description": "One order expression."
+            },
+            "description": "Plausible order_by expression array passed through to the Stats API."
+          },
+          "include": {
+            "type": "object",
+            "properties": {
+              "imports": {
+                "type": "boolean",
+                "description": "Whether imported stats should be included when supported."
+              },
+              "time_labels": {
+                "type": "boolean",
+                "description": "Whether the response should include rendered time_labels."
+              },
+              "total_rows": {
+                "type": "boolean",
+                "description": "Whether the response should include total_rows metadata."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional include flags supported by the Plausible Stats API."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum number of rows to return."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based offset for paginated queries."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination options passed through to the Plausible Stats API."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "time:hour",
+              "time:day",
+              "time:week",
+              "time:month"
+            ],
+            "description": "Time dimension used to build a timeseries query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date_range",
+          "metrics",
+          "interval"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimensions": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Dimension values returned for this row, in the same order as the query dimensions."
+                },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Metric values returned for this row, in the same order as the query metrics."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "dimensions",
+                "metrics"
+              ],
+              "description": "Single Plausible stats result row."
+            },
+            "description": "Ordered result rows returned by the query."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by the Plausible Stats API."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Resolved query payload returned by the Plausible Stats API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Plausible Stats API query response."
+      },
+      "followUpActions": [
+        "plausible_analytics.get_breakdown_stats"
+      ]
+    },
+    {
+      "id": "plausible_analytics.query_stats",
+      "service": "plausible_analytics",
+      "name": "query_stats",
+      "description": "Query historical or real-time analytics for a Plausible site using the Stats API v2.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site identifier in Plausible. When omitted, the provider falls back to the default site configured on the connection."
+          },
+          "date_range": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A relative date range such as 7d, 30d, or month."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One date boundary."
+                },
+                "description": "A custom [from, to] ISO date tuple.",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            ],
+            "description": "Date range to query, such as '7d', '30d', 'month', or a custom [from, to] ISO date tuple."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metrics to calculate for the query.",
+            "minItems": 1
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "description": "One filter expression."
+            },
+            "description": "Plausible filter expression array passed through to the Stats API."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "description": "One order expression."
+            },
+            "description": "Plausible order_by expression array passed through to the Stats API."
+          },
+          "include": {
+            "type": "object",
+            "properties": {
+              "imports": {
+                "type": "boolean",
+                "description": "Whether imported stats should be included when supported."
+              },
+              "time_labels": {
+                "type": "boolean",
+                "description": "Whether the response should include rendered time_labels."
+              },
+              "total_rows": {
+                "type": "boolean",
+                "description": "Whether the response should include total_rows metadata."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional include flags supported by the Plausible Stats API."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum number of rows to return."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based offset for paginated queries."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination options passed through to the Plausible Stats API."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Dimensions to group the query results by."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date_range",
+          "metrics"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimensions": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Dimension values returned for this row, in the same order as the query dimensions."
+                },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "description": "Metric values returned for this row, in the same order as the query metrics."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "dimensions",
+                "metrics"
+              ],
+              "description": "Single Plausible stats result row."
+            },
+            "description": "Ordered result rows returned by the query."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by the Plausible Stats API."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Resolved query payload returned by the Plausible Stats API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Plausible Stats API query response."
+      },
+      "followUpActions": [
+        "plausible_analytics.get_breakdown_stats",
+        "plausible_analytics.get_timeseries_stats"
+      ]
+    },
+    {
+      "id": "plausible_analytics.record_event",
+      "service": "plausible_analytics",
+      "name": "record_event",
+      "description": "Record a pageview or custom event through the Plausible Events API for server-side or app tracking.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Site identifier used by Plausible for the event. When omitted, the provider falls back to the default site configured on the connection."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event name. Use 'pageview' for a pageview event or any custom event name."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Absolute URL of the page or screen where the event happened."
+          },
+          "referrer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Referrer URL to associate with the event."
+          },
+          "props": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Custom event properties to attach to the recorded event."
+          },
+          "revenue": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "ISO 4217 currency code, such as USD or EUR."
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Revenue amount as a number."
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Revenue amount as a numeric string."
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "amount"
+            ],
+            "description": "Action input."
+          },
+          "interactive": {
+            "type": "boolean",
+            "description": "Whether the event should count as interactive for bounce calculations."
+          },
+          "userAgent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom User-Agent header to send with the event request."
+          },
+          "forwardedFor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IP address or X-Forwarded-For chain to send with the event request."
+          },
+          "debugRequest": {
+            "type": "boolean",
+            "description": "Whether to enable Plausible debug mode with the X-Debug-Request header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "url"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Plausible Events API response. Successful non-debug requests usually return an empty object."
+      },
+      "followUpActions": [
+        "plausible_analytics.query_stats"
+      ]
+    }
+  ]
+}

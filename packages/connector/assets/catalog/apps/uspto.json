@@ -1,0 +1,196 @@
+{
+  "service": "uspto",
+  "displayName": "USPTO",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_USPTO_API_KEY",
+      "description": "USPTO API key sent in the USPTO-API-KEY header. Request or view your key in the official API Key Manager: https://account.uspto.gov/api-manager/."
+    }
+  ],
+  "homepageUrl": "https://www.uspto.gov/",
+  "actions": [
+    {
+      "id": "uspto.get_trademark_case_last_update",
+      "service": "uspto",
+      "name": "get_trademark_case_last_update",
+      "description": "Get the latest recorded TSDR update dates for a trademark application serial number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serialNumber": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The eight-digit USPTO trademark application serial number without spaces or punctuation.",
+            "pattern": "^[0-9]{8}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A USPTO trademark application selector."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "serialNumber": {
+                "type": "string",
+                "description": "The USPTO trademark application serial number."
+              },
+              "lastModifiedDate": {
+                "type": "string",
+                "description": "The latest modification date reported for the case."
+              },
+              "statusLastModifiedDate": {
+                "type": "string",
+                "description": "The latest modification date reported for case status data."
+              },
+              "prosecutionLastModifiedDate": {
+                "type": "string",
+                "description": "The latest modification date reported for prosecution history data."
+              },
+              "documentsLastModifiedDate": {
+                "type": "string",
+                "description": "The latest modification date reported for case document data."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The original case update item returned by the USPTO TSDR API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "serialNumber",
+              "raw"
+            ],
+            "description": "The normalized latest update information for the trademark application."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The normalized latest update information for the trademark application."
+      }
+    },
+    {
+      "id": "uspto.get_trademark_case_status",
+      "service": "uspto",
+      "name": "get_trademark_case_status",
+      "description": "Get the official TSDR case status record for a trademark application serial number as XML.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serialNumber": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The eight-digit USPTO trademark application serial number without spaces or punctuation.",
+            "pattern": "^[0-9]{8}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A USPTO trademark application selector."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "xml": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The raw XML document returned by the USPTO TSDR API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The official TSDR trademark case status record."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The official TSDR trademark case status record."
+      }
+    },
+    {
+      "id": "uspto.get_trademark_documents_metadata",
+      "service": "uspto",
+      "name": "get_trademark_documents_metadata",
+      "description": "Get TSDR metadata for documents associated with a trademark application serial number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serialNumber": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The eight-digit USPTO trademark application serial number without spaces or punctuation.",
+            "pattern": "^[0-9]{8}$"
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "The earliest document date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "description": "The latest document date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The chronological order for returned document metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serialNumber"
+        ],
+        "description": "Filters for retrieving USPTO trademark document metadata."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "xml": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The raw XML document returned by the USPTO TSDR API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The TSDR metadata for matching trademark case documents."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "The TSDR metadata for matching trademark case documents."
+      }
+    }
+  ]
+}

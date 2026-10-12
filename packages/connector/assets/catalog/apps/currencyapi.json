@@ -1,0 +1,521 @@
+{
+  "service": "currencyapi",
+  "displayName": "currencyapi",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CURRENCYAPI_API_KEY",
+      "description": "currencyapi API key sent with the apikey header. Get it from https://app.currencyapi.com/dashboard.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://currencyapi.com",
+  "actions": [
+    {
+      "id": "currencyapi.convert_currency",
+      "service": "currencyapi",
+      "name": "convert_currency",
+      "description": "Convert a monetary amount into one or more currencies with currencyapi.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Numeric amount to convert from the base currency."
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date in YYYY-MM-DD format."
+          },
+          "base_currency": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{3,10}$",
+            "description": "Currency code using uppercase ASCII letters or digits."
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{3,10}$",
+              "description": "Currency code using uppercase ASCII letters or digits."
+            },
+            "description": "List of currency codes to include in the response.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fiat",
+              "metal",
+              "crypto"
+            ],
+            "description": "Currency type filter. Supported values are fiat, metal, or crypto."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "description": "Input parameters for converting a monetary amount with currencyapi."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "last_updated_at": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp indicating when the dataset was last updated."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "last_updated_at"
+            ],
+            "description": "Response metadata returned by currencyapi."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{3,10}$",
+                  "description": "Currency code using uppercase ASCII letters or digits."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Exchange rate or converted value returned by currencyapi."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "value"
+              ],
+              "description": "Exchange rate entry returned by currencyapi."
+            },
+            "description": "Mapping of currency codes to exchange rate entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "data"
+        ],
+        "description": "Exchange rate payload returned by currencyapi."
+      }
+    },
+    {
+      "id": "currencyapi.get_api_status",
+      "service": "currencyapi",
+      "name": "get_api_status",
+      "description": "Retrieve current currencyapi account quota usage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving current currencyapi quota usage."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "integer",
+            "description": "currencyapi account identifier."
+          },
+          "quotas": {
+            "type": "object",
+            "properties": {
+              "month": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "description": "Total quota available in the current bucket."
+                  },
+                  "used": {
+                    "type": "integer",
+                    "description": "Quota already consumed in the current bucket."
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "description": "Quota still available in the current bucket."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "total",
+                  "used",
+                  "remaining"
+                ],
+                "description": "Usage quota bucket."
+              },
+              "grace": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "description": "Total quota available in the current bucket."
+                  },
+                  "used": {
+                    "type": "integer",
+                    "description": "Quota already consumed in the current bucket."
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "description": "Quota still available in the current bucket."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "total",
+                  "used",
+                  "remaining"
+                ],
+                "description": "Usage quota bucket."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "month",
+              "grace"
+            ],
+            "description": "Quota usage information returned by currencyapi."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account_id",
+          "quotas"
+        ],
+        "description": "currencyapi account quota status."
+      }
+    },
+    {
+      "id": "currencyapi.get_historical_rates",
+      "service": "currencyapi",
+      "name": "get_historical_rates",
+      "description": "Retrieve historical exchange rates for a specific date from currencyapi.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Date in YYYY-MM-DD format."
+          },
+          "base_currency": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{3,10}$",
+            "description": "Currency code using uppercase ASCII letters or digits."
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{3,10}$",
+              "description": "Currency code using uppercase ASCII letters or digits."
+            },
+            "description": "List of currency codes to include in the response.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fiat",
+              "metal",
+              "crypto"
+            ],
+            "description": "Currency type filter. Supported values are fiat, metal, or crypto."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Input parameters for retrieving historical exchange rates from currencyapi."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "last_updated_at": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp indicating when the dataset was last updated."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "last_updated_at"
+            ],
+            "description": "Response metadata returned by currencyapi."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{3,10}$",
+                  "description": "Currency code using uppercase ASCII letters or digits."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Exchange rate or converted value returned by currencyapi."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "value"
+              ],
+              "description": "Exchange rate entry returned by currencyapi."
+            },
+            "description": "Mapping of currency codes to exchange rate entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "data"
+        ],
+        "description": "Exchange rate payload returned by currencyapi."
+      }
+    },
+    {
+      "id": "currencyapi.get_latest_rates",
+      "service": "currencyapi",
+      "name": "get_latest_rates",
+      "description": "Retrieve the latest exchange rates from currencyapi.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base_currency": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{3,10}$",
+            "description": "Currency code using uppercase ASCII letters or digits."
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{3,10}$",
+              "description": "Currency code using uppercase ASCII letters or digits."
+            },
+            "description": "List of currency codes to include in the response.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fiat",
+              "metal",
+              "crypto"
+            ],
+            "description": "Currency type filter. Supported values are fiat, metal, or crypto."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving latest exchange rates from currencyapi."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "last_updated_at": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp indicating when the dataset was last updated."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "last_updated_at"
+            ],
+            "description": "Response metadata returned by currencyapi."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{3,10}$",
+                  "description": "Currency code using uppercase ASCII letters or digits."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Exchange rate or converted value returned by currencyapi."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "value"
+              ],
+              "description": "Exchange rate entry returned by currencyapi."
+            },
+            "description": "Mapping of currency codes to exchange rate entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "data"
+        ],
+        "description": "Exchange rate payload returned by currencyapi."
+      }
+    },
+    {
+      "id": "currencyapi.get_supported_currencies",
+      "service": "currencyapi",
+      "name": "get_supported_currencies",
+      "description": "Retrieve supported currency metadata from currencyapi.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]{3,10}$",
+              "description": "Currency code using uppercase ASCII letters or digits."
+            },
+            "description": "List of currency codes to include in the response.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "fiat",
+              "metal",
+              "crypto"
+            ],
+            "description": "Currency type filter. Supported values are fiat, metal, or crypto."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving supported currencies from currencyapi."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Currency symbol returned by currencyapi."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Currency display name."
+                },
+                "symbol_native": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Native currency symbol."
+                },
+                "decimal_digits": {
+                  "type": "integer",
+                  "description": "Number of decimal digits used by the currency."
+                },
+                "rounding": {
+                  "type": "number",
+                  "description": "Currency rounding precision value."
+                },
+                "code": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]{3,10}$",
+                  "description": "Currency code using uppercase ASCII letters or digits."
+                },
+                "name_plural": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Plural display name for the currency."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "fiat",
+                    "metal",
+                    "crypto"
+                  ],
+                  "description": "Currency type filter. Supported values are fiat, metal, or crypto."
+                },
+                "countries": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "ISO country code that uses the currency."
+                  },
+                  "description": "List of ISO country codes associated with the currency."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "name",
+                "symbol_native",
+                "decimal_digits",
+                "rounding",
+                "code",
+                "name_plural",
+                "type",
+                "countries"
+              ],
+              "description": "Currency metadata returned by currencyapi."
+            },
+            "description": "Mapping of currency codes to currency metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Supported currencies returned by currencyapi."
+      }
+    }
+  ]
+}

@@ -1,0 +1,890 @@
+{
+  "service": "umami",
+  "displayName": "Umami",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "umami_api_key",
+      "description": "Umami Cloud API key used as an Authorization Bearer token. Create and manage API keys in Umami Cloud account settings: https://umami.is/docs/cloud/api-key.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://umami.is",
+  "actions": [
+    {
+      "id": "umami.get_current_user",
+      "service": "umami",
+      "name": "get_current_user",
+      "description": "Get the current Umami user for the configured API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get the current Umami user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "User ID."
+              },
+              "username": {
+                "type": "string",
+                "description": "Username."
+              },
+              "role": {
+                "type": "string",
+                "description": "User role."
+              },
+              "isAdmin": {
+                "type": "boolean",
+                "description": "Whether the user has administrator privileges."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Umami user profile."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user",
+          "raw"
+        ],
+        "description": "Current Umami user response."
+      }
+    },
+    {
+      "id": "umami.get_metrics",
+      "service": "umami",
+      "name": "get_metrics",
+      "description": "Get grouped Umami website metrics such as URLs, referrers, browsers, or countries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          },
+          "startAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Start timestamp in milliseconds since the Unix epoch."
+          },
+          "endAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "End timestamp in milliseconds since the Unix epoch."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone name used by Umami for date grouping."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL path filter for the query."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Referrer filter for the query."
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title filter for the query."
+          },
+          "host": {
+            "type": "string",
+            "description": "Host filter for the query."
+          },
+          "os": {
+            "type": "string",
+            "description": "Operating system filter for the query."
+          },
+          "browser": {
+            "type": "string",
+            "description": "Browser filter for the query."
+          },
+          "device": {
+            "type": "string",
+            "description": "Device filter for the query."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country filter for the query."
+          },
+          "region": {
+            "type": "string",
+            "description": "Region filter for the query."
+          },
+          "city": {
+            "type": "string",
+            "description": "City filter for the query."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "url",
+              "referrer",
+              "browser",
+              "os",
+              "device",
+              "country",
+              "region",
+              "city",
+              "language",
+              "event"
+            ],
+            "description": "Website metric dimension to return."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of metric rows to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId",
+          "startAt",
+          "endAt",
+          "timezone",
+          "type"
+        ],
+        "description": "Request parameters for retrieving grouped Umami website metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "description": "Metric dimension value returned by Umami."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "Metric count returned by Umami."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Umami metric row."
+            },
+            "description": "Metric rows returned by Umami."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "description": "Raw Umami array item."
+            },
+            "description": "Raw Umami response array."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metrics",
+          "raw"
+        ],
+        "description": "Umami website metrics response."
+      }
+    },
+    {
+      "id": "umami.get_pageviews",
+      "service": "umami",
+      "name": "get_pageviews",
+      "description": "Get Umami pageview and session timeseries for a website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          },
+          "startAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Start timestamp in milliseconds since the Unix epoch."
+          },
+          "endAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "End timestamp in milliseconds since the Unix epoch."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone name used by Umami for date grouping."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL path filter for the query."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Referrer filter for the query."
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title filter for the query."
+          },
+          "host": {
+            "type": "string",
+            "description": "Host filter for the query."
+          },
+          "os": {
+            "type": "string",
+            "description": "Operating system filter for the query."
+          },
+          "browser": {
+            "type": "string",
+            "description": "Browser filter for the query."
+          },
+          "device": {
+            "type": "string",
+            "description": "Device filter for the query."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country filter for the query."
+          },
+          "region": {
+            "type": "string",
+            "description": "Region filter for the query."
+          },
+          "city": {
+            "type": "string",
+            "description": "City filter for the query."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day",
+              "month",
+              "year"
+            ],
+            "description": "Time unit used for timeseries grouping."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId",
+          "startAt",
+          "endAt",
+          "timezone"
+        ],
+        "description": "Request parameters for retrieving Umami pageview timeseries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pageviews": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageviews",
+          "raw"
+        ],
+        "description": "Umami pageview timeseries response."
+      }
+    },
+    {
+      "id": "umami.get_realtime",
+      "service": "umami",
+      "name": "get_realtime",
+      "description": "Get realtime active visitor data for an Umami website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId"
+        ],
+        "description": "Request parameters for retrieving Umami realtime data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "realtime": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "realtime",
+          "raw"
+        ],
+        "description": "Umami realtime response."
+      }
+    },
+    {
+      "id": "umami.get_website",
+      "service": "umami",
+      "name": "get_website",
+      "description": "Get metadata for a single Umami website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId"
+        ],
+        "description": "Request parameters for retrieving an Umami website."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "website": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Website ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Website name."
+              },
+              "domain": {
+                "type": "string",
+                "description": "Website domain."
+              },
+              "shareId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Public share ID when sharing is enabled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Public share ID when sharing is enabled."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Umami website."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "website",
+          "raw"
+        ],
+        "description": "Umami website response."
+      }
+    },
+    {
+      "id": "umami.get_website_stats",
+      "service": "umami",
+      "name": "get_website_stats",
+      "description": "Get aggregate pageview, visitor, visit, bounce, and time statistics for a website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          },
+          "startAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Start timestamp in milliseconds since the Unix epoch."
+          },
+          "endAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "End timestamp in milliseconds since the Unix epoch."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone name used by Umami for date grouping."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL path filter for the query."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Referrer filter for the query."
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title filter for the query."
+          },
+          "host": {
+            "type": "string",
+            "description": "Host filter for the query."
+          },
+          "os": {
+            "type": "string",
+            "description": "Operating system filter for the query."
+          },
+          "browser": {
+            "type": "string",
+            "description": "Browser filter for the query."
+          },
+          "device": {
+            "type": "string",
+            "description": "Device filter for the query."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country filter for the query."
+          },
+          "region": {
+            "type": "string",
+            "description": "Region filter for the query."
+          },
+          "city": {
+            "type": "string",
+            "description": "City filter for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId",
+          "startAt",
+          "endAt",
+          "timezone"
+        ],
+        "description": "Request parameters for retrieving Umami website statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "pageviews": {
+                "description": "Pageview count or comparison object returned by Umami."
+              },
+              "visitors": {
+                "description": "Visitor count or comparison object returned by Umami."
+              },
+              "visits": {
+                "description": "Visit count or comparison object returned by Umami."
+              },
+              "bounces": {
+                "description": "Bounce count or comparison object returned by Umami."
+              },
+              "totaltime": {
+                "description": "Total time count or comparison object returned by Umami."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Umami website statistics."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stats",
+          "raw"
+        ],
+        "description": "Umami website statistics response."
+      }
+    },
+    {
+      "id": "umami.list_events",
+      "service": "umami",
+      "name": "list_events",
+      "description": "List tracked Umami events for a website within a time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "websiteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Umami website ID."
+          },
+          "startAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Start timestamp in milliseconds since the Unix epoch."
+          },
+          "endAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "End timestamp in milliseconds since the Unix epoch."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone name used by Umami for date grouping."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL path filter for the query."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Referrer filter for the query."
+          },
+          "title": {
+            "type": "string",
+            "description": "Page title filter for the query."
+          },
+          "host": {
+            "type": "string",
+            "description": "Host filter for the query."
+          },
+          "os": {
+            "type": "string",
+            "description": "Operating system filter for the query."
+          },
+          "browser": {
+            "type": "string",
+            "description": "Browser filter for the query."
+          },
+          "device": {
+            "type": "string",
+            "description": "Device filter for the query."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country filter for the query."
+          },
+          "region": {
+            "type": "string",
+            "description": "Region filter for the query."
+          },
+          "city": {
+            "type": "string",
+            "description": "City filter for the query."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query filter for the endpoint."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based page number for paginated Umami endpoints."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websiteId",
+          "startAt",
+          "endAt",
+          "timezone"
+        ],
+        "description": "Request parameters for listing Umami events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Event ID."
+                },
+                "websiteId": {
+                  "type": "string",
+                  "description": "Website ID."
+                },
+                "sessionId": {
+                  "type": "string",
+                  "description": "Session ID."
+                },
+                "eventName": {
+                  "type": "string",
+                  "description": "Event name."
+                },
+                "urlPath": {
+                  "type": "string",
+                  "description": "URL path associated with the event."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Event creation timestamp returned by Umami."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Umami event row."
+            },
+            "description": "Events returned by Umami."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of events matching the query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page size used by Umami."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Umami event list response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "count",
+          "page",
+          "pageSize",
+          "raw"
+        ],
+        "description": "Umami event list response."
+      }
+    },
+    {
+      "id": "umami.list_websites",
+      "service": "umami",
+      "name": "list_websites",
+      "description": "List Umami websites available to the configured API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query filter for the endpoint."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based page number for paginated Umami endpoints."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional pagination and search parameters for listing Umami websites."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Website ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Website name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "Website domain."
+                },
+                "shareId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Public share ID when sharing is enabled."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Public share ID when sharing is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Umami website."
+            },
+            "description": "Websites returned by Umami."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of websites matching the query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page size used by Umami."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Website ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Website name."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "Website domain."
+                    },
+                    "shareId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Public share ID when sharing is enabled."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Public share ID when sharing is enabled."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Umami website."
+                },
+                "description": "Websites returned by Umami."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of websites matching the query."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Page size used by Umami."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Paginated Umami websites response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "websites",
+          "count",
+          "page",
+          "pageSize",
+          "raw"
+        ],
+        "description": "Umami website list response."
+      }
+    }
+  ]
+}

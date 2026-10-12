@@ -1,0 +1,410 @@
+{
+  "service": "teamup",
+  "displayName": "Teamup Calendar",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TEAMUP_API_KEY",
+      "description": "Teamup API key sent in the Teamup-Token header. Request a free key at https://teamup.com/api-keys/request.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.teamup.com/",
+  "actions": [
+    {
+      "id": "teamup.create_event",
+      "service": "teamup",
+      "name": "create_event",
+      "description": "Create an event in a Teamup calendar.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA timezone used when Teamup returns event timestamps."
+          },
+          "startDateTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event start timestamp in ISO 8601 format."
+          },
+          "endDateTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event end timestamp in ISO 8601 format."
+          },
+          "subcalendarIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Teamup subcalendar identifier."
+            },
+            "description": "The Teamup subcalendar identifiers assigned to the event.",
+            "minItems": 1
+          },
+          "allDay": {
+            "type": "boolean",
+            "description": "Whether the event lasts all day."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event title."
+          },
+          "location": {
+            "type": "string",
+            "description": "The event location."
+          },
+          "who": {
+            "type": "string",
+            "description": "The people or group associated with the event."
+          },
+          "notes": {
+            "type": "string",
+            "description": "The event notes, which may contain Teamup-supported HTML."
+          },
+          "recurrenceRule": {
+            "type": "string",
+            "description": "The event recurrence rule accepted by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarKey",
+          "startDateTime",
+          "endDateTime",
+          "subcalendarIds",
+          "title"
+        ],
+        "description": "The input payload for creating a Teamup event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The event object returned by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after creating a Teamup event."
+      }
+    },
+    {
+      "id": "teamup.delete_event",
+      "service": "teamup",
+      "name": "delete_event",
+      "description": "Delete an event from a Teamup calendar.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup event identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting a Teamup event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "undoId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The identifier Teamup can use to undo the deletion."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The identifier Teamup can use to undo the deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting a Teamup event."
+      }
+    },
+    {
+      "id": "teamup.get_event",
+      "service": "teamup",
+      "name": "get_event",
+      "description": "Get one Teamup calendar event by its identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup event identifier."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA timezone used when Teamup returns event timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarKey",
+          "eventId"
+        ],
+        "description": "The input payload for getting a Teamup event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The event object returned by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting a Teamup event."
+      }
+    },
+    {
+      "id": "teamup.list_events",
+      "service": "teamup",
+      "name": "list_events",
+      "description": "List events from a Teamup calendar over an optional date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive range start in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive range end in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA timezone used when Teamup returns event timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarKey"
+        ],
+        "description": "The input payload for listing Teamup events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The event object returned by Teamup."
+            },
+            "description": "The events returned by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Teamup events."
+      }
+    },
+    {
+      "id": "teamup.list_subcalendars",
+      "service": "teamup",
+      "name": "list_subcalendars",
+      "description": "List subcalendars available through a Teamup calendar key or identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "includeInactive": {
+            "type": "boolean",
+            "description": "Whether inactive subcalendars should be included."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarKey"
+        ],
+        "description": "The input payload for listing Teamup subcalendars."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subcalendars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The subcalendar object returned by Teamup."
+            },
+            "description": "The subcalendars returned by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Teamup subcalendars."
+      }
+    },
+    {
+      "id": "teamup.update_event",
+      "service": "teamup",
+      "name": "update_event",
+      "description": "Update selected fields of an existing Teamup calendar event.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup calendar key or calendar identifier that addresses the calendar."
+          },
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teamup event identifier."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA timezone used when Teamup returns event timestamps."
+          },
+          "startDateTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event start timestamp in ISO 8601 format."
+          },
+          "endDateTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event end timestamp in ISO 8601 format."
+          },
+          "subcalendarIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Teamup subcalendar identifier."
+            },
+            "description": "The Teamup subcalendar identifiers assigned to the event.",
+            "minItems": 1
+          },
+          "allDay": {
+            "type": "boolean",
+            "description": "Whether the event lasts all day."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event title."
+          },
+          "location": {
+            "type": "string",
+            "description": "The event location."
+          },
+          "who": {
+            "type": "string",
+            "description": "The people or group associated with the event."
+          },
+          "notes": {
+            "type": "string",
+            "description": "The event notes, which may contain Teamup-supported HTML."
+          },
+          "recurrenceRule": {
+            "type": "string",
+            "description": "The event recurrence rule accepted by Teamup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarKey",
+          "eventId"
+        ],
+        "description": "The input payload for updating a Teamup event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The event object returned by Teamup."
+          },
+          "undoId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The identifier Teamup can use to undo the update."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The identifier Teamup can use to undo the update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after updating a Teamup event."
+      }
+    }
+  ]
+}

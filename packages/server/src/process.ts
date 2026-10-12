@@ -198,6 +198,14 @@ function dispatch(
       if (!(yield* authorizedRequest(request, auth))) return unauthorized()
       return yield* infoResponse(status, version, urls, tmp)
     }
+    // The connector MCP passthrough carries its own session-scoped engine token and would
+    // otherwise never satisfy Basic auth here; the handler enforces the engine-side check.
+    if (ready && url.pathname === "/api/connector/mcp") return yield* app.value
+    // The OAuth provider callback is public in the engine (state-validated there).
+    if (ready && url.pathname === "/connector/oauth/callback") return yield* app.value
+    // Trigger webhook ingress is a public provider callback; the engine validates the
+    // subscription nonce and the provider signature before any state advances.
+    if (ready && url.pathname.startsWith("/connector/webhook/")) return yield* app.value
     if (
       (!ready || (!hasPtyConnectTicketURL(url) && !hasPersistentPtyConnectTicketURL(url))) &&
       !(yield* authorizedRequest(request, auth))

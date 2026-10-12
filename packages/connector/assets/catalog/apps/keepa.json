@@ -1,0 +1,5349 @@
+{
+  "service": "keepa",
+  "displayName": "Keepa",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Access Key",
+      "placeholder": "KEEPA_API_KEY",
+      "description": "Private Keepa API access key passed as the key query parameter. Subscribe to Keepa Data Access and view your key at https://keepa.com/#!api."
+    }
+  ],
+  "homepageUrl": "https://keepa.com",
+  "actions": [
+    {
+      "id": "keepa.find_deals",
+      "service": "keepa",
+      "name": "find_deals",
+      "description": "Find recently changed Amazon products with Keepa deal filters and bounded pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "priceType": {
+            "type": "string",
+            "enum": [
+              "AMAZON",
+              "NEW",
+              "USED",
+              "SALES",
+              "COLLECTIBLE",
+              "REFURBISHED",
+              "NEW_FBM_SHIPPING",
+              "LIGHTNING_DEAL",
+              "WAREHOUSE",
+              "NEW_FBA",
+              "BUY_BOX_SHIPPING",
+              "USED_NEW_SHIPPING",
+              "USED_VERY_GOOD_SHIPPING",
+              "USED_GOOD_SHIPPING",
+              "USED_ACCEPTABLE_SHIPPING",
+              "REFURBISHED_SHIPPING",
+              "BUY_BOX_USED_SHIPPING",
+              "PRIME_EXCL"
+            ],
+            "description": "Keepa price or rank type whose change defines the deal."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based deal result page; each page contains at most 150 deals."
+          },
+          "dateRange": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Change interval: 0 for one day, 1 for one week, 2 for one month, or 3 for 90 days."
+          },
+          "includeCategories": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One category node ID."
+            },
+            "description": "Amazon category node IDs to include.",
+            "minItems": 1
+          },
+          "excludeCategories": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One category node ID."
+            },
+            "description": "Amazon category node IDs to exclude.",
+            "minItems": 1
+          },
+          "currentRange": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "description": "Range lower bound."
+              },
+              {
+                "type": "integer",
+                "description": "Range upper bound; some Keepa ranges accept -1 as an open upper bound."
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Inclusive two-value range."
+          },
+          "deltaRange": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "description": "Range lower bound."
+              },
+              {
+                "type": "integer",
+                "description": "Range upper bound; some Keepa ranges accept -1 as an open upper bound."
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Inclusive two-value range."
+          },
+          "deltaPercentRange": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "description": "Range lower bound."
+              },
+              {
+                "type": "integer",
+                "description": "Range upper bound; some Keepa ranges accept -1 as an open upper bound."
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Inclusive two-value range."
+          },
+          "salesRankRange": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "description": "Range lower bound."
+              },
+              {
+                "type": "integer",
+                "description": "Range upper bound; some Keepa ranges accept -1 as an open upper bound."
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Inclusive two-value range."
+          },
+          "deltaLastRange": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "description": "Range lower bound."
+              },
+              {
+                "type": "integer",
+                "description": "Range upper bound; some Keepa ranges accept -1 as an open upper bound."
+              }
+            ],
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Inclusive two-value range."
+          },
+          "titleSearch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Case-insensitive title keywords that must all appear in the product title."
+          },
+          "minimumRating": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "Minimum product rating multiplied by 10."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "absolute_delta",
+              "sales_rank",
+              "percentage_delta"
+            ],
+            "description": "Deal result sorting rule."
+          },
+          "invertSort": {
+            "type": "boolean",
+            "description": "Whether to invert Keepa's default sort direction; newest cannot be inverted."
+          },
+          "isLowestEver": {
+            "type": "boolean",
+            "description": "Whether the selected price must be the lowest value since tracking began."
+          },
+          "isLowest90Days": {
+            "type": "boolean",
+            "description": "Whether the selected price must be the lowest value in the past 90 days."
+          },
+          "isLowestOffer": {
+            "type": "boolean",
+            "description": "Whether the selected price must be the lowest of all New offers."
+          },
+          "isBackInStock": {
+            "type": "boolean",
+            "description": "Whether to include only products that returned to stock in the past 24 hours."
+          },
+          "isOutOfStock": {
+            "type": "boolean",
+            "description": "Whether to include only products that went out of stock in the past 24 hours."
+          },
+          "hasReviews": {
+            "type": "boolean",
+            "description": "Whether to exclude products without reviews."
+          },
+          "isPrimeExclusive": {
+            "type": "boolean",
+            "description": "Whether to include only Prime Exclusive products."
+          },
+          "mustHaveAmazonOffer": {
+            "type": "boolean",
+            "description": "Whether products must have an offer sold and fulfilled by Amazon."
+          },
+          "mustNotHaveAmazonOffer": {
+            "type": "boolean",
+            "description": "Whether products must not have an offer sold and fulfilled by Amazon."
+          },
+          "isHighest": {
+            "type": "boolean",
+            "description": "Whether the selected value must be the highest since tracking began."
+          },
+          "singleVariation": {
+            "type": "boolean",
+            "description": "Return one randomly chosen variation per matching family."
+          },
+          "isRisers": {
+            "type": "boolean",
+            "description": "Include only products whose price rose in the selected interval."
+          },
+          "filterErotic": {
+            "type": "boolean",
+            "description": "Exclude adult items when true."
+          },
+          "warehouseConditions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One condition code."
+            },
+            "description": "Amazon Warehouse condition codes."
+          },
+          "material": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One material value."
+            },
+            "description": "Values for the official material deal attribute filter."
+          },
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One type value."
+            },
+            "description": "Values for the official type deal attribute filter."
+          },
+          "manufacturer": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One manufacturer value."
+            },
+            "description": "Values for the official manufacturer deal attribute filter."
+          },
+          "brand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One brand value."
+            },
+            "description": "Values for the official brand deal attribute filter."
+          },
+          "model": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One model value."
+            },
+            "description": "Values for the official model deal attribute filter."
+          },
+          "color": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One color value."
+            },
+            "description": "Values for the official color deal attribute filter."
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One size value."
+            },
+            "description": "Values for the official size deal attribute filter."
+          },
+          "unitType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One unitType value."
+            },
+            "description": "Values for the official unitType deal attribute filter."
+          },
+          "scent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One scent value."
+            },
+            "description": "Values for the official scent deal attribute filter."
+          },
+          "itemForm": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One itemForm value."
+            },
+            "description": "Values for the official itemForm deal attribute filter."
+          },
+          "pattern": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One pattern value."
+            },
+            "description": "Values for the official pattern deal attribute filter."
+          },
+          "style": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One style value."
+            },
+            "description": "Values for the official style deal attribute filter."
+          },
+          "itemTypeKeyword": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One itemTypeKeyword value."
+            },
+            "description": "Values for the official itemTypeKeyword deal attribute filter."
+          },
+          "targetAudienceKeyword": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One targetAudienceKeyword value."
+            },
+            "description": "Values for the official targetAudienceKeyword deal attribute filter."
+          },
+          "edition": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One edition value."
+            },
+            "description": "Values for the official edition deal attribute filter."
+          },
+          "format": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One format value."
+            },
+            "description": "Values for the official format deal attribute filter."
+          },
+          "author": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One author value."
+            },
+            "description": "Values for the official author deal attribute filter."
+          },
+          "binding": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One binding value."
+            },
+            "description": "Values for the official binding deal attribute filter."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One languages value."
+            },
+            "description": "Values for the official languages deal attribute filter."
+          },
+          "brandStoreName": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One brandStoreName value."
+            },
+            "description": "Values for the official brandStoreName deal attribute filter."
+          },
+          "brandStoreUrlName": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One brandStoreUrlName value."
+            },
+            "description": "Values for the official brandStoreUrlName deal attribute filter."
+          },
+          "websiteDisplayGroup": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One websiteDisplayGroup value."
+            },
+            "description": "Values for the official websiteDisplayGroup deal attribute filter."
+          },
+          "websiteDisplayGroupName": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One websiteDisplayGroupName value."
+            },
+            "description": "Values for the official websiteDisplayGroupName deal attribute filter."
+          },
+          "salesRankDisplayGroup": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One salesRankDisplayGroup value."
+            },
+            "description": "Values for the official salesRankDisplayGroup deal attribute filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "priceType"
+        ],
+        "description": "Input for finding Keepa deals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "deals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon ASIN."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon ASIN."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product title."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Keepa deal record."
+            },
+            "description": "Deal records returned by Keepa."
+          },
+          "categoryIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One root category ID."
+            },
+            "description": "Root category IDs represented in the results."
+          },
+          "categoryNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One root category name."
+            },
+            "description": "Root category names represented in the results."
+          },
+          "categoryCount": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Deal count for one root category."
+            },
+            "description": "Deal counts aligned with categoryIds and categoryNames."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete Keepa deals response object."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "deals",
+          "categoryIds",
+          "categoryNames",
+          "categoryCount",
+          "raw",
+          "meta"
+        ],
+        "description": "Keepa deal search results."
+      }
+    },
+    {
+      "id": "keepa.find_products",
+      "service": "keepa",
+      "name": "find_products",
+      "description": "Find Amazon ASINs with Keepa Product Finder filters using official ProductFinderRequest field names.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Case-insensitive product title search text."
+              },
+              "brand": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One brand name."
+                },
+                "description": "Brands to include.",
+                "minItems": 1
+              },
+              "manufacturer": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One manufacturer name."
+                },
+                "description": "Manufacturers to include.",
+                "minItems": 1
+              },
+              "categories_include": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "description": "One category node ID."
+                },
+                "description": "Amazon category node IDs to include.",
+                "minItems": 1
+              },
+              "categories_exclude": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "description": "One category node ID."
+                },
+                "description": "Amazon category node IDs to exclude.",
+                "minItems": 1
+              },
+              "buyBoxSellerId": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Amazon seller ID."
+                },
+                "description": "Buy Box seller IDs to include.",
+                "minItems": 1
+              },
+              "current_AMAZON_gte": {
+                "type": "integer",
+                "description": "Minimum current Amazon price in the marketplace's smallest currency unit."
+              },
+              "current_AMAZON_lte": {
+                "type": "integer",
+                "description": "Maximum current Amazon price in the marketplace's smallest currency unit."
+              },
+              "current_NEW_gte": {
+                "type": "integer",
+                "description": "Minimum current Marketplace New price in the marketplace's smallest currency unit."
+              },
+              "current_NEW_lte": {
+                "type": "integer",
+                "description": "Maximum current Marketplace New price in the marketplace's smallest currency unit."
+              },
+              "current_BUY_BOX_SHIPPING_gte": {
+                "type": "integer",
+                "description": "Minimum current New Buy Box price including shipping in the marketplace's smallest currency unit."
+              },
+              "current_BUY_BOX_SHIPPING_lte": {
+                "type": "integer",
+                "description": "Maximum current New Buy Box price including shipping in the marketplace's smallest currency unit."
+              },
+              "current_SALES_gte": {
+                "type": "integer",
+                "description": "Minimum current sales rank."
+              },
+              "current_SALES_lte": {
+                "type": "integer",
+                "description": "Maximum current sales rank."
+              },
+              "current_RATING_gte": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50,
+                "description": "Minimum product rating multiplied by 10."
+              },
+              "current_RATING_lte": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50,
+                "description": "Maximum product rating multiplied by 10."
+              },
+              "current_COUNT_REVIEWS_gte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Minimum current review count."
+              },
+              "current_COUNT_REVIEWS_lte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum current review count."
+              },
+              "monthlySold_gte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Minimum estimated monthly sold count."
+              },
+              "monthlySold_lte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum estimated monthly sold count."
+              },
+              "totalOfferCount_gte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Minimum total offer count."
+              },
+              "totalOfferCount_lte": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum total offer count."
+              },
+              "hasReviews": {
+                "type": "boolean",
+                "description": "Whether products must have review data."
+              },
+              "isLowest_AMAZON": {
+                "type": "boolean",
+                "description": "Whether the current Amazon price must be the lowest value since tracking began."
+              },
+              "isLowest_NEW": {
+                "type": "boolean",
+                "description": "Whether the current Marketplace New price must be the lowest value since tracking began."
+              },
+              "isPrimeExclusive": {
+                "type": "boolean",
+                "description": "Whether to include only Prime Exclusive products."
+              },
+              "hasAPlus": {
+                "type": "boolean",
+                "description": "Whether products must include A+ content."
+              },
+              "hasMainVideo": {
+                "type": "boolean",
+                "description": "Whether products must include a main video."
+              },
+              "sort": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Official Product Finder field name used for sorting."
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Sort direction."
+                    }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "One official Keepa Product Finder sort rule."
+                },
+                "description": "Product Finder sort rules in priority order.",
+                "minItems": 1
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based Product Finder result page."
+              },
+              "perPage": {
+                "type": "integer",
+                "minimum": 50,
+                "maximum": 10000,
+                "description": "Number of ASINs requested per Product Finder page, from 50 to 10000."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Official Keepa ProductFinderRequest fields. Unknown official fields are preserved for forward compatibility."
+          },
+          "includeSearchInsights": {
+            "type": "boolean",
+            "description": "Include charged, query-wide Search Insights statistics."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "filters"
+        ],
+        "description": "Input for finding products in the Keepa catalog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Amazon ASIN."
+            },
+            "description": "Matching Amazon ASINs."
+          },
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Estimated total number of matching products."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Estimated total number of matching products."
+          },
+          "searchInsights": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Query-wide Search Insights returned when requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Query-wide Search Insights returned when requested."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "asins",
+          "totalResults",
+          "searchInsights",
+          "meta"
+        ],
+        "description": "Keepa Product Finder results."
+      }
+    },
+    {
+      "id": "keepa.find_sellers",
+      "service": "keepa",
+      "name": "find_sellers",
+      "description": "Find seller IDs by official Seller Finder criteria without fetching seller profiles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "search": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Text query for seller discovery."
+              },
+              "sellerName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Seller display name to match."
+              },
+              "businessName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Registered business name to match."
+              },
+              "addressCountry": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One country code."
+                },
+                "description": "Seller business country codes."
+              },
+              "currentRating_gte": {
+                "type": "integer",
+                "description": "Minimum current seller rating percentage."
+              },
+              "currentRatingCount_gte": {
+                "type": "integer",
+                "description": "Minimum current seller rating count."
+              },
+              "totalStorefrontAsins_gte": {
+                "type": "integer",
+                "description": "Minimum observed storefront ASIN count."
+              },
+              "brands": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One brand."
+                },
+                "description": "Brands sold by the merchant."
+              },
+              "rootCategories_include": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "description": "One root category ID."
+                },
+                "description": "Root category IDs to include."
+              },
+              "competitorSellerIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One seller ID."
+                },
+                "description": "Seller IDs whose listing competitors should be found."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based seller result page."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "const": 0,
+                    "type": "number",
+                    "description": "Use Keepa's 100-seller page shortcut."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 10000,
+                    "description": "Seller IDs requested per page."
+                  }
+                ],
+                "description": "Seller IDs per page; zero means 100, otherwise from 50 to 10000."
+              },
+              "sort": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Official Seller Finder field name."
+                    },
+                    {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Ascending or descending order."
+                    }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "One seller sort rule."
+                },
+                "description": "Up to three seller sort rules.",
+                "maxItems": 3
+              }
+            },
+            "additionalProperties": true,
+            "description": "Official Seller Finder selection fields; other official filters are preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "filters"
+        ],
+        "description": "Input for Keepa Seller Finder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "sellerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One seller ID."
+            },
+            "description": "Ordered seller IDs in this upstream result page."
+          },
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Total sellers matched across pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total sellers matched across pages."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "sellerIds",
+          "totalResults",
+          "meta"
+        ],
+        "description": "Keepa Seller Finder results."
+      }
+    },
+    {
+      "id": "keepa.get_best_sellers",
+      "service": "keepa",
+      "name": "get_best_sellers",
+      "description": "Retrieve Keepa's ordered Amazon best-seller ASIN list for a category node or website display group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Amazon category node ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Keepa website display group name."
+              }
+            ],
+            "description": "Amazon category node ID or Keepa website display group name."
+          },
+          "range": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number",
+                "description": "Current rank."
+              },
+              {
+                "const": 30,
+                "type": "number",
+                "description": "30-day average rank."
+              },
+              {
+                "const": 90,
+                "type": "number",
+                "description": "90-day average rank."
+              },
+              {
+                "const": 180,
+                "type": "number",
+                "description": "180-day average rank."
+              }
+            ],
+            "description": "Sales-rank averaging interval: 0, 30, 90 or 180 days."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "Historical month from 1 to 12; requires year."
+          },
+          "year": {
+            "type": "integer",
+            "description": "Four-digit year for a historical month; requires month."
+          },
+          "variations": {
+            "type": "boolean",
+            "description": "Return all variations instead of one representative."
+          },
+          "sublist": {
+            "type": "boolean",
+            "description": "Use subcategory rank instead of primary rank."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset into this response's full upstream list."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum entries returned; null returns all remaining entries."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum entries returned; null returns all remaining entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "category"
+        ],
+        "description": "Input for retrieving Keepa best sellers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Amazon category node ID resolved by Keepa."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Amazon category node ID resolved by Keepa."
+          },
+          "lastUpdate": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Best-seller list update time in Keepa Time minutes."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-seller list update time in Keepa Time minutes."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Amazon ASIN."
+            },
+            "description": "Ordered Amazon ASINs, starting with the product having the lowest sales rank."
+          },
+          "totalAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this upstream response."
+          },
+          "returnedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this response window."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether this upstream response contains more entries after the window."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Next local offset, when more entries exist."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next local offset, when more entries exist."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Keepa bestSellersList metadata without the full ASIN list."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "categoryId",
+          "lastUpdate",
+          "asins",
+          "totalAvailable",
+          "returnedCount",
+          "hasMore",
+          "nextOffset",
+          "raw",
+          "meta"
+        ],
+        "description": "Keepa best-seller results."
+      }
+    },
+    {
+      "id": "keepa.get_lightning_deal",
+      "service": "keepa",
+      "name": "get_lightning_deal",
+      "description": "Get lightning deals for a required ASIN, avoiding the costly full-list request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "asin": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10,
+            "description": "A 10-character Amazon ASIN.",
+            "pattern": "^[A-Za-z0-9]{10}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "WAITLIST",
+              "SOLDOUT",
+              "WAITLISTFULL",
+              "EXPIRED",
+              "SUPPRESSED"
+            ],
+            "description": "Official Keepa lightning deal state."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "asin"
+        ],
+        "description": "Input for one product's lightning deal."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "lightningDeals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One upstream lightning deal."
+            },
+            "description": "Lightning deal objects."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "lightningDeals",
+          "meta"
+        ],
+        "description": "Lightning deals for one ASIN."
+      }
+    },
+    {
+      "id": "keepa.get_most_rated_sellers",
+      "service": "keepa",
+      "name": "get_most_rated_sellers",
+      "description": "Get seller IDs ordered by rating count, with a local result window; each window fetches and pays for the full upstream list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset into this response's full upstream list."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum entries returned; null returns all remaining entries."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum entries returned; null returns all remaining entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace"
+        ],
+        "description": "Input for most rated sellers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "sellerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One seller ID."
+            },
+            "description": "Seller IDs ordered by rating count."
+          },
+          "totalAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this upstream response."
+          },
+          "returnedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this response window."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether this upstream response contains more entries after the window."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Next local offset, when more entries exist."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next local offset, when more entries exist."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "sellerIds",
+          "totalAvailable",
+          "returnedCount",
+          "hasMore",
+          "nextOffset",
+          "meta"
+        ],
+        "description": "Most rated sellers result window."
+      }
+    },
+    {
+      "id": "keepa.get_product_history",
+      "service": "keepa",
+      "name": "get_product_history",
+      "description": "Retrieve named Keepa price, rank, offer-count, rating, review, monthly-sales, and coupon history for Amazon ASINs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "A 10-character Amazon ASIN.",
+              "pattern": "^[A-Za-z0-9]{10}$"
+            },
+            "description": "Amazon ASINs to request.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Limit all returned history to the most recent number of 24-hour periods."
+          },
+          "historyTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "AMAZON",
+                "NEW",
+                "USED",
+                "SALES",
+                "LISTPRICE",
+                "COLLECTIBLE",
+                "REFURBISHED",
+                "NEW_FBM_SHIPPING",
+                "LIGHTNING_DEAL",
+                "WAREHOUSE",
+                "NEW_FBA",
+                "COUNT_NEW",
+                "COUNT_USED",
+                "COUNT_REFURBISHED",
+                "COUNT_COLLECTIBLE",
+                "EXTRA_INFO_UPDATES",
+                "RATING",
+                "COUNT_REVIEWS",
+                "BUY_BOX_SHIPPING",
+                "USED_NEW_SHIPPING",
+                "USED_VERY_GOOD_SHIPPING",
+                "USED_GOOD_SHIPPING",
+                "USED_ACCEPTABLE_SHIPPING",
+                "COLLECTIBLE_NEW_SHIPPING",
+                "COLLECTIBLE_VERY_GOOD_SHIPPING",
+                "COLLECTIBLE_GOOD_SHIPPING",
+                "COLLECTIBLE_ACCEPTABLE_SHIPPING",
+                "REFURBISHED_SHIPPING",
+                "EBAY_NEW_SHIPPING",
+                "EBAY_USED_SHIPPING",
+                "TRADE_IN",
+                "RENT",
+                "BUY_BOX_USED_SHIPPING",
+                "PRIME_EXCL",
+                "COUNT_NEW_FBA",
+                "COUNT_NEW_FBM"
+              ],
+              "description": "One official Keepa Product.CsvType name."
+            },
+            "description": "Keepa CSV history series to include in `series`; this does not suppress monthlySoldHistory, couponHistory, or salesRankHistory when Keepa returns them.",
+            "minItems": 1
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One numeric product code, kept as a string.",
+              "pattern": "^[0-9]{8,14}$"
+            },
+            "description": "UPC, EAN, GTIN, or ISBN-13 codes; keep leading zeroes.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "codeLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum products returned for each product code."
+          },
+          "statsDays": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of recent days used for Keepa summary statistics at no additional token cost."
+          },
+          "statsRange": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC start time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval start."
+                  }
+                ],
+                "description": "Interval start, as ISO 8601 UTC text or Unix milliseconds."
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC end time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval end."
+                  }
+                ],
+                "description": "Interval end, as ISO 8601 UTC text or Unix milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end"
+            ],
+            "description": "UTC statistics interval."
+          },
+          "updateHours": {
+            "type": "integer",
+            "minimum": -1,
+            "description": "Refresh when older than these hours; zero forces refresh and -1 disables refresh."
+          },
+          "offers": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 100,
+            "description": "Number of marketplace offers to include; values from 20 through 100 may increase token cost and limit the request to 20 ASINs."
+          },
+          "onlyLiveOffers": {
+            "type": "boolean",
+            "description": "Whether to omit historical offers when offers are requested, reducing response size."
+          },
+          "includeBuyBox": {
+            "type": "boolean",
+            "description": "Whether to include Keepa buy box data; this may consume two additional tokens per product when offers are not requested."
+          },
+          "includeRating": {
+            "type": "boolean",
+            "description": "Whether to include existing rating and review-count history in the product payload."
+          },
+          "includeVideos": {
+            "type": "boolean",
+            "description": "Whether to include existing product video metadata."
+          },
+          "includeAPlus": {
+            "type": "boolean",
+            "description": "Whether to include existing A+ content."
+          },
+          "includeStock": {
+            "type": "boolean",
+            "description": "Whether to include stock history with requested offers; may cost extra tokens."
+          },
+          "includeHistoricalVariations": {
+            "type": "boolean",
+            "description": "Whether to include historical and out-of-stock variations; may cost extra tokens."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace"
+        ],
+        "description": "Input for retrieving Keepa product history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "priceValuesUseMinorUnits": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether price integers remain in the marketplace's smallest currency unit."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asin": {
+                  "type": "string",
+                  "description": "Amazon ASIN."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product title."
+                },
+                "brand": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Product brand."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product brand."
+                },
+                "series": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "AMAZON",
+                          "NEW",
+                          "USED",
+                          "SALES",
+                          "LISTPRICE",
+                          "COLLECTIBLE",
+                          "REFURBISHED",
+                          "NEW_FBM_SHIPPING",
+                          "LIGHTNING_DEAL",
+                          "WAREHOUSE",
+                          "NEW_FBA",
+                          "COUNT_NEW",
+                          "COUNT_USED",
+                          "COUNT_REFURBISHED",
+                          "COUNT_COLLECTIBLE",
+                          "EXTRA_INFO_UPDATES",
+                          "RATING",
+                          "COUNT_REVIEWS",
+                          "BUY_BOX_SHIPPING",
+                          "USED_NEW_SHIPPING",
+                          "USED_VERY_GOOD_SHIPPING",
+                          "USED_GOOD_SHIPPING",
+                          "USED_ACCEPTABLE_SHIPPING",
+                          "COLLECTIBLE_NEW_SHIPPING",
+                          "COLLECTIBLE_VERY_GOOD_SHIPPING",
+                          "COLLECTIBLE_GOOD_SHIPPING",
+                          "COLLECTIBLE_ACCEPTABLE_SHIPPING",
+                          "REFURBISHED_SHIPPING",
+                          "EBAY_NEW_SHIPPING",
+                          "EBAY_USED_SHIPPING",
+                          "TRADE_IN",
+                          "RENT",
+                          "BUY_BOX_USED_SHIPPING",
+                          "PRIME_EXCL",
+                          "COUNT_NEW_FBA",
+                          "COUNT_NEW_FBM"
+                        ],
+                        "description": "Official Keepa Product.CsvType name."
+                      },
+                      "index": {
+                        "type": "integer",
+                        "description": "Official Keepa Product.CsvType array index."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "enum": [
+                          "minor_currency_unit",
+                          "sales_rank",
+                          "count",
+                          "rating_tenths",
+                          "metadata"
+                        ],
+                        "description": "Unit interpretation for values in this series; lower sales-rank values indicate better rank."
+                      },
+                      "includesShipping": {
+                        "type": "boolean",
+                        "description": "Whether each raw point contains a separate shipping value after the main value."
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "keepaTime": {
+                              "type": "integer",
+                              "description": "Original Keepa Time value in minutes."
+                            },
+                            "timestamp": {
+                              "type": "string",
+                              "description": "UTC timestamp converted from Keepa Time.",
+                              "format": "date-time"
+                            },
+                            "value": {
+                              "type": "integer",
+                              "description": "History value; price values use the marketplace's smallest currency unit and -1 represents no offer."
+                            },
+                            "shipping": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "description": "Shipping amount in the marketplace's smallest currency unit when this history type records it separately."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Shipping amount in the marketplace's smallest currency unit when this history type records it separately."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "keepaTime",
+                            "timestamp",
+                            "value",
+                            "shipping"
+                          ],
+                          "description": "One normalized Keepa history data point."
+                        },
+                        "description": "Chronological history points."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "index",
+                      "unit",
+                      "includesShipping",
+                      "points"
+                    ],
+                    "description": "One named Keepa product history series."
+                  },
+                  "description": "Named Keepa history series."
+                },
+                "monthlySoldHistory": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "keepaTime": {
+                        "type": "integer",
+                        "description": "Original Keepa Time value in minutes."
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "description": "UTC timestamp converted from Keepa Time.",
+                        "format": "date-time"
+                      },
+                      "value": {
+                        "type": "integer",
+                        "description": "Amazon's bought-in-past-month value observed by Keepa; this is not a sales estimate."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "keepaTime",
+                      "timestamp",
+                      "value"
+                    ],
+                    "description": "One historical Amazon bought-in-past-month value."
+                  },
+                  "description": "Historical Amazon bought-in-past-month values returned by Keepa."
+                },
+                "couponHistory": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "keepaTime": {
+                        "type": "integer",
+                        "description": "Original Keepa Time value in minutes."
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "description": "UTC timestamp converted from Keepa Time.",
+                        "format": "date-time"
+                      },
+                      "oneTimeCoupon": {
+                        "type": "integer",
+                        "description": "One-time coupon discount: zero means unavailable, positive values use the marketplace's smallest currency unit, and negative values are percentage discounts."
+                      },
+                      "subscribeAndSaveCoupon": {
+                        "type": "integer",
+                        "description": "Subscribe-and-Save coupon discount: zero means unavailable, positive values use the marketplace's smallest currency unit, and negative values are percentage discounts."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "keepaTime",
+                      "timestamp",
+                      "oneTimeCoupon",
+                      "subscribeAndSaveCoupon"
+                    ],
+                    "description": "One historical Keepa coupon observation."
+                  },
+                  "description": "Historical coupon observations returned by Keepa."
+                },
+                "salesRankHistory": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "categoryId": {
+                        "type": "integer",
+                        "description": "Amazon subcategory node ID."
+                      },
+                      "points": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "keepaTime": {
+                              "type": "integer",
+                              "description": "Original Keepa Time value in minutes."
+                            },
+                            "timestamp": {
+                              "type": "string",
+                              "description": "UTC timestamp converted from Keepa Time.",
+                              "format": "date-time"
+                            },
+                            "value": {
+                              "type": "integer",
+                              "description": "Amazon sales rank; lower values indicate better rank."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "keepaTime",
+                            "timestamp",
+                            "value"
+                          ],
+                          "description": "One historical sales-rank observation."
+                        },
+                        "description": "Chronological sales-rank observations; lower values indicate better rank."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "categoryId",
+                      "points"
+                    ],
+                    "description": "One Amazon subcategory sales-rank history."
+                  },
+                  "description": "Sales-rank histories grouped by Amazon subcategory."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The complete Keepa product object including raw history arrays."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "asin",
+                "title",
+                "brand",
+                "series",
+                "monthlySoldHistory",
+                "couponHistory",
+                "salesRankHistory",
+                "raw"
+              ],
+              "description": "Normalized Keepa history for one product."
+            },
+            "description": "Products and normalized histories returned by Keepa."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "priceValuesUseMinorUnits",
+          "products",
+          "meta"
+        ],
+        "description": "Keepa product history response."
+      }
+    },
+    {
+      "id": "keepa.get_product_snapshot",
+      "service": "keepa",
+      "name": "get_product_snapshot",
+      "description": "Retrieve current Keepa product metadata and named statistics for one or more Amazon ASINs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "A 10-character Amazon ASIN.",
+              "pattern": "^[A-Za-z0-9]{10}$"
+            },
+            "description": "Amazon ASINs to request.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One numeric product code, kept as a string.",
+              "pattern": "^[0-9]{8,14}$"
+            },
+            "description": "UPC, EAN, GTIN, or ISBN-13 codes; keep leading zeroes.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "codeLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum products returned for each product code."
+          },
+          "statsDays": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of recent days used for Keepa summary statistics at no additional token cost."
+          },
+          "statsRange": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC start time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval start."
+                  }
+                ],
+                "description": "Interval start, as ISO 8601 UTC text or Unix milliseconds."
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC end time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval end."
+                  }
+                ],
+                "description": "Interval end, as ISO 8601 UTC text or Unix milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end"
+            ],
+            "description": "UTC statistics interval."
+          },
+          "updateHours": {
+            "type": "integer",
+            "minimum": -1,
+            "description": "Refresh when older than these hours; zero forces refresh and -1 disables refresh."
+          },
+          "offers": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 100,
+            "description": "Number of marketplace offers to include; values from 20 through 100 may increase token cost and limit the request to 20 ASINs."
+          },
+          "onlyLiveOffers": {
+            "type": "boolean",
+            "description": "Whether to omit historical offers when offers are requested, reducing response size."
+          },
+          "includeBuyBox": {
+            "type": "boolean",
+            "description": "Whether to include Keepa buy box data; this may consume two additional tokens per product when offers are not requested."
+          },
+          "includeRating": {
+            "type": "boolean",
+            "description": "Whether to include existing rating and review-count history in the product payload."
+          },
+          "includeVideos": {
+            "type": "boolean",
+            "description": "Whether to include existing product video metadata."
+          },
+          "includeAPlus": {
+            "type": "boolean",
+            "description": "Whether to include existing A+ content."
+          },
+          "includeStock": {
+            "type": "boolean",
+            "description": "Whether to include stock history with requested offers; may cost extra tokens."
+          },
+          "includeHistoricalVariations": {
+            "type": "boolean",
+            "description": "Whether to include historical and out-of-stock variations; may cost extra tokens."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace"
+        ],
+        "description": "Input for retrieving Keepa product snapshots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX",
+              "BR"
+            ],
+            "description": "Amazon marketplace code using Keepa's official AmazonLocale names."
+          },
+          "priceValuesUseMinorUnits": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether price integers remain in the marketplace's smallest currency unit."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asin": {
+                  "type": "string",
+                  "description": "Amazon ASIN."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product title."
+                },
+                "brand": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Product brand."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product brand."
+                },
+                "manufacturer": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Product manufacturer."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product manufacturer."
+                },
+                "productGroup": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product group."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product group."
+                },
+                "parentAsin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Parent ASIN when this product is a variation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent ASIN when this product is a variation."
+                },
+                "rootCategory": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Root Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Root Amazon category node identifier."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "One Amazon category node identifier."
+                  },
+                  "description": "Amazon category node identifiers assigned to the product."
+                },
+                "imageUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One Amazon media image URL."
+                  },
+                  "description": "Resolved Amazon image URLs derived from Keepa image metadata."
+                },
+                "monthlySold": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated monthly sold count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated monthly sold count when available."
+                },
+                "lastUpdate": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Last product update in Keepa Time minutes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Last product update in Keepa Time minutes."
+                },
+                "stats": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "current": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average30Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average90Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average180Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average365Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "atIntervalStart": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "isLowestEver": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean",
+                            "description": "A Keepa statistic flag."
+                          },
+                          "description": "Boolean values keyed by official Keepa Product.CsvType name."
+                        },
+                        "isLowest90Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean",
+                            "description": "A Keepa statistic flag."
+                          },
+                          "description": "Boolean values keyed by official Keepa Product.CsvType name."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The complete Keepa stats object."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "current",
+                        "average",
+                        "average30Days",
+                        "average90Days",
+                        "average180Days",
+                        "average365Days",
+                        "atIntervalStart",
+                        "isLowestEver",
+                        "isLowest90Days",
+                        "raw"
+                      ],
+                      "description": "Named Keepa product statistics."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Named Keepa product statistics."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The complete Keepa product object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "asin",
+                "domainId",
+                "title",
+                "brand",
+                "manufacturer",
+                "productGroup",
+                "parentAsin",
+                "rootCategory",
+                "categories",
+                "imageUrls",
+                "monthlySold",
+                "lastUpdate",
+                "stats",
+                "raw"
+              ],
+              "description": "A normalized Keepa product snapshot."
+            },
+            "description": "Products returned by Keepa."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "priceValuesUseMinorUnits",
+          "products",
+          "meta"
+        ],
+        "description": "Keepa product snapshot response."
+      }
+    },
+    {
+      "id": "keepa.get_seller_snapshot",
+      "service": "keepa",
+      "name": "get_seller_snapshot",
+      "description": "Retrieve compact Keepa marketplace seller profiles, ratings, category statistics, brands, and competitors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "sellerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Amazon seller ID."
+            },
+            "description": "Amazon marketplace seller IDs.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "sellerIds"
+        ],
+        "description": "Input for retrieving Keepa seller snapshots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "sellers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sellerId": {
+                  "type": "string",
+                  "description": "Amazon seller ID."
+                },
+                "sellerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon seller display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon seller display name."
+                },
+                "currentRating": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Current seller rating percentage."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Current seller rating percentage."
+                },
+                "ratingCount": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One seller rating count."
+                      },
+                      "description": "Rating counts for the last 30, 90, and 365 days and lifetime."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rating counts for the last 30, 90, and 365 days and lifetime."
+                },
+                "hasFba": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Keepa has observed current FBA listings."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Keepa has observed current FBA listings."
+                },
+                "shipsFromChina": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Keepa identifies the seller as shipping from China."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Keepa identifies the seller as shipping from China."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The complete Keepa seller object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One normalized Keepa seller profile."
+            },
+            "description": "Seller profiles returned by Keepa."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "sellers",
+          "meta"
+        ],
+        "description": "Keepa seller snapshot results."
+      }
+    },
+    {
+      "id": "keepa.get_seller_storefront",
+      "service": "keepa",
+      "name": "get_seller_storefront",
+      "description": "Inspect one seller's observed storefront ASINs and aligned last-seen times; the list can be incomplete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "sellerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One Amazon seller ID that does not contain commas.",
+            "pattern": "^[^,]+$"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset into this response's full upstream list."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum entries returned; null returns all remaining entries."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum entries returned; null returns all remaining entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "sellerId"
+        ],
+        "description": "Input for one seller storefront."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "seller": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Seller profile without full storefront arrays."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seller profile without full storefront arrays."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asin": {
+                  "type": "string",
+                  "description": "Amazon ASIN."
+                },
+                "lastSeen": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Last observed Keepa Time minute."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Last observed Keepa Time minute."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "asin",
+                "lastSeen"
+              ],
+              "description": "One storefront listing observation."
+            },
+            "description": "Observed ASIN and last-seen pairs."
+          },
+          "totalAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this upstream response."
+          },
+          "returnedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this response window."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether this upstream response contains more entries after the window."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Next local offset, when more entries exist."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next local offset, when more entries exist."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "seller",
+          "items",
+          "totalAvailable",
+          "returnedCount",
+          "hasMore",
+          "nextOffset",
+          "meta"
+        ],
+        "description": "Observed seller storefront window."
+      }
+    },
+    {
+      "id": "keepa.get_token_status",
+      "service": "keepa",
+      "name": "get_token_status",
+      "description": "Retrieve Keepa token availability and refill information without consuming tokens.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving Keepa token status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta"
+        ],
+        "description": "Current Keepa token status."
+      }
+    },
+    {
+      "id": "keepa.list_lightning_deals",
+      "service": "keepa",
+      "name": "list_lightning_deals",
+      "description": "List lightning deals with a local result window; Keepa charges 500 tokens for each full upstream request, regardless of window size.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "WAITLIST",
+              "SOLDOUT",
+              "WAITLISTFULL",
+              "EXPIRED",
+              "SUPPRESSED"
+            ],
+            "description": "Official Keepa lightning deal state."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset into this response's full upstream list."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum entries returned; null returns all remaining entries."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum entries returned; null returns all remaining entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace"
+        ],
+        "description": "Input for the full Keepa lightning deal list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "lightningDeals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One upstream lightning deal."
+            },
+            "description": "Lightning deals in this local window."
+          },
+          "totalAvailable": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this upstream response."
+          },
+          "returnedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entries in this response window."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether this upstream response contains more entries after the window."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Next local offset, when more entries exist."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next local offset, when more entries exist."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "lightningDeals",
+          "totalAvailable",
+          "returnedCount",
+          "hasMore",
+          "nextOffset",
+          "meta"
+        ],
+        "description": "Lightning deal result window."
+      }
+    },
+    {
+      "id": "keepa.lookup_categories",
+      "service": "keepa",
+      "name": "lookup_categories",
+      "description": "Look up up to ten Amazon category IDs and optionally their parent tree; ID zero lists roots.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "categoryIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "One category ID."
+            },
+            "description": "Category IDs, or a sole zero to list roots.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "includeParents": {
+            "type": "boolean",
+            "description": "Include parent categories up to the root."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "categoryIds"
+        ],
+        "description": "Input for Keepa category lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "catId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category node identifier."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon category name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category name."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent category node identifier."
+                },
+                "children": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One child category node identifier."
+                      },
+                      "description": "Child category node identifiers."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Child category node identifiers."
+                },
+                "productCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated product count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated product count."
+                },
+                "sellerCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated distinct seller count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated distinct seller count."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One category object returned by Keepa."
+            },
+            "description": "Matched categories."
+          },
+          "categoryParents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "catId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category node identifier."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon category name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category name."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent category node identifier."
+                },
+                "children": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One child category node identifier."
+                      },
+                      "description": "Child category node identifiers."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Child category node identifiers."
+                },
+                "productCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated product count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated product count."
+                },
+                "sellerCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated distinct seller count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated distinct seller count."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One category object returned by Keepa."
+            },
+            "description": "Parent categories when requested."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "categories",
+          "categoryParents",
+          "meta"
+        ],
+        "description": "Keepa category lookup results."
+      }
+    },
+    {
+      "id": "keepa.search_categories",
+      "service": "keepa",
+      "name": "search_categories",
+      "description": "Search Keepa Amazon categories by name so category IDs can be used in product and best-seller queries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "term": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Space-separated category keywords; each keyword must contain at least three characters."
+          },
+          "includeParents": {
+            "type": "boolean",
+            "description": "Whether Keepa should include the parent tree for each category."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "term"
+        ],
+        "description": "Input for searching Keepa categories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "catId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category node identifier."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon category name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category name."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent category node identifier."
+                },
+                "children": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One child category node identifier."
+                      },
+                      "description": "Child category node identifiers."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Child category node identifiers."
+                },
+                "productCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated product count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated product count."
+                },
+                "sellerCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated distinct seller count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated distinct seller count."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One category object returned by Keepa."
+            },
+            "description": "Matching categories."
+          },
+          "categoryParents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "catId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category node identifier."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon category name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon category name."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent category node identifier."
+                },
+                "children": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One child category node identifier."
+                      },
+                      "description": "Child category node identifiers."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Child category node identifiers."
+                },
+                "productCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated product count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated product count."
+                },
+                "sellerCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated distinct seller count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated distinct seller count."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One category object returned by Keepa."
+            },
+            "description": "Parent categories returned when requested."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "categories",
+          "categoryParents",
+          "meta"
+        ],
+        "description": "Keepa category search results."
+      }
+    },
+    {
+      "id": "keepa.search_products",
+      "service": "keepa",
+      "name": "search_products",
+      "description": "Search Amazon products by keyword in Amazon result order, without fetching more details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "term": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amazon product search terms."
+          },
+          "asinsOnly": {
+            "type": "boolean",
+            "description": "Return only ordered ASINs instead of product objects."
+          },
+          "statsDays": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Recent days for free product statistics."
+          },
+          "statsRange": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC start time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval start."
+                  }
+                ],
+                "description": "Interval start, as ISO 8601 UTC text or Unix milliseconds."
+              },
+              "end": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 UTC end time.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix milliseconds at interval end."
+                  }
+                ],
+                "description": "Interval end, as ISO 8601 UTC text or Unix milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end"
+            ],
+            "description": "UTC statistics interval."
+          },
+          "updateHours": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Refresh threshold in hours; zero can cost extra tokens."
+          },
+          "includeHistory": {
+            "type": "boolean",
+            "description": "Include available product price history."
+          },
+          "includeRating": {
+            "type": "boolean",
+            "description": "Include existing rating and review history, possibly at extra cost."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "term"
+        ],
+        "description": "Input for Keepa keyword product search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "US",
+              "GB",
+              "DE",
+              "FR",
+              "JP",
+              "CA",
+              "IT",
+              "ES",
+              "IN",
+              "MX"
+            ],
+            "description": "Amazon marketplace supported by this Keepa endpoint (Brazil is unavailable)."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One ASIN."
+            },
+            "description": "Ordered matching ASINs."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asin": {
+                  "type": "string",
+                  "description": "Amazon ASIN."
+                },
+                "domainId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Keepa Amazon locale identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Keepa Amazon locale identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product title."
+                },
+                "brand": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Product brand."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product brand."
+                },
+                "manufacturer": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Product manufacturer."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product manufacturer."
+                },
+                "productGroup": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amazon product group."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amazon product group."
+                },
+                "parentAsin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Parent ASIN when this product is a variation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent ASIN when this product is a variation."
+                },
+                "rootCategory": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Root Amazon category node identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Root Amazon category node identifier."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "One Amazon category node identifier."
+                  },
+                  "description": "Amazon category node identifiers assigned to the product."
+                },
+                "imageUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One Amazon media image URL."
+                  },
+                  "description": "Resolved Amazon image URLs derived from Keepa image metadata."
+                },
+                "monthlySold": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Estimated monthly sold count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated monthly sold count when available."
+                },
+                "lastUpdate": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Last product update in Keepa Time minutes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Last product update in Keepa Time minutes."
+                },
+                "stats": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "current": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average30Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average90Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average180Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "average365Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "atIntervalStart": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "A Keepa price, rank, count, rating, or metadata value; price values use the marketplace's smallest currency unit."
+                          },
+                          "description": "Values keyed by official Keepa Product.CsvType name."
+                        },
+                        "isLowestEver": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean",
+                            "description": "A Keepa statistic flag."
+                          },
+                          "description": "Boolean values keyed by official Keepa Product.CsvType name."
+                        },
+                        "isLowest90Days": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean",
+                            "description": "A Keepa statistic flag."
+                          },
+                          "description": "Boolean values keyed by official Keepa Product.CsvType name."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The complete Keepa stats object."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "current",
+                        "average",
+                        "average30Days",
+                        "average90Days",
+                        "average180Days",
+                        "average365Days",
+                        "atIntervalStart",
+                        "isLowestEver",
+                        "isLowest90Days",
+                        "raw"
+                      ],
+                      "description": "Named Keepa product statistics."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Named Keepa product statistics."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The complete Keepa product object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "asin",
+                "domainId",
+                "title",
+                "brand",
+                "manufacturer",
+                "productGroup",
+                "parentAsin",
+                "rootCategory",
+                "categories",
+                "imageUrls",
+                "monthlySold",
+                "lastUpdate",
+                "stats",
+                "raw"
+              ],
+              "description": "A normalized Keepa product snapshot."
+            },
+            "description": "Product objects when ASIN-only mode is disabled."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Keepa server response time in Unix epoch milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Keepa server response time in Unix epoch milliseconds."
+              },
+              "tokensLeft": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens remaining after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens remaining after this request."
+              },
+              "refillInMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Milliseconds until Keepa next refills tokens."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Milliseconds until Keepa next refills tokens."
+              },
+              "refillRatePerMinute": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of Keepa tokens refilled per minute."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of Keepa tokens refilled per minute."
+              },
+              "tokensConsumed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Tokens consumed by this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tokens consumed by this request."
+              },
+              "processingTimeMs": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Server-side processing time in milliseconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Server-side processing time in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "tokensLeft",
+              "refillInMs",
+              "refillRatePerMinute",
+              "tokensConsumed",
+              "processingTimeMs"
+            ],
+            "description": "Keepa request and token-budget metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "asins",
+          "products",
+          "meta"
+        ],
+        "description": "Ordered Keepa keyword search results."
+      }
+    }
+  ]
+}

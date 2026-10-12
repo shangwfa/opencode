@@ -1,0 +1,1152 @@
+{
+  "service": "mem",
+  "displayName": "Mem",
+  "categories": [
+    "Productivity",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MEM_API_KEY",
+      "description": "Mem API key sent as a Bearer token. Create or view it in the API section of your Mem settings: https://app.mem.ai/settings/api."
+    }
+  ],
+  "homepageUrl": "https://mem.ai",
+  "actions": [
+    {
+      "id": "mem.create_note",
+      "service": "mem",
+      "name": "create_note",
+      "description": "Create a Mem note from a complete markdown body and optional collection links.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional caller-provided UUID for the note.",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional caller-provided UUID for the note."
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Full markdown body; the first line becomes the note title."
+          },
+          "collection_ids": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Mem collection UUID.",
+                  "format": "uuid"
+                },
+                "description": "Collection UUIDs associated with the note."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Collection UUIDs associated with the note."
+          },
+          "collection_titles": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "A Mem collection title."
+                },
+                "description": "Collection titles matched case-insensitively by exact title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Collection titles matched case-insensitively by exact title."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional creation timestamp for the note.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional creation timestamp for the note."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional initial update timestamp for the note.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional initial update timestamp for the note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The markdown body and optional metadata for a new Mem note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUID of the Mem note.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Current title of the note."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full markdown content stored for the note."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current note content document version."
+          },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Mem collection UUID.",
+              "format": "uuid"
+            },
+            "description": "Collection UUIDs associated with the note."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation timestamp for the note.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last modification timestamp for the note.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "id",
+          "title",
+          "content",
+          "version",
+          "collection_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "A note returned after a Mem write operation."
+      }
+    },
+    {
+      "id": "mem.delete_note",
+      "service": "mem",
+      "name": "delete_note",
+      "description": "Permanently delete a Mem note; this operation cannot be restored.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "UUID of the target Mem note.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id"
+        ],
+        "description": "The UUID of the Mem note to permanently delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id"
+        ],
+        "description": "The acknowledgement returned by a Mem note lifecycle operation."
+      }
+    },
+    {
+      "id": "mem.list_notes",
+      "service": "mem",
+      "name": "list_notes",
+      "description": "List Mem notes with cursor pagination, chronological ordering, and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Maximum notes to return in this page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum notes to return in this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque cursor returned by a previous list response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque cursor returned by a previous list response."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "updated_at"
+            ],
+            "description": "Timestamp used for chronological ordering."
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Collection UUID used to filter notes.",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Collection UUID used to filter notes."
+          },
+          "filter_by_created_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive lower bound for note creation time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive lower bound for note creation time."
+          },
+          "filter_by_created_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive upper bound for note creation time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive upper bound for note creation time."
+          },
+          "filter_by_updated_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive lower bound for note update time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive lower bound for note update time."
+          },
+          "filter_by_updated_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive upper bound for note update time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive upper bound for note update time."
+          },
+          "contains_open_tasks": {
+            "type": "boolean",
+            "description": "Whether to include notes containing an open task."
+          },
+          "contains_tasks": {
+            "type": "boolean",
+            "description": "Whether to include notes containing any task."
+          },
+          "contains_images": {
+            "type": "boolean",
+            "description": "Whether to include notes containing image media."
+          },
+          "contains_files": {
+            "type": "boolean",
+            "description": "Whether to include notes containing file-like attachments."
+          },
+          "include_note_content": {
+            "type": "boolean",
+            "description": "Whether each result should include full markdown content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cursor pagination and filters for listing Mem notes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "UUID of the Mem note.",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Current title of the note."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Full markdown content when the request includes note content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Full markdown content when the request includes note content."
+                },
+                "collection_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Mem collection UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "Collection UUIDs associated with the note."
+                },
+                "audio_recording_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Mem audio recording UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "Audio recording UUIDs associated with the note."
+                },
+                "snippet": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Derived preview text for the note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Derived preview text for the note."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp for the note.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Last modification timestamp for the note.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "collection_ids",
+                "audio_recording_ids",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "A note summary returned by Mem."
+            },
+            "description": "Notes in the current page."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching notes before pagination."
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque cursor for the next page of notes."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque cursor for the next page of notes."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "results",
+          "total"
+        ],
+        "description": "A cursor-paginated page of Mem note summaries."
+      }
+    },
+    {
+      "id": "mem.read_note",
+      "service": "mem",
+      "name": "read_note",
+      "description": "Read the full current state of one Mem note, including trash state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "UUID of the target Mem note.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id"
+        ],
+        "description": "The UUID of the Mem note to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUID of the Mem note.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Current title of the note."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full markdown content stored for the note."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current note content document version."
+          },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Mem collection UUID.",
+              "format": "uuid"
+            },
+            "description": "Collection UUIDs associated with the note."
+          },
+          "audio_recording_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Mem audio recording UUID.",
+              "format": "uuid"
+            },
+            "description": "Audio recording UUIDs associated with the note."
+          },
+          "attachment_metadata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attachment_kind": {
+                  "type": "string",
+                  "enum": [
+                    "pdf",
+                    "image"
+                  ],
+                  "description": "The attachment kind."
+                },
+                "attachment_id": {
+                  "type": "string",
+                  "description": "UUID of the note attachment.",
+                  "format": "uuid"
+                },
+                "page_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Number of pages for a PDF attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Number of pages for a PDF attachment."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Extracted summary for the attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Extracted summary for the attachment."
+                },
+                "suggested_search": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Suggested query for searching within the attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Suggested query for searching within the attachment."
+                },
+                "ocr_text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Extracted OCR text for an image attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Extracted OCR text for an image attachment."
+                },
+                "visual_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Visual description for an image attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Visual description for an image attachment."
+                },
+                "image_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Detected image type for an image attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Detected image type for an image attachment."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "attachment_kind",
+                "attachment_id"
+              ],
+              "description": "Compact metadata for an attachment embedded in a note."
+            },
+            "description": "Compact metadata for attachments embedded in the note."
+          },
+          "trashed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Timestamp when the note was moved to trash, or null when active.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Timestamp when the note was moved to trash, or null when active."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation timestamp for the note.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last modification timestamp for the note.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "id",
+          "title",
+          "content",
+          "version",
+          "collection_ids",
+          "audio_recording_ids",
+          "attachment_metadata",
+          "trashed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "The full current state of a Mem note."
+      }
+    },
+    {
+      "id": "mem.restore_note",
+      "service": "mem",
+      "name": "restore_note",
+      "description": "Restore a previously trashed Mem note to the active note set.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "UUID of the target Mem note.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id"
+        ],
+        "description": "The UUID of the trashed Mem note to restore."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id"
+        ],
+        "description": "The acknowledgement returned by a Mem note lifecycle operation."
+      }
+    },
+    {
+      "id": "mem.search_notes",
+      "service": "mem",
+      "name": "search_notes",
+      "description": "Search Mem notes by relevance with filters and bounded snapshot pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text query used to search notes by relevance."
+          },
+          "filter_by_collection_ids": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Mem collection UUID.",
+                  "format": "uuid"
+                },
+                "description": "Collection UUID filters; notes in any listed collection may match."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Collection UUID filters; notes in any listed collection may match."
+          },
+          "filter_by_created_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive lower bound for note creation time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive lower bound for note creation time."
+          },
+          "filter_by_created_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive upper bound for note creation time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive upper bound for note creation time."
+          },
+          "filter_by_updated_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive lower bound for note update time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive lower bound for note update time."
+          },
+          "filter_by_updated_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Inclusive upper bound for note update time.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Inclusive upper bound for note update time."
+          },
+          "filter_by_contains_open_tasks": {
+            "type": "boolean",
+            "description": "Whether to include notes containing an open task."
+          },
+          "filter_by_contains_tasks": {
+            "type": "boolean",
+            "description": "Whether to include notes containing any task."
+          },
+          "filter_by_contains_images": {
+            "type": "boolean",
+            "description": "Whether to include notes containing image media."
+          },
+          "filter_by_contains_files": {
+            "type": "boolean",
+            "description": "Whether to include notes containing file-like attachments."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "include_note_content": {
+                "type": "boolean",
+                "description": "Whether search results should include full markdown content."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Flags controlling the search response payload."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50,
+                "description": "Maximum notes to return in this search page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum notes to return in this search page."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based number of matching notes to skip."
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Snapshot UUID returned by a previous search page.",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot UUID returned by a previous search page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Search query, filters, and bounded snapshot pagination settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "UUID of the Mem note.",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Current title of the note."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Full markdown content when the request includes note content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Full markdown content when the request includes note content."
+                },
+                "collection_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Mem collection UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "Collection UUIDs associated with the note."
+                },
+                "audio_recording_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Mem audio recording UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "Audio recording UUIDs associated with the note."
+                },
+                "snippet": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Derived preview text for the note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Derived preview text for the note."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp for the note.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Last modification timestamp for the note.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "collection_ids",
+                "audio_recording_ids",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "A note summary returned by Mem."
+            },
+            "description": "Relevance-ranked note results."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Matching notes captured in the bounded search snapshot."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset applied to the search results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Limit applied to the search page."
+          },
+          "has_next_page": {
+            "type": "boolean",
+            "description": "Whether another page exists in this search snapshot."
+          },
+          "snapshot_id": {
+            "type": "string",
+            "description": "Snapshot UUID to reuse for deterministic later pages.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "results",
+          "total",
+          "offset",
+          "limit",
+          "has_next_page",
+          "snapshot_id"
+        ],
+        "description": "A bounded relevance-ranked search page from Mem."
+      }
+    },
+    {
+      "id": "mem.trash_note",
+      "service": "mem",
+      "name": "trash_note",
+      "description": "Move a Mem note to trash so it can be restored later.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "UUID of the target Mem note.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id"
+        ],
+        "description": "The UUID of the Mem note to move to trash."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id"
+        ],
+        "description": "The acknowledgement returned by a Mem note lifecycle operation."
+      }
+    },
+    {
+      "id": "mem.update_note",
+      "service": "mem",
+      "name": "update_note",
+      "description": "Replace a Mem note's markdown body using its exact current content version.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "description": "UUID of the Mem note to update.",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 200000,
+            "description": "Complete replacement markdown body for the note."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Exact current content document version."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional update timestamp for this write.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional update timestamp for this write."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note_id",
+          "content",
+          "version"
+        ],
+        "description": "The note UUID, complete replacement body, and optimistic concurrency version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier for the Mem API request."
+          },
+          "id": {
+            "type": "string",
+            "description": "UUID of the Mem note.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Current title of the note after the update."
+          },
+          "content": {
+            "type": "string",
+            "description": "Full markdown content stored after the update."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Current note content document version after the update."
+          },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Mem collection UUID.",
+              "format": "uuid"
+            },
+            "description": "Collection UUIDs associated with the note."
+          },
+          "trashed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Timestamp when the note was moved to trash, or null when active.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Timestamp when the note was moved to trash, or null when active."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Creation timestamp for the note.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Last modification timestamp after the update.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "request_id",
+          "id",
+          "title",
+          "content",
+          "version",
+          "collection_ids",
+          "trashed_at",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "The current state of a Mem note after an update."
+      }
+    }
+  ]
+}

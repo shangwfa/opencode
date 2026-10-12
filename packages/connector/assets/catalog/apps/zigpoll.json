@@ -1,0 +1,517 @@
+{
+  "service": "zigpoll",
+  "displayName": "Zigpoll",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "zigpoll_private_key",
+      "description": "Zigpoll private API key sent in the Authorization header. Create or copy it from the Zigpoll dashboard under Integrations > Private Keys: https://docs.zigpoll.com/web-api."
+    }
+  ],
+  "homepageUrl": "https://www.zigpoll.com",
+  "actions": [
+    {
+      "id": "zigpoll.generate_survey_link",
+      "service": "zigpoll",
+      "name": "generate_survey_link",
+      "description": "Generate a unique trackable Zigpoll survey link for a poll.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pollId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zigpoll poll ID."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A metadata value accepted by Zigpoll."
+            },
+            "description": "Optional key-value metadata to attach to the generated survey activity."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "ISO 8601 datetime after which the survey link expires.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pollId"
+        ],
+        "description": "Input for generating a unique Zigpoll survey link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The unique survey URL to distribute to a respondent.",
+            "format": "uri"
+          },
+          "activityId": {
+            "type": "string",
+            "description": "The unique Zigpoll activity ID associated with the survey link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A generated Zigpoll survey link."
+      }
+    },
+    {
+      "id": "zigpoll.get_current_user",
+      "service": "zigpoll",
+      "name": "get_current_user",
+      "description": "Fetch the authenticated Zigpoll user object.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this Zigpoll action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "The Zigpoll user ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The Zigpoll user's email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "description": "The Zigpoll user's display name."
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Zigpoll account ID."
+            },
+            "description": "Account IDs associated with the user."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the user was created.",
+            "format": "date-time"
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "Timestamp when the user was last modified.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "_id",
+          "email",
+          "name",
+          "accounts",
+          "createdAt",
+          "lastModified"
+        ],
+        "description": "The authenticated Zigpoll user."
+      }
+    },
+    {
+      "id": "zigpoll.get_poll",
+      "service": "zigpoll",
+      "name": "get_poll",
+      "description": "Fetch a Zigpoll poll by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pollId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zigpoll poll ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for fetching a Zigpoll poll."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Raw Zigpoll object fields returned by the API."
+      }
+    },
+    {
+      "id": "zigpoll.list_accounts",
+      "service": "zigpoll",
+      "name": "list_accounts",
+      "description": "List Zigpoll account objects available to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this Zigpoll action."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Raw Zigpoll object fields returned by the API."
+        },
+        "description": "Zigpoll account objects returned by the API."
+      }
+    },
+    {
+      "id": "zigpoll.list_participants",
+      "service": "zigpoll",
+      "name": "list_participants",
+      "description": "List Zigpoll participants by account, poll, or slide with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll account ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "accountId"
+            ],
+            "description": "Input for listing paginated Zigpoll participants by account, poll, or slide. Filter by accountId."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "pollId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll poll ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pollId"
+            ],
+            "description": "Input for listing paginated Zigpoll participants by account, poll, or slide. Filter by pollId."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "slideId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll slide ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "slideId"
+            ],
+            "description": "Input for listing paginated Zigpoll participants by account, poll, or slide. Filter by slideId."
+          }
+        ],
+        "description": "Input for listing paginated Zigpoll participants by account, poll, or slide. Provide exactly one of accountId, pollId, or slideId."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Raw Zigpoll object fields returned by the API."
+            },
+            "description": "Objects returned by Zigpoll."
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          },
+          "endCursor": {
+            "type": "string",
+            "description": "Cursor for fetching the next page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "hasNextPage",
+          "endCursor"
+        ],
+        "description": "A Zigpoll cursor-paginated response."
+      }
+    },
+    {
+      "id": "zigpoll.list_polls",
+      "service": "zigpoll",
+      "name": "list_polls",
+      "description": "List Zigpoll polls for an account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zigpoll account ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Zigpoll polls."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Raw Zigpoll object fields returned by the API."
+        },
+        "description": "Zigpoll poll objects returned by the API."
+      }
+    },
+    {
+      "id": "zigpoll.list_responses",
+      "service": "zigpoll",
+      "name": "list_responses",
+      "description": "List Zigpoll responses by account, poll, or slide with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll account ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              },
+              "createdAfter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or after this time."
+              },
+              "createdBefore": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or before this time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "accountId"
+            ],
+            "description": "Input for listing paginated Zigpoll responses by account, poll, or slide. Filter by accountId."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "pollId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll poll ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              },
+              "createdAfter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or after this time."
+              },
+              "createdBefore": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or before this time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pollId"
+            ],
+            "description": "Input for listing paginated Zigpoll responses by account, poll, or slide. Filter by pollId."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "slideId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zigpoll slide ID."
+              },
+              "startCursor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor returned by Zigpoll for the next page."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5000,
+                "description": "Maximum number of objects to return. Zigpoll documents a maximum of 5000."
+              },
+              "createdAfter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or after this time."
+              },
+              "createdBefore": {
+                "type": "string",
+                "minLength": 1,
+                "description": "JavaScript timestamp string for returning objects created on or before this time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "slideId"
+            ],
+            "description": "Input for listing paginated Zigpoll responses by account, poll, or slide. Filter by slideId."
+          }
+        ],
+        "description": "Input for listing paginated Zigpoll responses by account, poll, or slide. Provide exactly one of accountId, pollId, or slideId."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Raw Zigpoll object fields returned by the API."
+            },
+            "description": "Objects returned by Zigpoll."
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          },
+          "endCursor": {
+            "type": "string",
+            "description": "Cursor for fetching the next page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "hasNextPage",
+          "endCursor"
+        ],
+        "description": "A Zigpoll cursor-paginated response."
+      }
+    },
+    {
+      "id": "zigpoll.list_slides",
+      "service": "zigpoll",
+      "name": "list_slides",
+      "description": "List Zigpoll slides for a poll.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pollId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zigpoll poll ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Zigpoll slides."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Raw Zigpoll object fields returned by the API."
+        },
+        "description": "Zigpoll slide objects returned by the API."
+      }
+    }
+  ]
+}

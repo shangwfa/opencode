@@ -1,0 +1,3268 @@
+{
+  "service": "elasticsearch",
+  "displayName": "Elasticsearch",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key",
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Encoded API Key",
+      "placeholder": "base64-encoded-id-and-api-key",
+      "description": "Elasticsearch encoded API key sent with the Authorization: ApiKey header.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Elasticsearch URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://es.example.com:9200",
+          "description": "Elasticsearch API base URL for your own deployment, including any proxy path if required."
+        }
+      ]
+    },
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "Elasticsearch URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://es.example.com:9200",
+          "description": "Elasticsearch API base URL for your own deployment, including any proxy path if required."
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "description": "The Basic auth username for your own Elasticsearch deployment."
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "description": "The Basic auth password for your own Elasticsearch deployment."
+        }
+      ],
+      "testAction": {
+        "actionName": "ping_cluster",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://www.elastic.co/elasticsearch",
+  "actions": [
+    {
+      "id": "elasticsearch.bulk_index_documents",
+      "service": "elasticsearch",
+      "name": "bulk_index_documents",
+      "description": "Apply many Elasticsearch document writes in one bulk request. Each operation names its own index, and per-operation failures are reported in the response instead of failing the whole request.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "index",
+                    "create",
+                    "update",
+                    "delete"
+                  ],
+                  "description": "The bulk action to apply for this document."
+                },
+                "indexName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The index this operation targets."
+                },
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The document identifier. Required for delete operations and optional otherwise."
+                },
+                "document": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The document body. Required for index, create, and update operations, and ignored for delete."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "indexName"
+              ],
+              "description": "One bulk operation."
+            },
+            "description": "The document writes to apply in order.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "refresh": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "wait_for"
+            ],
+            "description": "Whether to refresh the affected shards before returning: true refreshes immediately, wait_for waits for the next scheduled refresh, and false skips refreshing.",
+            "default": "false"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "operations"
+        ],
+        "description": "The input payload for a bulk Elasticsearch write."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "took": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The bulk duration in milliseconds, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bulk duration in milliseconds, or null when unavailable."
+          },
+          "errors": {
+            "type": "boolean",
+            "description": "Whether at least one operation failed."
+          },
+          "successCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of operations that succeeded."
+          },
+          "failureCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of operations that failed."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "description": "The bulk action that was applied."
+                },
+                "index": {
+                  "type": "string",
+                  "description": "The index the operation targeted."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The document identifier assigned or used by the operation."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The HTTP status code for this operation, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The HTTP status code for this operation, or null when unavailable."
+                },
+                "result": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Elasticsearch result for this operation, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Elasticsearch result for this operation, or null when unavailable."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The failure reason, or null when the operation succeeded."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The failure reason, or null when the operation succeeded."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The outcome of one bulk operation."
+            },
+            "description": "The per-operation outcomes in request order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch bulk response."
+      }
+    },
+    {
+      "id": "elasticsearch.count_documents",
+      "service": "elasticsearch",
+      "name": "count_documents",
+      "description": "Count Elasticsearch documents matching a query without returning any hits, which is cheaper than a search when only the size of a result set matters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index or index pattern to count documents in."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A free-text query_string query."
+          },
+          "termFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "The exact value to match in a term query."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One exact term filter."
+            },
+            "description": "Exact term filters for specific field values.",
+            "minItems": 1
+          },
+          "rangeFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "gt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than this value."
+                },
+                "gte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than or equal to this value."
+                },
+                "lt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than this value."
+                },
+                "lte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than or equal to this value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A range filter for numeric, keyword, or date fields."
+            },
+            "description": "Range filters for fields.",
+            "minItems": 1
+          },
+          "timeFilter": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The timestamp field to filter on."
+              },
+              "gt": {
+                "type": "string",
+                "description": "Match timestamps greater than this ISO 8601 value."
+              },
+              "gte": {
+                "type": "string",
+                "description": "Match timestamps greater than or equal to this ISO 8601 value."
+              },
+              "lt": {
+                "type": "string",
+                "description": "Match timestamps less than this ISO 8601 value."
+              },
+              "lte": {
+                "type": "string",
+                "description": "Match timestamps less than or equal to this ISO 8601 value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "A time-based range filter for timestamp fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName"
+        ],
+        "description": "The input payload for counting Elasticsearch documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index the count ran against."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of documents matching the query."
+          },
+          "successfulShards": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of shards that answered the count, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of shards that answered the count, or null when unavailable."
+          },
+          "failedShards": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of shards that failed the count, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of shards that failed the count, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch count response."
+      }
+    },
+    {
+      "id": "elasticsearch.create_index",
+      "service": "elasticsearch",
+      "name": "create_index",
+      "description": "Create one Elasticsearch index with explicit mappings, settings, and aliases.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact name of the index to create.",
+            "pattern": "^[^*?,]+$"
+          },
+          "mappings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The mapping definition for the new index, such as a properties object."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The index settings for the new index, such as number_of_shards and number_of_replicas."
+          },
+          "aliases": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The aliases to attach to the new index, keyed by alias name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName"
+        ],
+        "description": "The input payload for creating one Elasticsearch index."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The created index name."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether Elasticsearch acknowledged the index creation."
+          },
+          "shardsAcknowledged": {
+            "type": "boolean",
+            "description": "Whether the required number of shard copies started before the request returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch index creation response."
+      }
+    },
+    {
+      "id": "elasticsearch.delete_by_query",
+      "service": "elasticsearch",
+      "name": "delete_by_query",
+      "description": "Delete Elasticsearch documents matching a query. This destroys data and cannot be undone, so a bounded maxDocs and at least one of query, termFilters, rangeFilters, or timeFilter are required, the index name must be exact, and _all is rejected. That makes it impossible to empty an entire index by accident. The action waits for the deletion to finish, and a large maxDocs can outlast that wait: a timeout does not cancel the deletion, which keeps running on the cluster with no task id to poll, so a retry after a timeout deletes a further batch.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact index to delete documents from. Wildcards, comma-separated lists, and _all are rejected.",
+            "pattern": "^[^*?,]+$"
+          },
+          "maxDocs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of documents this request may delete. Elasticsearch stops once the limit is reached."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A free-text query_string query."
+          },
+          "termFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "The exact value to match in a term query."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One exact term filter."
+            },
+            "description": "Exact term filters for specific field values.",
+            "minItems": 1
+          },
+          "rangeFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "gt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than this value."
+                },
+                "gte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than or equal to this value."
+                },
+                "lt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than this value."
+                },
+                "lte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than or equal to this value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A range filter for numeric, keyword, or date fields."
+            },
+            "description": "Range filters for fields.",
+            "minItems": 1
+          },
+          "timeFilter": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The timestamp field to filter on."
+              },
+              "gt": {
+                "type": "string",
+                "description": "Match timestamps greater than this ISO 8601 value."
+              },
+              "gte": {
+                "type": "string",
+                "description": "Match timestamps greater than or equal to this ISO 8601 value."
+              },
+              "lt": {
+                "type": "string",
+                "description": "Match timestamps less than this ISO 8601 value."
+              },
+              "lte": {
+                "type": "string",
+                "description": "Match timestamps less than or equal to this ISO 8601 value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "A time-based range filter for timestamp fields."
+          },
+          "conflicts": {
+            "type": "string",
+            "enum": [
+              "abort",
+              "proceed"
+            ],
+            "description": "Whether to abort on the first version conflict or keep processing the remaining documents.",
+            "default": "abort"
+          },
+          "refresh": {
+            "type": "boolean",
+            "description": "Whether to refresh the affected shards after the deletion completes.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "maxDocs"
+        ],
+        "description": "The input payload for deleting Elasticsearch documents by query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index the deletion ran against."
+          },
+          "took": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The request duration in milliseconds, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The request duration in milliseconds, or null when unavailable."
+          },
+          "timedOut": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the request timed out, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the request timed out, or null when unavailable."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of documents matched by the query, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of documents matched by the query, or null when unavailable."
+          },
+          "deleted": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of documents deleted, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of documents deleted, or null when unavailable."
+          },
+          "batches": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of batches processed, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of batches processed, or null when unavailable."
+          },
+          "versionConflicts": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of version conflicts encountered, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of version conflicts encountered, or null when unavailable."
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One failure message."
+            },
+            "description": "The failures reported by Elasticsearch, as readable messages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch delete by query response."
+      }
+    },
+    {
+      "id": "elasticsearch.delete_document",
+      "service": "elasticsearch",
+      "name": "delete_document",
+      "description": "Delete one Elasticsearch document by id. A missing document returns a not_found result instead of raising an error.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index that holds the document."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the document to delete."
+          },
+          "refresh": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "wait_for"
+            ],
+            "description": "Whether to refresh the affected shards before returning: true refreshes immediately, wait_for waits for the next scheduled refresh, and false skips refreshing.",
+            "default": "false"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "documentId"
+        ],
+        "description": "The input payload for deleting one Elasticsearch document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "description": "The index the delete targeted."
+          },
+          "id": {
+            "type": "string",
+            "description": "The document identifier that was requested."
+          },
+          "result": {
+            "type": "string",
+            "description": "The Elasticsearch delete result, such as deleted or not_found."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The document version, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The document version, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch delete document response."
+      }
+    },
+    {
+      "id": "elasticsearch.delete_index",
+      "service": "elasticsearch",
+      "name": "delete_index",
+      "description": "Permanently delete one or more Elasticsearch indices by exact name. This destroys data and cannot be undone, so wildcards, comma-separated lists, and _all are rejected, and expectedCount must equal the number of names supplied.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One exact index name to delete."
+            },
+            "description": "The exact index names to delete. Wildcards and _all are rejected.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "expectedCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of indices the caller expects to delete. It must equal the length of indices, so a mistyped request fails instead of deleting the wrong data."
+          },
+          "ignoreUnavailable": {
+            "type": "boolean",
+            "description": "Whether to ignore index names that do not exist instead of failing.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indices",
+          "expectedCount"
+        ],
+        "description": "The input payload for permanently deleting Elasticsearch indices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether Elasticsearch acknowledged the deletion."
+          },
+          "deletedIndices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One deleted index name."
+            },
+            "description": "The index names that were submitted for deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch index deletion response."
+      }
+    },
+    {
+      "id": "elasticsearch.get_cluster_health",
+      "service": "elasticsearch",
+      "name": "get_cluster_health",
+      "description": "Get detailed Elasticsearch cluster health including shard counts and an optional per-index breakdown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of index names or wildcard expressions to limit the returned indices."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "cluster",
+              "indices",
+              "shards"
+            ],
+            "description": "How much detail to return in the health response.",
+            "default": "cluster"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for reading Elasticsearch cluster health."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterName": {
+            "type": "string",
+            "description": "The cluster name."
+          },
+          "status": {
+            "type": "string",
+            "description": "The overall cluster health status."
+          },
+          "timedOut": {
+            "type": "boolean",
+            "description": "Whether the health request timed out before the cluster stabilized."
+          },
+          "numberOfNodes": {
+            "type": "integer",
+            "description": "The number of nodes in the cluster."
+          },
+          "numberOfDataNodes": {
+            "type": "integer",
+            "description": "The number of data nodes in the cluster."
+          },
+          "activePrimaryShards": {
+            "type": "integer",
+            "description": "The number of active primary shards."
+          },
+          "activeShards": {
+            "type": "integer",
+            "description": "The number of active shards including replicas."
+          },
+          "relocatingShards": {
+            "type": "integer",
+            "description": "The number of shards being relocated."
+          },
+          "initializingShards": {
+            "type": "integer",
+            "description": "The number of shards being initialized."
+          },
+          "unassignedShards": {
+            "type": "integer",
+            "description": "The number of unassigned shards."
+          },
+          "delayedUnassignedShards": {
+            "type": "integer",
+            "description": "The number of unassigned shards whose allocation is delayed."
+          },
+          "numberOfPendingTasks": {
+            "type": "integer",
+            "description": "The number of cluster-level tasks waiting to be executed."
+          },
+          "activeShardsPercent": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The percentage of shards that are active, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The percentage of shards that are active, or null when unavailable."
+          },
+          "indices": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "string",
+                      "description": "The index name."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The index health status."
+                    },
+                    "numberOfShards": {
+                      "type": "integer",
+                      "description": "The number of primary shards configured for the index."
+                    },
+                    "numberOfReplicas": {
+                      "type": "integer",
+                      "description": "The number of replicas configured for the index."
+                    },
+                    "activePrimaryShards": {
+                      "type": "integer",
+                      "description": "The number of active primary shards."
+                    },
+                    "activeShards": {
+                      "type": "integer",
+                      "description": "The number of active shards including replicas."
+                    },
+                    "relocatingShards": {
+                      "type": "integer",
+                      "description": "The number of relocating shards."
+                    },
+                    "initializingShards": {
+                      "type": "integer",
+                      "description": "The number of initializing shards."
+                    },
+                    "unassignedShards": {
+                      "type": "integer",
+                      "description": "The number of unassigned shards."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Health for one index in the cluster."
+                },
+                "description": "The per-index health breakdown, or null when level is cluster."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The per-index health breakdown, or null when level is cluster."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch cluster health response."
+      }
+    },
+    {
+      "id": "elasticsearch.get_cluster_nodes",
+      "service": "elasticsearch",
+      "name": "get_cluster_nodes",
+      "description": "List Elasticsearch cluster nodes with uptime, heap, disk, and role information. Node uptime is what makes the cumulative counters from get_index_stats interpretable.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Elasticsearch cluster nodes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cluster name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cluster name, or null when unavailable."
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The node identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The node name."
+                },
+                "host": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The node host address, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The node host address, or null when unavailable."
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One node role."
+                  },
+                  "description": "The roles assigned to the node."
+                },
+                "uptimeMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The node JVM uptime in milliseconds, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The node JVM uptime in milliseconds, or null when unavailable."
+                },
+                "heapUsedPercent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The percentage of JVM heap in use, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The percentage of JVM heap in use, or null when unavailable."
+                },
+                "cpuPercent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The percentage of CPU in use on the node, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The percentage of CPU in use on the node, or null when unavailable."
+                },
+                "diskTotalBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total file system size in bytes, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total file system size in bytes, or null when unavailable."
+                },
+                "diskFreeBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The free file system space in bytes, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The free file system space in bytes, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Elasticsearch cluster node."
+            },
+            "description": "The nodes in the cluster, sorted by name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch cluster node list."
+      }
+    },
+    {
+      "id": "elasticsearch.get_document",
+      "service": "elasticsearch",
+      "name": "get_document",
+      "description": "Get one Elasticsearch document by id. A missing document returns found as false instead of raising an error.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index that holds the document."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the document to read."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A source field to include in the response."
+            },
+            "description": "Specific source fields to return instead of the whole document.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "documentId"
+        ],
+        "description": "The input payload for reading one Elasticsearch document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "description": "The index that was queried."
+          },
+          "id": {
+            "type": "string",
+            "description": "The document identifier that was requested."
+          },
+          "found": {
+            "type": "boolean",
+            "description": "Whether the document exists."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The document version, or null when the document is missing."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The document version, or null when the document is missing."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The document source, or null when the document is missing."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The document source, or null when the document is missing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch document response."
+      }
+    },
+    {
+      "id": "elasticsearch.get_index_schema",
+      "service": "elasticsearch",
+      "name": "get_index_schema",
+      "description": "Get mappings, settings, aliases, and field statistics for one Elasticsearch index.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Elasticsearch index name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for reading one Elasticsearch index schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resolved index name."
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "aliases": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Aliases configured for the index."
+              },
+              "mappings": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Mappings configured for the index."
+              },
+              "settings": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Settings configured for the index."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The index schema payload returned by Elasticsearch."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "totalFields": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of mapped fields."
+              },
+              "fieldTypes": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "A record value."
+                },
+                "description": "A count of mapped fields by Elasticsearch field type."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Statistics derived from the index mappings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch index schema response."
+      }
+    },
+    {
+      "id": "elasticsearch.get_index_stats",
+      "service": "elasticsearch",
+      "name": "get_index_stats",
+      "description": "Get document, store, search, get, and indexing statistics for Elasticsearch indices. Counters such as searchQueryTotal are cumulative since each node started rather than a time window, so compare them against the node uptime in counterWindow before concluding that a zero means the index is never queried.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of index names or wildcard expressions to limit the returned indices."
+          },
+          "includeCounterWindow": {
+            "type": "boolean",
+            "description": "Whether to also fetch node uptime so the cumulative counters can be interpreted.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for reading Elasticsearch index statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "string",
+                  "description": "The index name."
+                },
+                "health": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index health status, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index health status, or null when unavailable."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index open or closed status, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index open or closed status, or null when unavailable."
+                },
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index UUID, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index UUID, or null when unavailable."
+                },
+                "docsCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of live documents in the index, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of live documents in the index, or null when unavailable."
+                },
+                "docsDeleted": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of deleted documents not yet merged away, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of deleted documents not yet merged away, or null when unavailable."
+                },
+                "storeSizeBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total store size in bytes across all shard copies, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total store size in bytes across all shard copies, or null when unavailable."
+                },
+                "searchQueryTotal": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative number of search queries since node start, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative number of search queries since node start, or null when unavailable."
+                },
+                "searchQueryTimeMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative search query time in milliseconds, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative search query time in milliseconds, or null when unavailable."
+                },
+                "searchFetchTotal": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative number of search fetch phases, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative number of search fetch phases, or null when unavailable."
+                },
+                "getTotal": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative number of get-by-id requests, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative number of get-by-id requests, or null when unavailable."
+                },
+                "getTimeMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative get-by-id time in milliseconds, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative get-by-id time in milliseconds, or null when unavailable."
+                },
+                "indexingIndexTotal": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative number of indexing operations, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative number of indexing operations, or null when unavailable."
+                },
+                "indexingDeleteTotal": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cumulative number of delete operations, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cumulative number of delete operations, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Statistics for one Elasticsearch index."
+            },
+            "description": "The per-index statistics."
+          },
+          "counterWindow": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "description": "An explanation of how the cumulative counters should be read."
+                  },
+                  "nodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The node name."
+                        },
+                        "uptimeMs": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "description": "The node JVM uptime in milliseconds, or null when unavailable."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The node JVM uptime in milliseconds, or null when unavailable."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "One node uptime entry."
+                    },
+                    "description": "The cluster nodes and how long each has been running."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Node uptime context for the cumulative counters, or null when it was not requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Node uptime context for the cumulative counters, or null when it was not requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch index statistics response."
+      }
+    },
+    {
+      "id": "elasticsearch.get_task",
+      "service": "elasticsearch",
+      "name": "get_task",
+      "description": "Get the state and progress of one Elasticsearch task, such as a reindex started by the reindex action.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task identifier returned when the task was submitted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for reading one Elasticsearch task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The task identifier that was polled."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ],
+            "description": "The normalized task state."
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether Elasticsearch reports the task as finished."
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Elasticsearch action the task runs, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Elasticsearch action the task runs, or null when unavailable."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The human-readable task description, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The human-readable task description, or null when unavailable."
+          },
+          "startTimeMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The task start time in epoch milliseconds, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The task start time in epoch milliseconds, or null when unavailable."
+          },
+          "runningTimeMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "How long the task has been running in milliseconds, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How long the task has been running in milliseconds, or null when unavailable."
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of documents to process, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of documents to process, or null when unknown."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of documents created, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of documents created, or null when unknown."
+              },
+              "updated": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of documents updated, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of documents updated, or null when unknown."
+              },
+              "deleted": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of documents deleted, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of documents deleted, or null when unknown."
+              },
+              "batches": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of batches processed, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of batches processed, or null when unknown."
+              },
+              "versionConflicts": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of version conflicts encountered, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of version conflicts encountered, or null when unknown."
+              },
+              "noops": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of documents skipped as no-ops, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of documents skipped as no-ops, or null when unknown."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The progress counters reported by the task."
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One failure message."
+            },
+            "description": "The failures reported by the task, as readable messages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch task response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "elasticsearch.reindex",
+        "statusActionId": "elasticsearch.get_task"
+      }
+    },
+    {
+      "id": "elasticsearch.index_document",
+      "service": "elasticsearch",
+      "name": "index_document",
+      "description": "Index or replace one document in an Elasticsearch index. Supplying documentId replaces that document, while omitting it lets Elasticsearch generate an id.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index to write the document into."
+          },
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The document body to index."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier to write the document under. Elasticsearch generates one when this is omitted."
+          },
+          "opType": {
+            "type": "string",
+            "enum": [
+              "index",
+              "create"
+            ],
+            "description": "Whether to overwrite an existing document (index) or fail when the id already exists (create).",
+            "default": "index"
+          },
+          "refresh": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "wait_for"
+            ],
+            "description": "Whether to refresh the affected shards before returning: true refreshes immediately, wait_for waits for the next scheduled refresh, and false skips refreshing.",
+            "default": "false"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "document"
+        ],
+        "description": "The input payload for indexing one Elasticsearch document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "description": "The index the document was written to."
+          },
+          "id": {
+            "type": "string",
+            "description": "The identifier of the written document."
+          },
+          "result": {
+            "type": "string",
+            "description": "The Elasticsearch write result, such as created or updated."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The document version, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The document version, or null when unavailable."
+          },
+          "successfulShards": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of shard copies that acknowledged the write, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of shard copies that acknowledged the write, or null when unavailable."
+          },
+          "failedShards": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of shard copies that failed the write, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of shard copies that failed the write, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch index document response."
+      }
+    },
+    {
+      "id": "elasticsearch.list_aliases",
+      "service": "elasticsearch",
+      "name": "list_aliases",
+      "description": "List Elasticsearch aliases and the indices behind them, optionally filtered by alias or index pattern.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An alias name or wildcard pattern to filter by."
+          },
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of index names or wildcard expressions to limit the returned indices."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Elasticsearch aliases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "alias": {
+                  "type": "string",
+                  "description": "The alias name."
+                },
+                "index": {
+                  "type": "string",
+                  "description": "The index the alias points at."
+                },
+                "isWriteIndex": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether this index is the write index for the alias, or null when not configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether this index is the write index for the alias, or null when not configured."
+                },
+                "filter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The alias filter query, or null when the alias has no filter."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alias filter query, or null when the alias has no filter."
+                },
+                "indexRouting": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alias index routing value, or null when not configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alias index routing value, or null when not configured."
+                },
+                "searchRouting": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alias search routing value, or null when not configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alias search routing value, or null when not configured."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One alias assignment on one index."
+            },
+            "description": "One row per alias and index pair."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch alias list."
+      }
+    },
+    {
+      "id": "elasticsearch.list_indices",
+      "service": "elasticsearch",
+      "name": "list_indices",
+      "description": "List Elasticsearch indices visible to the connected user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of index names or wildcard expressions to limit the returned indices."
+          },
+          "health": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red"
+            ],
+            "description": "Filter indices by health status."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of cat indices columns to sort by, such as index or docs.count:desc."
+          },
+          "expandWildcards": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The comma-separated wildcard expansion modes for index patterns.",
+            "pattern": "^(open|closed|hidden|none|all)(,(open|closed|hidden|none|all))*$"
+          },
+          "includePrimaryShardsOnly": {
+            "type": "boolean",
+            "description": "Whether to return only primary shard information.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Elasticsearch indices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "string",
+                  "description": "The index name."
+                },
+                "health": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index health status, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index health status, or null when unavailable."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index open or closed status, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index open or closed status, or null when unavailable."
+                },
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index UUID, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index UUID, or null when unavailable."
+                },
+                "primaryShards": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of primary shards, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of primary shards, or null when unavailable."
+                },
+                "replicaShards": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of replica shards, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of replica shards, or null when unavailable."
+                },
+                "docsCount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of documents in the index, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of documents in the index, or null when unavailable."
+                },
+                "docsDeleted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of deleted documents in the index, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of deleted documents in the index, or null when unavailable."
+                },
+                "storeSize": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The total index store size, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total index store size, or null when unavailable."
+                },
+                "primaryStoreSize": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary shard store size, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary shard store size, or null when unavailable."
+                },
+                "creationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index creation timestamp, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index creation timestamp, or null when unavailable."
+                },
+                "creationDateString": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index creation date string, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index creation date string, or null when unavailable."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "index",
+                "health",
+                "status",
+                "uuid",
+                "primaryShards",
+                "replicaShards",
+                "docsCount",
+                "docsDeleted",
+                "storeSize",
+                "primaryStoreSize",
+                "creationDate",
+                "creationDateString"
+              ],
+              "description": "An Elasticsearch index summary."
+            },
+            "description": "The list of Elasticsearch index summaries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch indices list."
+      }
+    },
+    {
+      "id": "elasticsearch.list_shards",
+      "service": "elasticsearch",
+      "name": "list_shards",
+      "description": "List Elasticsearch shard placement, state, and size, optionally limited to an index pattern or a shard state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of index names or wildcard expressions to limit the returned indices."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of cat shards columns to sort by, such as index or store:desc."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "STARTED",
+              "INITIALIZING",
+              "RELOCATING",
+              "UNASSIGNED"
+            ],
+            "description": "Only return shards in this state."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Elasticsearch shards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The index the shard belongs to, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The index the shard belongs to, or null when unavailable."
+                },
+                "shard": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The shard number, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The shard number, or null when unavailable."
+                },
+                "prirep": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Whether the shard is a primary (p) or replica (r), or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the shard is a primary (p) or replica (r), or null when unavailable."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The shard state, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The shard state, or null when unavailable."
+                },
+                "docs": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of documents in the shard, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of documents in the shard, or null when unavailable."
+                },
+                "store": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The shard store size, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The shard store size, or null when unavailable."
+                },
+                "node": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The node hosting the shard, or null when unassigned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The node hosting the shard, or null when unassigned."
+                },
+                "unassignedReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Why the shard is unassigned, or null when the shard is assigned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Why the shard is unassigned, or null when the shard is assigned."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Elasticsearch shard row returned by the cat API."
+            },
+            "description": "The shard rows returned by Elasticsearch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch shard list."
+      }
+    },
+    {
+      "id": "elasticsearch.ping_cluster",
+      "service": "elasticsearch",
+      "name": "ping_cluster",
+      "description": "Check whether the Elasticsearch cluster is reachable and return its health status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for checking Elasticsearch cluster health."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "isRunning": {
+            "type": "boolean",
+            "description": "Whether the cluster health endpoint returned successfully."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Elasticsearch."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cluster health status, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cluster health status, or null when unavailable."
+          },
+          "clusterName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Elasticsearch cluster name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Elasticsearch cluster name, or null when unavailable."
+          },
+          "message": {
+            "type": "string",
+            "description": "A human-readable summary of the cluster status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cluster health response."
+      }
+    },
+    {
+      "id": "elasticsearch.query_index",
+      "service": "elasticsearch",
+      "name": "query_index",
+      "description": "Search an Elasticsearch index with text queries, filters, pagination, sorting, and aggregations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Elasticsearch index name."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A free-text query_string query."
+          },
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The starting offset for search pagination.",
+            "default": 0
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of search results to return, capped at 1000.",
+            "default": 10
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A source field to include in search hits."
+            },
+            "description": "Specific document source fields to return.",
+            "minItems": 1
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlights for the search query.",
+            "default": false
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to sort by."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort order for this field.",
+                  "default": "asc"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "One Elasticsearch sort field."
+            },
+            "description": "Sort order for search results.",
+            "minItems": 1
+          },
+          "termFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "The exact value to match in a term query."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One exact term filter."
+            },
+            "description": "Exact term filters for specific field values.",
+            "minItems": 1
+          },
+          "rangeFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "gt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than this value."
+                },
+                "gte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than or equal to this value."
+                },
+                "lt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than this value."
+                },
+                "lte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than or equal to this value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A range filter for numeric, keyword, or date fields."
+            },
+            "description": "Range filters for fields.",
+            "minItems": 1
+          },
+          "timeFilter": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The timestamp field to filter on."
+              },
+              "gt": {
+                "type": "string",
+                "description": "Match timestamps greater than this ISO 8601 value."
+              },
+              "gte": {
+                "type": "string",
+                "description": "Match timestamps greater than or equal to this ISO 8601 value."
+              },
+              "lt": {
+                "type": "string",
+                "description": "Match timestamps less than this ISO 8601 value."
+              },
+              "lte": {
+                "type": "string",
+                "description": "Match timestamps less than or equal to this ISO 8601 value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "A time-based range filter for timestamp fields."
+          },
+          "aggregations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The aggregation name, used as the key in the aggregations output."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "terms",
+                    "date_histogram",
+                    "stats",
+                    "cardinality",
+                    "min",
+                    "max",
+                    "avg",
+                    "sum",
+                    "value_count"
+                  ],
+                  "description": "The aggregation type to run."
+                },
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The document field to aggregate on."
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "description": "The maximum number of buckets to return. Only used by terms aggregations.",
+                  "default": 10
+                },
+                "interval": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The bucket interval for date_histogram aggregations, such as 1d or month. Required when type is date_histogram."
+                },
+                "intervalType": {
+                  "type": "string",
+                  "enum": [
+                    "calendar",
+                    "fixed"
+                  ],
+                  "description": "Whether the date_histogram interval is a calendar interval or a fixed interval.",
+                  "default": "calendar"
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The bucket sort order by document count. Only used by terms aggregations.",
+                  "default": "desc"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "type",
+                "field"
+              ],
+              "description": "One aggregation to compute over the matching documents."
+            },
+            "description": "Aggregations to compute alongside the search hits.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName"
+        ],
+        "description": "The input payload for searching one Elasticsearch index."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The queried index name."
+          },
+          "totalHits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching documents."
+          },
+          "hits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "string",
+                  "description": "The index that contains the hit."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The document identifier."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The search score, or null when Elasticsearch omits it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The search score, or null when Elasticsearch omits it."
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The document source payload."
+                },
+                "highlight": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "An array item."
+                    },
+                    "description": "A record value."
+                  },
+                  "description": "Highlighted snippets keyed by field name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "index",
+                "id",
+                "score",
+                "source"
+              ],
+              "description": "A normalized Elasticsearch search hit."
+            },
+            "description": "The normalized search hits."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The starting offset used for this search."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested page size."
+              },
+              "returned": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of hits returned in this page."
+              },
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether more hits likely exist after this page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata for the search response."
+          },
+          "took": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The search duration in milliseconds, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The search duration in milliseconds, or null when unavailable."
+          },
+          "timedOut": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the search timed out, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the search timed out, or null when unavailable."
+          },
+          "maxScore": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The maximum score in the page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The maximum score in the page, or null when unavailable."
+          },
+          "aggregations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The aggregation name."
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw aggregation result."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Elasticsearch aggregation result."
+            },
+            "description": "Aggregation results returned by Elasticsearch, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "totalHits",
+          "hits",
+          "pagination",
+          "took",
+          "timedOut",
+          "maxScore"
+        ],
+        "description": "The normalized Elasticsearch search response."
+      }
+    },
+    {
+      "id": "elasticsearch.reindex",
+      "service": "elasticsearch",
+      "name": "reindex",
+      "description": "Start an Elasticsearch reindex from one index to another and return a task id to poll with get_task. The copy runs in the background, so this action returns before the data has moved.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceIndex": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index or index pattern to copy documents from."
+          },
+          "destIndex": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index to copy documents into."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A free-text query_string query."
+          },
+          "termFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "The exact value to match in a term query."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One exact term filter."
+            },
+            "description": "Exact term filters for specific field values.",
+            "minItems": 1
+          },
+          "rangeFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field to filter on."
+                },
+                "gt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than this value."
+                },
+                "gte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values greater than or equal to this value."
+                },
+                "lt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than this value."
+                },
+                "lte": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A union variant."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A union variant."
+                    }
+                  ],
+                  "description": "Match values less than or equal to this value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A range filter for numeric, keyword, or date fields."
+            },
+            "description": "Range filters for fields.",
+            "minItems": 1
+          },
+          "timeFilter": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The timestamp field to filter on."
+              },
+              "gt": {
+                "type": "string",
+                "description": "Match timestamps greater than this ISO 8601 value."
+              },
+              "gte": {
+                "type": "string",
+                "description": "Match timestamps greater than or equal to this ISO 8601 value."
+              },
+              "lt": {
+                "type": "string",
+                "description": "Match timestamps less than this ISO 8601 value."
+              },
+              "lte": {
+                "type": "string",
+                "description": "Match timestamps less than or equal to this ISO 8601 value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "A time-based range filter for timestamp fields."
+          },
+          "maxDocs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of documents to copy. All documents are copied when omitted."
+          },
+          "opType": {
+            "type": "string",
+            "enum": [
+              "index",
+              "create"
+            ],
+            "description": "Whether to overwrite documents that already exist in the destination (index) or skip them as conflicts (create)."
+          },
+          "conflicts": {
+            "type": "string",
+            "enum": [
+              "abort",
+              "proceed"
+            ],
+            "description": "Whether to abort on the first version conflict or keep processing the remaining documents.",
+            "default": "abort"
+          },
+          "requestsPerSecond": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The throttle applied to the reindex, in requests per second."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceIndex",
+          "destIndex"
+        ],
+        "description": "The input payload for starting an Elasticsearch reindex."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The task identifier to poll with get_task."
+          },
+          "sourceIndex": {
+            "type": "string",
+            "description": "The index documents are copied from."
+          },
+          "destIndex": {
+            "type": "string",
+            "description": "The index documents are copied into."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The submitted Elasticsearch reindex task."
+      },
+      "asyncLifecycle": {
+        "startActionId": "elasticsearch.reindex",
+        "statusActionId": "elasticsearch.get_task"
+      }
+    },
+    {
+      "id": "elasticsearch.update_aliases",
+      "service": "elasticsearch",
+      "name": "update_aliases",
+      "description": "Atomically add or remove Elasticsearch alias assignments in a single request, which is how an alias is switched between indices without downtime. This action cannot delete an index; use delete_index for that.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "remove"
+                  ],
+                  "description": "Whether to add or remove the alias assignment."
+                },
+                "index": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The index or index pattern the alias assignment applies to. Patterns are useful when removing an alias from every index behind it."
+                },
+                "alias": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The alias name."
+                },
+                "isWriteIndex": {
+                  "type": "boolean",
+                  "description": "Whether this index becomes the write index for the alias. Only used when type is add."
+                },
+                "filter": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A query that restricts the documents visible through the alias. Only used when type is add."
+                },
+                "indexRouting": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The routing value used for indexing through the alias. Only used when type is add."
+                },
+                "searchRouting": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The routing value used for searching through the alias. Only used when type is add."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "index",
+                "alias"
+              ],
+              "description": "One alias change."
+            },
+            "description": "The alias changes to apply atomically.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for updating Elasticsearch aliases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether Elasticsearch acknowledged the alias changes."
+          },
+          "appliedActions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of alias changes submitted in the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch alias update response."
+      }
+    },
+    {
+      "id": "elasticsearch.update_index_mappings",
+      "service": "elasticsearch",
+      "name": "update_index_mappings",
+      "description": "Add or update field mappings on an existing Elasticsearch index. Existing field types cannot be changed in place, so incompatible changes require a new index and a reindex.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index whose mappings are updated."
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The field mappings to add or update, keyed by field name."
+          },
+          "dynamic": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "strict",
+              "runtime"
+            ],
+            "description": "How Elasticsearch should treat fields that are not mapped explicitly."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexName",
+          "properties"
+        ],
+        "description": "The input payload for updating Elasticsearch index mappings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indexName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The index whose mappings were updated."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether Elasticsearch acknowledged the mapping update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Elasticsearch mapping update response."
+      }
+    }
+  ]
+}

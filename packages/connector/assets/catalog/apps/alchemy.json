@@ -1,0 +1,539 @@
+{
+  "service": "alchemy",
+  "displayName": "Alchemy",
+  "categories": [
+    "Developer Tools",
+    "Data",
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ALCHEMY_API_KEY",
+      "description": "Alchemy API key used with the Authorization: Bearer header. Copy it from your app details page in the Alchemy Dashboard, as shown in the official guide: https://www.alchemy.com/docs/create-an-api-key."
+    }
+  ],
+  "homepageUrl": "https://www.alchemy.com",
+  "actions": [
+    {
+      "id": "alchemy.get_asset_transfers",
+      "service": "alchemy",
+      "name": "get_asset_transfers",
+      "description": "Retrieve historical asset transfers for Ethereum mainnet addresses through Alchemy.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromBlock": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Starting block tag or hex block number."
+          },
+          "toBlock": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ending block tag or hex block number."
+          },
+          "fromAddress": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          },
+          "toAddress": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          },
+          "excludeZeroValue": {
+            "type": "boolean",
+            "description": "Whether zero-value transfers should be excluded."
+          },
+          "category": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "external",
+                "internal",
+                "erc20",
+                "erc721",
+                "erc1155",
+                "specialnft"
+              ],
+              "description": "Transfer category forwarded to Alchemy."
+            },
+            "description": "Transfer categories to include in the response.",
+            "minItems": 1
+          },
+          "contractAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$",
+              "description": "A 0x-prefixed 20-byte hex address."
+            },
+            "description": "Token or NFT contract addresses used to filter transfers.",
+            "minItems": 1
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Transfer ordering returned by Alchemy."
+          },
+          "withMetadata": {
+            "type": "boolean",
+            "description": "Whether Alchemy should attach block metadata when available."
+          },
+          "maxCount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Hex-encoded maximum number of transfers to return."
+          },
+          "pageKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination key returned by a previous transfers call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "category"
+        ],
+        "description": "Input parameters for retrieving historical asset transfers from Alchemy Ethereum mainnet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Alchemy result string returned when no transfer object payload is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alchemy result string returned when no transfer object payload is available."
+          },
+          "pageKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Pagination key for fetching the next transfer page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination key for fetching the next transfer page."
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Transfer object."
+            },
+            "description": "Transfer objects returned by Alchemy."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transfers"
+        ],
+        "description": "Historical asset transfers returned by Alchemy."
+      }
+    },
+    {
+      "id": "alchemy.get_nft_metadata",
+      "service": "alchemy",
+      "name": "get_nft_metadata",
+      "description": "Retrieve metadata for a specific NFT from Alchemy Ethereum mainnet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contractAddress": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          },
+          "tokenId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "NFT token identifier in decimal or hex form."
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "ERC721",
+              "ERC1155"
+            ],
+            "description": "NFT token type forwarded to Alchemy."
+          },
+          "tokenUriTimeoutInMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Timeout in milliseconds for live token URI fetches when metadata is requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contractAddress",
+          "tokenId"
+        ],
+        "description": "Input parameters for retrieving metadata for one NFT from Alchemy Ethereum mainnet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nft": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "NFT metadata object returned by Alchemy."
+          }
+        },
+        "additionalProperties": false,
+        "description": "NFT metadata payload returned by Alchemy."
+      }
+    },
+    {
+      "id": "alchemy.get_nfts_for_owner",
+      "service": "alchemy",
+      "name": "get_nfts_for_owner",
+      "description": "Retrieve NFTs currently owned by an address from Alchemy Ethereum mainnet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Owner address or ENS name accepted by Alchemy."
+          },
+          "contractAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$",
+              "description": "A 0x-prefixed 20-byte hex address."
+            },
+            "description": "NFT contract addresses used to filter the response.",
+            "minItems": 1,
+            "maxItems": 45
+          },
+          "withMetadata": {
+            "type": "boolean",
+            "description": "Whether NFT metadata should be returned."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "transferTime"
+            ],
+            "description": "NFT ordering mode accepted by Alchemy."
+          },
+          "tokenUriTimeoutInMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Timeout in milliseconds for live token URI fetches when metadata is requested."
+          },
+          "pageKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination key returned by a previous NFTs-by-owner call."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of NFTs to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "owner"
+        ],
+        "description": "Input parameters for retrieving NFTs owned by an address from Alchemy Ethereum mainnet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ownedNfts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "NFT object."
+            },
+            "description": "NFT objects returned by Alchemy."
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total number of NFTs owned by the requested address."
+          },
+          "pageKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Pagination key for the next NFTs-by-owner page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination key for the next NFTs-by-owner page."
+          },
+          "validAt": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Block-validity metadata returned by Alchemy."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Block-validity metadata returned by Alchemy."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ownedNfts",
+          "totalCount"
+        ],
+        "description": "NFT ownership payload returned by Alchemy."
+      }
+    },
+    {
+      "id": "alchemy.get_token_balances",
+      "service": "alchemy",
+      "name": "get_token_balances",
+      "description": "Retrieve ERC-20 token balances for a wallet address from Alchemy Ethereum mainnet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          },
+          "tokenSpec": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "erc20",
+                  "DEFAULT_TOKENS",
+                  "NATIVE_TOKEN"
+                ],
+                "description": "Built-in token selection used by Alchemy."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$",
+                  "description": "A 0x-prefixed 20-byte hex address."
+                },
+                "description": "Explicit token contract addresses to include in the balance response.",
+                "minItems": 1
+              }
+            ],
+            "description": "Token selection forwarded to Alchemy Token API."
+          },
+          "pageKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination key returned by a previous Alchemy token-balance call."
+          },
+          "maxCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of balances to request per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address"
+        ],
+        "description": "Input parameters for retrieving ERC-20 balances from Alchemy Ethereum mainnet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          },
+          "pageKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Pagination key for fetching the next page of token balances."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination key for fetching the next page of token balances."
+          },
+          "tokenBalances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contractAddress": {
+                  "type": "string",
+                  "pattern": "^0x[0-9a-fA-F]{40}$",
+                  "description": "A 0x-prefixed 20-byte hex address."
+                },
+                "tokenBalance": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Hex-encoded token balance returned by Alchemy when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Hex-encoded token balance returned by Alchemy when available."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Alchemy error string for this token balance when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Alchemy error string for this token balance when present."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Single token balance entry returned by Alchemy."
+            },
+            "description": "Token balance entries returned by Alchemy."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "tokenBalances"
+        ],
+        "description": "ERC-20 balances returned by Alchemy."
+      }
+    },
+    {
+      "id": "alchemy.get_token_metadata",
+      "service": "alchemy",
+      "name": "get_token_metadata",
+      "description": "Retrieve ERC-20 token metadata for one contract from Alchemy Ethereum mainnet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contractAddress": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$",
+            "description": "A 0x-prefixed 20-byte hex address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving token metadata from Alchemy Ethereum mainnet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Token name returned by Alchemy when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token name returned by Alchemy when available."
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Token symbol returned by Alchemy when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token symbol returned by Alchemy when available."
+          },
+          "decimals": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Token decimals returned by Alchemy when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token decimals returned by Alchemy when available."
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Token logo URL returned by Alchemy when available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token logo URL returned by Alchemy when available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Token metadata returned by Alchemy."
+      }
+    }
+  ]
+}

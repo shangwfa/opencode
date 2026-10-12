@@ -73,6 +73,52 @@ CREATE TABLE "control_account" (
           "time_updated" bigint NOT NULL,
           CONSTRAINT "control_account_pk" PRIMARY KEY("email", "url")
         );
+CREATE TABLE "connector_connection" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "engine_connection_id" text NOT NULL,
+          "engine_connection_name" text NOT NULL,
+          "service" text NOT NULL,
+          "alias" text NOT NULL,
+          "auth_type" text NOT NULL,
+          "status" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "connector_oauth_request" (
+          "connection_request_id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "service" text NOT NULL,
+          "state" text NOT NULL,
+          "alias" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "connector_trigger_schedule" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "service" text NOT NULL,
+          "trigger_id" text NOT NULL,
+          "engine_connection_id" text NOT NULL,
+          "endpoint_url" text NOT NULL,
+          "engine_subscription_id" text,
+          "engine_token_id" text,
+          "engine_token" text,
+          "engine_token_encrypted" text,
+          "token_state" text DEFAULT 'active' NOT NULL,
+          "config_json" text DEFAULT '{}' NOT NULL,
+          "checkpoint_json" text,
+          "checkpoint_revision" bigint DEFAULT 0 NOT NULL,
+          "next_run_at" bigint NOT NULL,
+          "lease_epoch" bigint DEFAULT 0 NOT NULL,
+          "lease_until" bigint DEFAULT 0 NOT NULL,
+          "status" text NOT NULL,
+          "wake_seq" bigint DEFAULT 0 NOT NULL,
+          "poll_attempts" bigint DEFAULT 0 NOT NULL,
+          "last_result_json" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "credential" (
           "id" text PRIMARY KEY,
           "integration_id" text,
@@ -369,6 +415,11 @@ CREATE UNIQUE INDEX "snapshot_operation_active_uniq" ON "snapshot_operation" ("s
 CREATE INDEX "snapshot_refresh_operation_claim_idx" ON "snapshot_refresh_operation" ("state","next_retry_at");
 CREATE INDEX "snapshot_refresh_operation_session_idx" ON "snapshot_refresh_operation" ("session_id","time_created");
 CREATE UNIQUE INDEX "snapshot_refresh_operation_active_uniq" ON "snapshot_refresh_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');
+CREATE UNIQUE INDEX "connector_connection_engine_id_uq" ON "connector_connection" ("engine_connection_id");
+CREATE INDEX "connector_connection_session_idx" ON "connector_connection" ("session_id");
+CREATE INDEX "connector_oauth_request_session_idx" ON "connector_oauth_request" ("session_id");
+CREATE INDEX "connector_trigger_schedule_session_idx" ON "connector_trigger_schedule" ("session_id");
+CREATE INDEX "connector_trigger_schedule_due_idx" ON "connector_trigger_schedule" ("next_run_at");
 CREATE UNIQUE INDEX "event_aggregate_seq_idx" ON "event" ("aggregate_id","seq");
 CREATE INDEX "event_aggregate_type_seq_idx" ON "event" ("aggregate_id","type","seq");
 CREATE INDEX "hitl_request_session_pending_idx" ON "hitl_request" ("session_id","decision");

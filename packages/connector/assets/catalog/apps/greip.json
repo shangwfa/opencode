@@ -1,0 +1,405 @@
+{
+  "service": "greip",
+  "displayName": "Greip",
+  "homepageUrl": "https://greip.io",
+  "categories": [
+    "Security & Identity",
+    "Maps & Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Get your API key from https://dashboard.greip.io/home. Requests use Authorization: Bearer <API key>."
+    }
+  ],
+  "actions": [
+    {
+      "id": "greip.lookup_asn",
+      "service": "greip",
+      "name": "lookup_asn",
+      "description": "Look up an autonomous system number, its organization and network prefixes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Autonomous system number, with or without the AS prefix, such as AS6167 or 6167."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "description": "Environment; test returns simulated data, live is the default."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asn"
+        ],
+        "description": "ASN lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "asn": {
+                "type": "string",
+                "description": "Autonomous system number."
+              },
+              "name": {
+                "type": "string",
+                "description": "Autonomous system name."
+              },
+              "country": {
+                "type": "string",
+                "description": "Country code."
+              },
+              "org": {
+                "type": "string",
+                "description": "Organization name."
+              },
+              "prefixes": {
+                "type": "object",
+                "properties": {
+                  "ipv4": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "IPv4 network prefix."
+                    },
+                    "description": "IPv4 network prefixes."
+                  },
+                  "ipv6": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "IPv6 network prefix."
+                    },
+                    "description": "IPv6 network prefixes."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "Total number of prefixes."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Network prefixes advertised by the autonomous system."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "asn"
+            ],
+            "description": "Autonomous system information."
+          },
+          "status": {
+            "type": "string",
+            "description": "Response status."
+          },
+          "executionTime": {
+            "type": "number",
+            "description": "Processing time in milliseconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "status"
+        ],
+        "description": "Greip response with the original data and response metadata."
+      }
+    },
+    {
+      "id": "greip.lookup_country",
+      "service": "greip",
+      "name": "lookup_country",
+      "description": "Look up country information with optional language, flag, currency and timezone details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "CountryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code, such as GB."
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "language",
+                "flag",
+                "currency",
+                "timezone"
+              ],
+              "description": "Country detail module."
+            },
+            "description": "Optional country detail modules.",
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "description": "Environment; test returns simulated data, live is the default."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "CountryCode"
+        ],
+        "description": "Country lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "countryCode": {
+                "type": "string",
+                "description": "ISO country code."
+              },
+              "countryName": {
+                "type": "string",
+                "description": "Country name."
+              },
+              "capital": {
+                "type": "string",
+                "description": "Capital city."
+              },
+              "population": {
+                "type": "integer",
+                "description": "Country population."
+              },
+              "phoneCode": {
+                "type": "string",
+                "description": "International calling code."
+              },
+              "countryIsEU": {
+                "type": "boolean",
+                "description": "Whether the country is an EU member."
+              },
+              "language": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Language details."
+              },
+              "flag": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Flag emoji and image URLs."
+              },
+              "currency": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Currency details."
+              },
+              "timezone": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Timezone details."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "countryCode"
+            ],
+            "description": "Country information and requested detail modules."
+          },
+          "status": {
+            "type": "string",
+            "description": "Response status."
+          },
+          "executionTime": {
+            "type": "number",
+            "description": "Processing time in milliseconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "status"
+        ],
+        "description": "Greip response with the original data and response metadata."
+      }
+    },
+    {
+      "id": "greip.lookup_ip",
+      "service": "greip",
+      "name": "lookup_ip",
+      "description": "Look up an IPv4 or IPv6 address with optional location and security enrichment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IPv4 or IPv6 address to look up."
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "security",
+                "currency",
+                "timezone",
+                "location"
+              ],
+              "description": "Enrichment module."
+            },
+            "description": "Optional enrichment modules; availability depends on the plan.",
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "lang": {
+            "type": "string",
+            "enum": [
+              "EN",
+              "AR",
+              "DE",
+              "FR",
+              "ES",
+              "JA",
+              "ZH",
+              "RU"
+            ],
+            "description": "Response language; EN is the default."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "description": "Environment; test returns simulated data, live is the default."
+          },
+          "userID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional user identifier for tracking requests in Greip events."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ip"
+        ],
+        "description": "IP lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "ip": {
+                "type": "string",
+                "description": "The queried IP address."
+              },
+              "ipType": {
+                "type": "string",
+                "description": "IP address version."
+              },
+              "countryCode": {
+                "type": "string",
+                "description": "ISO country code."
+              },
+              "countryName": {
+                "type": "string",
+                "description": "Country name."
+              },
+              "cityName": {
+                "type": "string",
+                "description": "City name."
+              },
+              "latitude": {
+                "type": "string",
+                "description": "Latitude coordinate."
+              },
+              "longitude": {
+                "type": "string",
+                "description": "Longitude coordinate."
+              },
+              "asn": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Autonomous system details."
+              },
+              "security": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Proxy, Tor, hosting and other security signals."
+              },
+              "currency": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Currency details."
+              },
+              "timezone": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Timezone details."
+              },
+              "location": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional location details."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ip"
+            ],
+            "description": "IP geolocation and optional enrichment modules."
+          },
+          "status": {
+            "type": "string",
+            "description": "Response status."
+          },
+          "executionTime": {
+            "type": "number",
+            "description": "Processing time in milliseconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "status"
+        ],
+        "description": "Greip response with the original data and response metadata."
+      }
+    }
+  ]
+}

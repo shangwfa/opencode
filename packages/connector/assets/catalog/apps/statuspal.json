@@ -1,0 +1,786 @@
+{
+  "service": "statuspal",
+  "displayName": "StatusPal",
+  "categories": [
+    "Developer Tools",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "STATUSPAL_API_KEY",
+      "description": "StatusPal API key used with the Authorization header. Copy it from your StatusPal profile settings API section.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.statuspal.io",
+  "actions": [
+    {
+      "id": "statuspal.get_incident",
+      "service": "statuspal",
+      "name": "get_incident",
+      "description": "Get one StatusPal incident by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          },
+          "incidentId": {
+            "type": "integer",
+            "description": "The StatusPal incident ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain",
+          "incidentId"
+        ],
+        "description": "Input for targeting a StatusPal incident."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incident": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The StatusPal incident ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The incident title."
+              },
+              "type": {
+                "type": "string",
+                "description": "The incident type key."
+              },
+              "starts_at": {
+                "type": "string",
+                "description": "When the incident or maintenance starts.",
+                "format": "date-time"
+              },
+              "ends_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the incident or maintenance ends.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the incident or maintenance ends."
+              },
+              "service_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "description": "A StatusPal service ID."
+                },
+                "description": "Affected service IDs."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public URL for the incident."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A StatusPal incident."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw StatusPal object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incident",
+          "raw"
+        ],
+        "description": "StatusPal incident response."
+      }
+    },
+    {
+      "id": "statuspal.get_service",
+      "service": "statuspal",
+      "name": "get_service",
+      "description": "Get one StatusPal service by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          },
+          "serviceId": {
+            "type": "integer",
+            "description": "The StatusPal service ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain",
+          "serviceId"
+        ],
+        "description": "Input for targeting a StatusPal service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The StatusPal service ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The service name."
+              },
+              "current_incident_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current incident type key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current incident type key."
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw StatusPal object."
+                },
+                "description": "Nested child services returned by StatusPal."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A StatusPal status service."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw StatusPal object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "service",
+          "raw"
+        ],
+        "description": "StatusPal service response."
+      }
+    },
+    {
+      "id": "statuspal.get_status_page_status",
+      "service": "statuspal",
+      "name": "get_status_page_status",
+      "description": "Get the current status reported on a public StatusPal status page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain"
+        ],
+        "description": "Input for targeting a StatusPal page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusPage": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The URL of the website the status page is about."
+              },
+              "time_zone": {
+                "type": "string",
+                "description": "The primary timezone the status page uses."
+              },
+              "subdomain": {
+                "type": "string",
+                "description": "The subdomain that identifies the status page."
+              },
+              "name": {
+                "type": "string",
+                "description": "The status page name."
+              },
+              "current_incident_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current incident type key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current incident type key."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A StatusPal status page summary object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw StatusPal object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statusPage",
+          "raw"
+        ],
+        "description": "StatusPal page status response."
+      }
+    },
+    {
+      "id": "statuspal.get_status_page_summary",
+      "service": "statuspal",
+      "name": "get_status_page_summary",
+      "description": "Get a StatusPal page summary including services and active incidents.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain"
+        ],
+        "description": "Input for targeting a StatusPal page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusPage": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The URL of the website the status page is about."
+              },
+              "time_zone": {
+                "type": "string",
+                "description": "The primary timezone the status page uses."
+              },
+              "subdomain": {
+                "type": "string",
+                "description": "The subdomain that identifies the status page."
+              },
+              "name": {
+                "type": "string",
+                "description": "The status page name."
+              },
+              "current_incident_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current incident type key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current incident type key."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A StatusPal status page summary object."
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal service ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The service name."
+                },
+                "current_incident_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current incident type key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current incident type key."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Raw StatusPal object."
+                  },
+                  "description": "Nested child services returned by StatusPal."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal status service."
+            },
+            "description": "Services returned in the summary."
+          },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal incident ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The incident title."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The incident type key."
+                },
+                "starts_at": {
+                  "type": "string",
+                  "description": "When the incident or maintenance starts.",
+                  "format": "date-time"
+                },
+                "ends_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the incident or maintenance ends.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the incident or maintenance ends."
+                },
+                "service_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A StatusPal service ID."
+                  },
+                  "description": "Affected service IDs."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public URL for the incident."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal incident."
+            },
+            "description": "Active incidents returned in the summary."
+          },
+          "maintenances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal incident ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The incident title."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The incident type key."
+                },
+                "starts_at": {
+                  "type": "string",
+                  "description": "When the incident or maintenance starts.",
+                  "format": "date-time"
+                },
+                "ends_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the incident or maintenance ends.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the incident or maintenance ends."
+                },
+                "service_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A StatusPal service ID."
+                  },
+                  "description": "Affected service IDs."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public URL for the incident."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal incident."
+            },
+            "description": "Active maintenances returned in the summary."
+          },
+          "upcomingMaintenances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal incident ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The incident title."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The incident type key."
+                },
+                "starts_at": {
+                  "type": "string",
+                  "description": "When the incident or maintenance starts.",
+                  "format": "date-time"
+                },
+                "ends_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the incident or maintenance ends.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the incident or maintenance ends."
+                },
+                "service_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A StatusPal service ID."
+                  },
+                  "description": "Affected service IDs."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public URL for the incident."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal incident."
+            },
+            "description": "Upcoming maintenances returned in the summary."
+          },
+          "infoNotices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw StatusPal object."
+            },
+            "description": "Featured information notices."
+          },
+          "currentStatusType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current status type for the status page summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current status type for the status page summary."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw StatusPal object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statusPage",
+          "services",
+          "incidents",
+          "maintenances",
+          "upcomingMaintenances",
+          "infoNotices",
+          "currentStatusType",
+          "raw"
+        ],
+        "description": "StatusPal page summary response."
+      }
+    },
+    {
+      "id": "statuspal.list_incidents",
+      "service": "statuspal",
+      "name": "list_incidents",
+      "description": "List StatusPal incidents with cursor, limit, and type filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor for items before this position."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor for items after this position."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of incidents to return, up to 100."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter incidents by incident type key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain"
+        ],
+        "description": "Input for listing StatusPal incidents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal incident ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The incident title."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The incident type key."
+                },
+                "starts_at": {
+                  "type": "string",
+                  "description": "When the incident or maintenance starts.",
+                  "format": "date-time"
+                },
+                "ends_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the incident or maintenance ends.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the incident or maintenance ends."
+                },
+                "service_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A StatusPal service ID."
+                  },
+                  "description": "Affected service IDs."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public URL for the incident."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal incident."
+            },
+            "description": "Incidents returned by StatusPal."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw StatusPal object."
+            },
+            "description": "Raw StatusPal incidents response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incidents",
+          "raw"
+        ],
+        "description": "StatusPal incident list response."
+      }
+    },
+    {
+      "id": "statuspal.list_services",
+      "service": "statuspal",
+      "name": "list_services",
+      "description": "List services configured on a StatusPal status page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StatusPal status page subdomain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subdomain"
+        ],
+        "description": "Input for targeting a StatusPal page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The StatusPal service ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The service name."
+                },
+                "current_incident_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current incident type key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current incident type key."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Raw StatusPal object."
+                  },
+                  "description": "Nested child services returned by StatusPal."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A StatusPal status service."
+            },
+            "description": "Services returned by StatusPal."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw StatusPal object."
+            },
+            "description": "Raw StatusPal services response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "services",
+          "raw"
+        ],
+        "description": "StatusPal service list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,561 @@
+{
+  "service": "ringg_ai",
+  "displayName": "Ringg AI",
+  "categories": [
+    "AI",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Workspace API Key",
+      "placeholder": "YOUR_RINGG_AI_API_KEY",
+      "description": "Ringg AI workspace API key. Copy it from https://www.ringg.ai/dashboard/api"
+    }
+  ],
+  "homepageUrl": "https://www.ringg.ai",
+  "actions": [
+    {
+      "id": "ringg_ai.get_assistant",
+      "service": "ringg_ai",
+      "name": "get_assistant",
+      "description": "Retrieve detailed configuration for one Ringg AI assistant.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ringg AI resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The assistant to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique assistant identifier."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The requested Ringg AI assistant."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agents"
+        ],
+        "description": "The Ringg AI assistant details response."
+      }
+    },
+    {
+      "id": "ringg_ai.get_call",
+      "service": "ringg_ai",
+      "name": "get_call",
+      "description": "Retrieve details for one Ringg AI call, optionally including analysis data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the call to retrieve."
+          },
+          "send_analysis": {
+            "type": "boolean",
+            "description": "Whether to include platform and client analysis data in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The call details request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The result status returned by Ringg AI."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique call identifier."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The requested call details."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "data"
+        ],
+        "description": "The Ringg AI call details response."
+      }
+    },
+    {
+      "id": "ringg_ai.get_workspace",
+      "service": "ringg_ai",
+      "name": "get_workspace",
+      "description": "Retrieve information about the Ringg AI workspace associated with the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "An empty input payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_info": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique workspace identifier."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The workspace display name."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "The authenticated Ringg AI workspace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "workspace_info"
+        ],
+        "description": "The Ringg AI workspace response."
+      }
+    },
+    {
+      "id": "ringg_ai.initiate_call",
+      "service": "ringg_ai",
+      "name": "initiate_call",
+      "description": "Initiate one outbound call with a Ringg AI assistant and caller number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the person to call."
+          },
+          "mobile_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination phone number including its country code."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the assistant that will handle the call."
+          },
+          "from_number": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            ],
+            "description": "A caller phone number or a non-empty array of caller phone numbers, including country codes."
+          },
+          "from_number_id": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            ],
+            "description": "A workspace number identifier or a non-empty array of workspace number identifiers."
+          },
+          "custom_args_values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom variable value."
+            },
+            "description": "Custom variable values substituted into the assistant prompt."
+          },
+          "version_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The assistant version identifier; defaults to the active version."
+          },
+          "call_category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A category used for internal reporting or workflow grouping."
+          },
+          "parent_call_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent call identifier for a follow-up or chained call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "mobile_number",
+          "agent_id"
+        ],
+        "description": "The input payload for initiating one outbound Ringg AI call.",
+        "oneOf": [
+          {
+            "required": [
+              "from_number_id"
+            ]
+          },
+          {
+            "required": [
+              "from_number"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The result status returned by Ringg AI."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "call_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the initiated call."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "call_id"
+            ],
+            "description": "The initiated call data."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The result message returned by Ringg AI."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "data",
+          "message"
+        ],
+        "description": "The Ringg AI call initiation response."
+      }
+    },
+    {
+      "id": "ringg_ai.list_assistants",
+      "service": "ringg_ai",
+      "name": "list_assistants",
+      "description": "List assistants available in the current Ringg AI workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, up to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Ringg AI assistants."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "agents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Ringg AI assistant."
+                },
+                "description": "The assistants available in the workspace."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "agents"
+            ],
+            "description": "The assistant list data envelope."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "The Ringg AI assistant list response."
+      }
+    },
+    {
+      "id": "ringg_ai.list_calls",
+      "service": "ringg_ai",
+      "name": "list_calls",
+      "description": "List Ringg AI call history with pagination and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "The inclusive call start date in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "The inclusive call end date in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, up to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The assistant identifier used to filter calls."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "registered",
+              "ongoing",
+              "retry",
+              "error",
+              "completed",
+              "failed",
+              "cancelled",
+              "forwarded"
+            ],
+            "description": "The call status used to filter results."
+          },
+          "bulk_list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign bulk list identifier used to filter calls."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination options for Ringg AI call history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Ringg AI call history entry."
+            },
+            "description": "The calls in the current result page."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of calls requested for this page."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The number of calls skipped before this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of calls returned in this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of calls matching the filters."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "calls",
+          "limit",
+          "offset",
+          "count",
+          "total"
+        ],
+        "description": "The paginated Ringg AI call history response."
+      }
+    },
+    {
+      "id": "ringg_ai.list_voices",
+      "service": "ringg_ai",
+      "name": "list_voices",
+      "description": "List voices available for Ringg AI assistants, optionally filtered by language.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A language code or comma-separated language codes, such as en-US or en-US,hi-IN."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Language filtering options for listing Ringg AI voices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Ringg AI voice."
+            },
+            "description": "The voices available to Ringg AI assistants."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "voices"
+        ],
+        "description": "The Ringg AI voice list response."
+      }
+    },
+    {
+      "id": "ringg_ai.list_workspace_numbers",
+      "service": "ringg_ai",
+      "name": "list_workspace_numbers",
+      "description": "List caller numbers available in the current Ringg AI workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, up to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Ringg AI workspace numbers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_numbers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Ringg AI workspace number."
+            },
+            "description": "The caller numbers available in the workspace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "workspace_numbers"
+        ],
+        "description": "The Ringg AI workspace number list response."
+      }
+    }
+  ]
+}

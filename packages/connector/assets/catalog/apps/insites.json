@@ -1,0 +1,440 @@
+{
+  "service": "insites",
+  "displayName": "Insites",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_INSITES_API_KEY",
+      "description": "Insites API key sent with the api-key header. Manage it at https://app.insites.com/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://insites.com",
+  "actions": [
+    {
+      "id": "insites.get_audit",
+      "service": "insites",
+      "name": "get_audit",
+      "description": "Get the processing state and account-configured JSON result for one Insites audit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Insites audit report ID."
+          },
+          "includeDatasets": {
+            "type": "boolean",
+            "description": "Whether to include additional datasets such as broken links."
+          },
+          "availableVersions": {
+            "type": "boolean",
+            "description": "Whether to include the IDs of available audit versions."
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A specific audit version ID to retrieve."
+          },
+          "staging": {
+            "type": "boolean",
+            "description": "Whether to retrieve the staging audit associated with this business."
+          },
+          "categories": {
+            "type": "boolean",
+            "description": "Whether to include categories from the account overview layout."
+          },
+          "percentiles": {
+            "type": "boolean",
+            "description": "Whether to include percentile data for this business."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId"
+        ],
+        "description": "The audit and optional result sections to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by Insites."
+          },
+          "reportStatus": {
+            "type": "string",
+            "description": "The audit processing state returned by Insites."
+          },
+          "report": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The account-configured Insites audit data returned for this website."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account-configured Insites audit data returned for this website."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reportStatus"
+        ],
+        "description": "The current state and optional data for one Insites audit."
+      },
+      "asyncLifecycle": {
+        "startActionId": "insites.start_audit",
+        "statusActionId": "insites.get_audit"
+      }
+    },
+    {
+      "id": "insites.get_llm_audit",
+      "service": "insites",
+      "name": "get_llm_audit",
+      "description": "Get the LLM-optimized JSON result for one Insites audit with a compact AI-oriented payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Insites audit report ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId"
+        ],
+        "description": "The Insites audit to retrieve in LLM-optimized form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by Insites."
+          },
+          "reportStatus": {
+            "type": "string",
+            "description": "The audit processing state returned by Insites."
+          },
+          "report": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The account-configured Insites audit data returned for this website."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account-configured Insites audit data returned for this website."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reportStatus"
+        ],
+        "description": "The current state and optional data for one Insites audit."
+      }
+    },
+    {
+      "id": "insites.list_audits",
+      "service": "insites",
+      "name": "list_audits",
+      "description": "Search existing Insites audits with documented filters, ordering, and offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "equal",
+                    "not_equal",
+                    "more_than",
+                    "less_than",
+                    "str_contains"
+                  ],
+                  "description": "The comparison operator applied by Insites."
+                },
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented audit property, such as domain, overall_score, or report_id."
+                },
+                "targetValue": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string filter value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric filter value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean filter value."
+                    }
+                  ],
+                  "description": "The value compared against the selected audit property."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "operator",
+                "property",
+                "targetValue"
+              ],
+              "description": "One Insites audit search filter."
+            },
+            "description": "The filters applied to existing audits."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "id",
+              "user_email",
+              "report_hash",
+              "run_date",
+              "overall_score",
+              "overall"
+            ],
+            "description": "The audit property used to order results."
+          },
+          "orderDirection": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The audit result sort direction."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of audit rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of audit rows to skip."
+          },
+          "includeHistoric": {
+            "type": "boolean",
+            "description": "Whether to include old versions of business audits."
+          },
+          "listId": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 32,
+            "description": "The 32-character hexadecimal Insites list ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters, ordering, and pagination applied to the Insites audit search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by Insites."
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The account-configured Insites audit data returned for this website."
+            },
+            "description": "The matching account-configured audit summaries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reports"
+        ],
+        "description": "The matching Insites audits."
+      }
+    },
+    {
+      "id": "insites.start_audit",
+      "service": "insites",
+      "name": "start_audit",
+      "description": "Start an Insites SEO and AEO website audit and return the report ID for status polling.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The website URL or hostname to analyze."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "batch"
+            ],
+            "description": "The audit queue priority."
+          },
+          "dedupeMethod": {
+            "type": "string",
+            "enum": [
+              "none",
+              "match_hostname"
+            ],
+            "description": "How Insites matches this request to an existing audit."
+          },
+          "customerName": {
+            "type": "string",
+            "description": "The customer name used when the audit is shared by email."
+          },
+          "customerEmail": {
+            "type": "string",
+            "description": "The customer email used when the audit is shared by email.",
+            "format": "email"
+          },
+          "businessName": {
+            "type": "string",
+            "description": "The business name used by local presence and review checks."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The business phone number used by local presence and review checks."
+          },
+          "address": {
+            "type": "string",
+            "description": "The first line of the business address."
+          },
+          "buildingNumber": {
+            "type": "string",
+            "description": "The building number used to improve location accuracy."
+          },
+          "street": {
+            "type": "string",
+            "description": "The street name used to improve location accuracy."
+          },
+          "city": {
+            "type": "string",
+            "description": "The business city used to improve location accuracy."
+          },
+          "state": {
+            "type": "string",
+            "description": "The business state or county used to improve location accuracy."
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "The business ZIP code or postcode."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 business country code."
+          },
+          "latitude": {
+            "type": "string",
+            "description": "The business latitude used to improve location accuracy."
+          },
+          "longitude": {
+            "type": "string",
+            "description": "The business longitude used to improve location accuracy."
+          },
+          "googlePlaceId": {
+            "type": "string",
+            "description": "The Google Place ID for the business."
+          },
+          "products": {
+            "type": "string",
+            "description": "Comma-separated products and services offered by the business."
+          },
+          "locations": {
+            "type": "string",
+            "description": "Comma-separated locations served by the business."
+          },
+          "competitorReportId": {
+            "type": "string",
+            "description": "An existing audit ID to which this audit should be added as a competitor."
+          },
+          "pagesToAnalyze": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of website pages to include in the audit."
+          },
+          "generateKeywords": {
+            "type": "boolean",
+            "description": "Whether Insites should automatically generate business keywords."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The website and optional business details used to start an Insites audit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by Insites."
+          },
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Insites audit report ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "reportId"
+        ],
+        "description": "The newly queued Insites audit."
+      },
+      "asyncLifecycle": {
+        "startActionId": "insites.start_audit",
+        "statusActionId": "insites.get_audit"
+      }
+    }
+  ]
+}

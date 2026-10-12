@@ -1,0 +1,3115 @@
+{
+  "service": "docker_hub",
+  "displayName": "Docker Hub",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Credential",
+      "placeholder": "username:dckr_pat_xxx or organization:dckr_oat_xxx",
+      "description": "Enter identifier:secret so the runtime can exchange it for a Docker Hub bearer token. Use your Docker username with a password or personal access token, or an organization name with an organization access token.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://hub.docker.com",
+  "actions": [
+    {
+      "id": "docker_hub.add_org_member",
+      "service": "docker_hub",
+      "name": "add_org_member",
+      "description": "Invite a Docker ID or email address to join a Docker Hub organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "invitee": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker ID or email address to invite."
+          },
+          "teamName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional team to attach to the invite."
+          },
+          "role": {
+            "type": "string",
+            "description": "The optional organization role to assign to the invite."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Whether to validate the invite without creating it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "invitee"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invitees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "invitee": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The invited Docker ID or email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The invited Docker ID or email address."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The invite creation result status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The invite creation result status."
+                },
+                "invite": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The invite identifier, when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The invite identifier, when available."
+                        },
+                        "inviterUsername": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The Docker Hub username that created the invite, when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The Docker Hub username that created the invite, when available."
+                        },
+                        "invitee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The invited Docker ID or email address."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The invited Docker ID or email address."
+                        },
+                        "org": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The organization that owns the invite."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The organization that owns the invite."
+                        },
+                        "team": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The team attached to the invite, when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The team attached to the invite, when available."
+                        },
+                        "createdAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The ISO 8601 timestamp when the invite was created, when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The ISO 8601 timestamp when the invite was created, when available."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A Docker Hub organization invite."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Docker Hub organization invite."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single Docker Hub bulk invite result."
+            },
+            "description": "The invite results returned by the bulk invite endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invitees"
+        ],
+        "description": "The output payload for inviting a member to a Docker Hub organization."
+      }
+    },
+    {
+      "id": "docker_hub.create_repository",
+      "service": "docker_hub",
+      "name": "create_repository",
+      "description": "Create a Docker Hub repository inside a namespace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The namespace where the repository should be created."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 255,
+            "description": "The repository name to create."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The short repository description."
+          },
+          "fullDescription": {
+            "type": "string",
+            "maxLength": 25000,
+            "description": "The detailed repository description."
+          },
+          "registry": {
+            "type": "string",
+            "description": "The registry where the repository should be hosted."
+          },
+          "isPrivate": {
+            "type": "boolean",
+            "description": "Whether the repository should be created as private."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace",
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "repository": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The repository name."
+              },
+              "namespace": {
+                "type": "string",
+                "description": "The namespace that owns the repository."
+              },
+              "repositoryType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository type, such as image or plugin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository type, such as image or plugin."
+              },
+              "status": {
+                "type": "integer",
+                "description": "The numeric repository status code."
+              },
+              "statusDescription": {
+                "type": "string",
+                "description": "The human-readable repository status."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The short repository description, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The short repository description, when available."
+              },
+              "isPrivate": {
+                "type": "boolean",
+                "description": "Whether the repository is private."
+              },
+              "starCount": {
+                "type": "integer",
+                "description": "The number of stars on the repository."
+              },
+              "pullCount": {
+                "type": "integer",
+                "description": "The total number of pulls for the repository."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was last updated."
+              },
+              "lastModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was last modified."
+              },
+              "dateRegistered": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was created."
+              },
+              "affiliation": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current user's affiliation with the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current user's affiliation with the repository, when available."
+              },
+              "mediaTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The media types supported by the repository."
+              },
+              "contentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The content types supported by the repository."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The human-readable repository category name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The URL-friendly repository category identifier."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Docker Hub repository category."
+                },
+                "description": "The categories assigned to the repository."
+              },
+              "storageSize": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The repository storage size in bytes, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository storage size in bytes, when available."
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository owner username, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository owner username, when available."
+              },
+              "hubUser": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Docker Hub user associated with the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Docker Hub user associated with the repository, when available."
+              },
+              "collaboratorCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of collaborators on the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of collaborators on the repository, when available."
+              },
+              "fullDescription": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The full repository description, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The full repository description, when available."
+              },
+              "hasStarred": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the current user has starred the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the current user has starred the repository, when available."
+              },
+              "permissions": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "read": {
+                        "type": "boolean",
+                        "description": "Whether read access is available."
+                      },
+                      "write": {
+                        "type": "boolean",
+                        "description": "Whether write access is available."
+                      },
+                      "admin": {
+                        "type": "boolean",
+                        "description": "Whether admin access is available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The repository permissions visible to the current credential."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository permissions visible to the current credential."
+              },
+              "immutableTagsSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "Whether immutable tags are enabled for the repository."
+                      },
+                      "rules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": "The immutable tag rules configured for the repository."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The immutable tag configuration for the repository."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The immutable tag configuration for the repository."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository source metadata, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository source metadata, when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Detailed Docker Hub repository metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "repository"
+        ],
+        "description": "The output payload for creating a Docker Hub repository."
+      }
+    },
+    {
+      "id": "docker_hub.delete_team",
+      "service": "docker_hub",
+      "name": "delete_team",
+      "description": "Delete a Docker Hub team within an organization.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "teamName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The team name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "teamName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the team deletion request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "docker_hub.get_image",
+      "service": "docker_hub",
+      "name": "get_image",
+      "description": "Find a Docker Hub image variant by digest by scanning the repository's published tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The namespace that owns the repository."
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The repository name."
+          },
+          "digest": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The image manifest digest to look up."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "maxPages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of tag pages to scan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace",
+          "repository",
+          "digest"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The numeric tag identifier, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric tag identifier, when available."
+              },
+              "name": {
+                "type": "string",
+                "description": "The repository tag name."
+              },
+              "creator": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID that originally created the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID that originally created the tag."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last updated."
+              },
+              "lastUpdater": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID that last updated the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID that last updated the tag."
+              },
+              "lastUpdaterUsername": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Docker Hub username that last updated the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Docker Hub username that last updated the tag."
+              },
+              "repository": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The numeric repository identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric repository identifier."
+              },
+              "fullSize": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The compressed tag size in bytes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The compressed tag size in bytes."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current Docker Hub tag status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Docker Hub tag status."
+              },
+              "tagLastPulled": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last pulled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last pulled."
+              },
+              "tagLastPushed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last pushed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last pushed."
+              },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "architecture": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU architecture for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU architecture for the image variant, when available."
+                    },
+                    "features": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU feature set reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU feature set reported for the image variant, when available."
+                    },
+                    "variant": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU variant reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU variant reported for the image variant, when available."
+                    },
+                    "digest": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The image manifest digest, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image manifest digest, when available."
+                    },
+                    "layers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "digest": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The image layer digest, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The image layer digest, when available."
+                          },
+                          "size": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "The image layer size in bytes, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The image layer size in bytes, when available."
+                          },
+                          "instruction": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The Dockerfile instruction associated with the layer, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The Dockerfile instruction associated with the layer, when available."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A Docker image layer."
+                      },
+                      "description": "The image layers included in the image variant."
+                    },
+                    "os": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system for the image variant, when available."
+                    },
+                    "osFeatures": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system features reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system features reported for the image variant, when available."
+                    },
+                    "osVersion": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system version for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system version for the image variant, when available."
+                    },
+                    "size": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The image size in bytes, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image size in bytes, when available."
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The image status returned by Docker Hub, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image status returned by Docker Hub, when available."
+                    },
+                    "lastPulled": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ISO 8601 timestamp when the image variant was last pulled."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ISO 8601 timestamp when the image variant was last pulled."
+                    },
+                    "lastPushed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ISO 8601 timestamp when the image variant was last pushed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ISO 8601 timestamp when the image variant was last pushed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A platform-specific Docker image variant."
+                },
+                "description": "The image variants currently published for the tag."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Docker Hub repository tag."
+          },
+          "image": {
+            "type": "object",
+            "properties": {
+              "architecture": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CPU architecture for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CPU architecture for the image variant, when available."
+              },
+              "features": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CPU feature set reported for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CPU feature set reported for the image variant, when available."
+              },
+              "variant": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CPU variant reported for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CPU variant reported for the image variant, when available."
+              },
+              "digest": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The image manifest digest, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The image manifest digest, when available."
+              },
+              "layers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "digest": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The image layer digest, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image layer digest, when available."
+                    },
+                    "size": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The image layer size in bytes, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image layer size in bytes, when available."
+                    },
+                    "instruction": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Dockerfile instruction associated with the layer, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Dockerfile instruction associated with the layer, when available."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Docker image layer."
+                },
+                "description": "The image layers included in the image variant."
+              },
+              "os": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The operating system for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The operating system for the image variant, when available."
+              },
+              "osFeatures": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The operating system features reported for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The operating system features reported for the image variant, when available."
+              },
+              "osVersion": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The operating system version for the image variant, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The operating system version for the image variant, when available."
+              },
+              "size": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The image size in bytes, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The image size in bytes, when available."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The image status returned by Docker Hub, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The image status returned by Docker Hub, when available."
+              },
+              "lastPulled": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the image variant was last pulled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the image variant was last pulled."
+              },
+              "lastPushed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the image variant was last pushed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the image variant was last pushed."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A platform-specific Docker image variant."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag",
+          "image"
+        ],
+        "description": "The output payload for searching a Docker Hub image by digest."
+      }
+    },
+    {
+      "id": "docker_hub.get_repository",
+      "service": "docker_hub",
+      "name": "get_repository",
+      "description": "Get detailed metadata for a Docker Hub repository within a namespace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The namespace that owns the repository."
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The repository name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace",
+          "repository"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "repository": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The repository name."
+              },
+              "namespace": {
+                "type": "string",
+                "description": "The namespace that owns the repository."
+              },
+              "repositoryType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository type, such as image or plugin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository type, such as image or plugin."
+              },
+              "status": {
+                "type": "integer",
+                "description": "The numeric repository status code."
+              },
+              "statusDescription": {
+                "type": "string",
+                "description": "The human-readable repository status."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The short repository description, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The short repository description, when available."
+              },
+              "isPrivate": {
+                "type": "boolean",
+                "description": "Whether the repository is private."
+              },
+              "starCount": {
+                "type": "integer",
+                "description": "The number of stars on the repository."
+              },
+              "pullCount": {
+                "type": "integer",
+                "description": "The total number of pulls for the repository."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was last updated."
+              },
+              "lastModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was last modified."
+              },
+              "dateRegistered": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the repository was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the repository was created."
+              },
+              "affiliation": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current user's affiliation with the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current user's affiliation with the repository, when available."
+              },
+              "mediaTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The media types supported by the repository."
+              },
+              "contentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The content types supported by the repository."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The human-readable repository category name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The URL-friendly repository category identifier."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Docker Hub repository category."
+                },
+                "description": "The categories assigned to the repository."
+              },
+              "storageSize": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The repository storage size in bytes, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository storage size in bytes, when available."
+              },
+              "user": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository owner username, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository owner username, when available."
+              },
+              "hubUser": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Docker Hub user associated with the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Docker Hub user associated with the repository, when available."
+              },
+              "collaboratorCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of collaborators on the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of collaborators on the repository, when available."
+              },
+              "fullDescription": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The full repository description, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The full repository description, when available."
+              },
+              "hasStarred": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the current user has starred the repository, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the current user has starred the repository, when available."
+              },
+              "permissions": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "read": {
+                        "type": "boolean",
+                        "description": "Whether read access is available."
+                      },
+                      "write": {
+                        "type": "boolean",
+                        "description": "Whether write access is available."
+                      },
+                      "admin": {
+                        "type": "boolean",
+                        "description": "Whether admin access is available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The repository permissions visible to the current credential."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository permissions visible to the current credential."
+              },
+              "immutableTagsSettings": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "Whether immutable tags are enabled for the repository."
+                      },
+                      "rules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": "The immutable tag rules configured for the repository."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The immutable tag configuration for the repository."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The immutable tag configuration for the repository."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The repository source metadata, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The repository source metadata, when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Detailed Docker Hub repository metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "repository"
+        ],
+        "description": "The output payload for retrieving a Docker Hub repository."
+      }
+    },
+    {
+      "id": "docker_hub.get_tag",
+      "service": "docker_hub",
+      "name": "get_tag",
+      "description": "Get metadata and image variants for a specific Docker Hub repository tag.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The namespace that owns the repository."
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The repository name."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tag name to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace",
+          "repository",
+          "tag"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The numeric tag identifier, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric tag identifier, when available."
+              },
+              "name": {
+                "type": "string",
+                "description": "The repository tag name."
+              },
+              "creator": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID that originally created the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID that originally created the tag."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last updated."
+              },
+              "lastUpdater": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID that last updated the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID that last updated the tag."
+              },
+              "lastUpdaterUsername": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Docker Hub username that last updated the tag."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Docker Hub username that last updated the tag."
+              },
+              "repository": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The numeric repository identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric repository identifier."
+              },
+              "fullSize": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The compressed tag size in bytes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The compressed tag size in bytes."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current Docker Hub tag status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Docker Hub tag status."
+              },
+              "tagLastPulled": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last pulled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last pulled."
+              },
+              "tagLastPushed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the tag was last pushed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the tag was last pushed."
+              },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "architecture": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU architecture for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU architecture for the image variant, when available."
+                    },
+                    "features": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU feature set reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU feature set reported for the image variant, when available."
+                    },
+                    "variant": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CPU variant reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CPU variant reported for the image variant, when available."
+                    },
+                    "digest": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The image manifest digest, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image manifest digest, when available."
+                    },
+                    "layers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "digest": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The image layer digest, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The image layer digest, when available."
+                          },
+                          "size": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "description": "The image layer size in bytes, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The image layer size in bytes, when available."
+                          },
+                          "instruction": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The Dockerfile instruction associated with the layer, when available."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The Dockerfile instruction associated with the layer, when available."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A Docker image layer."
+                      },
+                      "description": "The image layers included in the image variant."
+                    },
+                    "os": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system for the image variant, when available."
+                    },
+                    "osFeatures": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system features reported for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system features reported for the image variant, when available."
+                    },
+                    "osVersion": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The operating system version for the image variant, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The operating system version for the image variant, when available."
+                    },
+                    "size": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The image size in bytes, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image size in bytes, when available."
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The image status returned by Docker Hub, when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The image status returned by Docker Hub, when available."
+                    },
+                    "lastPulled": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ISO 8601 timestamp when the image variant was last pulled."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ISO 8601 timestamp when the image variant was last pulled."
+                    },
+                    "lastPushed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ISO 8601 timestamp when the image variant was last pushed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ISO 8601 timestamp when the image variant was last pushed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A platform-specific Docker image variant."
+                },
+                "description": "The image variants currently published for the tag."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Docker Hub repository tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag"
+        ],
+        "description": "The output payload for retrieving a Docker Hub repository tag."
+      }
+    },
+    {
+      "id": "docker_hub.get_team",
+      "service": "docker_hub",
+      "name": "get_team",
+      "description": "Get a Docker Hub team within an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "teamName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The team name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "teamName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "team": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The numeric team identifier, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric team identifier, when available."
+              },
+              "uuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The stable UUID of the team, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The stable UUID of the team, when available."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The team name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The team description, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team description, when available."
+              },
+              "memberCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of members in the team."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of members in the team."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Docker Hub organization team."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team"
+        ],
+        "description": "The output payload for retrieving a Docker Hub team."
+      }
+    },
+    {
+      "id": "docker_hub.list_org_access_tokens",
+      "service": "docker_hub",
+      "name": "list_org_access_tokens",
+      "description": "List Docker Hub organization access tokens for an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "The total number of organization access tokens."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, or null when unavailable."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, or null when unavailable."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The organization access token identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The organization access token identifier."
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The organization access token label."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The organization access token label."
+                },
+                "createdBy": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The username that created the token, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The username that created the token, when available."
+                },
+                "isActive": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the organization access token is active."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the organization access token is active."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the token was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the token was created."
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the token expires, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the token expires, when available."
+                },
+                "lastUsedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the token was last used, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the token was last used, when available."
+                },
+                "resources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The organization access token resource type."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The organization access token resource type."
+                      },
+                      "path": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The resource path granted to the token."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The resource path granted to the token."
+                      },
+                      "scopes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": "The scopes granted for the resource."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A Docker Hub organization access token resource grant."
+                  },
+                  "description": "The resource grants attached to the token."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Docker Hub organization access token."
+            },
+            "description": "The organization access tokens in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated Docker Hub organization access token list."
+      }
+    },
+    {
+      "id": "docker_hub.list_org_members",
+      "service": "docker_hub",
+      "name": "list_org_members",
+      "description": "List Docker Hub organization members with optional filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "search": {
+            "type": "string",
+            "description": "An optional member search term."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "invites": {
+            "type": "boolean",
+            "description": "Whether to include invites in the response when supported."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "invitee",
+              "member"
+            ],
+            "description": "The member type filter."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor",
+              "member"
+            ],
+            "description": "The organization role filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching items."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, or null when unavailable."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, or null when unavailable."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The member identifier, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The member identifier, when available."
+                },
+                "username": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Docker Hub username of the member."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Docker Hub username of the member."
+                },
+                "fullName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The full name of the member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The full name of the member, when available."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address of the member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address of the member, when available."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Docker Hub member type, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Docker Hub member type, when available."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The organization role assigned to the member."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The organization role assigned to the member."
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The teams that include the member."
+                },
+                "isGuest": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the member is marked as a guest in the organization."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the member is marked as a guest in the organization."
+                },
+                "dateJoined": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the member joined the organization."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the member joined the organization."
+                },
+                "lastLoggedInAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the member last logged in, when visible."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the member last logged in, when visible."
+                },
+                "lastSeenAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the member was last seen, when visible."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the member was last seen, when visible."
+                },
+                "lastDesktopVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The last Docker Desktop version seen for the member, when visible."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last Docker Desktop version seen for the member, when visible."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Docker Hub organization member."
+            },
+            "description": "The items in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated Docker Hub organization member list."
+      }
+    },
+    {
+      "id": "docker_hub.list_repositories",
+      "service": "docker_hub",
+      "name": "list_repositories",
+      "description": "List Docker Hub repositories in a namespace with optional name filtering and ordering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The namespace that owns the repositories."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional partial repository name filter."
+          },
+          "ordering": {
+            "type": "string",
+            "enum": [
+              "name",
+              "-name",
+              "last_updated",
+              "-last_updated",
+              "pull_count",
+              "-pull_count"
+            ],
+            "description": "The field and direction used to order repositories."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching items."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, or null when unavailable."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, or null when unavailable."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The repository name."
+                },
+                "namespace": {
+                  "type": "string",
+                  "description": "The namespace that owns the repository."
+                },
+                "repositoryType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The repository type, such as image or plugin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The repository type, such as image or plugin."
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "The numeric repository status code."
+                },
+                "statusDescription": {
+                  "type": "string",
+                  "description": "The human-readable repository status."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The short repository description, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The short repository description, when available."
+                },
+                "isPrivate": {
+                  "type": "boolean",
+                  "description": "Whether the repository is private."
+                },
+                "starCount": {
+                  "type": "integer",
+                  "description": "The number of stars on the repository."
+                },
+                "pullCount": {
+                  "type": "integer",
+                  "description": "The total number of pulls for the repository."
+                },
+                "lastUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the repository was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the repository was last updated."
+                },
+                "lastModified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the repository was last modified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the repository was last modified."
+                },
+                "dateRegistered": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the repository was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the repository was created."
+                },
+                "affiliation": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current user's affiliation with the repository, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current user's affiliation with the repository, when available."
+                },
+                "mediaTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The media types supported by the repository."
+                },
+                "contentTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The content types supported by the repository."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The human-readable repository category name."
+                      },
+                      "slug": {
+                        "type": "string",
+                        "description": "The URL-friendly repository category identifier."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A Docker Hub repository category."
+                  },
+                  "description": "The categories assigned to the repository."
+                },
+                "storageSize": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The repository storage size in bytes, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The repository storage size in bytes, when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Docker Hub repository summary."
+            },
+            "description": "The items in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated Docker Hub repository list."
+      }
+    },
+    {
+      "id": "docker_hub.list_team_members",
+      "service": "docker_hub",
+      "name": "list_team_members",
+      "description": "List members of a Docker Hub team within an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "teamName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The team name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional member search term."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "teamName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching items."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, or null when unavailable."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, or null when unavailable."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The member identifier, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The member identifier, when available."
+                },
+                "username": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Docker Hub username of the team member."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Docker Hub username of the team member."
+                },
+                "fullName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The full name of the team member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The full name of the team member, when available."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address of the team member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address of the team member, when available."
+                },
+                "company": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company value returned for the member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company value returned for the member, when available."
+                },
+                "location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The location value returned for the member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The location value returned for the member, when available."
+                },
+                "profileUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The profile URL returned for the member, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The profile URL returned for the member, when available."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Docker Hub member type, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Docker Hub member type, when available."
+                },
+                "dateJoined": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the member joined the team."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the member joined the team."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Docker Hub team member."
+            },
+            "description": "The items in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated Docker Hub team member list."
+      }
+    },
+    {
+      "id": "docker_hub.list_teams",
+      "service": "docker_hub",
+      "name": "list_teams",
+      "description": "List Docker Hub teams for an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional username to filter teams by membership."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional team search term."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching items."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, or null when unavailable."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, or null when unavailable."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The numeric team identifier, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The numeric team identifier, when available."
+                },
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The stable UUID of the team, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The stable UUID of the team, when available."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The team name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The team name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The team description, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The team description, when available."
+                },
+                "memberCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of members in the team."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of members in the team."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Docker Hub organization team."
+            },
+            "description": "The items in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated Docker Hub team list."
+      }
+    },
+    {
+      "id": "docker_hub.remove_org_member",
+      "service": "docker_hub",
+      "name": "remove_org_member",
+      "description": "Remove a member from a Docker Hub organization.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub username to remove."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "username"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "description": "Whether the member removal request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "removed"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "docker_hub.remove_team_member",
+      "service": "docker_hub",
+      "name": "remove_team_member",
+      "description": "Remove a user from a Docker Hub team within an organization.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub organization name."
+          },
+          "teamName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The team name."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Docker Hub username to remove from the team."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgName",
+          "teamName",
+          "username"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "description": "Whether the team member removal request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "removed"
+        ],
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

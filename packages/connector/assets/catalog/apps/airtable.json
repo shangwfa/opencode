@@ -1,0 +1,1908 @@
+{
+  "service": "airtable",
+  "displayName": "Airtable",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://airtable.com/oauth2/v1/authorize",
+      "tokenUrl": "https://airtable.com/oauth2/v1/token",
+      "scopes": [
+        "data.records:read",
+        "data.records:write",
+        "schema.bases:read",
+        "schema.bases:write",
+        "workspacesAndBases:read"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic",
+      "pkce": {
+        "method": "S256"
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "patXXXXXXXXXXXXXX",
+      "description": "Airtable personal access token used with the Authorization Bearer header. Create it in the Airtable developer hub at https://airtable.com/create/tokens.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://airtable.com",
+  "actions": [
+    {
+      "id": "airtable.create_base",
+      "service": "airtable",
+      "name": "create_base",
+      "description": "Create an Airtable base in a workspace with the provided initial table and field schema.",
+      "operationType": "write",
+      "requiredScopes": [
+        "schema.bases:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the Airtable base."
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Workspace ID in the format wspXXXXXXXXXXXXXX."
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name for the Airtable table."
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "Optional Airtable description, up to 20,000 characters."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name for the Airtable field."
+                      },
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Airtable field type, such as singleLineText."
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 20000,
+                        "description": "Optional Airtable description, up to 20,000 characters."
+                      },
+                      "options": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Type-specific Airtable field options."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "name",
+                      "type"
+                    ],
+                    "description": "Airtable field configuration accepted by metadata write endpoints."
+                  },
+                  "description": "Field configurations to create in the Airtable table.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "fields"
+              ],
+              "description": "Airtable table configuration accepted when creating a base or table."
+            },
+            "description": "Tables to create along with the new Airtable base.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "workspaceId",
+          "tables"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Base ID."
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Table ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Table name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Table description when Airtable returns one."
+                },
+                "primaryFieldId": {
+                  "type": "string",
+                  "description": "Primary field ID configured for the table."
+                },
+                "dateDependencySettings": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Date dependency settings returned by Airtable for the table."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Field ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Field name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Field type reported by Airtable."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Field description when Airtable returns one."
+                      },
+                      "options": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Field options reported by Airtable."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "type"
+                    ],
+                    "description": "Airtable field definition."
+                  },
+                  "description": "Fields defined on the Airtable table."
+                },
+                "views": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "View ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "View name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "View type reported by Airtable."
+                      },
+                      "visibleFieldIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Field IDs visible in the Airtable view."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "description": "Airtable view definition."
+                  },
+                  "description": "Views defined on the Airtable table."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "fields"
+              ],
+              "description": "Airtable table definition."
+            },
+            "description": "Tables created with the Airtable base."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tables"
+        ],
+        "description": "Airtable create base response."
+      },
+      "followUpActions": [
+        "airtable.get_base_schema",
+        "airtable.delete_base"
+      ]
+    },
+    {
+      "id": "airtable.create_field",
+      "service": "airtable",
+      "name": "create_field",
+      "description": "Create a field in an Airtable table.",
+      "operationType": "write",
+      "requiredScopes": [
+        "schema.bases:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID in the format tblXXXXXXXXXXXXXX."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the Airtable field."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Airtable field type, such as singleLineText."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "Optional Airtable description, up to 20,000 characters."
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Type-specific Airtable field options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableId",
+          "name",
+          "type"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Field ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name."
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type reported by Airtable."
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description when Airtable returns one."
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field options reported by Airtable."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "type"
+        ],
+        "description": "Airtable field definition."
+      },
+      "followUpActions": [
+        "airtable.update_field",
+        "airtable.create_records"
+      ]
+    },
+    {
+      "id": "airtable.create_records",
+      "service": "airtable",
+      "name": "create_records",
+      "description": "Create one or more Airtable records in a table.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data.records:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields keyed by field name or field ID."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "fields"
+              ],
+              "description": "Record payload used when creating Airtable records."
+            },
+            "description": "Records to create in the Airtable table.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "typecast": {
+            "type": "boolean",
+            "description": "Whether Airtable should coerce incoming values to compatible field types."
+          },
+          "returnFieldsByFieldId": {
+            "type": "boolean",
+            "description": "Whether Airtable should return field IDs instead of field names in record objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName",
+          "records"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Record ID."
+                },
+                "createdTime": {
+                  "type": "string",
+                  "description": "Record creation timestamp returned by Airtable."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields keyed by field name or field ID."
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "description": "Comment count returned by Airtable when enabled on the endpoint."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "Airtable record."
+            },
+            "description": "Records created by Airtable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.list_records"
+      ]
+    },
+    {
+      "id": "airtable.create_table",
+      "service": "airtable",
+      "name": "create_table",
+      "description": "Create a table in an Airtable base with the provided field schema.",
+      "operationType": "write",
+      "requiredScopes": [
+        "schema.bases:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the Airtable table."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "Optional Airtable description, up to 20,000 characters."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name for the Airtable field."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Airtable field type, such as singleLineText."
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "Optional Airtable description, up to 20,000 characters."
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Type-specific Airtable field options."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "type"
+              ],
+              "description": "Airtable field configuration accepted by metadata write endpoints."
+            },
+            "description": "Field configurations to create in the Airtable table.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "name",
+          "fields"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Table ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Table name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Table description when Airtable returns one."
+          },
+          "primaryFieldId": {
+            "type": "string",
+            "description": "Primary field ID configured for the table."
+          },
+          "dateDependencySettings": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Date dependency settings returned by Airtable for the table."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Field ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Field name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Field type reported by Airtable."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Field description when Airtable returns one."
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Field options reported by Airtable."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type"
+              ],
+              "description": "Airtable field definition."
+            },
+            "description": "Fields defined on the Airtable table."
+          },
+          "views": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "View ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "View name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "View type reported by Airtable."
+                },
+                "visibleFieldIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Field IDs visible in the Airtable view."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "Airtable view definition."
+            },
+            "description": "Views defined on the Airtable table."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "fields"
+        ],
+        "description": "Airtable table definition."
+      },
+      "followUpActions": [
+        "airtable.create_records",
+        "airtable.update_table",
+        "airtable.create_field"
+      ]
+    },
+    {
+      "id": "airtable.delete_base",
+      "service": "airtable",
+      "name": "delete_base",
+      "description": "Delete an Airtable base. Airtable restricts this endpoint to enterprise admins.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workspacesAndBases:manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Base ID."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether Airtable reports the base as deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "deleted"
+        ],
+        "description": "Airtable deleted-base acknowledgement."
+      }
+    },
+    {
+      "id": "airtable.delete_records",
+      "service": "airtable",
+      "name": "delete_records",
+      "description": "Delete one or more Airtable records by record ID.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "data.records:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "recordIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Record ID in the format recXXXXXXXXXXXXXX."
+            },
+            "description": "Record IDs to delete from the Airtable table.",
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName",
+          "recordIds"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Record ID."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Whether Airtable reports the record as deleted."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "deleted"
+              ],
+              "description": "Airtable deleted-record acknowledgement."
+            },
+            "description": "Deleted-record acknowledgements returned by Airtable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Airtable action output."
+      }
+    },
+    {
+      "id": "airtable.get_base_collaborators",
+      "service": "airtable",
+      "name": "get_base_collaborators",
+      "description": "Read Airtable base metadata, including workspaceId and optional collaborator details.",
+      "operationType": "read",
+      "requiredScopes": [
+        "schema.bases:read",
+        "workspacesAndBases:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "collaborators",
+                "inviteLinks",
+                "interfaces",
+                "packages"
+              ]
+            },
+            "description": "Optional Airtable base collaboration details to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Base ID."
+              },
+              "createdTime": {
+                "type": "string",
+                "description": "Base creation timestamp returned by Airtable."
+              },
+              "permissionLevel": {
+                "type": "string",
+                "description": "Permission level reported by Airtable for the authenticated user."
+              },
+              "workspaceId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Workspace ID in the format wspXXXXXXXXXXXXXX."
+              },
+              "name": {
+                "type": "string",
+                "description": "Base name."
+              },
+              "interfaces": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Interface metadata returned by Airtable."
+              },
+              "collaborators": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Deprecated collaborator metadata returned by Airtable."
+              },
+              "groupCollaborators": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Group collaborator metadata returned by Airtable."
+              },
+              "individualCollaborators": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Individual collaborator metadata returned by Airtable."
+              },
+              "inviteLinks": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Invite link metadata returned by Airtable."
+              },
+              "packages": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Package metadata returned by Airtable."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "createdTime",
+              "permissionLevel",
+              "workspaceId",
+              "name"
+            ],
+            "description": "Airtable base details response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "base"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.create_base",
+        "airtable.get_base_schema"
+      ]
+    },
+    {
+      "id": "airtable.get_base_schema",
+      "service": "airtable",
+      "name": "get_base_schema",
+      "description": "Read Airtable table, field, and view schema for a specific base.",
+      "operationType": "read",
+      "requiredScopes": [
+        "schema.bases:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "const": "visibleFieldIds",
+              "type": "string"
+            },
+            "description": "Optional Airtable schema details to include in table views.",
+            "minItems": 1,
+            "maxItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Table ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Table name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Table description when Airtable returns one."
+                },
+                "primaryFieldId": {
+                  "type": "string",
+                  "description": "Primary field ID configured for the table."
+                },
+                "dateDependencySettings": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Date dependency settings returned by Airtable for the table."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Field ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Field name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Field type reported by Airtable."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Field description when Airtable returns one."
+                      },
+                      "options": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Field options reported by Airtable."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "type"
+                    ],
+                    "description": "Airtable field definition."
+                  },
+                  "description": "Fields defined on the Airtable table."
+                },
+                "views": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "View ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "View name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "View type reported by Airtable."
+                      },
+                      "visibleFieldIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Field IDs visible in the Airtable view."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "description": "Airtable view definition."
+                  },
+                  "description": "Views defined on the Airtable table."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "fields"
+              ],
+              "description": "Airtable table definition."
+            },
+            "description": "Tables returned by Airtable for the base."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tables"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.create_table",
+        "airtable.create_field",
+        "airtable.list_records"
+      ]
+    },
+    {
+      "id": "airtable.get_record",
+      "service": "airtable",
+      "name": "get_record",
+      "description": "Read a single Airtable record by record ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data.records:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "cellFormat": {
+            "type": "string",
+            "enum": [
+              "json",
+              "string"
+            ],
+            "description": "Cell format accepted by Airtable for read operations."
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Timezone string sent to Airtable when cellFormat is string."
+          },
+          "userLocale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User locale sent to Airtable when cellFormat is string."
+          },
+          "returnFieldsByFieldId": {
+            "type": "boolean",
+            "description": "Whether Airtable should return field IDs instead of field names in record objects."
+          },
+          "includeDateDependencyMetadata": {
+            "type": "boolean",
+            "description": "Whether Airtable should return date dependency metadata for linked record fields."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Record ID in the format recXXXXXXXXXXXXXX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName",
+          "recordId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Record ID."
+              },
+              "createdTime": {
+                "type": "string",
+                "description": "Record creation timestamp returned by Airtable."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Record fields keyed by field name or field ID."
+              },
+              "commentCount": {
+                "type": "integer",
+                "description": "Comment count returned by Airtable when enabled on the endpoint."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "Airtable record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.update_records",
+        "airtable.delete_records"
+      ]
+    },
+    {
+      "id": "airtable.list_bases",
+      "service": "airtable",
+      "name": "list_bases",
+      "description": "List Airtable bases accessible to the authenticated credential.",
+      "operationType": "read",
+      "requiredScopes": [
+        "schema.bases:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Airtable response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Base ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Base name."
+                },
+                "permissionLevel": {
+                  "type": "string",
+                  "description": "Permission level reported by Airtable for this base."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "permissionLevel"
+              ],
+              "description": "Airtable base summary."
+            },
+            "description": "Bases returned by Airtable."
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Pagination cursor for the next page of bases, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination cursor for the next page of bases, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bases",
+          "offset"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.get_base_collaborators",
+        "airtable.get_base_schema"
+      ]
+    },
+    {
+      "id": "airtable.list_records",
+      "service": "airtable",
+      "name": "list_records",
+      "description": "List Airtable records from a table with optional fields, sorting, view filters, formula filters, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "data.records:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "cellFormat": {
+            "type": "string",
+            "enum": [
+              "json",
+              "string"
+            ],
+            "description": "Cell format accepted by Airtable for read operations."
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Timezone string sent to Airtable when cellFormat is string."
+          },
+          "userLocale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User locale sent to Airtable when cellFormat is string."
+          },
+          "returnFieldsByFieldId": {
+            "type": "boolean",
+            "description": "Whether Airtable should return field IDs instead of field names in record objects."
+          },
+          "includeDateDependencyMetadata": {
+            "type": "boolean",
+            "description": "Whether Airtable should return date dependency metadata for linked record fields."
+          },
+          "view": {
+            "type": "string",
+            "minLength": 1,
+            "description": "View name or view ID used by Airtable to filter and sort results."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Field names or field IDs to include in the Airtable response.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Field name or field ID used by Airtable for sorting."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Sort direction accepted by Airtable."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "Sort rule accepted by the Airtable list records endpoint."
+            },
+            "description": "Sort rules applied by Airtable in order.",
+            "minItems": 1
+          },
+          "filterByFormula": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Formula string evaluated by Airtable to filter matching records."
+          },
+          "maxRecords": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum total number of records to return before Airtable stops pagination."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of records to return per page."
+          },
+          "offset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by a previous Airtable response."
+          },
+          "recordMetadata": {
+            "type": "array",
+            "items": {
+              "const": "commentCount",
+              "type": "string"
+            },
+            "description": "Record metadata fields to include in Airtable list records responses.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Record ID."
+                },
+                "createdTime": {
+                  "type": "string",
+                  "description": "Record creation timestamp returned by Airtable."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields keyed by field name or field ID."
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "description": "Comment count returned by Airtable when enabled on the endpoint."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "Airtable record."
+            },
+            "description": "Records returned by Airtable."
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Pagination cursor for the next page of records, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination cursor for the next page of records, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "offset"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.get_record",
+        "airtable.update_records"
+      ]
+    },
+    {
+      "id": "airtable.update_field",
+      "service": "airtable",
+      "name": "update_field",
+      "description": "Update an Airtable field name, description, or type-specific options.",
+      "operationType": "write",
+      "requiredScopes": [
+        "schema.bases:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID in the format tblXXXXXXXXXXXXXX."
+          },
+          "columnId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Field ID in the format fldXXXXXXXXXXXXXX."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the Airtable field."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "Optional Airtable description, up to 20,000 characters."
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Type-specific Airtable field options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableId",
+          "columnId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Field ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Field name."
+          },
+          "type": {
+            "type": "string",
+            "description": "Field type reported by Airtable."
+          },
+          "description": {
+            "type": "string",
+            "description": "Field description when Airtable returns one."
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field options reported by Airtable."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "type"
+        ],
+        "description": "Airtable field definition."
+      },
+      "followUpActions": [
+        "airtable.get_base_schema"
+      ]
+    },
+    {
+      "id": "airtable.update_records",
+      "service": "airtable",
+      "name": "update_records",
+      "description": "Update one or more existing Airtable records by record ID.",
+      "operationType": "write",
+      "requiredScopes": [
+        "data.records:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Record ID in the format recXXXXXXXXXXXXXX."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields keyed by field name or field ID."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "Record payload used when updating Airtable records."
+            },
+            "description": "Records to update in the Airtable table.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "typecast": {
+            "type": "boolean",
+            "description": "Whether Airtable should coerce incoming values to compatible field types."
+          },
+          "returnFieldsByFieldId": {
+            "type": "boolean",
+            "description": "Whether Airtable should return field IDs instead of field names in record objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName",
+          "records"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Record ID."
+                },
+                "createdTime": {
+                  "type": "string",
+                  "description": "Record creation timestamp returned by Airtable."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields keyed by field name or field ID."
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "description": "Comment count returned by Airtable when enabled on the endpoint."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "Airtable record."
+            },
+            "description": "Records returned by Airtable after update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Airtable action output."
+      },
+      "followUpActions": [
+        "airtable.get_record"
+      ]
+    },
+    {
+      "id": "airtable.update_table",
+      "service": "airtable",
+      "name": "update_table",
+      "description": "Update an Airtable table name, description, or date dependency settings.",
+      "operationType": "write",
+      "requiredScopes": [
+        "schema.bases:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base ID in the format appXXXXXXXXXXXXXX."
+          },
+          "tableIdOrName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Table ID or table name accepted by the Airtable path parameter."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name for the Airtable table."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "Optional Airtable description, up to 20,000 characters."
+          },
+          "dateDependencySettings": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Airtable date dependency settings for a table."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "baseId",
+          "tableIdOrName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Table ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Table name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Table description when Airtable returns one."
+          },
+          "primaryFieldId": {
+            "type": "string",
+            "description": "Primary field ID configured for the table."
+          },
+          "dateDependencySettings": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Date dependency settings returned by Airtable for the table."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Field ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Field name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Field type reported by Airtable."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Field description when Airtable returns one."
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Field options reported by Airtable."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type"
+              ],
+              "description": "Airtable field definition."
+            },
+            "description": "Fields defined on the Airtable table."
+          },
+          "views": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "View ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "View name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "View type reported by Airtable."
+                },
+                "visibleFieldIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Field IDs visible in the Airtable view."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "Airtable view definition."
+            },
+            "description": "Views defined on the Airtable table."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "fields"
+        ],
+        "description": "Airtable table definition."
+      },
+      "followUpActions": [
+        "airtable.get_base_schema"
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "configInputs": [
+        {
+          "handle": "baseId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^app[A-Za-z0-9]{14}$"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "fields",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "nullable": false,
+          "value": []
+        },
+        {
+          "handle": "formula",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "maxRecordsPerPoll",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "nullable": false,
+          "value": 200
+        },
+        {
+          "handle": "tableIdOrName",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggerField",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^}]*$"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "view",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.",
+      "displayName": "Record Created or Updated",
+      "key": "airtable.on_record_changed",
+      "name": "on_record_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "baseId": {
+                  "type": "string"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "object"
+                },
+                "recordId": {
+                  "type": "string"
+                },
+                "tableIdOrName": {
+                  "type": "string"
+                },
+                "triggerField": {
+                  "type": "string"
+                },
+                "triggerFieldValue": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "baseId",
+                "tableIdOrName",
+                "recordId",
+                "createdTime",
+                "triggerField",
+                "triggerFieldValue",
+                "fields"
+              ]
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "airtable",
+      "type": "poll"
+    }
+  ],
+  "triggerPermissions": [
+    {
+      "id": "airtable.on_record_changed",
+      "name": "Record Created or Updated",
+      "description": "Reads records in the selected base and table to detect creations or updates. Does not modify records.",
+      "providerPermissions": [
+        "data.records:read"
+      ],
+      "instructions": "Grant the token access to the selected base. The configured timestamp field must reflect the changes to monitor."
+    }
+  ]
+}

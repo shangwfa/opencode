@@ -1,0 +1,434 @@
+{
+  "service": "sms_alert",
+  "displayName": "SMS Alert",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sms_alert_api_key",
+      "description": "SMS Alert API key sent as the apikey query parameter. Sign in to SMS Alert, open Developers, then API keys to view or create one: https://kb.smsalert.co.in/knowledgebase/api-kit/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.smsalert.co.in/",
+  "actions": [
+    {
+      "id": "sms_alert.generate_otp",
+      "service": "sms_alert",
+      "name": "generate_otp",
+      "description": "Generate and send an OTP message through SMS Alert.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "senderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender ID used for the OTP message."
+          },
+          "mobileNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination mobile number for the OTP."
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OTP template text, which must include the \"[otp]\" placeholder and may include optional length/retry/validity attributes.",
+            "pattern": "\\[otp(?:\\]|[ \\t\\n][^\\[]*\\])"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "senderId",
+          "mobileNumber",
+          "template"
+        ],
+        "description": "The input payload for generating an OTP through SMS Alert."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The provider message returned by SMS Alert."
+          },
+          "batchId": {
+            "type": "string",
+            "description": "The batch identifier returned by SMS Alert."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mobileNumber": {
+                  "type": "string",
+                  "description": "The destination mobile number."
+                },
+                "messageId": {
+                  "type": "string",
+                  "description": "The provider message identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The provider delivery status string."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "mobileNumber",
+                "messageId",
+                "status"
+              ],
+              "description": "One SMS Alert batch delivery entry."
+            },
+            "description": "The batch delivery records returned by SMS Alert."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message",
+          "batchId",
+          "deliveries"
+        ],
+        "description": "The normalized SMS Alert batch operation response."
+      }
+    },
+    {
+      "id": "sms_alert.get_credit_balance",
+      "service": "sms_alert",
+      "name": "get_credit_balance",
+      "description": "Get the remaining SMS Alert credits grouped by delivery route.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string",
+            "description": "The raw balance summary string returned by SMS Alert."
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "type": "string",
+                  "description": "The SMS Alert route identifier."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The display name for this route in SMS Alert."
+                },
+                "credits": {
+                  "type": "integer",
+                  "description": "The remaining credits for this route."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "route",
+                "displayName",
+                "credits"
+              ],
+              "description": "One SMS Alert balance route entry."
+            },
+            "description": "The route-level balances available on the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summary",
+          "routes"
+        ],
+        "description": "The SMS Alert credit balance response."
+      }
+    },
+    {
+      "id": "sms_alert.list_sender_ids",
+      "service": "sms_alert",
+      "name": "list_sender_ids",
+      "description": "List the sender IDs available in the SMS Alert account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "senders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sender": {
+                  "type": "string",
+                  "description": "The sender ID value."
+                },
+                "approved": {
+                  "type": "boolean",
+                  "description": "Whether SMS Alert marks the sender as approved."
+                },
+                "open": {
+                  "type": "boolean",
+                  "description": "Whether the sender is currently open for use."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The sender creation timestamp returned by SMS Alert."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "sender",
+                "approved",
+                "open",
+                "createdAt"
+              ],
+              "description": "One sender ID entry returned by SMS Alert."
+            },
+            "description": "The sender IDs currently available for the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "senders"
+        ],
+        "description": "The SMS Alert sender list response."
+      }
+    },
+    {
+      "id": "sms_alert.list_templates",
+      "service": "sms_alert",
+      "name": "list_templates",
+      "description": "List SMS templates from the SMS Alert account with optional pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort order for template listing."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request from SMS Alert."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size to request from SMS Alert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing SMS Alert templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The template identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The template title."
+                },
+                "template": {
+                  "type": "string",
+                  "description": "The SMS template body."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The template creation timestamp returned by SMS Alert."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "template",
+                "createdAt"
+              ],
+              "description": "One template entry returned by SMS Alert."
+            },
+            "description": "The SMS templates currently available for the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ],
+        "description": "The SMS Alert template list response."
+      }
+    },
+    {
+      "id": "sms_alert.send_sms",
+      "service": "sms_alert",
+      "name": "send_sms",
+      "description": "Send a direct SMS message through SMS Alert.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "senderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender ID assigned to your SMS Alert account."
+          },
+          "mobileNumbers": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One or more destination numbers, separated by commas when sending to multiple recipients."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SMS body to send."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "senderId",
+          "mobileNumbers",
+          "message"
+        ],
+        "description": "The input payload for sending a direct SMS through SMS Alert."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The provider message returned by SMS Alert."
+          },
+          "batchId": {
+            "type": "string",
+            "description": "The batch identifier returned by SMS Alert."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mobileNumber": {
+                  "type": "string",
+                  "description": "The destination mobile number."
+                },
+                "messageId": {
+                  "type": "string",
+                  "description": "The provider message identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The provider delivery status string."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "mobileNumber",
+                "messageId",
+                "status"
+              ],
+              "description": "One SMS Alert batch delivery entry."
+            },
+            "description": "The batch delivery records returned by SMS Alert."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message",
+          "batchId",
+          "deliveries"
+        ],
+        "description": "The normalized SMS Alert batch operation response."
+      }
+    },
+    {
+      "id": "sms_alert.validate_otp",
+      "service": "sms_alert",
+      "name": "validate_otp",
+      "description": "Validate an OTP code previously generated through SMS Alert.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mobileNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination mobile number used during OTP generation."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OTP code entered by the user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mobileNumber",
+          "code"
+        ],
+        "description": "The input payload for validating an OTP through SMS Alert."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "boolean",
+            "description": "Whether SMS Alert reported that the OTP matched."
+          },
+          "message": {
+            "type": "string",
+            "description": "The provider validation message returned by SMS Alert."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "matched",
+          "message"
+        ],
+        "description": "The normalized SMS Alert OTP validation response."
+      }
+    }
+  ]
+}

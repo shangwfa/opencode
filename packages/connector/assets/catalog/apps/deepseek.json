@@ -1,0 +1,549 @@
+{
+  "service": "deepseek",
+  "displayName": "DeepSeek",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sk-...",
+      "description": "DeepSeek API key used for DeepSeek API requests. Create or manage keys at https://platform.deepseek.com/api_keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://platform.deepseek.com",
+  "actions": [
+    {
+      "id": "deepseek.create_anthropic_message",
+      "service": "deepseek",
+      "name": "create_anthropic_message",
+      "description": "Create a DeepSeek message via the Anthropic-compatible API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "deepseek-chat",
+              "deepseek-reasoner"
+            ],
+            "description": "The DeepSeek model identifier."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of tokens to generate."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the DeepSeek API."
+                        },
+                        "description": "A JSON object passed through to the DeepSeek API."
+                      },
+                      "description": "Structured content blocks."
+                    }
+                  ],
+                  "description": "Message content as plain text or structured blocks."
+                }
+              },
+              "additionalProperties": false
+            },
+            "description": "The ordered conversation history to send to the model."
+          },
+          "stop_sequences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A stop sequence."
+            },
+            "description": "Sequences that stop generation."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only accepts false or omission."
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text content."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value accepted by the DeepSeek API."
+                  },
+                  "description": "A JSON object passed through to the DeepSeek API."
+                },
+                "description": "Structured content blocks."
+              }
+            ],
+            "description": "Message content as plain text or structured blocks."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature to use for generation."
+          },
+          "thinking": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The thinking mode requested by the Anthropic-compatible API."
+              },
+              "budget_tokens": {
+                "type": "integer",
+                "description": "The maximum number of tokens allocated to thinking."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Thinking configuration for the Anthropic-compatible request."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "any",
+                  "none"
+                ],
+                "description": "A predefined Anthropic-compatible tool choice mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the DeepSeek API."
+                },
+                "description": "A JSON object passed through to the DeepSeek API."
+              }
+            ],
+            "description": "How the model should choose tools for the request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the DeepSeek API."
+              },
+              "description": "A JSON object passed through to the DeepSeek API."
+            },
+            "description": "The tools available to the model."
+          },
+          "top_p": {
+            "type": "number",
+            "description": "The nucleus sampling threshold."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "max_tokens",
+          "messages"
+        ],
+        "description": "The input payload for the Anthropic-compatible message action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The response payload for the Anthropic-compatible message action."
+      }
+    },
+    {
+      "id": "deepseek.create_chat_completion",
+      "service": "deepseek",
+      "name": "create_chat_completion",
+      "description": "Create a DeepSeek chat completion via the OpenAI-compatible API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "deepseek-chat",
+              "deepseek-reasoner"
+            ],
+            "description": "The DeepSeek model identifier."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The text content of the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The text content of the message."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The optional participant name for the message."
+                },
+                "prefix": {
+                  "type": "boolean",
+                  "description": "Whether the assistant message should be treated as a prefix."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "The identifier of the tool call that this tool message responds to."
+                },
+                "reasoning_content": {
+                  "type": "string",
+                  "description": "Reasoning content provided for assistant context."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A message in the OpenAI-compatible chat completion request."
+            },
+            "description": "The ordered conversation history to send to the model."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The frequency penalty to apply to repeated tokens."
+          },
+          "logprobs": {
+            "type": "boolean",
+            "description": "Whether to include token-level log probability details in the response."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of tokens to generate."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The presence penalty to apply to newly introduced tokens."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json_object"
+                ],
+                "description": "The response format type requested from the model."
+              }
+            },
+            "additionalProperties": false
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single stop sequence."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A stop sequence."
+                },
+                "description": "A list of stop sequences."
+              }
+            ],
+            "description": "One or more sequences that stop generation."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only accepts false or omission."
+          },
+          "stream_options": {
+            "type": "object",
+            "properties": {
+              "include_usage": {
+                "type": "boolean",
+                "description": "Whether usage information should be included in stream chunks."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Streaming options for the request."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature to use for generation."
+          },
+          "thinking": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "enabled",
+                  "disabled"
+                ],
+                "description": "Whether reasoning mode should be enabled for the request."
+              }
+            },
+            "additionalProperties": false
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "auto",
+                  "required"
+                ],
+                "description": "A predefined tool selection strategy for the request."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "function",
+                    "type": "string",
+                    "description": "The tool choice type. Must be function."
+                  },
+                  "function": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the function tool to force."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A tool choice that forces one specific function tool."
+              }
+            ],
+            "description": "The tool selection policy for the chat completion request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function",
+                  "type": "string",
+                  "description": "The tool type. Must be function."
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The function name exposed to the model."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "A human-readable description of the function."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON value accepted by the DeepSeek API."
+                      },
+                      "description": "A JSON object passed through to the DeepSeek API."
+                    },
+                    "strict": {
+                      "type": "boolean",
+                      "description": "Whether the model must follow the declared parameter schema exactly."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The function definition for an OpenAI-compatible tool."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An OpenAI-compatible tool definition."
+            },
+            "description": "The tools available to the model."
+          },
+          "top_logprobs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "The number of top token log probabilities to return."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for the OpenAI-compatible chat completion action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The response payload for the chat completion action."
+      }
+    },
+    {
+      "id": "deepseek.get_user_balance",
+      "service": "deepseek",
+      "name": "get_user_balance",
+      "description": "Get the current DeepSeek account balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "is_available": {
+            "type": "boolean",
+            "description": "Whether the account balance information is currently available."
+          },
+          "balance_infos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "description": "The currency code for the balance."
+                },
+                "total_balance": {
+                  "type": "string",
+                  "description": "The total available balance."
+                },
+                "granted_balance": {
+                  "type": "string",
+                  "description": "The promotional or granted balance."
+                },
+                "topped_up_balance": {
+                  "type": "string",
+                  "description": "The manually topped-up balance."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A balance entry returned by the DeepSeek balance API."
+            },
+            "description": "The list of balances grouped by currency."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "deepseek.list_models",
+      "service": "deepseek",
+      "name": "list_models",
+      "description": "List the available DeepSeek models.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type returned by the API."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by the API."
+                },
+                "owned_by": {
+                  "type": "string",
+                  "description": "The owner of the model."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A DeepSeek model summary."
+            },
+            "description": "The list of available models."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

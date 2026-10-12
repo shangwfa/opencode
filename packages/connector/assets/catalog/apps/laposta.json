@@ -1,0 +1,856 @@
+{
+  "service": "laposta",
+  "displayName": "Laposta",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "LAPOSTA_API_KEY",
+      "description": "Laposta API key used as the HTTP Basic Auth username with an empty password. Create a key from the Koppelingen page in your Laposta account: https://docs.laposta.nl/article/349-hoe-kom-ik-aan-een-api-sleutel."
+    }
+  ],
+  "homepageUrl": "https://laposta.nl/",
+  "actions": [
+    {
+      "id": "laposta.create_list",
+      "service": "laposta",
+      "name": "create_list",
+      "description": "Create a Laposta mailing list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List name."
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Whether the list is locked against changes in the application."
+          },
+          "remarks": {
+            "type": "string",
+            "description": "Optional remarks about the list."
+          },
+          "subscribe_notification_email": {
+            "type": "string",
+            "description": "Email address notified when a member subscribes.",
+            "format": "email"
+          },
+          "unsubscribe_notification_email": {
+            "type": "string",
+            "description": "Email address notified when a member unsubscribes.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Fields for creating a Laposta list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta list ID."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "deleted"
+                ],
+                "description": "Current list state."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "List name."
+              },
+              "locked": {
+                "type": "boolean",
+                "description": "Whether the list is locked against changes in the application."
+              },
+              "members": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of active members."
+                  },
+                  "unsubscribed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of unsubscribed members."
+                  },
+                  "cleaned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of cleaned members."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "active",
+                  "unsubscribed",
+                  "cleaned"
+                ],
+                "description": "Laposta list member counts by state."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "list_id",
+              "state",
+              "name",
+              "locked",
+              "members"
+            ],
+            "description": "A Laposta mailing list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "A single Laposta list response."
+      }
+    },
+    {
+      "id": "laposta.create_member",
+      "service": "laposta",
+      "name": "create_member",
+      "description": "Add a member to a Laposta mailing list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list to which the member should be added."
+          },
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IP address from which the member registered."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the member to add.",
+            "format": "email"
+          },
+          "source_url": {
+            "type": "string",
+            "description": "URL from which the member registered.",
+            "format": "uri"
+          },
+          "custom_fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom field values keyed by Laposta custom_name."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "upsert": {
+                "type": "boolean",
+                "description": "Update an existing active member with the same email address."
+              },
+              "suppress_reactivation": {
+                "type": "boolean",
+                "description": "Prevent an unsubscribed member from being reactivated during upsert."
+              },
+              "suppress_email_notification": {
+                "type": "boolean",
+                "description": "Prevent Laposta from sending the API subscription notification email."
+              },
+              "ignore_doubleoptin": {
+                "type": "boolean",
+                "description": "Activate the member immediately without sending a double opt-in confirmation."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Laposta member creation options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "ip",
+          "email"
+        ],
+        "description": "Fields for creating a Laposta member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {
+              "member_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta member ID."
+              },
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "ID of the list containing the member."
+              },
+              "email": {
+                "type": "string",
+                "description": "Member email address.",
+                "format": "email"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "unsubscribed",
+                  "unconfirmed",
+                  "cleaned",
+                  "deleted"
+                ],
+                "description": "Current member state."
+              },
+              "custom_fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Values of the list's custom fields for this member."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "member_id",
+              "list_id",
+              "email",
+              "state",
+              "custom_fields"
+            ],
+            "description": "A Laposta mailing list member."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member"
+        ],
+        "description": "A single Laposta member response."
+      }
+    },
+    {
+      "id": "laposta.get_list",
+      "service": "laposta",
+      "name": "get_list",
+      "description": "Get one Laposta mailing list by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Input for retrieving a Laposta list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta list ID."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "deleted"
+                ],
+                "description": "Current list state."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "List name."
+              },
+              "locked": {
+                "type": "boolean",
+                "description": "Whether the list is locked against changes in the application."
+              },
+              "members": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of active members."
+                  },
+                  "unsubscribed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of unsubscribed members."
+                  },
+                  "cleaned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of cleaned members."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "active",
+                  "unsubscribed",
+                  "cleaned"
+                ],
+                "description": "Laposta list member counts by state."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "list_id",
+              "state",
+              "name",
+              "locked",
+              "members"
+            ],
+            "description": "A Laposta mailing list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "A single Laposta list response."
+      }
+    },
+    {
+      "id": "laposta.get_member",
+      "service": "laposta",
+      "name": "get_member",
+      "description": "Get one Laposta member by member ID or email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list containing the member."
+          },
+          "member_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Member ID or raw member email address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "member_id"
+        ],
+        "description": "Input for retrieving a Laposta member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {
+              "member_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta member ID."
+              },
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "ID of the list containing the member."
+              },
+              "email": {
+                "type": "string",
+                "description": "Member email address.",
+                "format": "email"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "unsubscribed",
+                  "unconfirmed",
+                  "cleaned",
+                  "deleted"
+                ],
+                "description": "Current member state."
+              },
+              "custom_fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Values of the list's custom fields for this member."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "member_id",
+              "list_id",
+              "email",
+              "state",
+              "custom_fields"
+            ],
+            "description": "A Laposta mailing list member."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member"
+        ],
+        "description": "A single Laposta member response."
+      }
+    },
+    {
+      "id": "laposta.list_lists",
+      "service": "laposta",
+      "name": "list_lists",
+      "description": "List all mailing lists available to the authenticated Laposta account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Laposta lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "list_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique Laposta list ID."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "deleted"
+                  ],
+                  "description": "Current list state."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "List name."
+                },
+                "locked": {
+                  "type": "boolean",
+                  "description": "Whether the list is locked against changes in the application."
+                },
+                "members": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Number of active members."
+                    },
+                    "unsubscribed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Number of unsubscribed members."
+                    },
+                    "cleaned": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Number of cleaned members."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "active",
+                    "unsubscribed",
+                    "cleaned"
+                  ],
+                  "description": "Laposta list member counts by state."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "list_id",
+                "state",
+                "name",
+                "locked",
+                "members"
+              ],
+              "description": "A Laposta mailing list."
+            },
+            "description": "Lists returned by Laposta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lists"
+        ],
+        "description": "Laposta mailing lists."
+      }
+    },
+    {
+      "id": "laposta.list_members",
+      "service": "laposta",
+      "name": "list_members",
+      "description": "List members of a Laposta mailing list, optionally filtered by state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list whose members should be returned."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "unsubscribed",
+              "cleaned"
+            ],
+            "description": "Member state filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Filters for listing Laposta members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "member_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique Laposta member ID."
+                },
+                "list_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID of the list containing the member."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Member email address.",
+                  "format": "email"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "unsubscribed",
+                    "unconfirmed",
+                    "cleaned",
+                    "deleted"
+                  ],
+                  "description": "Current member state."
+                },
+                "custom_fields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Values of the list's custom fields for this member."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "member_id",
+                "list_id",
+                "email",
+                "state",
+                "custom_fields"
+              ],
+              "description": "A Laposta mailing list member."
+            },
+            "description": "Members returned by Laposta."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "members"
+        ],
+        "description": "Laposta mailing list members."
+      }
+    },
+    {
+      "id": "laposta.update_list",
+      "service": "laposta",
+      "name": "update_list",
+      "description": "Update selected fields on a Laposta mailing list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list to update."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List name."
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Whether the list is locked against changes in the application."
+          },
+          "remarks": {
+            "type": "string",
+            "description": "Optional remarks about the list."
+          },
+          "subscribe_notification_email": {
+            "type": "string",
+            "description": "Email address notified when a member subscribes.",
+            "format": "email"
+          },
+          "unsubscribe_notification_email": {
+            "type": "string",
+            "description": "Email address notified when a member unsubscribes.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Fields to update on a Laposta list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta list ID."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "deleted"
+                ],
+                "description": "Current list state."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "List name."
+              },
+              "locked": {
+                "type": "boolean",
+                "description": "Whether the list is locked against changes in the application."
+              },
+              "members": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of active members."
+                  },
+                  "unsubscribed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of unsubscribed members."
+                  },
+                  "cleaned": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of cleaned members."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "active",
+                  "unsubscribed",
+                  "cleaned"
+                ],
+                "description": "Laposta list member counts by state."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "list_id",
+              "state",
+              "name",
+              "locked",
+              "members"
+            ],
+            "description": "A Laposta mailing list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "A single Laposta list response."
+      }
+    },
+    {
+      "id": "laposta.update_member",
+      "service": "laposta",
+      "name": "update_member",
+      "description": "Update selected fields on a Laposta mailing list member.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the list containing the member."
+          },
+          "member_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Member ID or raw member email address."
+          },
+          "email": {
+            "type": "string",
+            "description": "Member email address.",
+            "format": "email"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "unsubscribed"
+            ],
+            "description": "New member state."
+          },
+          "custom_fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom field values keyed by Laposta custom_name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "member_id"
+        ],
+        "description": "Fields to update on a Laposta member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {
+              "member_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Laposta member ID."
+              },
+              "list_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "ID of the list containing the member."
+              },
+              "email": {
+                "type": "string",
+                "description": "Member email address.",
+                "format": "email"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "unsubscribed",
+                  "unconfirmed",
+                  "cleaned",
+                  "deleted"
+                ],
+                "description": "Current member state."
+              },
+              "custom_fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Values of the list's custom fields for this member."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "member_id",
+              "list_id",
+              "email",
+              "state",
+              "custom_fields"
+            ],
+            "description": "A Laposta mailing list member."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member"
+        ],
+        "description": "A single Laposta member response."
+      }
+    }
+  ]
+}

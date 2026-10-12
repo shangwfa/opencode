@@ -1,0 +1,194 @@
+{
+  "service": "contentful_graphql",
+  "displayName": "Contentful GraphQL",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Content API Token",
+      "placeholder": "CONTENTFUL_DELIVERY_OR_PREVIEW_TOKEN",
+      "description": "Contentful GraphQL Content API access token sent with the Authorization Bearer header. Create or copy delivery and preview tokens from Space settings > API keys in the Contentful web app: https://app.contentful.com/spaces",
+      "extraFields": [
+        {
+          "key": "spaceId",
+          "label": "Space ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your_space_id",
+          "description": "Contentful space ID used in GraphQL endpoint paths. Copy it from the Contentful web app space settings or API keys page: https://app.contentful.com/spaces"
+        },
+        {
+          "key": "environmentId",
+          "label": "Environment ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "master",
+          "description": "Contentful environment ID used in GraphQL endpoint paths. Use master for the default environment."
+        },
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "global",
+          "description": "Contentful GraphQL API region. Use global for graphql.contentful.com or eu for EU data residency on graphql.eu.contentful.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.contentful.com",
+  "actions": [
+    {
+      "id": "contentful_graphql.execute_query",
+      "service": "contentful_graphql",
+      "name": "execute_query",
+      "description": "Execute a Contentful GraphQL Content API query against a space and environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contentful space identifier. Defaults to the space configured on the connection when omitted."
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contentful environment identifier. Defaults to the environment configured on the connection when omitted."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "global",
+              "eu"
+            ],
+            "description": "Contentful GraphQL API region."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphQL query document to execute."
+          },
+          "variables": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "GraphQL variables keyed by variable name and encoded as JSON values."
+          },
+          "operationName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphQL operation name to execute when the document defines multiple operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for executing a Contentful GraphQL query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The GraphQL data object returned by Contentful, or null when execution failed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The GraphQL data object returned by Contentful, or null when execution failed."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The GraphQL error message."
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "type": "integer",
+                        "description": "The one-based source line for the GraphQL error."
+                      },
+                      "column": {
+                        "type": "integer",
+                        "description": "The one-based source column for the GraphQL error."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One GraphQL error location."
+                  },
+                  "description": "Source locations associated with the GraphQL error."
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "description": "One GraphQL path segment."
+                  },
+                  "description": "GraphQL response path entries associated with the error."
+                },
+                "extensions": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-specific GraphQL error extensions."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One GraphQL error returned by Contentful."
+            },
+            "description": "GraphQL errors returned by Contentful."
+          },
+          "extensions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "GraphQL response extensions returned by Contentful."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Contentful request identifier response header."
+          },
+          "queryCost": {
+            "type": "integer",
+            "description": "The Contentful GraphQL query cost response header."
+          },
+          "rateLimitSecondLimit": {
+            "type": "integer",
+            "description": "The per-second Contentful rate limit response header."
+          },
+          "rateLimitReset": {
+            "type": "integer",
+            "description": "Seconds until the Contentful rate limit resets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Contentful GraphQL response."
+      }
+    }
+  ]
+}

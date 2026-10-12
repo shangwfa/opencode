@@ -1,0 +1,1429 @@
+{
+  "service": "statuspage",
+  "displayName": "Statuspage",
+  "categories": [
+    "Developer Tools",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "STATUSPAGE_API_TOKEN",
+      "description": "Statuspage API token sent with the Authorization: OAuth header. Create or copy tokens from your Statuspage account API info page.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.atlassian.com/software/statuspage",
+  "actions": [
+    {
+      "id": "statuspage.create_component",
+      "service": "statuspage",
+      "name": "create_component",
+      "description": "Create a component on a Statuspage page.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "component": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The component name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "operational",
+                  "under_maintenance",
+                  "degraded_performance",
+                  "partial_outage",
+                  "major_outage"
+                ],
+                "description": "The Statuspage component status."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The component description."
+              },
+              "groupId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Statuspage component group identifier."
+              },
+              "onlyShowIfDegraded": {
+                "type": "boolean",
+                "description": "Whether Statuspage should show the component only when degraded."
+              },
+              "showcase": {
+                "type": "boolean",
+                "description": "Whether Statuspage should showcase the component."
+              },
+              "startDate": {
+                "type": "string",
+                "description": "The component start date.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "The component fields sent to Statuspage when creating a component."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "component"
+        ],
+        "description": "Input parameters for creating a Statuspage component."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The component id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The component name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The component status returned by Statuspage."
+              },
+              "groupId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The component group id when the component belongs to a group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The component group id when the component belongs to a group."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage component object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "raw"
+        ],
+        "description": "The normalized Statuspage component response."
+      }
+    },
+    {
+      "id": "statuspage.create_incident",
+      "service": "statuspage",
+      "name": "create_incident",
+      "description": "Create an incident on a Statuspage page.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "incident": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The incident name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "investigating",
+                  "identified",
+                  "monitoring",
+                  "resolved",
+                  "postmortem"
+                ],
+                "description": "The Statuspage incident status."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The incident update body."
+              },
+              "impactOverride": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minor",
+                  "major",
+                  "critical",
+                  "maintenance"
+                ],
+                "description": "The Statuspage incident impact override."
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "componentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Statuspage component identifier."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "operational",
+                        "under_maintenance",
+                        "degraded_performance",
+                        "partial_outage",
+                        "major_outage"
+                      ],
+                      "description": "The Statuspage component status."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "componentId",
+                    "status"
+                  ],
+                  "description": "A component status change attached to an incident update."
+                },
+                "description": "Component status changes for this incident.",
+                "minItems": 1
+              },
+              "deliverNotifications": {
+                "type": "boolean",
+                "description": "Whether Statuspage should deliver incident notifications."
+              },
+              "autoTransitionToMaintenanceState": {
+                "type": "boolean",
+                "description": "Whether Statuspage should automatically transition components into maintenance."
+              },
+              "autoTransitionToOperationalState": {
+                "type": "boolean",
+                "description": "Whether Statuspage should automatically transition components back to operational."
+              },
+              "autoTransitionDeliverNotificationsAtEnd": {
+                "type": "boolean",
+                "description": "Whether Statuspage should deliver notifications when an automatic transition ends."
+              },
+              "autoTweetAtBeginning": {
+                "type": "boolean",
+                "description": "Whether Statuspage should tweet at the start."
+              },
+              "autoTweetOnCompletion": {
+                "type": "boolean",
+                "description": "Whether Statuspage should tweet on completion."
+              },
+              "autoTweetOnCreation": {
+                "type": "boolean",
+                "description": "Whether Statuspage should tweet on incident creation."
+              },
+              "autoTweetOneHourBefore": {
+                "type": "boolean",
+                "description": "Whether Statuspage should tweet one hour before scheduled maintenance."
+              },
+              "backfillDate": {
+                "type": "string",
+                "description": "The date used by Statuspage for a backfilled incident.",
+                "format": "date"
+              },
+              "backfilled": {
+                "type": "boolean",
+                "description": "Whether the incident is backfilled."
+              },
+              "scheduledFor": {
+                "type": "string",
+                "description": "The scheduled start time for a scheduled incident.",
+                "format": "date-time"
+              },
+              "scheduledUntil": {
+                "type": "string",
+                "description": "The scheduled end time for a scheduled incident.",
+                "format": "date-time"
+              },
+              "scheduledRemindPrior": {
+                "type": "boolean",
+                "description": "Whether Statuspage should send a scheduled reminder."
+              },
+              "scheduledAutoInProgress": {
+                "type": "boolean",
+                "description": "Whether Statuspage should automatically move scheduled maintenance in progress."
+              },
+              "scheduledAutoCompleted": {
+                "type": "boolean",
+                "description": "Whether Statuspage should automatically complete scheduled maintenance."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional provider-defined metadata returned by Statuspage."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "The incident fields sent to Statuspage when creating an incident."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "incident"
+        ],
+        "description": "Input parameters for creating a Statuspage incident."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incident": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The incident id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The incident name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The incident status returned by Statuspage."
+              },
+              "impact": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The incident impact returned by Statuspage."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The incident impact returned by Statuspage."
+              },
+              "shortlink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Statuspage incident shortlink when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Statuspage incident shortlink when present."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage incident object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incident",
+          "raw"
+        ],
+        "description": "The normalized Statuspage incident response."
+      }
+    },
+    {
+      "id": "statuspage.delete_component",
+      "service": "statuspage",
+      "name": "delete_component",
+      "description": "Delete a Statuspage component.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "componentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage component identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "componentId"
+        ],
+        "description": "Input parameters for deleting a Statuspage component."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request completed successfully."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "raw"
+        ],
+        "description": "The normalized Statuspage delete component response."
+      }
+    },
+    {
+      "id": "statuspage.delete_incident",
+      "service": "statuspage",
+      "name": "delete_incident",
+      "description": "Delete a Statuspage incident.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "incidentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage incident identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "incidentId"
+        ],
+        "description": "Input parameters for deleting a Statuspage incident."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request completed successfully."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "raw"
+        ],
+        "description": "The normalized Statuspage delete incident response."
+      }
+    },
+    {
+      "id": "statuspage.get_automation_email",
+      "service": "statuspage",
+      "name": "get_automation_email",
+      "description": "Get the inbound automation email address for a Statuspage page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for getting a Statuspage automation email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "automationEmail": {
+            "type": "string",
+            "description": "The automation email address used by Statuspage for email automation.",
+            "format": "email"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "automationEmail",
+          "raw"
+        ],
+        "description": "The normalized Statuspage automation email response."
+      }
+    },
+    {
+      "id": "statuspage.get_incident",
+      "service": "statuspage",
+      "name": "get_incident",
+      "description": "Get one Statuspage incident by id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "incidentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage incident identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "incidentId"
+        ],
+        "description": "Input parameters for getting a Statuspage incident."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incident": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The incident id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The incident name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The incident status returned by Statuspage."
+              },
+              "impact": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The incident impact returned by Statuspage."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The incident impact returned by Statuspage."
+              },
+              "shortlink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Statuspage incident shortlink when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Statuspage incident shortlink when present."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage incident object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incident",
+          "raw"
+        ],
+        "description": "The normalized Statuspage incident response."
+      }
+    },
+    {
+      "id": "statuspage.get_page",
+      "service": "statuspage",
+      "name": "get_page",
+      "description": "Get one Statuspage page by id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for getting a Statuspage page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The page id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The page name."
+              },
+              "subdomain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page subdomain when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page subdomain when present."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The public page URL when Statuspage returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The public page URL when Statuspage returns one."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage page object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "raw"
+        ],
+        "description": "The normalized Statuspage page response."
+      }
+    },
+    {
+      "id": "statuspage.list_components",
+      "service": "statuspage",
+      "name": "list_components",
+      "description": "List components for a Statuspage page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for listing Statuspage components."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The component id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The component name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The component status returned by Statuspage."
+                },
+                "groupId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The component group id when the component belongs to a group."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The component group id when the component belongs to a group."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Statuspage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Statuspage component object."
+            },
+            "description": "The components returned by Statuspage."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Statuspage."
+            },
+            "description": "The raw component objects returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "components",
+          "raw"
+        ],
+        "description": "The normalized Statuspage components response."
+      }
+    },
+    {
+      "id": "statuspage.list_events",
+      "service": "statuspage",
+      "name": "list_events",
+      "description": "List activity events for a Statuspage page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of events to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Statuspage pagination page number."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query used by Statuspage to filter events."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for listing Statuspage activity events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The event id when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The event id when present."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The event type when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The event type when present."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when Statuspage created the event."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when Statuspage created the event."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Statuspage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Statuspage activity event object."
+            },
+            "description": "The events returned by Statuspage."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Statuspage."
+            },
+            "description": "The raw event objects returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "raw"
+        ],
+        "description": "The normalized Statuspage events response."
+      }
+    },
+    {
+      "id": "statuspage.list_incidents",
+      "service": "statuspage",
+      "name": "list_incidents",
+      "description": "List incidents for a Statuspage page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of incidents to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Statuspage pagination page number."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query used by Statuspage to filter incidents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for listing Statuspage incidents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The incident id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The incident name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The incident status returned by Statuspage."
+                },
+                "impact": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The incident impact returned by Statuspage."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The incident impact returned by Statuspage."
+                },
+                "shortlink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Statuspage incident shortlink when present.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Statuspage incident shortlink when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Statuspage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Statuspage incident object."
+            },
+            "description": "The incidents returned by Statuspage."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Statuspage."
+            },
+            "description": "The raw incident objects returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incidents",
+          "raw"
+        ],
+        "description": "The normalized Statuspage incidents response."
+      }
+    },
+    {
+      "id": "statuspage.list_pages",
+      "service": "statuspage",
+      "name": "list_pages",
+      "description": "List Statuspage pages available to the API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Statuspage pages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The page id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The page name."
+                },
+                "subdomain": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page subdomain when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page subdomain when present."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The public page URL when Statuspage returns one.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The public page URL when Statuspage returns one."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Statuspage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Statuspage page object."
+            },
+            "description": "The pages returned by Statuspage."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Statuspage."
+            },
+            "description": "The raw page objects returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pages",
+          "raw"
+        ],
+        "description": "The normalized Statuspage pages response."
+      }
+    },
+    {
+      "id": "statuspage.update_component",
+      "service": "statuspage",
+      "name": "update_component",
+      "description": "Update a Statuspage component.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "componentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage component identifier."
+          },
+          "component": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The component name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "operational",
+                  "under_maintenance",
+                  "degraded_performance",
+                  "partial_outage",
+                  "major_outage"
+                ],
+                "description": "The Statuspage component status."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The component description."
+              },
+              "groupId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Statuspage component group identifier."
+              },
+              "onlyShowIfDegraded": {
+                "type": "boolean",
+                "description": "Whether Statuspage should show the component only when degraded."
+              },
+              "showcase": {
+                "type": "boolean",
+                "description": "Whether Statuspage should showcase the component."
+              },
+              "startDate": {
+                "type": "string",
+                "description": "The component start date.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The component fields sent to Statuspage when updating a component."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "componentId",
+          "component"
+        ],
+        "description": "Input parameters for updating a Statuspage component."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The component id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The component name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The component status returned by Statuspage."
+              },
+              "groupId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The component group id when the component belongs to a group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The component group id when the component belongs to a group."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage component object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "raw"
+        ],
+        "description": "The normalized Statuspage component response."
+      }
+    },
+    {
+      "id": "statuspage.update_incident",
+      "service": "statuspage",
+      "name": "update_incident",
+      "description": "Update a Statuspage incident.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage page identifier."
+          },
+          "incidentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Statuspage incident identifier."
+          },
+          "incident": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The incident name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "investigating",
+                  "identified",
+                  "monitoring",
+                  "resolved",
+                  "postmortem"
+                ],
+                "description": "The Statuspage incident status."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The incident update body."
+              },
+              "impactOverride": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "minor",
+                  "major",
+                  "critical",
+                  "maintenance"
+                ],
+                "description": "The Statuspage incident impact override."
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "componentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Statuspage component identifier."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "operational",
+                        "under_maintenance",
+                        "degraded_performance",
+                        "partial_outage",
+                        "major_outage"
+                      ],
+                      "description": "The Statuspage component status."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "componentId",
+                    "status"
+                  ],
+                  "description": "A component status change attached to an incident update."
+                },
+                "description": "Component status changes for this incident.",
+                "minItems": 1
+              },
+              "deliverNotifications": {
+                "type": "boolean",
+                "description": "Whether Statuspage should deliver incident notifications."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional provider-defined metadata returned by Statuspage."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The incident fields sent to Statuspage when updating an incident."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "incidentId",
+          "incident"
+        ],
+        "description": "Input parameters for updating a Statuspage incident."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incident": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The incident id."
+              },
+              "name": {
+                "type": "string",
+                "description": "The incident name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The incident status returned by Statuspage."
+              },
+              "impact": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The incident impact returned by Statuspage."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The incident impact returned by Statuspage."
+              },
+              "shortlink": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Statuspage incident shortlink when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Statuspage incident shortlink when present."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Statuspage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Statuspage incident object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Statuspage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "incident",
+          "raw"
+        ],
+        "description": "The normalized Statuspage incident response."
+      }
+    }
+  ]
+}

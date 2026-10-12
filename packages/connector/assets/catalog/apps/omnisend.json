@@ -1,0 +1,1258 @@
+{
+  "service": "omnisend",
+  "displayName": "Omnisend",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OMNISEND_API_KEY",
+      "description": "Omnisend API key used with the Authorization: Omnisend-API-Key header. Create or manage it in the Omnisend API keys section at https://app.omnisend.com/integrations/api-keys."
+    }
+  ],
+  "homepageUrl": "https://www.omnisend.com",
+  "actions": [
+    {
+      "id": "omnisend.add_tags",
+      "service": "omnisend",
+      "name": "add_tags",
+      "description": "Add tags to multiple Omnisend contacts in a batch.",
+      "operationType": "write",
+      "requiredScopes": [
+        "contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactIDs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Omnisend contact ID."
+            },
+            "description": "Omnisend contact IDs.",
+            "minItems": 1,
+            "maxItems": 250
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Tags to add or remove.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIDs",
+          "tags"
+        ],
+        "description": "Contact IDs and tags for a batch tag operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Omnisend accepted the tag operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Result of an Omnisend batch tag operation."
+      }
+    },
+    {
+      "id": "omnisend.get_contact",
+      "service": "omnisend",
+      "name": "get_contact",
+      "description": "Fetch a single Omnisend contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Omnisend contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactID"
+        ],
+        "description": "Path parameters for fetching an Omnisend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Contact resource returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.get_segment",
+      "service": "omnisend",
+      "name": "get_segment",
+      "description": "Fetch a single Omnisend segment by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "segments.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentID": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "Omnisend segment ID. Omnisend documents segment IDs as 24-character hexadecimal strings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentID"
+        ],
+        "description": "Path parameters for fetching an Omnisend segment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Segment resource returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.list_contacts",
+      "service": "omnisend",
+      "name": "list_contacts",
+      "description": "List Omnisend contacts with documented filters and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "Number of contacts per page. Range: 1-250."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor for fetching the next page."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor for fetching the previous page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "updatedAt"
+            ],
+            "description": "Contact sort field accepted by Omnisend."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction accepted by Omnisend."
+          },
+          "email": {
+            "type": "string",
+            "description": "Filter by email address.",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by phone number."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "subscribed",
+              "unsubscribed",
+              "nonSubscribed"
+            ],
+            "description": "Contact subscription status filter."
+          },
+          "segmentID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by segment ID."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by tag. Cannot be combined with status."
+          },
+          "updatedAtFrom": {
+            "type": "string",
+            "description": "Filter contacts updated at or after this RFC3339 timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Omnisend contacts.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "after",
+                "before"
+              ]
+            },
+            {
+              "required": [
+                "tag",
+                "status"
+              ]
+            },
+            {
+              "required": [
+                "updatedAtFrom",
+                "email"
+              ]
+            },
+            {
+              "required": [
+                "updatedAtFrom",
+                "phone"
+              ]
+            },
+            {
+              "required": [
+                "updatedAtFrom",
+                "status"
+              ]
+            },
+            {
+              "required": [
+                "updatedAtFrom",
+                "segmentID"
+              ]
+            },
+            {
+              "required": [
+                "updatedAtFrom",
+                "tag"
+              ]
+            }
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Contact resource returned by Omnisend."
+            },
+            "description": "Contact resources returned by Omnisend."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether more results are available beyond the current page."
+              },
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Opaque cursor for fetching the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Opaque cursor for fetching the next page."
+                  },
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Opaque cursor for fetching the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Opaque cursor for fetching the previous page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Cursor values for navigating between pages."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cursor-based pagination metadata returned by Omnisend."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "paging"
+        ],
+        "description": "Paginated contacts response returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.list_segments",
+      "service": "omnisend",
+      "name": "list_segments",
+      "description": "List Omnisend segments with sorting and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "segments.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Number of segments per page. Range: 1-50."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor for fetching the next page."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor for fetching the previous page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "name"
+            ],
+            "description": "Segment sort field accepted by Omnisend."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction accepted by Omnisend."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Omnisend segments.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "after",
+                "before"
+              ]
+            }
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Segment resource returned by Omnisend."
+            },
+            "description": "Segment resources returned by Omnisend."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether more results are available beyond the current page."
+              },
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Opaque cursor for fetching the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Opaque cursor for fetching the next page."
+                  },
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Opaque cursor for fetching the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Opaque cursor for fetching the previous page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Cursor values for navigating between pages."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cursor-based pagination metadata returned by Omnisend."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segments",
+          "paging"
+        ],
+        "description": "Paginated segments response returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.remove_tags",
+      "service": "omnisend",
+      "name": "remove_tags",
+      "description": "Remove tags from multiple Omnisend contacts in a batch.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactIDs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Omnisend contact ID."
+            },
+            "description": "Omnisend contact IDs.",
+            "minItems": 1,
+            "maxItems": 250
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Tags to add or remove.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIDs",
+          "tags"
+        ],
+        "description": "Contact IDs and tags for a batch tag operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Omnisend accepted the tag operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Result of an Omnisend batch tag operation."
+      }
+    },
+    {
+      "id": "omnisend.update_contact_by_email",
+      "service": "omnisend",
+      "name": "update_contact_by_email",
+      "description": "Update an existing Omnisend contact selected by email address.",
+      "operationType": "write",
+      "requiredScopes": [
+        "contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Contact email address used to select the Omnisend contact.",
+            "format": "email"
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Street, house number, apartment number."
+          },
+          "birthdate": {
+            "type": "string",
+            "description": "Contact birthdate in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact city."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country name. Used to derive ISO country code when countryCode is not provided."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "ISO 3166-1 alpha-2 country code."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Contact creation timestamp. Omnisend stores it as the \"externalCreated\" custom property.",
+            "format": "date-time"
+          },
+          "customProperties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom contact properties defined for the brand."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact first name."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "m",
+              "f"
+            ],
+            "description": "Contact gender accepted by Omnisend."
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Identifier value. For email, provide an email address. For phone, provide an E.164 phone number."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "phone"
+                  ],
+                  "description": "Contact identifier type accepted by Omnisend."
+                },
+                "channels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "subscribed",
+                          "unsubscribed",
+                          "nonSubscribed"
+                        ],
+                        "description": "Contact subscription status filter."
+                      },
+                      "statusChangedAt": {
+                        "type": "string",
+                        "description": "Timestamp when the channel status last changed.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "status"
+                    ],
+                    "description": "Channel subscription details accepted by Omnisend."
+                  },
+                  "description": "Communication channels keyed by channel name."
+                },
+                "consent": {
+                  "type": "object",
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                      "description": "Consent collection timestamp in RFC3339 format. Defaults to current time if not provided.",
+                      "format": "date-time"
+                    },
+                    "ip": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "IP address at time of consent."
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Source of consent."
+                    },
+                    "userAgent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "User agent at time of consent."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Consent record for a contact channel."
+                },
+                "sendWelcomeMessage": {
+                  "type": "boolean",
+                  "description": "Whether to send a welcome message for this identifier when the workflow is enabled."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Source of the identifier."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "description": "A unique Omnisend contact identifier."
+            },
+            "description": "Contact identifiers, such as email or phone.",
+            "minItems": 1
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact last name."
+          },
+          "postalCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Postal or zip code."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "State or region."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Labels assigned to the contact.",
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Contact payload for updating an Omnisend contact by email.",
+        "anyOf": [
+          {
+            "required": [
+              "address"
+            ]
+          },
+          {
+            "required": [
+              "birthdate"
+            ]
+          },
+          {
+            "required": [
+              "city"
+            ]
+          },
+          {
+            "required": [
+              "country"
+            ]
+          },
+          {
+            "required": [
+              "countryCode"
+            ]
+          },
+          {
+            "required": [
+              "createdAt"
+            ]
+          },
+          {
+            "required": [
+              "customProperties"
+            ]
+          },
+          {
+            "required": [
+              "firstName"
+            ]
+          },
+          {
+            "required": [
+              "gender"
+            ]
+          },
+          {
+            "required": [
+              "identifiers"
+            ]
+          },
+          {
+            "required": [
+              "lastName"
+            ]
+          },
+          {
+            "required": [
+              "postalCode"
+            ]
+          },
+          {
+            "required": [
+              "state"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Contact resource returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.update_contact_by_id",
+      "service": "omnisend",
+      "name": "update_contact_by_id",
+      "description": "Update an existing Omnisend contact selected by contact ID.",
+      "operationType": "write",
+      "requiredScopes": [
+        "contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Omnisend contact ID."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Street, house number, apartment number."
+          },
+          "birthdate": {
+            "type": "string",
+            "description": "Contact birthdate in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact city."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country name. Used to derive ISO country code when countryCode is not provided."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "ISO 3166-1 alpha-2 country code."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Contact creation timestamp. Omnisend stores it as the \"externalCreated\" custom property.",
+            "format": "date-time"
+          },
+          "customProperties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom contact properties defined for the brand."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact first name."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "m",
+              "f"
+            ],
+            "description": "Contact gender accepted by Omnisend."
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Identifier value. For email, provide an email address. For phone, provide an E.164 phone number."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "phone"
+                  ],
+                  "description": "Contact identifier type accepted by Omnisend."
+                },
+                "channels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "subscribed",
+                          "unsubscribed",
+                          "nonSubscribed"
+                        ],
+                        "description": "Contact subscription status filter."
+                      },
+                      "statusChangedAt": {
+                        "type": "string",
+                        "description": "Timestamp when the channel status last changed.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "status"
+                    ],
+                    "description": "Channel subscription details accepted by Omnisend."
+                  },
+                  "description": "Communication channels keyed by channel name."
+                },
+                "consent": {
+                  "type": "object",
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                      "description": "Consent collection timestamp in RFC3339 format. Defaults to current time if not provided.",
+                      "format": "date-time"
+                    },
+                    "ip": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "IP address at time of consent."
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Source of consent."
+                    },
+                    "userAgent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "User agent at time of consent."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Consent record for a contact channel."
+                },
+                "sendWelcomeMessage": {
+                  "type": "boolean",
+                  "description": "Whether to send a welcome message for this identifier when the workflow is enabled."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Source of the identifier."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "description": "A unique Omnisend contact identifier."
+            },
+            "description": "Contact identifiers, such as email or phone.",
+            "minItems": 1
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact last name."
+          },
+          "postalCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Postal or zip code."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "State or region."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Labels assigned to the contact.",
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactID"
+        ],
+        "description": "Contact payload for updating an Omnisend contact by ID.",
+        "anyOf": [
+          {
+            "required": [
+              "address"
+            ]
+          },
+          {
+            "required": [
+              "birthdate"
+            ]
+          },
+          {
+            "required": [
+              "city"
+            ]
+          },
+          {
+            "required": [
+              "country"
+            ]
+          },
+          {
+            "required": [
+              "countryCode"
+            ]
+          },
+          {
+            "required": [
+              "createdAt"
+            ]
+          },
+          {
+            "required": [
+              "customProperties"
+            ]
+          },
+          {
+            "required": [
+              "firstName"
+            ]
+          },
+          {
+            "required": [
+              "gender"
+            ]
+          },
+          {
+            "required": [
+              "identifiers"
+            ]
+          },
+          {
+            "required": [
+              "lastName"
+            ]
+          },
+          {
+            "required": [
+              "postalCode"
+            ]
+          },
+          {
+            "required": [
+              "state"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Contact resource returned by Omnisend."
+      }
+    },
+    {
+      "id": "omnisend.upsert_contact",
+      "service": "omnisend",
+      "name": "upsert_contact",
+      "description": "Create a new Omnisend contact or update an existing contact matched by email.",
+      "operationType": "write",
+      "requiredScopes": [
+        "contacts.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Street, house number, apartment number."
+          },
+          "birthdate": {
+            "type": "string",
+            "description": "Contact birthdate in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact city."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country name. Used to derive ISO country code when countryCode is not provided."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "ISO 3166-1 alpha-2 country code."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Contact creation timestamp. Omnisend stores it as the \"externalCreated\" custom property.",
+            "format": "date-time"
+          },
+          "customProperties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom contact properties defined for the brand."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact first name."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "m",
+              "f"
+            ],
+            "description": "Contact gender accepted by Omnisend."
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Identifier value. For email, provide an email address. For phone, provide an E.164 phone number."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "phone"
+                  ],
+                  "description": "Contact identifier type accepted by Omnisend."
+                },
+                "channels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "subscribed",
+                          "unsubscribed",
+                          "nonSubscribed"
+                        ],
+                        "description": "Contact subscription status filter."
+                      },
+                      "statusChangedAt": {
+                        "type": "string",
+                        "description": "Timestamp when the channel status last changed.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "status"
+                    ],
+                    "description": "Channel subscription details accepted by Omnisend."
+                  },
+                  "description": "Communication channels keyed by channel name."
+                },
+                "consent": {
+                  "type": "object",
+                  "properties": {
+                    "createdAt": {
+                      "type": "string",
+                      "description": "Consent collection timestamp in RFC3339 format. Defaults to current time if not provided.",
+                      "format": "date-time"
+                    },
+                    "ip": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "IP address at time of consent."
+                    },
+                    "source": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Source of consent."
+                    },
+                    "userAgent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "User agent at time of consent."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Consent record for a contact channel."
+                },
+                "sendWelcomeMessage": {
+                  "type": "boolean",
+                  "description": "Whether to send a welcome message for this identifier when the workflow is enabled."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Source of the identifier."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "description": "A unique Omnisend contact identifier."
+            },
+            "description": "Contact identifiers, such as email or phone.",
+            "minItems": 1
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact last name."
+          },
+          "postalCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Postal or zip code."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "State or region."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Labels assigned to the contact.",
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifiers"
+        ],
+        "description": "Contact payload for creating or updating an Omnisend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Contact resource returned by Omnisend."
+      }
+    }
+  ]
+}

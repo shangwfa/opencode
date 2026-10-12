@@ -1,0 +1,401 @@
+{
+  "service": "finchina",
+  "displayName": "FinChina",
+  "homepageUrl": "https://mcp.finchina.com",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ak_...",
+      "description": "Register or sign in at https://mcp.finchina.com/intro to obtain your FinChina API Key. Queries consume FinChina credits; some advanced datasets require account verification. The key is sent in the x-api-key header."
+    }
+  ],
+  "actions": [
+    {
+      "id": "finchina.discover_tools",
+      "service": "finchina",
+      "name": "discover_tools",
+      "description": "Call a FinChina query_* or screen_* navigation tool with no arguments to obtain subTools and their parameter schemas. This returns definitions, not business records. Use execute_tool to query a discovered subtool.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact query_* or screen_* tool name from list_tools."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "The navigation tool to inspect after list_tools."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Decoded FinChina JSON, or the original MCP content when no JSON object is returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The discovered tool or metadata result."
+      }
+    },
+    {
+      "id": "finchina.execute_tool",
+      "service": "finchina",
+      "name": "execute_tool",
+      "description": "Query a FinChina data subtool discovered with discover_tools. Pass its exact name and arguments. Queries consume account credits; this action executes one request without automatic pagination or business retries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact subTools name returned by a navigation tool; not a top-level query_* or screen_* name."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arguments matching the current schema discovered from FinChina. Preserve upstream field names and pagination parameters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName",
+          "arguments"
+        ],
+        "description": "A discovered FinChina data subtool and its arguments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Query summary and records. records.headInfo describes the columns; records.data contains positional row arrays. Nested array columns retain their property metadata."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "number",
+                "description": "FinChina business status code, including success with parameter adjustments."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Business status and diagnostics. Codes below 100 indicate success."
+          }
+        },
+        "additionalProperties": true,
+        "description": "FinChina query data and business status, including additional upstream fields."
+      }
+    },
+    {
+      "id": "finchina.get_company_basic_info",
+      "service": "finchina",
+      "name": "get_company_basic_info",
+      "description": "Query company basic information and selected indicators through FinChina, such as registered capital. Consumes account credits and executes one query. Discover query_enterprise_profile for the current additional parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company name or unified social credit code."
+            },
+            "description": "Company names or unified social credit codes, up to 100 companies.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "indicators": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One requested indicator."
+            },
+            "description": "Financial or company indicators in Chinese or English; FinChina supports fuzzy matching.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The indicator or field to sort by, such as 注册资本 or 营业总收入."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "order"
+              ],
+              "description": "One sort rule."
+            },
+            "description": "Sort the query results by one or more fields."
+          },
+          "additionalArguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional parameters from the discovered subtool schema. Must not repeat fields supplied through companies, indicators, date, or sort."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "companies",
+          "indicators"
+        ],
+        "description": "Company indicator query parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Query summary and records. records.headInfo describes the columns; records.data contains positional row arrays. Nested array columns retain their property metadata."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "number",
+                "description": "FinChina business status code, including success with parameter adjustments."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Business status and diagnostics. Codes below 100 indicate success."
+          }
+        },
+        "additionalProperties": true,
+        "description": "FinChina query data and business status, including additional upstream fields."
+      }
+    },
+    {
+      "id": "finchina.get_company_financial_metrics",
+      "service": "finchina",
+      "name": "get_company_financial_metrics",
+      "description": "Query company financial indicators through FinChina, such as revenue over the last three years. Consumes account credits and executes one query. Discover query_enterprise_financial_data for the current additional parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company name or unified social credit code."
+            },
+            "description": "Company names or unified social credit codes, up to 100 companies.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "indicators": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One requested indicator."
+            },
+            "description": "Financial or company indicators in Chinese or English; FinChina supports fuzzy matching.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The indicator or field to sort by, such as 注册资本 or 营业总收入."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "order"
+              ],
+              "description": "One sort rule."
+            },
+            "description": "Sort the query results by one or more fields."
+          },
+          "additionalArguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional parameters from the discovered subtool schema. Must not repeat fields supplied through companies, indicators, date, or sort."
+          },
+          "date": {
+            "type": "string",
+            "description": "A reporting date or natural-language period, such as 近三年 or 2023年报."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "companies",
+          "indicators"
+        ],
+        "description": "Company indicator query parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Query summary and records. records.headInfo describes the columns; records.data contains positional row arrays. Nested array columns retain their property metadata."
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "number",
+                "description": "FinChina business status code, including success with parameter adjustments."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Business status and diagnostics. Codes below 100 indicate success."
+          }
+        },
+        "additionalProperties": true,
+        "description": "FinChina query data and business status, including additional upstream fields."
+      }
+    },
+    {
+      "id": "finchina.get_metadata",
+      "service": "finchina",
+      "name": "get_metadata",
+      "description": "Query FinChina indicator definitions, enumerations, or parameter metadata through caihui_mcp_metadata. Inspect its current schema using list_tools before supplying arguments.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arguments matching the current schema discovered from FinChina. Preserve upstream field names and pagination parameters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "arguments"
+        ],
+        "description": "Arguments for the FinChina metadata tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Decoded FinChina JSON, or the original MCP content when no JSON object is returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The discovered tool or metadata result."
+      }
+    },
+    {
+      "id": "finchina.list_tools",
+      "service": "finchina",
+      "name": "list_tools",
+      "description": "Discover FinChina financial and enterprise-risk navigation tools, the execution entry point, and metadata tools with their current input schemas.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The exact MCP tool name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current upstream tool description."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for this tool's arguments."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Optional upstream behavior hints."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A live MCP tool definition."
+            },
+            "description": "Tools exposed by the connected FinChina account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The current FinChina MCP tool catalog."
+      }
+    }
+  ]
+}

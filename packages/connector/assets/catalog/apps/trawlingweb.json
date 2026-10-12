@@ -1,0 +1,224 @@
+{
+  "service": "trawlingweb",
+  "displayName": "TrawlingWeb",
+  "categories": [
+    "Data",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "TRAWLINGWEB_API_TOKEN",
+      "description": "TrawlingWeb API token sent as the token query parameter. Sign in or create an account through the official FeedScale console at https://console.trawlingweb.app/login, then copy the token from your dashboard."
+    }
+  ],
+  "homepageUrl": "https://trawlingweb.com",
+  "actions": [
+    {
+      "id": "trawlingweb.search_news",
+      "service": "trawlingweb",
+      "name": "search_news",
+      "description": "Search indexed news and blog publications through the TrawlingWeb News API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Lucene-compatible search expression, including optional field filters and Boolean operators.",
+            "pattern": "\\S"
+          },
+          "countryPreference": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country preference required for safe Pay-per-Use billing."
+          },
+          "fromTimestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The inclusive start timestamp in Unix milliseconds."
+          },
+          "toTimestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The inclusive end timestamp in Unix milliseconds."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of publications to return in this page."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "crawled",
+              "published"
+            ],
+            "description": "The publication timestamp used to sort results."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "countryPreference"
+        ],
+        "description": "Input parameters for searching TrawlingWeb news and blog publications."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The publication identifier assigned by TrawlingWeb."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The publication title."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The publication body text."
+                },
+                "published": {
+                  "type": "string",
+                  "description": "The publication timestamp in ISO 8601 UTC format."
+                },
+                "crawled": {
+                  "type": "integer",
+                  "description": "The crawl timestamp in Unix milliseconds."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The original publication URL."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The publication author when available."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The publication language code."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain where the publication was found."
+                },
+                "site": {
+                  "type": "string",
+                  "description": "The site where the publication was found."
+                },
+                "site_type": {
+                  "type": "string",
+                  "description": "The content type assigned to the source site."
+                },
+                "site_language": {
+                  "type": "string",
+                  "description": "The source site language code."
+                },
+                "site_country": {
+                  "type": "string",
+                  "description": "The source site country code."
+                },
+                "site_region": {
+                  "type": "string",
+                  "description": "The source site region code."
+                },
+                "site_section": {
+                  "type": "string",
+                  "description": "The source site section containing the publication."
+                },
+                "section": {
+                  "type": "string",
+                  "description": "The indexed publication section."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "The estimated economic value of the publication."
+                },
+                "rank": {
+                  "type": "integer",
+                  "description": "The source domain rank."
+                },
+                "unique_visitors": {
+                  "type": "integer",
+                  "description": "The estimated unique visitor count."
+                },
+                "url_image": {
+                  "type": "string",
+                  "description": "The featured image URL when the add-on is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "text",
+                "published",
+                "crawled",
+                "url"
+              ],
+              "description": "One indexed news or blog publication returned by TrawlingWeb."
+            },
+            "description": "The publications returned for this page."
+          },
+          "requestLeft": {
+            "type": "integer",
+            "description": "The number of subscription requests remaining after this call."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of publications matching the query."
+          },
+          "restResults": {
+            "type": "integer",
+            "description": "The number of matching publications not yet delivered."
+          },
+          "nextCursor": {
+            "type": "object",
+            "properties": {
+              "fromTimestamp": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The start timestamp for the next page."
+              },
+              "toTimestamp": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The end timestamp for the next page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Safe timestamp cursor values parsed from the upstream next URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "A normalized TrawlingWeb news search page without credential-bearing pagination URLs."
+      }
+    }
+  ]
+}

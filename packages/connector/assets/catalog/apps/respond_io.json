@@ -1,0 +1,1810 @@
+{
+  "service": "respond_io",
+  "displayName": "Respond.io",
+  "description": "Manage Respond.io contacts, conversations, users, channels, and tags.",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Developer API Access Token",
+      "placeholder": "RESPOND_IO_ACCESS_TOKEN",
+      "description": "Respond.io Developer API access token sent as a Bearer token. Developer API requires the Growth plan or above. Create a token in Workspace Settings > Integrations > Developer API: https://respond.io/help/integrations/developer-api"
+    }
+  ],
+  "homepageUrl": "https://respond.io/",
+  "actions": [
+    {
+      "id": "respond_io.add_contact_tags",
+      "service": "respond_io",
+      "name": "add_contact_tags",
+      "description": "Add up to ten tags to a Respond.io contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "One contact tag, up to 255 characters.",
+              "pattern": "\\S"
+            },
+            "description": "The contact tags to add or remove.",
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "tags"
+        ],
+        "description": "Input parameters for changing Respond.io contact tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.assign_conversation",
+      "service": "respond_io",
+      "name": "assign_conversation",
+      "description": "Assign or unassign the open conversation for a Respond.io contact.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The assignee email address.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The assignee Respond.io user ID."
+              },
+              {
+                "type": "null",
+                "description": "A null value that removes the current assignee."
+              }
+            ],
+            "description": "A Respond.io user ID, email address, or null to unassign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "assignee"
+        ],
+        "description": "Input parameters for assigning a Respond.io conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.create_comment",
+      "service": "respond_io",
+      "name": "create_comment",
+      "description": "Add an internal comment to a Respond.io contact conversation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The internal comment text.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "text"
+        ],
+        "description": "Input parameters for adding a Respond.io conversation comment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID that received the comment."
+          },
+          "text": {
+            "type": "string",
+            "description": "The stored comment text."
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "The comment creation timestamp returned by Respond.io."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId",
+          "text",
+          "created_at"
+        ],
+        "description": "The Respond.io conversation comment result."
+      }
+    },
+    {
+      "id": "respond_io.create_contact",
+      "service": "respond_io",
+      "name": "create_contact",
+      "description": "Create a Respond.io contact identified by an email address or phone number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new contact identifier in email:<address> or phone:<number> format.",
+            "pattern": "^(?:email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's first name.",
+            "pattern": "\\S"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's last name when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's last name when set."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's phone number when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's phone number when set."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's email address when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's email address when set."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's language when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's language when set."
+          },
+          "profilePic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream."
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's country code when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's country code when set."
+          },
+          "custom_fields": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The custom field name.",
+                      "pattern": "\\S"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string custom field value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric custom field value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean custom field value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null custom field value."
+                        }
+                      ],
+                      "description": "A Respond.io custom field value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact custom field value."
+                },
+                "description": "The custom field values to store on the contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom field values to store on the contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "firstName"
+        ],
+        "description": "Input parameters for creating a Respond.io contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The Respond.io result code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Respond.io result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "The Respond.io contact creation result."
+      }
+    },
+    {
+      "id": "respond_io.create_or_update_contact",
+      "service": "respond_io",
+      "name": "create_or_update_contact",
+      "description": "Create a Respond.io contact when it does not exist, or update it when the identifier already exists.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's first name.",
+            "pattern": "\\S"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's last name when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's last name when set."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's phone number when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's phone number when set."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's email address when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's email address when set."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's language when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's language when set."
+          },
+          "profilePic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream."
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's country code when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's country code when set."
+          },
+          "custom_fields": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The custom field name.",
+                      "pattern": "\\S"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string custom field value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric custom field value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean custom field value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null custom field value."
+                        }
+                      ],
+                      "description": "A Respond.io custom field value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact custom field value."
+                },
+                "description": "The custom field values to store on the contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom field values to store on the contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "firstName"
+        ],
+        "description": "Input parameters for creating or updating a Respond.io contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.delete_contact",
+      "service": "respond_io",
+      "name": "delete_contact",
+      "description": "Delete a Respond.io contact by contact ID, email address, or phone number.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Input parameters for deleting a Respond.io contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.get_contact",
+      "service": "respond_io",
+      "name": "get_contact",
+      "description": "Get one Respond.io contact by contact ID, email address, or phone number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Input parameters for retrieving a Respond.io contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The Respond.io contact ID."
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The contact's first name."
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's last name when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's last name when set."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's phone number when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's phone number when set."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's email address when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's email address when set."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's language when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's language when set."
+          },
+          "profilePic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's profile image URL when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's profile image URL when set."
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's country code when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's country code when set."
+          },
+          "custom_fields": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The custom field name.",
+                      "pattern": "\\S"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string custom field value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric custom field value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean custom field value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null custom field value."
+                        }
+                      ],
+                      "description": "A Respond.io custom field value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact custom field value."
+                },
+                "description": "The contact's custom field values when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's custom field values when returned."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close"
+            ],
+            "description": "The contact's conversation status when returned."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One contact tag."
+            },
+            "description": "The tags attached to the contact when returned."
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "The Respond.io user ID."
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "description": "The user's first name."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "description": "The user's last name."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The user's email address."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "firstName",
+                  "lastName",
+                  "email"
+                ],
+                "description": "A Respond.io user assigned to a contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Respond.io user assigned to a contact."
+          },
+          "lifecycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's lifecycle stage when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's lifecycle stage when set."
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "The contact creation timestamp returned by Respond.io."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "firstName",
+          "created_at"
+        ],
+        "description": "A Respond.io contact returned by the API."
+      }
+    },
+    {
+      "id": "respond_io.list_channels",
+      "service": "respond_io",
+      "name": "list_channels",
+      "description": "List channels in the connected Respond.io workspace with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to return."
+          },
+          "cursorId": {
+            "type": "integer",
+            "description": "The cursor ID used to move forward or backward through paginated results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for listing Respond.io workspace resources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Respond.io channel ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Respond.io channel name."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "The channel source identifier."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "The channel creation timestamp returned by Respond.io."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "source",
+                "created_at"
+              ],
+              "description": "A Respond.io workspace channel."
+            },
+            "description": "The workspace channels returned for this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "The next-page URL, or an empty string when there is no next page."
+              },
+              "previous": {
+                "type": "string",
+                "description": "The previous-page URL, or an empty string when there is no previous page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "next",
+              "previous"
+            ],
+            "description": "Respond.io pagination links for this result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "description": "A paginated Respond.io workspace channel list."
+      }
+    },
+    {
+      "id": "respond_io.list_contacts",
+      "service": "respond_io",
+      "name": "list_contacts",
+      "description": "List Respond.io contacts using workspace timezone-aware filters and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Free-text search applied to contacts."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA timezone used to evaluate time-based filters.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "$and": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "contactField",
+                        "contactTag",
+                        "lifecycle"
+                      ],
+                      "description": "The type of contact data evaluated by this condition."
+                    },
+                    "field": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The field name, or null when the category has no field name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The field name, or null when the category has no field name."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "isEqualTo",
+                        "isNotEqualTo",
+                        "isTimestampAfter",
+                        "isTimestampBefore",
+                        "isTimestampBetween",
+                        "exists",
+                        "doesNotExist",
+                        "isGreaterThan",
+                        "isLessThan",
+                        "isBetween",
+                        "hasAnyOf",
+                        "hasAllOf",
+                        "hasNoneOf"
+                      ],
+                      "description": "The operator applied to this filter condition."
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A single filter value."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One filter value."
+                          },
+                          "description": "A list of filter values."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The inclusive lower range value.",
+                              "pattern": "\\S"
+                            },
+                            "to": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The inclusive upper range value.",
+                              "pattern": "\\S"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "description": "A from-to range used by a filter condition."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value."
+                        }
+                      ],
+                      "description": "The value used by the filter operator, or null for existence operators."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "category",
+                    "field",
+                    "operator",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact filter condition."
+                },
+                "description": "Conditions that must all match."
+              },
+              "$or": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "contactField",
+                        "contactTag",
+                        "lifecycle"
+                      ],
+                      "description": "The type of contact data evaluated by this condition."
+                    },
+                    "field": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The field name, or null when the category has no field name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The field name, or null when the category has no field name."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "isEqualTo",
+                        "isNotEqualTo",
+                        "isTimestampAfter",
+                        "isTimestampBefore",
+                        "isTimestampBetween",
+                        "exists",
+                        "doesNotExist",
+                        "isGreaterThan",
+                        "isLessThan",
+                        "isBetween",
+                        "hasAnyOf",
+                        "hasAllOf",
+                        "hasNoneOf"
+                      ],
+                      "description": "The operator applied to this filter condition."
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A single filter value."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One filter value."
+                          },
+                          "description": "A list of filter values."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The inclusive lower range value.",
+                              "pattern": "\\S"
+                            },
+                            "to": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The inclusive upper range value.",
+                              "pattern": "\\S"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "description": "A from-to range used by a filter condition."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value."
+                        }
+                      ],
+                      "description": "The value used by the filter operator, or null for existence operators."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "category",
+                    "field",
+                    "operator",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact filter condition."
+                },
+                "description": "Conditions where at least one must match."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Boolean groups of Respond.io contact filter conditions."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to return."
+          },
+          "cursorId": {
+            "type": "integer",
+            "description": "The cursor ID used to move forward or backward through paginated results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timezone",
+          "filter"
+        ],
+        "description": "Input parameters for listing Respond.io contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Respond.io contact ID."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The contact's first name."
+                },
+                "lastName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's last name when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's last name when set."
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's phone number when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's phone number when set."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's email address when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's email address when set."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's language when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's language when set."
+                },
+                "profilePic": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's profile image URL when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's profile image URL when set."
+                },
+                "countryCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's country code when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's country code when set."
+                },
+                "custom_fields": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The custom field name.",
+                            "pattern": "\\S"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "A string custom field value."
+                              },
+                              {
+                                "type": "number",
+                                "description": "A numeric custom field value."
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "A boolean custom field value."
+                              },
+                              {
+                                "type": "null",
+                                "description": "A null custom field value."
+                              }
+                            ],
+                            "description": "A Respond.io custom field value."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "description": "One Respond.io contact custom field value."
+                      },
+                      "description": "The contact's custom field values when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's custom field values when returned."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "close"
+                  ],
+                  "description": "The contact's conversation status when returned."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One contact tag."
+                  },
+                  "description": "The tags attached to the contact when returned."
+                },
+                "assignee": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "The Respond.io user ID."
+                        },
+                        "firstName": {
+                          "type": "string",
+                          "description": "The user's first name."
+                        },
+                        "lastName": {
+                          "type": "string",
+                          "description": "The user's last name."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "The user's email address."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "id",
+                        "firstName",
+                        "lastName",
+                        "email"
+                      ],
+                      "description": "A Respond.io user assigned to a contact."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Respond.io user assigned to a contact."
+                },
+                "lifecycle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's lifecycle stage when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's lifecycle stage when set."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "The contact creation timestamp returned by Respond.io."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "firstName",
+                "created_at"
+              ],
+              "description": "A Respond.io contact returned by the API."
+            },
+            "description": "The contacts returned for this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "The next-page URL, or an empty string when there is no next page."
+              },
+              "previous": {
+                "type": "string",
+                "description": "The previous-page URL, or an empty string when there is no previous page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "next",
+              "previous"
+            ],
+            "description": "Respond.io pagination links for this result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "description": "A paginated Respond.io contact list response."
+      }
+    },
+    {
+      "id": "respond_io.list_users",
+      "service": "respond_io",
+      "name": "list_users",
+      "description": "List users in the connected Respond.io workspace with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to return."
+          },
+          "cursorId": {
+            "type": "integer",
+            "description": "The cursor ID used to move forward or backward through paginated results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for listing Respond.io workspace resources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Respond.io user ID."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The user's first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The user's last name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "agent",
+                    "manager",
+                    "owner"
+                  ],
+                  "description": "The user's workspace role."
+                },
+                "team": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "The Respond.io team ID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The Respond.io team name."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "A Respond.io team."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Respond.io team."
+                },
+                "restrictions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One workspace restriction identifier."
+                  },
+                  "description": "The workspace restriction identifiers assigned to this user."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "firstName",
+                "lastName",
+                "email",
+                "role",
+                "team",
+                "restrictions"
+              ],
+              "description": "A Respond.io workspace user."
+            },
+            "description": "The workspace users returned for this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "The next-page URL, or an empty string when there is no next page."
+              },
+              "previous": {
+                "type": "string",
+                "description": "The previous-page URL, or an empty string when there is no previous page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "next",
+              "previous"
+            ],
+            "description": "Respond.io pagination links for this result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "description": "A paginated Respond.io workspace user list."
+      }
+    },
+    {
+      "id": "respond_io.remove_contact_tags",
+      "service": "respond_io",
+      "name": "remove_contact_tags",
+      "description": "Remove up to ten tags from a Respond.io contact.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "One contact tag, up to 255 characters.",
+              "pattern": "\\S"
+            },
+            "description": "The contact tags to add or remove.",
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "tags"
+        ],
+        "description": "Input parameters for changing Respond.io contact tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.update_contact",
+      "service": "respond_io",
+      "name": "update_contact",
+      "description": "Update one or more fields on an existing Respond.io contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact's first name.",
+            "pattern": "\\S"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's last name when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's last name when set."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's phone number when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's phone number when set."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's email address when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's email address when set."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's language when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's language when set."
+          },
+          "profilePic": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's publicly reachable profile image URL. Respond.io fetches this URL upstream."
+          },
+          "countryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact's country code when set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact's country code when set."
+          },
+          "custom_fields": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The custom field name.",
+                      "pattern": "\\S"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string custom field value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric custom field value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean custom field value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null custom field value."
+                        }
+                      ],
+                      "description": "A Respond.io custom field value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "value"
+                  ],
+                  "description": "One Respond.io contact custom field value."
+                },
+                "description": "The custom field values to store on the contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom field values to store on the contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Input parameters for updating a Respond.io contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    },
+    {
+      "id": "respond_io.update_conversation_status",
+      "service": "respond_io",
+      "name": "update_conversation_status",
+      "description": "Open or close a Respond.io contact conversation with optional closing context.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact identifier in id:<number>, email:<address>, or phone:<number> format.",
+            "pattern": "^(?:id:[1-9][0-9]*|email:.*\\S.*|phone:.*\\S.*)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close"
+            ],
+            "description": "The conversation status to set."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The closing category when closing the conversation.",
+            "pattern": "\\S"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The closing summary when closing the conversation.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "status"
+        ],
+        "description": "Input parameters for updating a Respond.io conversation status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "description": "The Respond.io contact ID affected by the action."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contactId"
+        ],
+        "description": "A Respond.io contact action response."
+      }
+    }
+  ]
+}

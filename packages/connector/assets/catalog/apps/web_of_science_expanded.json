@@ -1,0 +1,2804 @@
+{
+  "service": "web_of_science_expanded",
+  "displayName": "Web of Science Expanded",
+  "description": "Search full Web of Science records, cited references, related documents, and citation reports through the paid Clarivate Expanded API.",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WEB_OF_SCIENCE_EXPANDED_API_KEY",
+      "description": "Web of Science API key with a paid Expanded API subscription, sent in the X-ApiKey header. Register an application and request Expanded access in the official Clarivate Developer Portal: https://developer.clarivate.com/apis/wos"
+    }
+  ],
+  "homepageUrl": "https://clarivate.com/academia-government/scientific-and-academic-research/research-discovery-and-referencing/web-of-science/",
+  "actions": [
+    {
+      "id": "web_of_science_expanded.get_citation_report",
+      "service": "web_of_science_expanded",
+      "name": "get_citation_report",
+      "description": "Generate citation totals, self-citation-adjusted metrics, yearly counts, and h-index for a Web of Science query.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Web of Science advanced query to analyze.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search language code. WOS supports en, while entitled regional databases may support other languages.",
+            "pattern": "\\S"
+          },
+          "edition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The collection and edition expression, such as WOS+SCI, with multiple editions separated by commas.",
+            "pattern": "\\S"
+          },
+          "publishTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "loadTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbolic database load time span, such as 5D, 30W, 10M, or 8Y.",
+            "pattern": "\\S"
+          },
+          "createdTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record creation date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "modifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "timesCitedModifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The times-cited modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "reportLevels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "WOS",
+                "AllDB"
+              ],
+              "description": "One citation report level."
+            },
+            "description": "The collection levels to include in the citation report. Defaults to WOS.",
+            "minItems": 1,
+            "maxItems": 2
+          },
+          "startYear": {
+            "type": "integer",
+            "minimum": 1900,
+            "description": "The first citing year to include, from 1900 onward."
+          },
+          "endYear": {
+            "type": "integer",
+            "minimum": 1900,
+            "description": "The last citing year to include, from 1900 onward."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for generating a citation report from a Web of Science query.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "loadTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "modifiedTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "database": {
+                  "const": "WOK"
+                }
+              },
+              "required": [
+                "database"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "modifiedTimeSpan"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "timesCitedModifiedTimeSpan"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "not": {
+                    "required": [
+                      "database"
+                    ]
+                  }
+                },
+                {
+                  "properties": {
+                    "database": {
+                      "const": "WOS"
+                    }
+                  },
+                  "required": [
+                    "database"
+                  ]
+                }
+              ]
+            },
+            "then": {
+              "properties": {
+                "language": {
+                  "type": "string",
+                  "pattern": "^\\s*[eE][nN]\\s*$"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queryMetadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "type": "string",
+                "description": "The temporary Web of Science query identifier."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of matching records when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound"
+            ],
+            "description": "Metadata for the query used to generate the report."
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reportLevel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The collection level represented by this report."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The collection level represented by this report."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The total times-cited value when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total times-cited value when available."
+                },
+                "timesCitedSansSelf": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The times-cited value excluding self-citations when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The times-cited value excluding self-citations when available."
+                },
+                "citingItemsSansSelf": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The number of citing items excluding self-citations when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of citing items excluding self-citations when available."
+                },
+                "dedupedTimesCited": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The de-duplicated times-cited value when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The de-duplicated times-cited value when available."
+                },
+                "averagePerItem": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The average citations per item when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The average citations per item when available."
+                },
+                "averagePerYear": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The average citations per year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The average citations per year when available."
+                },
+                "hIndex": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The h-index for the query result when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The h-index for the query result when available."
+                },
+                "citingYears": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The citation counts grouped by citing year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The citation counts grouped by citing year when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw citation report entry."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "reportLevel",
+                "timesCited",
+                "timesCitedSansSelf",
+                "citingItemsSansSelf",
+                "dedupedTimesCited",
+                "averagePerItem",
+                "averagePerYear",
+                "hIndex",
+                "citingYears",
+                "raw"
+              ],
+              "description": "A normalized citation report for one report level."
+            },
+            "description": "The citation reports returned for the requested levels."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw query and citation report responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryMetadata",
+          "reports",
+          "raw"
+        ],
+        "description": "The citation report generated for the query."
+      }
+    },
+    {
+      "id": "web_of_science_expanded.get_documents",
+      "service": "web_of_science_expanded",
+      "name": "get_documents",
+      "description": "Get one or more Web of Science Expanded records by UID with short, full, or custom field detail.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Web of Science UID, such as WOS:000267144200002.",
+              "pattern": "\\S"
+            },
+            "description": "The Web of Science UIDs to retrieve in one request.",
+            "minItems": 1
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en"
+            ],
+            "description": "The request language. This endpoint supports only en for English."
+          },
+          "recordDetail": {
+            "type": "string",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "description": "The record detail level. Short records do not count against the Expanded API Full Record quota. Defaults to short."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One official Web of Science record field name, such as titles or addresses.",
+              "pattern": "\\S"
+            },
+            "description": "The official Web of Science record fields to return. Supplying fields uses custom field selection instead of short or full records.",
+            "minItems": 1
+          },
+          "includeLinks": {
+            "type": "boolean",
+            "description": "Whether to include Web of Science gateway links in each record."
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlighted matching terms in the records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uids"
+        ],
+        "description": "The input payload for retrieving Expanded records by UID.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "fields",
+                "recordDetail"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary Web of Science query identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary Web of Science query identifier when available."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records when available."
+              },
+              "firstRecord": {
+                "type": "integer",
+                "description": "The one-based index of the first returned record."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The requested maximum number of returned records."
+              },
+              "nextFirstRecord": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The firstRecord value for the next page, or null when no next page is known."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The firstRecord value for the next page, or null when no next page is known."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound",
+              "firstRecord",
+              "limit",
+              "nextFirstRecord"
+            ],
+            "description": "Query and pagination metadata."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Web of Science unique identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document title when available."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication or source title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication or source title when available."
+                },
+                "publicationYear": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The publication year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication year when available."
+                },
+                "documentTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One document type."
+                  },
+                  "description": "The document types assigned by Web of Science."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's display name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's display name when available."
+                      },
+                      "firstName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's first name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's first name when available."
+                      },
+                      "lastName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's last name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's last name when available."
+                      },
+                      "researcherId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's Web of Science ResearcherID when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's Web of Science ResearcherID when available."
+                      },
+                      "orcidId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID identifier when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID identifier when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "displayName",
+                      "firstName",
+                      "lastName",
+                      "researcherId",
+                      "orcidId"
+                    ],
+                    "description": "One document author."
+                  },
+                  "description": "The normalized document authors."
+                },
+                "identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier type when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier type when available."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier value when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier value when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "value"
+                    ],
+                    "description": "One document identifier."
+                  },
+                  "description": "The normalized DOI and other document identifiers."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Web of Science Core Collection times-cited count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Web of Science Core Collection times-cited count when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Expanded API document record."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "title",
+                "sourceTitle",
+                "publicationYear",
+                "documentTypes",
+                "authors",
+                "identifiers",
+                "timesCited",
+                "raw"
+              ],
+              "description": "A normalized Web of Science Expanded document."
+            },
+            "description": "The requested Web of Science documents that were found."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Expanded API record response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metadata",
+          "documents",
+          "raw"
+        ],
+        "description": "The response returned when retrieving Expanded records by UID."
+      }
+    },
+    {
+      "id": "web_of_science_expanded.list_cited_references",
+      "service": "web_of_science_expanded",
+      "name": "list_cited_references",
+      "description": "List the bibliographic references cited by a Web of Science document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source Web of Science UID.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en"
+            ],
+            "description": "The request language. This endpoint supports only en for English."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of records to return, from 0 to 100."
+          },
+          "firstRecord": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "The one-based index of the first record to return, up to 100000."
+          },
+          "sortField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Web of Science sort expression.",
+            "pattern": "\\S"
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlighted matching terms in the references."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uid"
+        ],
+        "description": "The input payload for listing a document's cited references."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary Web of Science query identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary Web of Science query identifier when available."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records when available."
+              },
+              "firstRecord": {
+                "type": "integer",
+                "description": "The one-based index of the first returned record."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The requested maximum number of returned records."
+              },
+              "nextFirstRecord": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The firstRecord value for the next page, or null when no next page is known."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The firstRecord value for the next page, or null when no next page is known."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound",
+              "firstRecord",
+              "limit",
+              "nextFirstRecord"
+            ],
+            "description": "Query and pagination metadata."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The matched Web of Science UID when the reference is indexed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The matched Web of Science UID when the reference is indexed."
+                },
+                "citedAuthor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The cited author text when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited author text when available."
+                },
+                "citedTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The cited document title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited document title when available."
+                },
+                "citedWork": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The cited publication or work when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited publication or work when available."
+                },
+                "year": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cited publication year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited publication year when available."
+                },
+                "page": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cited page when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited page when available."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The cited DOI when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited DOI when available."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The cited reference's times-cited count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The cited reference's times-cited count when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw cited reference returned by Web of Science."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "citedAuthor",
+                "citedTitle",
+                "citedWork",
+                "year",
+                "page",
+                "doi",
+                "timesCited",
+                "raw"
+              ],
+              "description": "A normalized cited reference."
+            },
+            "description": "The references cited by the source document."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Expanded API cited-references response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metadata",
+          "references",
+          "raw"
+        ],
+        "description": "The response returned when listing cited references."
+      }
+    },
+    {
+      "id": "web_of_science_expanded.list_citing_documents",
+      "service": "web_of_science_expanded",
+      "name": "list_citing_documents",
+      "description": "List Web of Science documents that cite a source document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source Web of Science UID.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en"
+            ],
+            "description": "The request language. This endpoint supports only en for English."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of records to return, from 0 to 100."
+          },
+          "firstRecord": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "The one-based index of the first record to return, up to 100000."
+          },
+          "sortField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Web of Science sort expression.",
+            "pattern": "\\S"
+          },
+          "edition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The collection and edition expression, such as WOS+SCI, with multiple editions separated by commas.",
+            "pattern": "\\S"
+          },
+          "publishTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "modifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "timesCitedModifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The times-cited modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "recordDetail": {
+            "type": "string",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "description": "The record detail level. Short records do not count against the Expanded API Full Record quota. Defaults to short."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One official Web of Science record field name, such as titles or addresses.",
+              "pattern": "\\S"
+            },
+            "description": "The official Web of Science record fields to return. Supplying fields uses custom field selection instead of short or full records.",
+            "minItems": 1
+          },
+          "includeLinks": {
+            "type": "boolean",
+            "description": "Whether to include Web of Science gateway links in each record."
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlighted matching terms in the records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uid"
+        ],
+        "description": "The input payload for finding documents that cite a source document.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "loadTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "modifiedTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "database": {
+                  "const": "WOK"
+                }
+              },
+              "required": [
+                "database"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "modifiedTimeSpan"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "timesCitedModifiedTimeSpan"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "fields",
+                "recordDetail"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary Web of Science query identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary Web of Science query identifier when available."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records when available."
+              },
+              "firstRecord": {
+                "type": "integer",
+                "description": "The one-based index of the first returned record."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The requested maximum number of returned records."
+              },
+              "nextFirstRecord": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The firstRecord value for the next page, or null when no next page is known."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The firstRecord value for the next page, or null when no next page is known."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound",
+              "firstRecord",
+              "limit",
+              "nextFirstRecord"
+            ],
+            "description": "Query and pagination metadata."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Web of Science unique identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document title when available."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication or source title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication or source title when available."
+                },
+                "publicationYear": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The publication year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication year when available."
+                },
+                "documentTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One document type."
+                  },
+                  "description": "The document types assigned by Web of Science."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's display name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's display name when available."
+                      },
+                      "firstName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's first name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's first name when available."
+                      },
+                      "lastName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's last name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's last name when available."
+                      },
+                      "researcherId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's Web of Science ResearcherID when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's Web of Science ResearcherID when available."
+                      },
+                      "orcidId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID identifier when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID identifier when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "displayName",
+                      "firstName",
+                      "lastName",
+                      "researcherId",
+                      "orcidId"
+                    ],
+                    "description": "One document author."
+                  },
+                  "description": "The normalized document authors."
+                },
+                "identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier type when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier type when available."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier value when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier value when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "value"
+                    ],
+                    "description": "One document identifier."
+                  },
+                  "description": "The normalized DOI and other document identifiers."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Web of Science Core Collection times-cited count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Web of Science Core Collection times-cited count when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Expanded API document record."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "title",
+                "sourceTitle",
+                "publicationYear",
+                "documentTypes",
+                "authors",
+                "identifiers",
+                "timesCited",
+                "raw"
+              ],
+              "description": "A normalized Web of Science Expanded document."
+            },
+            "description": "The documents that cite the source document."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Expanded API citing response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metadata",
+          "documents",
+          "raw"
+        ],
+        "description": "The response returned when listing citing documents."
+      }
+    },
+    {
+      "id": "web_of_science_expanded.list_related_documents",
+      "service": "web_of_science_expanded",
+      "name": "list_related_documents",
+      "description": "List Web of Science documents related through shared cited references.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source Web of Science UID.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en"
+            ],
+            "description": "The request language. This endpoint supports only en for English."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of records to return, from 0 to 100."
+          },
+          "firstRecord": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "The one-based index of the first record to return, up to 100000."
+          },
+          "sortField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Web of Science sort expression.",
+            "pattern": "\\S"
+          },
+          "edition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The collection and edition expression, such as WOS+SCI, with multiple editions separated by commas.",
+            "pattern": "\\S"
+          },
+          "publishTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "modifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "timesCitedModifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The times-cited modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "recordDetail": {
+            "type": "string",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "description": "The record detail level. Short records do not count against the Expanded API Full Record quota. Defaults to short."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One official Web of Science record field name, such as titles or addresses.",
+              "pattern": "\\S"
+            },
+            "description": "The official Web of Science record fields to return. Supplying fields uses custom field selection instead of short or full records.",
+            "minItems": 1
+          },
+          "includeLinks": {
+            "type": "boolean",
+            "description": "Whether to include Web of Science gateway links in each record."
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlighted matching terms in the records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uid"
+        ],
+        "description": "The input payload for finding documents related through shared cited references.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "loadTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "modifiedTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "database": {
+                  "const": "WOK"
+                }
+              },
+              "required": [
+                "database"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "modifiedTimeSpan"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "timesCitedModifiedTimeSpan"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "fields",
+                "recordDetail"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary Web of Science query identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary Web of Science query identifier when available."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records when available."
+              },
+              "firstRecord": {
+                "type": "integer",
+                "description": "The one-based index of the first returned record."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The requested maximum number of returned records."
+              },
+              "nextFirstRecord": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The firstRecord value for the next page, or null when no next page is known."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The firstRecord value for the next page, or null when no next page is known."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound",
+              "firstRecord",
+              "limit",
+              "nextFirstRecord"
+            ],
+            "description": "Query and pagination metadata."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Web of Science unique identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document title when available."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication or source title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication or source title when available."
+                },
+                "publicationYear": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The publication year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication year when available."
+                },
+                "documentTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One document type."
+                  },
+                  "description": "The document types assigned by Web of Science."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's display name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's display name when available."
+                      },
+                      "firstName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's first name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's first name when available."
+                      },
+                      "lastName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's last name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's last name when available."
+                      },
+                      "researcherId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's Web of Science ResearcherID when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's Web of Science ResearcherID when available."
+                      },
+                      "orcidId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID identifier when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID identifier when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "displayName",
+                      "firstName",
+                      "lastName",
+                      "researcherId",
+                      "orcidId"
+                    ],
+                    "description": "One document author."
+                  },
+                  "description": "The normalized document authors."
+                },
+                "identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier type when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier type when available."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier value when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier value when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "value"
+                    ],
+                    "description": "One document identifier."
+                  },
+                  "description": "The normalized DOI and other document identifiers."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Web of Science Core Collection times-cited count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Web of Science Core Collection times-cited count when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Expanded API document record."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "title",
+                "sourceTitle",
+                "publicationYear",
+                "documentTypes",
+                "authors",
+                "identifiers",
+                "timesCited",
+                "raw"
+              ],
+              "description": "A normalized Web of Science Expanded document."
+            },
+            "description": "The documents related to the source document."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Expanded API related-records response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metadata",
+          "documents",
+          "raw"
+        ],
+        "description": "The response returned when listing related documents."
+      }
+    },
+    {
+      "id": "web_of_science_expanded.search_documents",
+      "service": "web_of_science_expanded",
+      "name": "search_documents",
+      "description": "Search Web of Science Expanded records with advanced queries, quota-aware detail selection, filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Web of Science advanced query, such as TS=(machine learning) or DO=10.1000/example.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "WOS",
+              "BCI",
+              "BIOABS",
+              "BIOSIS",
+              "CABI",
+              "CCC",
+              "CSCD",
+              "DCI",
+              "DIIDW",
+              "FSTA",
+              "GRANTS",
+              "INSPEC",
+              "MEDLINE",
+              "PPRN",
+              "PQDT",
+              "RC",
+              "SCIELO",
+              "WOK",
+              "ZOOREC"
+            ],
+            "description": "The Web of Science database to search. WOS searches the Core Collection and WOK searches all entitled databases. Defaults to WOS."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search language code. WOS supports en, while entitled regional databases may support other languages.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of records to return, from 0 to 100."
+          },
+          "firstRecord": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "The one-based index of the first record to return, up to 100000."
+          },
+          "sortField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official sort expression, such as PY+D for publication year descending or TC+D for times cited descending.",
+            "pattern": "\\S"
+          },
+          "edition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The collection and edition expression, such as WOS+SCI, with multiple editions separated by commas.",
+            "pattern": "\\S"
+          },
+          "publishTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "loadTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbolic database load time span, such as 5D, 30W, 10M, or 8Y.",
+            "pattern": "\\S"
+          },
+          "createdTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record creation date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "modifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The record modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "timesCitedModifiedTimeSpan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The times-cited modification date range in YYYY-MM-DD+YYYY-MM-DD form.",
+            "pattern": "\\S"
+          },
+          "recordDetail": {
+            "type": "string",
+            "enum": [
+              "short",
+              "full"
+            ],
+            "description": "The record detail level. Short records do not count against the Expanded API Full Record quota. Defaults to short."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One official Web of Science record field name, such as titles or addresses.",
+              "pattern": "\\S"
+            },
+            "description": "The official Web of Science record fields to return. Supplying fields uses custom field selection instead of short or full records.",
+            "minItems": 1
+          },
+          "includeLinks": {
+            "type": "boolean",
+            "description": "Whether to include Web of Science gateway links in each record."
+          },
+          "highlight": {
+            "type": "boolean",
+            "description": "Whether to request highlighted matching terms in the records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching full or short Web of Science records.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "loadTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "publishTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "createdTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "loadTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "modifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "createdTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "modifiedTimeSpan",
+                "timesCitedModifiedTimeSpan"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "database": {
+                  "const": "WOK"
+                }
+              },
+              "required": [
+                "database"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "modifiedTimeSpan"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "timesCitedModifiedTimeSpan"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "not": {
+                    "required": [
+                      "database"
+                    ]
+                  }
+                },
+                {
+                  "properties": {
+                    "database": {
+                      "const": "WOS"
+                    }
+                  },
+                  "required": [
+                    "database"
+                  ]
+                }
+              ]
+            },
+            "then": {
+              "properties": {
+                "language": {
+                  "type": "string",
+                  "pattern": "^\\s*[eE][nN]\\s*$"
+                }
+              }
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "fields",
+                "recordDetail"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "queryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary Web of Science query identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary Web of Science query identifier when available."
+              },
+              "recordsSearched": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records searched when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records searched when available."
+              },
+              "recordsFound": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records when available."
+              },
+              "firstRecord": {
+                "type": "integer",
+                "description": "The one-based index of the first returned record."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The requested maximum number of returned records."
+              },
+              "nextFirstRecord": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The firstRecord value for the next page, or null when no next page is known."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The firstRecord value for the next page, or null when no next page is known."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "queryId",
+              "recordsSearched",
+              "recordsFound",
+              "firstRecord",
+              "limit",
+              "nextFirstRecord"
+            ],
+            "description": "Query and pagination metadata."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Web of Science unique identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document title when available."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication or source title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication or source title when available."
+                },
+                "publicationYear": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The publication year when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication year when available."
+                },
+                "documentTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One document type."
+                  },
+                  "description": "The document types assigned by Web of Science."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's display name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's display name when available."
+                      },
+                      "firstName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's first name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's first name when available."
+                      },
+                      "lastName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's last name when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's last name when available."
+                      },
+                      "researcherId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's Web of Science ResearcherID when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's Web of Science ResearcherID when available."
+                      },
+                      "orcidId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID identifier when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID identifier when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "displayName",
+                      "firstName",
+                      "lastName",
+                      "researcherId",
+                      "orcidId"
+                    ],
+                    "description": "One document author."
+                  },
+                  "description": "The normalized document authors."
+                },
+                "identifiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier type when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier type when available."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The identifier value when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The identifier value when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "value"
+                    ],
+                    "description": "One document identifier."
+                  },
+                  "description": "The normalized DOI and other document identifiers."
+                },
+                "timesCited": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Web of Science Core Collection times-cited count when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Web of Science Core Collection times-cited count when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Expanded API document record."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "title",
+                "sourceTitle",
+                "publicationYear",
+                "documentTypes",
+                "authors",
+                "identifiers",
+                "timesCited",
+                "raw"
+              ],
+              "description": "A normalized Web of Science Expanded document."
+            },
+            "description": "The matching Web of Science documents."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Expanded API search response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metadata",
+          "documents",
+          "raw"
+        ],
+        "description": "The response returned when searching Expanded records."
+      }
+    }
+  ]
+}

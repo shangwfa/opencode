@@ -1,0 +1,695 @@
+{
+  "service": "favro",
+  "displayName": "Favro",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "FAVRO_API_TOKEN",
+      "description": "Favro API token used as the Basic Auth password. Generate a token from your Favro user profile: https://favro.com/developer/#tokens",
+      "extraFields": [
+        {
+          "key": "email",
+          "label": "Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@example.com",
+          "description": "Favro account email used as the Basic Auth username."
+        },
+        {
+          "key": "organizationId",
+          "label": "Organization ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "zk4CJpg5uozhL4R2W",
+          "description": "Favro organization ID used to route API requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.favro.com/",
+  "actions": [
+    {
+      "id": "favro.create_card",
+      "service": "favro",
+      "name": "create_card",
+      "description": "Create a Favro card in a board or in the configured user's todo list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the new card."
+          },
+          "widgetCommonId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Widget where the card should be created."
+          },
+          "laneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lane where the card should be created."
+          },
+          "columnId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Column where the card should be created."
+          },
+          "detailedDescription": {
+            "type": "string",
+            "description": "Detailed card description."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag name."
+            },
+            "description": "Tag names to add to the card."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Card start date in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Card due date in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "descriptionFormat": {
+            "type": "string",
+            "enum": [
+              "plaintext",
+              "markdown"
+            ],
+            "description": "Card description format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Fields for a new Favro card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Favro API entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Favro card."
+      }
+    },
+    {
+      "id": "favro.get_card",
+      "service": "favro",
+      "name": "get_card",
+      "description": "Retrieve one Favro card by its card identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the card to retrieve."
+          },
+          "descriptionFormat": {
+            "type": "string",
+            "enum": [
+              "plaintext",
+              "markdown"
+            ],
+            "description": "Card description format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId"
+        ],
+        "description": "The card to retrieve and its desired description format."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Favro API entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Favro card."
+      }
+    },
+    {
+      "id": "favro.get_organization",
+      "service": "favro",
+      "name": "get_organization",
+      "description": "Retrieve the Favro organization configured for this connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Favro API entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The configured Favro organization."
+      }
+    },
+    {
+      "id": "favro.get_widget",
+      "service": "favro",
+      "name": "get_widget",
+      "description": "Retrieve a Favro board or other widget by its common identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "widgetCommonId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Common identifier of the widget to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The widget to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "widget": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Favro API entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Favro widget."
+      }
+    },
+    {
+      "id": "favro.list_cards",
+      "service": "favro",
+      "name": "list_cards",
+      "description": "List Favro cards using a documented board, collection, card, or todo filter.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "todoList": {
+            "type": "boolean",
+            "description": "Whether to return cards from the user's todo list."
+          },
+          "cardCommonId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Common card identifier used to filter results."
+          },
+          "cardSequentialId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sequential card identifier used to filter results."
+          },
+          "widgetCommonId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Widget common identifier used to filter cards."
+          },
+          "columnId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Column identifier used to filter cards."
+          },
+          "collectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Collection identifier used to filter cards."
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "Whether to return unique cards only."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived cards."
+          },
+          "descriptionFormat": {
+            "type": "string",
+            "enum": [
+              "plaintext",
+              "markdown"
+            ],
+            "description": "Card description format."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier returned by the first page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page index to retrieve."
+          },
+          "backendIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Favro backend identifier returned by the first page for routing continuation requests."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Card filters and continuation data. At least one card filter is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Favro API entity."
+            },
+            "description": "Cards returned for this page."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier used to retrieve subsequent pages."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Zero-based page index returned by Favro."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total number of available pages."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entities in this page."
+          },
+          "backendIdentifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Favro backend identifier required when retrieving subsequent pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Favro backend identifier required when retrieving subsequent pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Favro cards."
+      }
+    },
+    {
+      "id": "favro.list_collections",
+      "service": "favro",
+      "name": "list_collections",
+      "description": "List collections in the configured Favro organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived collections."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier returned by the first page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page index to retrieve."
+          },
+          "backendIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Favro backend identifier returned by the first page for routing continuation requests."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and continuation data for listing Favro collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Favro API entity."
+            },
+            "description": "Collections returned for this page."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier used to retrieve subsequent pages."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Zero-based page index returned by Favro."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total number of available pages."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entities in this page."
+          },
+          "backendIdentifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Favro backend identifier required when retrieving subsequent pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Favro backend identifier required when retrieving subsequent pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Favro collections."
+      }
+    },
+    {
+      "id": "favro.list_organizations",
+      "service": "favro",
+      "name": "list_organizations",
+      "description": "List Favro organizations accessible to the configured user and API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier returned by the first page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page index to retrieve."
+          },
+          "backendIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Favro backend identifier returned by the first page for routing continuation requests."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Continuation data for listing Favro organizations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Favro API entity."
+            },
+            "description": "Organizations returned for this page."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier used to retrieve subsequent pages."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Zero-based page index returned by Favro."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total number of available pages."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entities in this page."
+          },
+          "backendIdentifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Favro backend identifier required when retrieving subsequent pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Favro backend identifier required when retrieving subsequent pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Favro organizations."
+      }
+    },
+    {
+      "id": "favro.list_widgets",
+      "service": "favro",
+      "name": "list_widgets",
+      "description": "List boards and other widgets in the configured Favro organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Collection identifier used to filter widgets."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived widgets."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier returned by the first page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page index to retrieve."
+          },
+          "backendIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Favro backend identifier returned by the first page for routing continuation requests."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and continuation data for listing Favro widgets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Favro API entity."
+            },
+            "description": "Widgets returned for this page."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Request identifier used to retrieve subsequent pages."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Zero-based page index returned by Favro."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total number of available pages."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of entities in this page."
+          },
+          "backendIdentifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Favro backend identifier required when retrieving subsequent pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Favro backend identifier required when retrieving subsequent pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Favro widgets."
+      }
+    },
+    {
+      "id": "favro.update_card",
+      "service": "favro",
+      "name": "update_card",
+      "description": "Update selected fields on an existing Favro card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the card to update."
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated card name."
+          },
+          "detailedDescription": {
+            "type": "string",
+            "description": "Updated detailed card description."
+          },
+          "widgetCommonId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Widget where the card should be moved."
+          },
+          "laneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lane where the card should be moved."
+          },
+          "columnId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Column where the card should be moved."
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Updated card start date in ISO 8601 format.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated card start date in ISO 8601 format."
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Updated card due date in ISO 8601 format.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Updated card due date in ISO 8601 format."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the card should be archived."
+          },
+          "descriptionFormat": {
+            "type": "string",
+            "enum": [
+              "plaintext",
+              "markdown"
+            ],
+            "description": "Card description format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId"
+        ],
+        "description": "Card identifier and fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Favro API entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Favro card."
+      }
+    }
+  ]
+}

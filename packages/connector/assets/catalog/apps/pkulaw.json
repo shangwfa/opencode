@@ -1,0 +1,411 @@
+{
+  "service": "pkulaw",
+  "displayName": "PKULaw",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "Paste your PKULaw Access Token",
+      "description": "Access Token used for PKULaw MCP Bearer authentication. Create one and enable MCP services at https://mcp.pkulaw.com/console/apps."
+    }
+  ],
+  "homepageUrl": "https://mcp.pkulaw.com",
+  "actions": [
+    {
+      "id": "pkulaw.call_tool",
+      "service": "pkulaw",
+      "name": "call_tool",
+      "description": "Call a current PKULaw legal data tool with JSON arguments after checking its live schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string",
+            "enum": [
+              "law-aggregate",
+              "law-keyword",
+              "law-semantic",
+              "case-keyword",
+              "case-semantic",
+              "case-number",
+              "law-recognition",
+              "fatiao",
+              "doc-link",
+              "citation-validator"
+            ],
+            "description": "The PKULaw MCP service to inspect or call."
+          },
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the selected tool's inputSchema."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serverId",
+          "toolName"
+        ],
+        "description": "Input for invoking one current PKULaw MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The structured tool result, or its MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the PKULaw MCP tool."
+      },
+      "followUpActions": [
+        "pkulaw.list_tools"
+      ]
+    },
+    {
+      "id": "pkulaw.get_law_article",
+      "service": "pkulaw",
+      "name": "get_law_article",
+      "description": "Retrieve the authoritative text of a specific provision by law title and article number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Chinese title of the law or regulation."
+          },
+          "number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The article number written in Chinese, such as 第一千零七十七条."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving one specific legal provision."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "article": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A result record returned by PKULaw."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested authoritative legal provision."
+      }
+    },
+    {
+      "id": "pkulaw.list_tools",
+      "service": "pkulaw",
+      "name": "list_tools",
+      "description": "Discover the current legal research tools and live input schemas exposed by one PKULaw MCP service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string",
+            "enum": [
+              "law-aggregate",
+              "law-keyword",
+              "law-semantic",
+              "case-keyword",
+              "case-semantic",
+              "case-number",
+              "law-recognition",
+              "fatiao",
+              "doc-link",
+              "citation-validator"
+            ],
+            "description": "The PKULaw MCP service to inspect or call."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for discovering one PKULaw MCP service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string",
+            "enum": [
+              "law-aggregate",
+              "law-keyword",
+              "law-semantic",
+              "case-keyword",
+              "case-semantic",
+              "case-number",
+              "law-recognition",
+              "fatiao",
+              "doc-link",
+              "citation-validator"
+            ],
+            "description": "The PKULaw MCP service to inspect or call."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The official display name of the selected PKULaw MCP service."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact PKULaw MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by PKULaw MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive operations."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside PKULaw."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP hints supplied by PKULaw about a tool's behavior."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by PKULaw MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by one PKULaw MCP service."
+            },
+            "description": "Tools currently exposed by the selected PKULaw service."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current PKULaw MCP tool catalog for one service."
+      },
+      "followUpActions": [
+        "pkulaw.call_tool"
+      ]
+    },
+    {
+      "id": "pkulaw.search_case_documents",
+      "service": "pkulaw",
+      "name": "search_case_documents",
+      "description": "Search detailed PKULaw judicial case records by title or full-text keywords.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to match against document titles."
+          },
+          "fulltext": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword or phrase to match against document text."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching detailed judicial case records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A result record returned by PKULaw."
+            },
+            "description": "Matching detailed judicial case records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed judicial case records matching the supplied keywords."
+      }
+    },
+    {
+      "id": "pkulaw.search_cases",
+      "service": "pkulaw",
+      "name": "search_cases",
+      "description": "Search authoritative PKULaw judicial cases using a natural-language fact pattern.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A natural-language fact pattern or legal issue in Chinese."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for semantically searching judicial cases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A result record returned by PKULaw."
+            },
+            "description": "Matching judicial case records, ordered by relevance."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Judicial cases matching the fact pattern."
+      },
+      "followUpActions": [
+        "pkulaw.search_case_documents"
+      ]
+    },
+    {
+      "id": "pkulaw.search_law_articles",
+      "service": "pkulaw",
+      "name": "search_law_articles",
+      "description": "Search authoritative PKULaw provisions using a natural-language legal question or fact pattern.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A natural-language legal question or fact pattern in Chinese."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for semantically searching legal provisions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A result record returned by PKULaw."
+            },
+            "description": "Matching legal provision records, ordered by relevance."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Legal provisions matching the query."
+      },
+      "followUpActions": [
+        "pkulaw.get_law_article"
+      ]
+    },
+    {
+      "id": "pkulaw.search_laws",
+      "service": "pkulaw",
+      "name": "search_laws",
+      "description": "Search PKULaw laws and regulations by title or full-text keywords.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to match against document titles."
+          },
+          "fulltext": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword or phrase to match against document text."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching laws and regulations by keyword."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "laws": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A result record returned by PKULaw."
+            },
+            "description": "Matching law and regulation records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Laws and regulations matching the supplied keywords."
+      },
+      "followUpActions": [
+        "pkulaw.get_law_article"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,461 @@
+{
+  "service": "keeper_scim",
+  "displayName": "Keeper SCIM",
+  "categories": [
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "SCIM Bearer Token",
+      "placeholder": "KEEPER_SCIM_BEARER_TOKEN",
+      "description": "Keeper SCIM bearer token sent in the Authorization header. Generate it on the SCIM provisioning setup page in the Keeper Admin Console: https://docs.keeper.io/enterprise-guide/user-and-team-provisioning/automated-provisioning-with-scim/using-scim-api-provisioning",
+      "extraFields": [
+        {
+          "key": "nodeId",
+          "label": "Node ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "123",
+          "description": "Keeper enterprise node ID used in the SCIM URL. Find it on the SCIM setup page in the Keeper Admin Console, or with Keeper Commander enterprise-info --nodes."
+        },
+        {
+          "key": "region",
+          "label": "Data Center",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "us",
+          "description": "Keeper data center for the tenant. Use us, eu, au, jp, ca, or gov as documented by Keeper for SCIM API provisioning."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.keepersecurity.com/",
+  "actions": [
+    {
+      "id": "keeper_scim.get_group",
+      "service": "keeper_scim",
+      "name": "get_group",
+      "description": "Get one Keeper SCIM group by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keeper SCIM resource ID returned by the Users or Groups endpoint."
+          },
+          "excludedAttributes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One SCIM attribute name to exclude, such as members."
+            },
+            "description": "SCIM attributes to exclude, sent as a comma-separated list. Keeper documents this for the members attribute on group queries.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Keeper SCIM group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Keeper team ID returned by SCIM."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Display name of the Keeper team."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "Provisioning client identifier for the group."
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "SCIM member entry."
+                },
+                "description": "Members returned for the group."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the group."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Keeper SCIM group resource. Keeper represents groups as teams."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single Keeper SCIM group response."
+      }
+    },
+    {
+      "id": "keeper_scim.get_service_provider_config",
+      "service": "keeper_scim",
+      "name": "get_service_provider_config",
+      "description": "Get the Keeper SCIM service provider configuration for the connected node.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this Keeper SCIM request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "ServiceProviderConfig object returned by Keeper SCIM."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Keeper SCIM service provider configuration response."
+      }
+    },
+    {
+      "id": "keeper_scim.get_user",
+      "service": "keeper_scim",
+      "name": "get_user",
+      "description": "Get one Keeper SCIM user by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keeper SCIM resource ID returned by the Users or Groups endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Keeper SCIM user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Keeper SCIM user ID."
+              },
+              "userName": {
+                "type": "string",
+                "description": "SCIM username, usually the user's email address."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Display name returned for the user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the user is active in Keeper."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "Provisioning client identifier for the user."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "SCIM email entry."
+                },
+                "description": "Email entries returned for the user."
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "SCIM group entry."
+                },
+                "description": "Group memberships returned for the user."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the user."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Keeper SCIM user resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single Keeper SCIM user response."
+      }
+    },
+    {
+      "id": "keeper_scim.list_groups",
+      "service": "keeper_scim",
+      "name": "list_groups",
+      "description": "List Keeper SCIM groups with optional pagination and excluded member attributes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based index of the first SCIM result to return."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of SCIM resources to return."
+          },
+          "excludedAttributes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One SCIM attribute name to exclude, such as members."
+            },
+            "description": "SCIM attributes to exclude, sent as a comma-separated list. Keeper documents this for the members attribute on group queries.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Keeper SCIM groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Keeper team ID returned by SCIM."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Display name of the Keeper team."
+                },
+                "externalId": {
+                  "type": "string",
+                  "description": "Provisioning client identifier for the group."
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "SCIM member entry."
+                  },
+                  "description": "Members returned for the group."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "SCIM metadata returned for the group."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Keeper SCIM group resource. Keeper represents groups as teams."
+            },
+            "description": "Groups returned in this page."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching SCIM resources across all pages."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based index of the first SCIM result to return."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of resources returned in this page."
+          },
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "SCIM schema URI."
+            },
+            "description": "SCIM schema URIs returned for the list response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Keeper SCIM list response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Keeper SCIM groups."
+      }
+    },
+    {
+      "id": "keeper_scim.list_users",
+      "service": "keeper_scim",
+      "name": "list_users",
+      "description": "List Keeper SCIM users with optional SCIM filter and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based index of the first SCIM result to return."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of SCIM resources to return."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SCIM user filter, such as id eq \"user_id\"."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Keeper SCIM users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Keeper SCIM user ID."
+                },
+                "userName": {
+                  "type": "string",
+                  "description": "SCIM username, usually the user's email address."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Display name returned for the user."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the user is active in Keeper."
+                },
+                "externalId": {
+                  "type": "string",
+                  "description": "Provisioning client identifier for the user."
+                },
+                "emails": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "SCIM email entry."
+                  },
+                  "description": "Email entries returned for the user."
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "SCIM group entry."
+                  },
+                  "description": "Group memberships returned for the user."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "SCIM metadata returned for the user."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Keeper SCIM user resource."
+            },
+            "description": "Users returned in this page."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching SCIM resources across all pages."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based index of the first SCIM result to return."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of resources returned in this page."
+          },
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "SCIM schema URI."
+            },
+            "description": "SCIM schema URIs returned for the list response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Keeper SCIM list response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Keeper SCIM users."
+      }
+    }
+  ]
+}

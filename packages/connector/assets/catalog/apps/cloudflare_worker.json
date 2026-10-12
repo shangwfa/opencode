@@ -1,0 +1,3769 @@
+{
+  "service": "cloudflare_worker",
+  "displayName": "Cloudflare Worker",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential",
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "API Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "cloudflare_api_token",
+          "description": "Cloudflare user API token or account API token sent as a Bearer token. User tokens are verified through /user/tokens/verify; account tokens are verified through the configured account ID."
+        },
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "023e105f4ecef8ad9ca31a8372d0c353",
+          "description": "Cloudflare account ID used for Workers API requests. Find it in the Cloudflare dashboard or account ID docs: https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+        }
+      ]
+    },
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://dash.cloudflare.com/oauth2/auth",
+      "tokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "refreshTokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "scopes": [
+        "offline_access",
+        "workers-scripts.read",
+        "workers-scripts.write",
+        "workers-ci.read",
+        "workers-ci.write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://workers.cloudflare.com",
+  "actions": [
+    {
+      "id": "cloudflare_worker.cancel_build",
+      "service": "cloudflare_worker",
+      "name": "cancel_build",
+      "description": "Cancel a queued or running Workers Builds job.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-ci.write"
+      ],
+      "providerPermissions": [
+        "Workers CI Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "buildUuid": {
+            "type": "string",
+            "description": "The Workers Builds job UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buildUuid"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "buildUuid": {
+            "type": "string",
+            "description": "The Workers Builds job UUID.",
+            "format": "uuid"
+          },
+          "buildOutcome": {
+            "type": "string",
+            "description": "The build outcome returned after cancellation."
+          },
+          "stoppedOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The build stop timestamp."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The build stop timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buildUuid"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.create_manual_build",
+      "service": "cloudflare_worker",
+      "name": "create_manual_build",
+      "description": "Start a Workers Builds job from a configured trigger and branch or commit.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-ci.write"
+      ],
+      "providerPermissions": [
+        "Workers CI Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "triggerUuid": {
+            "type": "string",
+            "description": "The Workers Builds trigger UUID.",
+            "format": "uuid"
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Git branch to build."
+          },
+          "commitHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Git commit hash to build."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "triggerUuid"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "branch"
+            ]
+          },
+          {
+            "required": [
+              "commitHash"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "buildUuid": {
+            "type": "string",
+            "description": "The Workers Builds job UUID.",
+            "format": "uuid"
+          },
+          "createdOn": {
+            "type": "string",
+            "description": "The build creation timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buildUuid"
+        ],
+        "description": "The output payload for this action."
+      },
+      "asyncLifecycle": {
+        "startActionId": "cloudflare_worker.create_manual_build",
+        "statusActionId": "cloudflare_worker.get_build",
+        "cancelActionId": "cloudflare_worker.cancel_build"
+      }
+    },
+    {
+      "id": "cloudflare_worker.create_worker",
+      "service": "cloudflare_worker",
+      "name": "create_worker",
+      "description": "Create a Cloudflare Worker using the Workers beta API.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Worker name."
+          },
+          "logpush": {
+            "type": "boolean",
+            "description": "Whether logpush should be enabled for the Worker."
+          },
+          "observability": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "subdomain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags to set on the Worker."
+          },
+          "tailConsumers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Tail consumer definitions to set on the Worker."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "worker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The immutable Worker ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Worker name."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The Worker creation timestamp."
+              },
+              "updatedOn": {
+                "type": "string",
+                "description": "The last Worker update timestamp."
+              },
+              "deployedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest deployment timestamp, or null when undeployed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest deployment timestamp, or null when undeployed."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled for the Worker."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "references": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "subdomain": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Tags associated with the Worker."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Other Workers that should consume logs from the Worker."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Cloudflare Worker managed by the Workers beta API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.delete_worker",
+      "service": "cloudflare_worker",
+      "name": "delete_worker",
+      "description": "Delete a Cloudflare Worker and its associated resources using the Workers beta API.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workerId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The deleted Worker ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.delete_worker_script",
+      "service": "cloudflare_worker",
+      "name": "delete_worker_script",
+      "description": "Delete a Cloudflare Worker script.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Whether to force deletion of associated service bindings, Durable Objects, or other bindings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scriptName": {
+            "type": "string",
+            "description": "The deleted Worker script name."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.delete_worker_script_secret",
+      "service": "cloudflare_worker",
+      "name": "delete_worker_script_secret",
+      "description": "Delete a secret binding from a Cloudflare Worker script.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "secretName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker secret name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName",
+          "secretName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The deleted secret binding name."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.edit_worker",
+      "service": "cloudflare_worker",
+      "name": "edit_worker",
+      "description": "Partially update a Cloudflare Worker using the Workers beta API while leaving omitted fields unchanged.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Worker name."
+          },
+          "logpush": {
+            "type": "boolean",
+            "description": "Whether logpush should be enabled for the Worker."
+          },
+          "observability": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "subdomain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags to set on the Worker."
+          },
+          "tailConsumers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Tail consumer definitions to set on the Worker."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workerId"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "logpush"
+            ]
+          },
+          {
+            "required": [
+              "observability"
+            ]
+          },
+          {
+            "required": [
+              "subdomain"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "tailConsumers"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "worker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The immutable Worker ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Worker name."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The Worker creation timestamp."
+              },
+              "updatedOn": {
+                "type": "string",
+                "description": "The last Worker update timestamp."
+              },
+              "deployedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest deployment timestamp, or null when undeployed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest deployment timestamp, or null when undeployed."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled for the Worker."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "references": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "subdomain": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Tags associated with the Worker."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Other Workers that should consume logs from the Worker."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Cloudflare Worker managed by the Workers beta API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_build",
+      "service": "cloudflare_worker",
+      "name": "get_build",
+      "description": "Get the current status and outcome of one Workers Builds job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-ci.read"
+      ],
+      "providerPermissions": [
+        "Workers CI Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "buildUuid": {
+            "type": "string",
+            "description": "The Workers Builds job UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buildUuid"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "object",
+            "properties": {
+              "buildUuid": {
+                "type": "string",
+                "description": "The Workers Builds job UUID.",
+                "format": "uuid"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "initializing",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "stopped"
+                ],
+                "description": "The normalized build lifecycle state."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "initializing",
+                  "running",
+                  "stopped"
+                ],
+                "description": "The Cloudflare build status."
+              },
+              "buildOutcome": {
+                "type": "string",
+                "enum": [
+                  "success",
+                  "fail",
+                  "skipped",
+                  "cancelled",
+                  "terminated"
+                ],
+                "description": "The Cloudflare build outcome."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The build creation timestamp."
+              },
+              "initializingOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The build initialization timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The build initialization timestamp."
+              },
+              "runningOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The build start timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The build start timestamp."
+              },
+              "stoppedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The build stop timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The build stop timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last build update timestamp."
+              },
+              "triggerMetadata": {
+                "type": "object",
+                "properties": {
+                  "author": {
+                    "type": "string",
+                    "description": "The source revision author."
+                  },
+                  "branch": {
+                    "type": "string",
+                    "description": "The source branch name."
+                  },
+                  "buildCommand": {
+                    "type": "string",
+                    "description": "The build command used by the job."
+                  },
+                  "deployCommand": {
+                    "type": "string",
+                    "description": "The deploy command used by the job."
+                  },
+                  "buildTokenName": {
+                    "type": "string",
+                    "description": "The build token name."
+                  },
+                  "buildTokenUuid": {
+                    "type": "string",
+                    "description": "The build token UUID.",
+                    "format": "uuid"
+                  },
+                  "buildTriggerSource": {
+                    "type": "string",
+                    "description": "The event source that triggered the build."
+                  },
+                  "commitHash": {
+                    "type": "string",
+                    "description": "The source commit hash."
+                  },
+                  "commitMessage": {
+                    "type": "string",
+                    "description": "The source commit message."
+                  },
+                  "environmentVariables": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The environment variables supplied to the build."
+                  },
+                  "providerAccountName": {
+                    "type": "string",
+                    "description": "The source provider account name."
+                  },
+                  "providerType": {
+                    "type": "string",
+                    "description": "The source repository provider type."
+                  },
+                  "repoName": {
+                    "type": "string",
+                    "description": "The source repository name."
+                  },
+                  "rootDirectory": {
+                    "type": "string",
+                    "description": "The repository directory where the build ran."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The source revision and build configuration that triggered a Workers Builds job."
+              },
+              "trigger": {
+                "type": "object",
+                "properties": {
+                  "triggerUuid": {
+                    "type": "string",
+                    "description": "The Workers Builds trigger UUID.",
+                    "format": "uuid"
+                  },
+                  "triggerName": {
+                    "type": "string",
+                    "description": "The build trigger name."
+                  },
+                  "externalScriptId": {
+                    "type": "string",
+                    "description": "The immutable Worker script tag."
+                  },
+                  "buildCommand": {
+                    "type": "string",
+                    "description": "The command that builds the Worker."
+                  },
+                  "deployCommand": {
+                    "type": "string",
+                    "description": "The command that deploys the Worker."
+                  },
+                  "rootDirectory": {
+                    "type": "string",
+                    "description": "The repository directory where the build runs."
+                  },
+                  "branchIncludes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Branches that can trigger builds."
+                  },
+                  "branchExcludes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Branches excluded from builds."
+                  },
+                  "pathIncludes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Repository paths that can trigger builds."
+                  },
+                  "pathExcludes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Repository paths excluded from builds."
+                  },
+                  "buildCachingEnabled": {
+                    "type": "boolean",
+                    "description": "Whether build caching is enabled."
+                  },
+                  "buildTokenUuid": {
+                    "type": "string",
+                    "description": "The UUID of the build token used by this trigger.",
+                    "format": "uuid"
+                  },
+                  "buildTokenName": {
+                    "type": "string",
+                    "description": "The name of the build token used by this trigger."
+                  },
+                  "createdOn": {
+                    "type": "string",
+                    "description": "The trigger creation timestamp."
+                  },
+                  "modifiedOn": {
+                    "type": "string",
+                    "description": "The last trigger update timestamp."
+                  },
+                  "deletedOn": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The trigger deletion timestamp, or null when active."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The trigger deletion timestamp, or null when active."
+                  },
+                  "repoConnection": {
+                    "type": "object",
+                    "properties": {
+                      "providerAccountId": {
+                        "type": "string",
+                        "description": "The source provider account identifier."
+                      },
+                      "providerAccountName": {
+                        "type": "string",
+                        "description": "The source provider account name."
+                      },
+                      "providerType": {
+                        "type": "string",
+                        "description": "The source repository provider type."
+                      },
+                      "repoConnectionUuid": {
+                        "type": "string",
+                        "description": "The repository connection UUID.",
+                        "format": "uuid"
+                      },
+                      "repoId": {
+                        "type": "string",
+                        "description": "The source repository identifier."
+                      },
+                      "repoName": {
+                        "type": "string",
+                        "description": "The source repository name."
+                      },
+                      "createdOn": {
+                        "type": "string",
+                        "description": "The repository connection creation timestamp."
+                      },
+                      "modifiedOn": {
+                        "type": "string",
+                        "description": "The repository connection modification timestamp."
+                      },
+                      "deletedOn": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The repository connection deletion timestamp, or null when active."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The repository connection deletion timestamp, or null when active."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The source repository connected to a Workers Builds trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "triggerUuid"
+                ],
+                "description": "A Cloudflare Workers Builds trigger."
+              },
+              "pullRequest": {
+                "type": "object",
+                "properties": {
+                  "createdOn": {
+                    "type": "string",
+                    "description": "The pull request creation timestamp."
+                  },
+                  "pullRequestUrl": {
+                    "type": "string",
+                    "description": "The pull request URL.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The pull request that triggered a Workers Builds job."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "buildUuid",
+              "state"
+            ],
+            "description": "A Cloudflare Workers Builds job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      },
+      "asyncLifecycle": {
+        "startActionId": "cloudflare_worker.create_manual_build",
+        "statusActionId": "cloudflare_worker.get_build",
+        "cancelActionId": "cloudflare_worker.cancel_build"
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_build_logs",
+      "service": "cloudflare_worker",
+      "name": "get_build_logs",
+      "description": "Get one page of log lines for a Workers Builds job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-ci.read"
+      ],
+      "providerPermissions": [
+        "Workers CI Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "buildUuid": {
+            "type": "string",
+            "description": "The Workers Builds job UUID.",
+            "format": "uuid"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the previous log page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buildUuid"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "number",
+                  "description": "The log timestamp supplied by Cloudflare."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The log message."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One line from a Workers Builds log."
+            },
+            "description": "The build log lines."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The cursor for the next log page."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether Cloudflare truncated the returned log page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lines"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_worker",
+      "service": "cloudflare_worker",
+      "name": "get_worker",
+      "description": "Get one Worker by Worker ID using the Workers beta API.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workerId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "worker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The immutable Worker ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Worker name."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The Worker creation timestamp."
+              },
+              "updatedOn": {
+                "type": "string",
+                "description": "The last Worker update timestamp."
+              },
+              "deployedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest deployment timestamp, or null when undeployed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest deployment timestamp, or null when undeployed."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled for the Worker."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "references": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "subdomain": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Tags associated with the Worker."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Other Workers that should consume logs from the Worker."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Cloudflare Worker managed by the Workers beta API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_worker_script_content",
+      "service": "cloudflare_worker",
+      "name": "get_worker_script_content",
+      "description": "Fetch the raw source content for a Cloudflare Worker script.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The raw Worker script content."
+          },
+          "contentType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP content type returned by Cloudflare."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP content type returned by Cloudflare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_worker_script_secret",
+      "service": "cloudflare_worker",
+      "name": "get_worker_script_secret",
+      "description": "Get one secret binding attached to a Cloudflare Worker script.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "secretName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker secret name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName",
+          "secretName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The secret binding name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The secret binding type."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The redacted secret text field."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The redacted secret text field."
+              },
+              "algorithm": {
+                "type": "string",
+                "description": "The key algorithm for key secrets."
+              },
+              "format": {
+                "type": "string",
+                "description": "The key format for key secrets."
+              },
+              "publicKey": {
+                "type": "string",
+                "description": "The public key for key secrets."
+              },
+              "iv": {
+                "type": "string",
+                "description": "The initialization vector for key secrets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "A Cloudflare Worker secret binding."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.get_worker_script_settings",
+      "service": "cloudflare_worker",
+      "name": "get_worker_script_settings",
+      "description": "Get Worker metadata and configuration for a Cloudflare Worker script.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "The script bindings."
+              },
+              "compatibilityDate": {
+                "type": "string",
+                "description": "The compatibility date."
+              },
+              "compatibilityFlags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The compatibility flags."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "placementMode": {
+                "type": "string",
+                "description": "The placement mode."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The script tags."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Tail consumer definitions."
+              },
+              "usageModel": {
+                "type": "string",
+                "description": "The usage model."
+              },
+              "limits": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "migrations": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cloudflare Worker script settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_accounts",
+      "service": "cloudflare_worker",
+      "name": "list_accounts",
+      "description": "List Cloudflare accounts visible to the current credential.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Cloudflare account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Cloudflare account name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Cloudflare account type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Cloudflare account summary."
+            },
+            "description": "The visible Cloudflare accounts."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_build_triggers",
+      "service": "cloudflare_worker",
+      "name": "list_build_triggers",
+      "description": "List Workers Builds triggers configured for one Worker script tag.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-ci.read"
+      ],
+      "providerPermissions": [
+        "Workers CI Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptTag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The immutable Worker script tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptTag"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "triggerUuid": {
+                  "type": "string",
+                  "description": "The Workers Builds trigger UUID.",
+                  "format": "uuid"
+                },
+                "triggerName": {
+                  "type": "string",
+                  "description": "The build trigger name."
+                },
+                "externalScriptId": {
+                  "type": "string",
+                  "description": "The immutable Worker script tag."
+                },
+                "buildCommand": {
+                  "type": "string",
+                  "description": "The command that builds the Worker."
+                },
+                "deployCommand": {
+                  "type": "string",
+                  "description": "The command that deploys the Worker."
+                },
+                "rootDirectory": {
+                  "type": "string",
+                  "description": "The repository directory where the build runs."
+                },
+                "branchIncludes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Branches that can trigger builds."
+                },
+                "branchExcludes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Branches excluded from builds."
+                },
+                "pathIncludes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Repository paths that can trigger builds."
+                },
+                "pathExcludes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Repository paths excluded from builds."
+                },
+                "buildCachingEnabled": {
+                  "type": "boolean",
+                  "description": "Whether build caching is enabled."
+                },
+                "buildTokenUuid": {
+                  "type": "string",
+                  "description": "The UUID of the build token used by this trigger.",
+                  "format": "uuid"
+                },
+                "buildTokenName": {
+                  "type": "string",
+                  "description": "The name of the build token used by this trigger."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The trigger creation timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last trigger update timestamp."
+                },
+                "deletedOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The trigger deletion timestamp, or null when active."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The trigger deletion timestamp, or null when active."
+                },
+                "repoConnection": {
+                  "type": "object",
+                  "properties": {
+                    "providerAccountId": {
+                      "type": "string",
+                      "description": "The source provider account identifier."
+                    },
+                    "providerAccountName": {
+                      "type": "string",
+                      "description": "The source provider account name."
+                    },
+                    "providerType": {
+                      "type": "string",
+                      "description": "The source repository provider type."
+                    },
+                    "repoConnectionUuid": {
+                      "type": "string",
+                      "description": "The repository connection UUID.",
+                      "format": "uuid"
+                    },
+                    "repoId": {
+                      "type": "string",
+                      "description": "The source repository identifier."
+                    },
+                    "repoName": {
+                      "type": "string",
+                      "description": "The source repository name."
+                    },
+                    "createdOn": {
+                      "type": "string",
+                      "description": "The repository connection creation timestamp."
+                    },
+                    "modifiedOn": {
+                      "type": "string",
+                      "description": "The repository connection modification timestamp."
+                    },
+                    "deletedOn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The repository connection deletion timestamp, or null when active."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The repository connection deletion timestamp, or null when active."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The source repository connected to a Workers Builds trigger."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "triggerUuid"
+              ],
+              "description": "A Cloudflare Workers Builds trigger."
+            },
+            "description": "The configured Workers Builds triggers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_builds",
+      "service": "cloudflare_worker",
+      "name": "list_builds",
+      "description": "List Workers Builds jobs for one Worker script tag.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-ci.read"
+      ],
+      "providerPermissions": [
+        "Workers CI Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptTag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The immutable Worker script tag."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The page size, up to 200."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptTag"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "buildUuid": {
+                  "type": "string",
+                  "description": "The Workers Builds job UUID.",
+                  "format": "uuid"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "initializing",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "stopped"
+                  ],
+                  "description": "The normalized build lifecycle state."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "initializing",
+                    "running",
+                    "stopped"
+                  ],
+                  "description": "The Cloudflare build status."
+                },
+                "buildOutcome": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "fail",
+                    "skipped",
+                    "cancelled",
+                    "terminated"
+                  ],
+                  "description": "The Cloudflare build outcome."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The build creation timestamp."
+                },
+                "initializingOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The build initialization timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The build initialization timestamp."
+                },
+                "runningOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The build start timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The build start timestamp."
+                },
+                "stoppedOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The build stop timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The build stop timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last build update timestamp."
+                },
+                "triggerMetadata": {
+                  "type": "object",
+                  "properties": {
+                    "author": {
+                      "type": "string",
+                      "description": "The source revision author."
+                    },
+                    "branch": {
+                      "type": "string",
+                      "description": "The source branch name."
+                    },
+                    "buildCommand": {
+                      "type": "string",
+                      "description": "The build command used by the job."
+                    },
+                    "deployCommand": {
+                      "type": "string",
+                      "description": "The deploy command used by the job."
+                    },
+                    "buildTokenName": {
+                      "type": "string",
+                      "description": "The build token name."
+                    },
+                    "buildTokenUuid": {
+                      "type": "string",
+                      "description": "The build token UUID.",
+                      "format": "uuid"
+                    },
+                    "buildTriggerSource": {
+                      "type": "string",
+                      "description": "The event source that triggered the build."
+                    },
+                    "commitHash": {
+                      "type": "string",
+                      "description": "The source commit hash."
+                    },
+                    "commitMessage": {
+                      "type": "string",
+                      "description": "The source commit message."
+                    },
+                    "environmentVariables": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The environment variables supplied to the build."
+                    },
+                    "providerAccountName": {
+                      "type": "string",
+                      "description": "The source provider account name."
+                    },
+                    "providerType": {
+                      "type": "string",
+                      "description": "The source repository provider type."
+                    },
+                    "repoName": {
+                      "type": "string",
+                      "description": "The source repository name."
+                    },
+                    "rootDirectory": {
+                      "type": "string",
+                      "description": "The repository directory where the build ran."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The source revision and build configuration that triggered a Workers Builds job."
+                },
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "triggerUuid": {
+                      "type": "string",
+                      "description": "The Workers Builds trigger UUID.",
+                      "format": "uuid"
+                    },
+                    "triggerName": {
+                      "type": "string",
+                      "description": "The build trigger name."
+                    },
+                    "externalScriptId": {
+                      "type": "string",
+                      "description": "The immutable Worker script tag."
+                    },
+                    "buildCommand": {
+                      "type": "string",
+                      "description": "The command that builds the Worker."
+                    },
+                    "deployCommand": {
+                      "type": "string",
+                      "description": "The command that deploys the Worker."
+                    },
+                    "rootDirectory": {
+                      "type": "string",
+                      "description": "The repository directory where the build runs."
+                    },
+                    "branchIncludes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Branches that can trigger builds."
+                    },
+                    "branchExcludes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Branches excluded from builds."
+                    },
+                    "pathIncludes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Repository paths that can trigger builds."
+                    },
+                    "pathExcludes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Repository paths excluded from builds."
+                    },
+                    "buildCachingEnabled": {
+                      "type": "boolean",
+                      "description": "Whether build caching is enabled."
+                    },
+                    "buildTokenUuid": {
+                      "type": "string",
+                      "description": "The UUID of the build token used by this trigger.",
+                      "format": "uuid"
+                    },
+                    "buildTokenName": {
+                      "type": "string",
+                      "description": "The name of the build token used by this trigger."
+                    },
+                    "createdOn": {
+                      "type": "string",
+                      "description": "The trigger creation timestamp."
+                    },
+                    "modifiedOn": {
+                      "type": "string",
+                      "description": "The last trigger update timestamp."
+                    },
+                    "deletedOn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The trigger deletion timestamp, or null when active."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The trigger deletion timestamp, or null when active."
+                    },
+                    "repoConnection": {
+                      "type": "object",
+                      "properties": {
+                        "providerAccountId": {
+                          "type": "string",
+                          "description": "The source provider account identifier."
+                        },
+                        "providerAccountName": {
+                          "type": "string",
+                          "description": "The source provider account name."
+                        },
+                        "providerType": {
+                          "type": "string",
+                          "description": "The source repository provider type."
+                        },
+                        "repoConnectionUuid": {
+                          "type": "string",
+                          "description": "The repository connection UUID.",
+                          "format": "uuid"
+                        },
+                        "repoId": {
+                          "type": "string",
+                          "description": "The source repository identifier."
+                        },
+                        "repoName": {
+                          "type": "string",
+                          "description": "The source repository name."
+                        },
+                        "createdOn": {
+                          "type": "string",
+                          "description": "The repository connection creation timestamp."
+                        },
+                        "modifiedOn": {
+                          "type": "string",
+                          "description": "The repository connection modification timestamp."
+                        },
+                        "deletedOn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The repository connection deletion timestamp, or null when active."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The repository connection deletion timestamp, or null when active."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The source repository connected to a Workers Builds trigger."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "triggerUuid"
+                  ],
+                  "description": "A Cloudflare Workers Builds trigger."
+                },
+                "pullRequest": {
+                  "type": "object",
+                  "properties": {
+                    "createdOn": {
+                      "type": "string",
+                      "description": "The pull request creation timestamp."
+                    },
+                    "pullRequestUrl": {
+                      "type": "string",
+                      "description": "The pull request URL.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The pull request that triggered a Workers Builds job."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "buildUuid",
+                "state"
+              ],
+              "description": "A Cloudflare Workers Builds job."
+            },
+            "description": "The Workers Builds jobs."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "builds"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_worker_script_secrets",
+      "service": "cloudflare_worker",
+      "name": "list_worker_script_secrets",
+      "description": "List secret bindings attached to a Cloudflare Worker script.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "secrets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The secret binding name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The secret binding type."
+                },
+                "text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The redacted secret text field."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The redacted secret text field."
+                },
+                "algorithm": {
+                  "type": "string",
+                  "description": "The key algorithm for key secrets."
+                },
+                "format": {
+                  "type": "string",
+                  "description": "The key format for key secrets."
+                },
+                "publicKey": {
+                  "type": "string",
+                  "description": "The public key for key secrets."
+                },
+                "iv": {
+                  "type": "string",
+                  "description": "The initialization vector for key secrets."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "description": "A Cloudflare Worker secret binding."
+            },
+            "description": "The list of Worker secrets."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "secrets"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_worker_scripts",
+      "service": "cloudflare_worker",
+      "name": "list_worker_scripts",
+      "description": "List Worker scripts in a Cloudflare account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scripts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The Worker script name."
+                },
+                "scriptTag": {
+                  "type": "string",
+                  "description": "The Worker script tag identifier."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The script creation timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last script update timestamp."
+                },
+                "compatibilityDate": {
+                  "type": "string",
+                  "description": "The compatibility date."
+                },
+                "compatibilityFlags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The compatibility flags."
+                },
+                "entrypoint": {
+                  "type": "string",
+                  "description": "The entrypoint module."
+                },
+                "handlers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Worker handlers."
+                },
+                "usageModel": {
+                  "type": "string",
+                  "description": "The Worker usage model."
+                },
+                "placementMode": {
+                  "type": "string",
+                  "description": "The placement mode."
+                },
+                "logpush": {
+                  "type": "boolean",
+                  "description": "Whether logpush is enabled."
+                },
+                "environmentName": {
+                  "type": "string",
+                  "description": "The environment name."
+                },
+                "environmentIsDefault": {
+                  "type": "boolean",
+                  "description": "Whether the environment is the default environment."
+                },
+                "serviceName": {
+                  "type": "string",
+                  "description": "The Worker service name."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Worker tags."
+                },
+                "observability": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Cloudflare Worker script summary."
+            },
+            "description": "The list of Worker scripts."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scripts"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.list_workers",
+      "service": "cloudflare_worker",
+      "name": "list_workers",
+      "description": "List Workers in a Cloudflare account using the Workers beta API.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field to order by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The immutable Worker ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Worker name."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The Worker creation timestamp."
+                },
+                "updatedOn": {
+                  "type": "string",
+                  "description": "The last Worker update timestamp."
+                },
+                "deployedOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The latest deployment timestamp, or null when undeployed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The latest deployment timestamp, or null when undeployed."
+                },
+                "logpush": {
+                  "type": "boolean",
+                  "description": "Whether logpush is enabled for the Worker."
+                },
+                "observability": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "references": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "subdomain": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Tags associated with the Worker."
+                },
+                "tailConsumers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A free-form object accepted by the Cloudflare API."
+                  },
+                  "description": "Other Workers that should consume logs from the Worker."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Cloudflare Worker managed by the Workers beta API."
+            },
+            "description": "The list of Workers."
+          },
+          "resultInfo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "description": "The current page number."
+                  },
+                  "perPage": {
+                    "type": "integer",
+                    "description": "The page size."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the current page."
+                  },
+                  "totalCount": {
+                    "type": "integer",
+                    "description": "The total number of matching items."
+                  },
+                  "totalPages": {
+                    "type": "integer",
+                    "description": "The total number of pages."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Cloudflare pagination metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.patch_worker_script_settings",
+      "service": "cloudflare_worker",
+      "name": "patch_worker_script_settings",
+      "description": "Patch Worker metadata and configuration for a Cloudflare Worker script.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "The full bindings array to set on the script."
+          },
+          "compatibilityDate": {
+            "type": "string",
+            "description": "The compatibility date."
+          },
+          "compatibilityFlags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The compatibility flags."
+          },
+          "logpush": {
+            "type": "boolean",
+            "description": "Whether logpush should be enabled."
+          },
+          "observability": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "placementMode": {
+            "type": "string",
+            "description": "The placement mode."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The script tags."
+          },
+          "tailConsumers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Tail consumer definitions."
+          },
+          "usageModel": {
+            "type": "string",
+            "description": "The usage model."
+          },
+          "limits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "migrations": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "bindings"
+            ]
+          },
+          {
+            "required": [
+              "compatibilityDate"
+            ]
+          },
+          {
+            "required": [
+              "compatibilityFlags"
+            ]
+          },
+          {
+            "required": [
+              "logpush"
+            ]
+          },
+          {
+            "required": [
+              "observability"
+            ]
+          },
+          {
+            "required": [
+              "placementMode"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "tailConsumers"
+            ]
+          },
+          {
+            "required": [
+              "usageModel"
+            ]
+          },
+          {
+            "required": [
+              "limits"
+            ]
+          },
+          {
+            "required": [
+              "migrations"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "The script bindings."
+              },
+              "compatibilityDate": {
+                "type": "string",
+                "description": "The compatibility date."
+              },
+              "compatibilityFlags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The compatibility flags."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "placementMode": {
+                "type": "string",
+                "description": "The placement mode."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The script tags."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Tail consumer definitions."
+              },
+              "usageModel": {
+                "type": "string",
+                "description": "The usage model."
+              },
+              "limits": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "migrations": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cloudflare Worker script settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.put_worker_script_content",
+      "service": "cloudflare_worker",
+      "name": "put_worker_script_content",
+      "description": "Replace only the content of a Cloudflare Worker script without changing metadata.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "mainModuleName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The multipart part name and file name for the Worker entry module.",
+            "default": "main.js"
+          },
+          "content": {
+            "type": "string",
+            "description": "The raw Worker script content."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The MIME type for the Worker entry module part.",
+            "default": "application/javascript+module"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName",
+          "content"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The Worker script name."
+              },
+              "scriptTag": {
+                "type": "string",
+                "description": "The Worker script tag identifier."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The script creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last script update timestamp."
+              },
+              "compatibilityDate": {
+                "type": "string",
+                "description": "The compatibility date."
+              },
+              "compatibilityFlags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The compatibility flags."
+              },
+              "entrypoint": {
+                "type": "string",
+                "description": "The entrypoint module."
+              },
+              "handlers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Worker handlers."
+              },
+              "usageModel": {
+                "type": "string",
+                "description": "The Worker usage model."
+              },
+              "placementMode": {
+                "type": "string",
+                "description": "The placement mode."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled."
+              },
+              "environmentName": {
+                "type": "string",
+                "description": "The environment name."
+              },
+              "environmentIsDefault": {
+                "type": "boolean",
+                "description": "Whether the environment is the default environment."
+              },
+              "serviceName": {
+                "type": "string",
+                "description": "The Worker service name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Worker tags."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Cloudflare Worker script summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.put_worker_script_secret",
+      "service": "cloudflare_worker",
+      "name": "put_worker_script_secret",
+      "description": "Add or replace a secret_text binding on a Cloudflare Worker script.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker secret name."
+          },
+          "text": {
+            "type": "string",
+            "description": "The secret text value."
+          },
+          "type": {
+            "const": "secret_text",
+            "type": "string",
+            "description": "The Worker secret binding type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName",
+          "name",
+          "text"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The secret binding name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The secret binding type."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The redacted secret text field."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The redacted secret text field."
+              },
+              "algorithm": {
+                "type": "string",
+                "description": "The key algorithm for key secrets."
+              },
+              "format": {
+                "type": "string",
+                "description": "The key format for key secrets."
+              },
+              "publicKey": {
+                "type": "string",
+                "description": "The public key for key secrets."
+              },
+              "iv": {
+                "type": "string",
+                "description": "The initialization vector for key secrets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "A Cloudflare Worker secret binding."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.search_worker_scripts",
+      "service": "cloudflare_worker",
+      "name": "search_worker_scripts",
+      "description": "Search Worker scripts in a Cloudflare account by name or script tag.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-scripts.read"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search by exact Worker script tag."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search by Worker script name."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "created_on",
+              "modified_on",
+              "name"
+            ],
+            "description": "The search sort field."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scripts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The Worker script name."
+                },
+                "scriptTag": {
+                  "type": "string",
+                  "description": "The Worker script tag identifier."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The script creation timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last script update timestamp."
+                },
+                "compatibilityDate": {
+                  "type": "string",
+                  "description": "The compatibility date."
+                },
+                "compatibilityFlags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The compatibility flags."
+                },
+                "entrypoint": {
+                  "type": "string",
+                  "description": "The entrypoint module."
+                },
+                "handlers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Worker handlers."
+                },
+                "usageModel": {
+                  "type": "string",
+                  "description": "The Worker usage model."
+                },
+                "placementMode": {
+                  "type": "string",
+                  "description": "The placement mode."
+                },
+                "logpush": {
+                  "type": "boolean",
+                  "description": "Whether logpush is enabled."
+                },
+                "environmentName": {
+                  "type": "string",
+                  "description": "The environment name."
+                },
+                "environmentIsDefault": {
+                  "type": "boolean",
+                  "description": "Whether the environment is the default environment."
+                },
+                "serviceName": {
+                  "type": "string",
+                  "description": "The Worker service name."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Worker tags."
+                },
+                "observability": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Cloudflare Worker script summary."
+            },
+            "description": "The matching Worker scripts."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scripts"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.update_worker",
+      "service": "cloudflare_worker",
+      "name": "update_worker",
+      "description": "Replace a Cloudflare Worker using the Workers beta API, setting omitted fields to API defaults.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "workerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Worker name."
+          },
+          "logpush": {
+            "type": "boolean",
+            "description": "Whether logpush should be enabled for the Worker."
+          },
+          "observability": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "subdomain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags to set on the Worker."
+          },
+          "tailConsumers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Tail consumer definitions to set on the Worker."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workerId",
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "worker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The immutable Worker ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Worker name."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The Worker creation timestamp."
+              },
+              "updatedOn": {
+                "type": "string",
+                "description": "The last Worker update timestamp."
+              },
+              "deployedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest deployment timestamp, or null when undeployed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest deployment timestamp, or null when undeployed."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled for the Worker."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "references": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "subdomain": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Tags associated with the Worker."
+              },
+              "tailConsumers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "description": "Other Workers that should consume logs from the Worker."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Cloudflare Worker managed by the Workers beta API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_worker.upload_worker_script",
+      "service": "cloudflare_worker",
+      "name": "upload_worker_script",
+      "description": "Create or replace a Cloudflare Worker script by uploading a module bundle as multipart/form-data.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-scripts.write"
+      ],
+      "providerPermissions": [
+        "Workers Scripts Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Omit this when the connection can uniquely determine the account. This field is required for multi-account OAuth connections; use list_accounts to find an accessible account ID."
+          },
+          "scriptName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Worker script name."
+          },
+          "mainModuleName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The multipart part name and file name for the Worker entry module.",
+            "default": "main.js"
+          },
+          "mainModuleContent": {
+            "type": "string",
+            "description": "The source content for the Worker entry module."
+          },
+          "mainModuleContentType": {
+            "type": "string",
+            "description": "The MIME type for the Worker entry module part.",
+            "default": "application/javascript+module"
+          },
+          "bindingsInherit": {
+            "type": "string",
+            "enum": [
+              "strict"
+            ],
+            "description": "Require inherited bindings to resolve against the previous Worker version."
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The multipart part name and file name for this Worker module."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The source content for this Worker module."
+                },
+                "contentType": {
+                  "type": "string",
+                  "description": "The MIME type for this Worker module part."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "content"
+              ],
+              "description": "A module file to upload with a Worker script."
+            },
+            "description": "Additional module files to upload with the Worker script."
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Bindings to expose in the Worker."
+          },
+          "compatibilityDate": {
+            "type": "string",
+            "description": "The compatibility date."
+          },
+          "compatibilityFlags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The compatibility flags."
+          },
+          "logpush": {
+            "type": "boolean",
+            "description": "Whether logpush should be enabled for the Worker."
+          },
+          "placement": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags to attach to the Worker."
+          },
+          "tailConsumers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Tail consumer definitions."
+          },
+          "migrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A free-form object accepted by the Cloudflare API."
+            },
+            "description": "Durable Object migrations to apply."
+          },
+          "annotations": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "assets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "keepAssets": {
+            "type": "boolean",
+            "description": "Whether to retain assets from the previously uploaded Worker version."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scriptName",
+          "mainModuleContent"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The Worker script name."
+              },
+              "scriptTag": {
+                "type": "string",
+                "description": "The Worker script tag identifier."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The script creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last script update timestamp."
+              },
+              "compatibilityDate": {
+                "type": "string",
+                "description": "The compatibility date."
+              },
+              "compatibilityFlags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The compatibility flags."
+              },
+              "entrypoint": {
+                "type": "string",
+                "description": "The entrypoint module."
+              },
+              "handlers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Worker handlers."
+              },
+              "usageModel": {
+                "type": "string",
+                "description": "The Worker usage model."
+              },
+              "placementMode": {
+                "type": "string",
+                "description": "The placement mode."
+              },
+              "logpush": {
+                "type": "boolean",
+                "description": "Whether logpush is enabled."
+              },
+              "environmentName": {
+                "type": "string",
+                "description": "The environment name."
+              },
+              "environmentIsDefault": {
+                "type": "boolean",
+                "description": "Whether the environment is the default environment."
+              },
+              "serviceName": {
+                "type": "string",
+                "description": "The Worker service name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Worker tags."
+              },
+              "observability": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Cloudflare Worker script summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

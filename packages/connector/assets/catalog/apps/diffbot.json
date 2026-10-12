@@ -1,0 +1,279 @@
+{
+  "service": "diffbot",
+  "displayName": "Diffbot",
+  "categories": [
+    "Data",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "DIFFBOT_TOKEN",
+      "description": "Diffbot API token sent with the token query parameter. Copy it from the account menu in the Diffbot app.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.diffbot.com",
+  "actions": [
+    {
+      "id": "diffbot.extract_article",
+      "service": "diffbot",
+      "name": "extract_article",
+      "description": "Extract article content and metadata from a public URL using Diffbot Article API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public article URL to extract with Diffbot.",
+            "format": "uri"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "links",
+                "extlinks",
+                "meta",
+                "querystring",
+                "breadcrumb",
+                "quotes"
+              ],
+              "description": "An optional Diffbot article field to request."
+            },
+            "description": "Optional Diffbot article fields to include in the response.",
+            "minItems": 1
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The upstream page retrieval timeout in milliseconds."
+          },
+          "renderDelay": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The extra delay in milliseconds before extraction."
+          },
+          "scroll": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "slow"
+            ],
+            "description": "The scrolling mode Diffbot should use to trigger lazy-loaded content."
+          },
+          "proxy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom proxy IP address Diffbot should use to fetch the target page."
+          },
+          "proxyAuth": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The proxy authentication string sent with the custom proxy."
+          },
+          "useProxy": {
+            "type": "string",
+            "enum": [
+              "default",
+              "none"
+            ],
+            "description": "Whether Diffbot should force its default proxy or disable proxy usage."
+          },
+          "paging": {
+            "type": "boolean",
+            "description": "Whether Diffbot should automatically concatenate multi-page articles."
+          },
+          "maxTags": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of auto-generated tags to return."
+          },
+          "tagConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum relevance score required for returned tags."
+          },
+          "categoryConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum relevance score required for returned categories."
+          },
+          "discussion": {
+            "type": "boolean",
+            "description": "Whether Diffbot should extract article comments and discussions."
+          },
+          "naturalLanguage": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "entities",
+                "sentiment",
+                "summary",
+                "facts",
+                "openFacts",
+                "records",
+                "categories",
+                "sentences",
+                "language"
+              ],
+              "description": "A Diffbot Natural Language feature to enable."
+            },
+            "description": "The Diffbot Natural Language features to enable for the article.",
+            "minItems": 1
+          },
+          "summaryNumSentences": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of summary sentences when summary analysis is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for extracting one article from a public URL with Diffbot."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pageUrl": {
+                    "type": "string",
+                    "description": "The target page URL echoed by Diffbot."
+                  },
+                  "api": {
+                    "type": "string",
+                    "description": "The Diffbot API family that handled the request."
+                  },
+                  "version": {
+                    "type": "integer",
+                    "description": "The Diffbot API version used for the request."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The top-level request metadata returned by Diffbot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The top-level request metadata returned by Diffbot."
+          },
+          "article": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "The Diffbot object type for the extracted page."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The extracted article title."
+                  },
+                  "pageUrl": {
+                    "type": "string",
+                    "description": "The canonical page URL extracted from the article."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The extracted plain text content of the article."
+                  },
+                  "html": {
+                    "type": "string",
+                    "description": "The extracted article HTML content."
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "The article publication date returned by Diffbot."
+                  },
+                  "humanLanguage": {
+                    "type": "string",
+                    "description": "The language code returned by Diffbot."
+                  },
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A Diffbot object with provider-specific fields."
+                    },
+                    "description": "The images returned by Diffbot for the article."
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A Diffbot object with provider-specific fields."
+                    },
+                    "description": "The topic tags returned by Diffbot."
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A Diffbot object with provider-specific fields."
+                    },
+                    "description": "The content categories returned by Diffbot."
+                  },
+                  "naturalLanguage": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Diffbot object with provider-specific fields."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The normalized primary article extracted from the Diffbot article endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The normalized primary article extracted from the Diffbot article endpoint."
+          },
+          "humanLanguage": {
+            "type": "string",
+            "description": "The language code returned at the top level."
+          },
+          "type": {
+            "type": "string",
+            "description": "The top-level Diffbot object type."
+          },
+          "title": {
+            "type": "string",
+            "description": "The top-level title returned by Diffbot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "request",
+          "article"
+        ],
+        "description": "The normalized Diffbot article extraction response."
+      }
+    }
+  ]
+}

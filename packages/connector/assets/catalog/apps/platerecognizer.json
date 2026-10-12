@@ -1,0 +1,463 @@
+{
+  "service": "platerecognizer",
+  "displayName": "Plate Recognizer",
+  "categories": [
+    "AI",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "PLATE_RECOGNIZER_API_TOKEN",
+      "description": "Plate Recognizer Snapshot Cloud API token used with the Authorization: Token header. Get it from the Snapshot Cloud dashboard: https://app.platerecognizer.com/service/snapshot-cloud/"
+    }
+  ],
+  "homepageUrl": "https://platerecognizer.com",
+  "actions": [
+    {
+      "id": "platerecognizer.get_statistics",
+      "service": "platerecognizer",
+      "name": "get_statistics",
+      "description": "Retrieve current-month Plate Recognizer Snapshot Cloud usage and reset information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "usage": {
+            "type": "object",
+            "properties": {
+              "month": {
+                "type": "integer",
+                "description": "The current billing month number."
+              },
+              "calls": {
+                "type": "integer",
+                "description": "The number of recognition calls used this month."
+              },
+              "year": {
+                "type": "integer",
+                "description": "The current billing year."
+              },
+              "resetsOn": {
+                "type": "string",
+                "description": "When the Plate Recognizer monthly counter resets.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "month",
+              "calls",
+              "year",
+              "resetsOn"
+            ],
+            "description": "Action output."
+          },
+          "totalCalls": {
+            "type": "integer",
+            "description": "The maximum number of calls allowed during the current period."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "usage",
+          "totalCalls"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "platerecognizer.read_number_plates",
+      "service": "platerecognizer",
+      "name": "read_number_plates",
+      "description": "Read number plates from one image by calling Plate Recognizer Snapshot Cloud and returning normalized detections.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public image URL to process instead of uploading raw bytes."
+          },
+          "uploadBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Base64-encoded image content to send as the upload field."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "Image file uploaded through POST /api/files."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional list of country or state codes used to bias recognition.",
+            "minItems": 1
+          },
+          "cameraId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional camera identifier sent to Plate Recognizer."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Optional UTC ISO 8601 timestamp associated with the image.",
+            "format": "date-time"
+          },
+          "mmc": {
+            "type": "boolean",
+            "description": "Whether to request optional make, model, color, orientation, and year predictions."
+          },
+          "direction": {
+            "type": "boolean",
+            "description": "Whether to request optional direction-of-travel prediction. Requires mmc=true."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional engine configuration forwarded as JSON. config.detection_mode=vehicle is not supported in this first pass."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for reading number plates from one image with Plate Recognizer. Provide exactly one of uploadUrl, uploadBase64, or file. direction requires mmc=true."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processingTime": {
+            "type": "number",
+            "description": "The processing time in milliseconds reported upstream."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The processed filename returned by Plate Recognizer."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The processed filename returned by Plate Recognizer."
+          },
+          "cameraId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The camera identifier echoed back by Plate Recognizer, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The camera identifier echoed back by Plate Recognizer, when present."
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp echoed back by Plate Recognizer, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp echoed back by Plate Recognizer, when present."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "box": {
+                  "type": "object",
+                  "properties": {
+                    "xmin": {
+                      "type": "integer",
+                      "description": "The left edge of the detected box in pixels."
+                    },
+                    "ymin": {
+                      "type": "integer",
+                      "description": "The top edge of the detected box in pixels."
+                    },
+                    "xmax": {
+                      "type": "integer",
+                      "description": "The right edge of the detected box in pixels."
+                    },
+                    "ymax": {
+                      "type": "integer",
+                      "description": "The bottom edge of the detected box in pixels."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "xmin",
+                    "ymin",
+                    "xmax",
+                    "ymax"
+                  ],
+                  "description": "Action output."
+                },
+                "plate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The normalized plate string returned by Plate Recognizer."
+                },
+                "region": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The upstream region or country code."
+                    },
+                    "score": {
+                      "type": "number",
+                      "description": "The confidence score for the returned region code."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "code",
+                    "score"
+                  ],
+                  "description": "Action output."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "The confidence score for the selected plate result."
+                },
+                "dscore": {
+                  "type": "number",
+                  "description": "The detector confidence score for the plate region."
+                },
+                "vehicle": {
+                  "type": "object",
+                  "properties": {
+                    "score": {
+                      "type": "number",
+                      "description": "The confidence score for the detected vehicle."
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The detected vehicle type, such as Sedan or SUV."
+                    },
+                    "box": {
+                      "type": "object",
+                      "properties": {
+                        "xmin": {
+                          "type": "integer",
+                          "description": "The left edge of the detected box in pixels."
+                        },
+                        "ymin": {
+                          "type": "integer",
+                          "description": "The top edge of the detected box in pixels."
+                        },
+                        "xmax": {
+                          "type": "integer",
+                          "description": "The right edge of the detected box in pixels."
+                        },
+                        "ymax": {
+                          "type": "integer",
+                          "description": "The bottom edge of the detected box in pixels."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "xmin",
+                        "ymin",
+                        "xmax",
+                        "ymax"
+                      ],
+                      "description": "Action output."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "score",
+                    "type",
+                    "box"
+                  ],
+                  "description": "Action output."
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "plate": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One alternative normalized plate candidate."
+                      },
+                      "score": {
+                        "type": "number",
+                        "description": "The confidence score for this plate candidate."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "plate",
+                      "score"
+                    ],
+                    "description": "Action output."
+                  },
+                  "description": "Alternative plate candidates returned for the same detection."
+                },
+                "model_make": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "description": "The confidence score for this prediction."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "score"
+                    ],
+                    "description": "A scored prediction object returned by optional Plate Recognizer MMC features."
+                  },
+                  "description": "Optional make and model predictions returned by MMC."
+                },
+                "color": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "description": "The confidence score for this prediction."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "score"
+                    ],
+                    "description": "A scored prediction object returned by optional Plate Recognizer MMC features."
+                  },
+                  "description": "Optional color predictions returned by MMC."
+                },
+                "orientation": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "score": {
+                        "type": "number",
+                        "description": "The confidence score for this prediction."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "score"
+                    ],
+                    "description": "A scored prediction object returned by optional Plate Recognizer MMC features."
+                  },
+                  "description": "Optional orientation predictions returned by MMC."
+                },
+                "year": {
+                  "type": "object",
+                  "properties": {
+                    "year_range": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "description": "One year boundary returned by Plate Recognizer."
+                      },
+                      "description": "The inclusive year range returned by the optional MMC feature.",
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "score": {
+                      "type": "number",
+                      "description": "The confidence score for the year range prediction."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "year_range",
+                    "score"
+                  ],
+                  "description": "Action output."
+                },
+                "direction": {
+                  "type": "number",
+                  "description": "Optional direction of travel in degrees returned when direction=true."
+                },
+                "direction_score": {
+                  "type": "number",
+                  "description": "Confidence score for the optional direction prediction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "box",
+                "plate",
+                "region",
+                "score",
+                "dscore",
+                "vehicle",
+                "candidates"
+              ],
+              "description": "One recognized number plate result returned by Plate Recognizer."
+            },
+            "description": "Recognized number plate results returned for the image."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processingTime",
+          "filename",
+          "cameraId",
+          "timestamp",
+          "results"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

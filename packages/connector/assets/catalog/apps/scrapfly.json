@@ -1,0 +1,417 @@
+{
+  "service": "scrapfly",
+  "displayName": "Scrapfly",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SCRAPFLY_API_KEY",
+      "description": "Scrapfly API key used as the key query parameter.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://scrapfly.io/",
+  "actions": [
+    {
+      "id": "scrapfly.get_monitoring_metrics",
+      "service": "scrapfly",
+      "name": "get_monitoring_metrics",
+      "description": "Retrieve Scrapfly monitoring metrics for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "aggregation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The metrics aggregation list accepted by Scrapfly, such as account, project, or account,project,target."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "last5m",
+              "last1h",
+              "last7d",
+              "last24h",
+              "subscription"
+            ],
+            "description": "The monitoring period to retrieve."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UTC start date accepted by Scrapfly when period is omitted."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UTC end date accepted by Scrapfly when period is omitted."
+          },
+          "group_subdomain": {
+            "type": "boolean",
+            "description": "Whether target aggregation should group subdomains."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Scrapfly monitoring metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Monitoring metrics returned by Scrapfly."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Scrapfly."
+              },
+              "api_cost": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The API credit cost reported by Scrapfly."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The API credit cost reported by Scrapfly."
+              },
+              "remaining_api_credit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Remaining API credit reported by Scrapfly."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Remaining API credit reported by Scrapfly."
+              },
+              "reject_code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Scrapfly reject code when a scrape is rejected."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrapfly reject code when a scrape is rejected."
+              },
+              "reject_description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Scrapfly reject documentation URL when a scrape is rejected."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrapfly reject documentation URL when a scrape is rejected."
+              },
+              "reject_retryable": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Whether Scrapfly reported the rejection as retryable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether Scrapfly reported the rejection as retryable."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from Scrapfly response headers."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by Scrapfly."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving Scrapfly monitoring metrics."
+      }
+    },
+    {
+      "id": "scrapfly.scrape",
+      "service": "scrapfly",
+      "name": "scrape",
+      "description": "Scrape one public URL through Scrapfly and return the documented JSON response envelope.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public URL Scrapfly should scrape.",
+            "format": "uri"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "description": "The HTTP method Scrapfly should use against the target URL."
+          },
+          "body": {
+            "type": "string",
+            "description": "The raw request body Scrapfly should send to the target URL."
+          },
+          "content_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Content-Type header for the target request body."
+          },
+          "format": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content format Scrapfly should return."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The proxy country selection accepted by Scrapfly, such as us, us,ca,mx, or -gb."
+          },
+          "proxy_pool": {
+            "type": "string",
+            "enum": [
+              "public_datacenter_pool",
+              "public_residential_pool"
+            ],
+            "description": "The Scrapfly proxy pool to use for the scrape."
+          },
+          "render_js": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should render JavaScript before returning."
+          },
+          "asp": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should enable Anti Scraping Protection."
+          },
+          "retry": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should retry the scrape request."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 150000,
+            "description": "The scrape timeout in milliseconds."
+          },
+          "wait_for_selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CSS selector Scrapfly should wait for before returning content."
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should use cached scrape results when available."
+          },
+          "cache_ttl": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The cache time-to-live in seconds."
+          },
+          "cache_clear": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should clear any matching cached result."
+          },
+          "session": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The Scrapfly session name used to keep browsing state."
+          },
+          "session_sticky_proxy": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should keep the session proxy sticky."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A target request header value."
+            },
+            "description": "Target request headers Scrapfly should send to the scraped website."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Scrapfly monitoring tag."
+            },
+            "description": "Tags for grouping the scrape in Scrapfly monitoring."
+          },
+          "correlation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A caller-provided correlation identifier for monitoring."
+          },
+          "debug": {
+            "type": "boolean",
+            "description": "Whether Scrapfly should expose debug data for the scrape."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for scraping a URL with Scrapfly."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "description": "The scraped content, a large object URL, or encoded binary content."
+              },
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by the target website."
+              },
+              "format": {
+                "type": "string",
+                "description": "The Scrapfly result content format."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "content",
+              "status_code",
+              "format"
+            ],
+            "description": "The result object returned by Scrapfly."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The scrape configuration returned by Scrapfly."
+          },
+          "context": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional context returned by Scrapfly."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Scrapfly."
+              },
+              "api_cost": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The API credit cost reported by Scrapfly."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The API credit cost reported by Scrapfly."
+              },
+              "remaining_api_credit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Remaining API credit reported by Scrapfly."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Remaining API credit reported by Scrapfly."
+              },
+              "reject_code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Scrapfly reject code when a scrape is rejected."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrapfly reject code when a scrape is rejected."
+              },
+              "reject_description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Scrapfly reject documentation URL when a scrape is rejected."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrapfly reject documentation URL when a scrape is rejected."
+              },
+              "reject_retryable": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Whether Scrapfly reported the rejection as retryable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether Scrapfly reported the rejection as retryable."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from Scrapfly response headers."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by Scrapfly."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when scraping with Scrapfly."
+      }
+    }
+  ]
+}

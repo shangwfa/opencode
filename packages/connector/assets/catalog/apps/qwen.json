@@ -1,0 +1,1713 @@
+{
+  "service": "qwen",
+  "displayName": "Qwen",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Model Studio API Key",
+      "placeholder": "Your Beijing Model Studio API key",
+      "description": "Beijing Model Studio API key sent as a Bearer token. Create one at https://bailian.console.aliyun.com/?apiKey=1#/api-key."
+    }
+  ],
+  "homepageUrl": "https://qwen.ai/",
+  "actions": [
+    {
+      "id": "qwen.analyze_document",
+      "service": "qwen",
+      "name": "analyze_document",
+      "description": "Analyze documents or text with Qwen-Doc-Turbo.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The extraction, classification, review, or summarization instruction."
+          },
+          "documentUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A public document URL."
+            },
+            "description": "Public URLs for up to ten documents.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain text to analyze instead of documents."
+          },
+          "systemPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The system instruction defining the model role and behavior.",
+            "default": "You are a helpful assistant."
+          },
+          "fileParsingStrategy": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "text_only",
+              "text_and_images"
+            ],
+            "description": "How Qwen parses document URLs.",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "instruction"
+        ],
+        "description": "A Qwen-Doc-Turbo analysis request using either documentUrls or text."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The generated analysis content."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model reported by Qwen."
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of input tokens billed by Qwen."
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of output tokens billed by Qwen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content",
+          "model",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "description": "The Qwen document analysis result and usage."
+      }
+    },
+    {
+      "id": "qwen.create_designed_voice",
+      "service": "qwen",
+      "name": "create_designed_voice",
+      "description": "Create a Qwen-Audio custom voice from a text description.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetModel": {
+            "type": "string",
+            "enum": [
+              "qwen-audio-3.0-tts-flash",
+              "qwen-audio-3.0-tts-plus"
+            ],
+            "description": "The Qwen-Audio 3.0 TTS model bound to the voice.",
+            "default": "qwen-audio-3.0-tts-flash"
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10,
+            "description": "An alphanumeric voice-name prefix of at most ten characters.",
+            "pattern": "^[A-Za-z0-9]+$"
+          },
+          "voicePrompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "A Chinese or English description of the desired voice."
+          },
+          "previewText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Chinese or English text spoken by the preview audio."
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh",
+                "en"
+              ],
+              "description": "A supported preview language code."
+            },
+            "description": "The preview language hint; the API currently uses only the first value.",
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "sampleRate": {
+            "type": "integer",
+            "enum": [
+              16000,
+              24000,
+              48000
+            ],
+            "default": 24000,
+            "description": "The preview audio sample rate in hertz."
+          },
+          "responseFormat": {
+            "type": "string",
+            "enum": [
+              "pcm",
+              "wav",
+              "mp3"
+            ],
+            "description": "The preview audio encoding.",
+            "default": "wav"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prefix",
+          "voicePrompt",
+          "previewText"
+        ],
+        "description": "A Qwen-Audio voice design request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The created voice identifier accepted by generate_speech."
+          },
+          "previewAudio": {
+            "type": "string",
+            "description": "The Base64-encoded preview audio."
+          },
+          "sampleRate": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The preview audio sample rate in hertz."
+          },
+          "responseFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preview audio encoding."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId",
+          "previewAudio",
+          "sampleRate",
+          "responseFormat"
+        ],
+        "description": "The created designed voice and preview audio."
+      }
+    },
+    {
+      "id": "qwen.create_voice_clone",
+      "service": "qwen",
+      "name": "create_voice_clone",
+      "description": "Create a Qwen-Audio custom voice from a public audio sample.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetModel": {
+            "type": "string",
+            "enum": [
+              "qwen-audio-3.0-tts-flash",
+              "qwen-audio-3.0-tts-plus"
+            ],
+            "description": "The Qwen-Audio 3.0 TTS model bound to the voice.",
+            "default": "qwen-audio-3.0-tts-flash"
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10,
+            "description": "An alphanumeric voice-name prefix of at most ten characters.",
+            "pattern": "^[A-Za-z0-9]+$"
+          },
+          "audioUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A publicly accessible reference audio URL."
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh",
+                "en",
+                "fr",
+                "de",
+                "ja",
+                "ko",
+                "ru",
+                "pt",
+                "th",
+                "id",
+                "vi",
+                "it",
+                "es",
+                "ms",
+                "fil",
+                "ar"
+              ],
+              "description": "A supported sample language code."
+            },
+            "description": "The sample audio language hint; the API currently uses only the first value.",
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "maxPromptAudioLength": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 30,
+            "description": "The maximum reference audio duration used, in seconds."
+          },
+          "enablePreprocess": {
+            "type": "boolean",
+            "description": "Whether to denoise and enhance the reference audio."
+          },
+          "enableVolumeNormalization": {
+            "type": "boolean",
+            "description": "Whether to normalize reference audio volume."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prefix",
+          "audioUrl"
+        ],
+        "description": "A Qwen-Audio voice cloning request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The created voice identifier accepted by generate_speech."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId"
+        ],
+        "description": "The created cloned voice."
+      }
+    },
+    {
+      "id": "qwen.delete_custom_voice",
+      "service": "qwen",
+      "name": "delete_custom_voice",
+      "description": "Delete one Qwen-Audio cloned or designed voice.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom voice identifier to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId"
+        ],
+        "description": "A custom voice deletion request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deleted custom voice identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId"
+        ],
+        "description": "The deleted custom voice."
+      }
+    },
+    {
+      "id": "qwen.extract_text",
+      "service": "qwen",
+      "name": "extract_text",
+      "description": "Extract text and structured information from an image with Qwen3.5-OCR.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "A publicly accessible image URL.",
+            "format": "uri"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "text_recognition",
+              "advanced_recognition",
+              "key_information_extraction",
+              "table_parsing",
+              "document_parsing",
+              "formula_recognition",
+              "multi_lan"
+            ],
+            "description": "The OCR task to perform.",
+            "default": "text_recognition"
+          },
+          "resultSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Fields to extract for key_information_extraction, keyed by field name with descriptions or nested field definitions."
+          },
+          "enableRotate": {
+            "type": "boolean",
+            "description": "Whether to automatically correct image rotation.",
+            "default": false
+          },
+          "minPixels": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The minimum number of image pixels used for model input."
+          },
+          "maxPixels": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of image pixels used for model input."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl"
+        ],
+        "description": "A Qwen3.5-OCR extraction request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The extracted text or formatted OCR output."
+          },
+          "details": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Task-specific structured OCR details when returned by Qwen."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qwen OCR model used for extraction."
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of input tokens billed by Qwen."
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of output tokens billed by Qwen."
+          },
+          "imageTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of image input tokens billed by Qwen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content",
+          "model",
+          "inputTokens",
+          "outputTokens",
+          "imageTokens"
+        ],
+        "description": "The normalized Qwen OCR result and usage."
+      }
+    },
+    {
+      "id": "qwen.generate_image",
+      "service": "qwen",
+      "name": "generate_image",
+      "description": "Generate or edit images with the Qwen Image 3.0 family.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen-image-3.0",
+              "qwen-image-3.0-pro"
+            ],
+            "description": "The Qwen Image 3.0 model.",
+            "default": "qwen-image-3.0"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The image generation or editing prompt."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A reference image URL or data URL."
+            },
+            "description": "Reference image URLs or data URLs. Omit for text-to-image generation.",
+            "maxItems": 3
+          },
+          "size": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional output dimensions as WIDTH*HEIGHT. Omit for model-selected dimensions."
+          },
+          "imageCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "The number of images to generate.",
+            "default": 1
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Content that should not appear in the generated images."
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether Qwen should enhance the prompt.",
+            "default": true
+          },
+          "promptExtendMode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "agent"
+            ],
+            "description": "The prompt enhancement mode.",
+            "default": "direct"
+          },
+          "enableThinking": {
+            "type": "boolean",
+            "description": "Whether to use reasoning during image generation.",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether generated images include a watermark.",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "The random seed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "A unified Qwen Image 3.0 generation or editing request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A generated image URL."
+            },
+            "description": "The generated temporary image URLs."
+          },
+          "imageCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of generated images."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The output image width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The output image height in pixels."
+          },
+          "inputImageCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of input images billed by Qwen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "images",
+          "imageCount",
+          "inputImageCount"
+        ],
+        "description": "The generated Qwen images and usage."
+      }
+    },
+    {
+      "id": "qwen.generate_speech",
+      "service": "qwen",
+      "name": "generate_speech",
+      "description": "Generate speech with Qwen-Audio 3.0 TTS.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen-audio-3.0-tts-flash",
+              "qwen-audio-3.0-tts-plus"
+            ],
+            "description": "The Qwen-Audio 3.0 TTS model.",
+            "default": "qwen-audio-3.0-tts-flash"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to synthesize."
+          },
+          "voice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A system, cloned, or designed Qwen-Audio voice name.",
+            "default": "longanhuan_v3.6"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "mp3",
+              "pcm",
+              "wav",
+              "opus"
+            ],
+            "description": "The generated audio encoding.",
+            "default": "mp3"
+          },
+          "sampleRate": {
+            "type": "integer",
+            "enum": [
+              8000,
+              16000,
+              22050,
+              24000,
+              44100,
+              48000
+            ],
+            "description": "The audio sample rate in hertz.",
+            "default": 22050
+          },
+          "volume": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The output volume from 0 to 100."
+          },
+          "rate": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "The speech rate from 0.5 to 2.0."
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "The pitch multiplier from 0.5 to 2.0."
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A natural-language instruction for dialect, emotion, pace, or role."
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "zh",
+                "en",
+                "fr",
+                "de",
+                "ja",
+                "ko",
+                "ru",
+                "pt",
+                "th",
+                "id",
+                "vi",
+                "es",
+                "it",
+                "ms",
+                "fil",
+                "ar"
+              ],
+              "description": "A supported target language code."
+            },
+            "description": "The target language hint; the API currently uses only the first value.",
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "enableSsml": {
+            "type": "boolean",
+            "description": "Whether text contains supported SSML markup."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "The deterministic synthesis seed."
+          },
+          "bitRate": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 510,
+            "description": "The Opus bit rate in kbps; only valid when format is opus."
+          },
+          "enableAigcTag": {
+            "type": "boolean",
+            "description": "Whether to embed an AIGC provenance tag in the generated audio."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "A Qwen-Audio 3.0 speech synthesis request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "audioUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The temporary generated audio URL."
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Unix timestamp when the audio URL expires."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audioUrl"
+        ],
+        "description": "The generated speech audio."
+      }
+    },
+    {
+      "id": "qwen.get_custom_voice",
+      "service": "qwen",
+      "name": "get_custom_voice",
+      "description": "Get one Qwen-Audio cloned or designed voice.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom voice identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId"
+        ],
+        "description": "A custom voice lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom voice identifier accepted by generate_speech."
+          },
+          "targetModel": {
+            "type": "string",
+            "enum": [
+              "qwen-audio-3.0-tts-flash",
+              "qwen-audio-3.0-tts-plus"
+            ],
+            "description": "The Qwen-Audio 3.0 TTS model bound to the voice."
+          },
+          "status": {
+            "type": "string",
+            "description": "The upstream voice status."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The upstream voice creation time."
+          },
+          "modifiedAt": {
+            "type": "string",
+            "description": "The upstream voice modification time."
+          },
+          "voicePrompt": {
+            "type": "string",
+            "description": "The voice description used for a designed voice."
+          },
+          "previewText": {
+            "type": "string",
+            "description": "The preview text used for a designed voice."
+          },
+          "resourceUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upstream reference or preview audio URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voiceId"
+        ],
+        "description": "The Qwen-Audio custom voice details."
+      }
+    },
+    {
+      "id": "qwen.get_image_translation",
+      "service": "qwen",
+      "name": "get_image_translation",
+      "description": "Retrieve a Qwen image translation task state and output.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Qwen image translation task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "An image translation task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen image translation task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is queued or running."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The task progress percentage when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A queued or running image translation task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen image translation task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "imageUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The temporary translated image URL."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "imageUrl"
+            ],
+            "description": "A succeeded image translation task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen image translation task identifier returned by the selected connection."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "cancelled",
+                  "expired"
+                ],
+                "description": "The terminal task state."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream error message."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The upstream terminal error."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A terminal image translation task that did not succeed."
+          }
+        ],
+        "description": "The normalized Qwen image translation task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "qwen.submit_image_translation",
+        "statusActionId": "qwen.get_image_translation"
+      }
+    },
+    {
+      "id": "qwen.get_speech_recognition",
+      "service": "qwen",
+      "name": "get_speech_recognition",
+      "description": "Retrieve a Qwen-Audio 3.0 transcription task and its normalized result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Qwen speech recognition task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A speech recognition task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen speech recognition task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is queued or running."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The task progress percentage when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A queued or running speech recognition task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen speech recognition task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "transcriptionUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The temporary URL of the original transcription JSON."
+              },
+              "fileUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transcribed file URL."
+              },
+              "duration": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The billable speech duration in seconds."
+              },
+              "transcripts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "channelId": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The zero-based audio channel index."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The complete recognized text for the channel."
+                    },
+                    "contentDuration": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The detected speech duration in milliseconds."
+                    },
+                    "sentences": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "description": "The recognized sentence text."
+                          },
+                          "beginTime": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The sentence start time in milliseconds."
+                          },
+                          "endTime": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The sentence end time in milliseconds."
+                          },
+                          "sentenceId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The sentence index."
+                          },
+                          "speakerId": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The detected speaker index when diarization is enabled."
+                          },
+                          "language": {
+                            "type": "string",
+                            "description": "The detected language code."
+                          },
+                          "emotion": {
+                            "type": "string",
+                            "description": "The detected emotion."
+                          },
+                          "words": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string",
+                                  "description": "The recognized word text."
+                                },
+                                "beginTime": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "The word start time in milliseconds."
+                                },
+                                "endTime": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "description": "The word end time in milliseconds."
+                                },
+                                "punctuation": {
+                                  "type": "string",
+                                  "description": "The punctuation following the word."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "required": [
+                                "text",
+                                "beginTime",
+                                "endTime",
+                                "punctuation"
+                              ],
+                              "description": "A recognized word with timing information."
+                            },
+                            "description": "Recognized words in the sentence."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "text",
+                          "beginTime",
+                          "endTime",
+                          "sentenceId"
+                        ],
+                        "description": "A recognized sentence."
+                      },
+                      "description": "Recognized sentences for the channel."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "channelId",
+                    "text",
+                    "contentDuration",
+                    "sentences"
+                  ],
+                  "description": "The transcription for one audio channel."
+                },
+                "description": "Normalized per-channel transcriptions."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "transcriptionUrl",
+              "fileUrl",
+              "duration",
+              "transcripts"
+            ],
+            "description": "A succeeded speech recognition task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Qwen speech recognition task identifier returned by the selected connection."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "cancelled",
+                  "expired"
+                ],
+                "description": "The terminal task state."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream error message."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The upstream terminal error."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A terminal speech recognition task that did not succeed."
+          }
+        ],
+        "description": "The normalized Qwen speech recognition task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "qwen.submit_speech_recognition",
+        "statusActionId": "qwen.get_speech_recognition"
+      }
+    },
+    {
+      "id": "qwen.list_custom_voices",
+      "service": "qwen",
+      "name": "list_custom_voices",
+      "description": "List Qwen-Audio cloned and designed voices together.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10,
+            "description": "An optional voice-name prefix filter."
+          },
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page index.",
+            "default": 0
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of voices requested per page.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "A custom voice list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "voiceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The custom voice identifier accepted by generate_speech."
+                },
+                "targetModel": {
+                  "type": "string",
+                  "enum": [
+                    "qwen-audio-3.0-tts-flash",
+                    "qwen-audio-3.0-tts-plus"
+                  ],
+                  "description": "The Qwen-Audio 3.0 TTS model bound to the voice."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The upstream voice status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The upstream voice creation time."
+                },
+                "modifiedAt": {
+                  "type": "string",
+                  "description": "The upstream voice modification time."
+                },
+                "voicePrompt": {
+                  "type": "string",
+                  "description": "The voice description used for a designed voice."
+                },
+                "previewText": {
+                  "type": "string",
+                  "description": "The preview text used for a designed voice."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "voiceId"
+              ],
+              "description": "A Qwen-Audio custom voice."
+            },
+            "description": "The custom voices on this page."
+          },
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page index."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested page size."
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching voices."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voices",
+          "pageIndex",
+          "pageSize",
+          "totalCount"
+        ],
+        "description": "A page of Qwen-Audio custom voices."
+      }
+    },
+    {
+      "id": "qwen.submit_image_translation",
+      "service": "qwen",
+      "name": "submit_image_translation",
+      "description": "Submit an asynchronous Qwen image translation task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A public URL for the image to translate."
+          },
+          "sourceLanguage": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "zh",
+              "en",
+              "ko",
+              "ja",
+              "ru",
+              "es",
+              "fr",
+              "pt",
+              "it",
+              "de",
+              "vi"
+            ],
+            "description": "The source language, or auto for detection.",
+            "default": "auto"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en",
+              "ko",
+              "ja",
+              "ru",
+              "es",
+              "fr",
+              "pt",
+              "it",
+              "vi",
+              "ms",
+              "th",
+              "id",
+              "ar"
+            ],
+            "description": "The target language."
+          },
+          "domainHint": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "An English domain hint describing the desired translation style."
+          },
+          "sensitivities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An exact text value."
+            },
+            "description": "Exact text values that should not be translated.",
+            "maxItems": 50
+          },
+          "terminologies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "description": "The source term."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "The required target term."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "target"
+              ],
+              "description": "A terminology mapping."
+            },
+            "description": "Required terminology translations.",
+            "maxItems": 50
+          },
+          "skipImageSegmentation": {
+            "type": "boolean",
+            "description": "Whether to translate all text without foreground segmentation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageUrl",
+          "targetLanguage"
+        ],
+        "description": "A Qwen image translation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Qwen image translation task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted image translation task handle."
+      },
+      "followUpActions": [
+        "qwen.get_image_translation"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "qwen.submit_image_translation",
+        "statusActionId": "qwen.get_image_translation"
+      }
+    },
+    {
+      "id": "qwen.submit_speech_recognition",
+      "service": "qwen",
+      "name": "submit_speech_recognition",
+      "description": "Submit a Qwen-Audio 3.0 asynchronous audio or video transcription task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A public HTTP or HTTPS URL for the audio or video file."
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A BCP-47-style language code supported by Qwen."
+            },
+            "description": "Possible language codes. Omit to let Qwen detect the language.",
+            "maxItems": 4
+          },
+          "channelIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "A zero-based audio channel index."
+            },
+            "description": "Zero-based audio channel indexes to transcribe. Each channel is billed separately.",
+            "minItems": 1,
+            "default": [
+              0
+            ]
+          },
+          "vocabularyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A precompiled Qwen vocabulary identifier."
+          },
+          "vocabulary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The hotword text."
+                },
+                "weight": {
+                  "type": "integer",
+                  "description": "The hotword weight from 1 to 5, or 50 for a super hotword."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text",
+                "weight"
+              ],
+              "description": "A request-specific hotword."
+            },
+            "description": "Request-specific hotwords and their recognition weights.",
+            "maxItems": 2000
+          },
+          "context": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Prior user speech text or domain vocabulary."
+                },
+                "assistantText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The corresponding prior assistant response."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userText",
+                "assistantText"
+              ],
+              "description": "One prior conversation turn."
+            },
+            "description": "Prior conversation turns or domain context used to improve recognition.",
+            "maxItems": 5
+          },
+          "specialWordFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qwen special-word filtering configuration string."
+          },
+          "diarizationEnabled": {
+            "type": "boolean",
+            "description": "Whether to separate speakers in single-channel audio.",
+            "default": false
+          },
+          "speakerCount": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 100,
+            "description": "The expected speaker count when diarization is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl"
+        ],
+        "description": "A Qwen-Audio 3.0 file transcription request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Qwen speech recognition task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted speech recognition task handle."
+      },
+      "followUpActions": [
+        "qwen.get_speech_recognition"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "qwen.submit_speech_recognition",
+        "statusActionId": "qwen.get_speech_recognition"
+      }
+    },
+    {
+      "id": "qwen.translate_text",
+      "service": "qwen",
+      "name": "translate_text",
+      "description": "Translate text with Qwen-MT and optional terminology, translation memory, and domain guidance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen-mt-flash",
+              "qwen-mt-plus"
+            ],
+            "description": "The Qwen-MT translation model.",
+            "default": "qwen-mt-flash"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to translate."
+          },
+          "sourceLanguage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source language name or code, or auto for automatic detection.",
+            "default": "auto"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target language name or code."
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source term or sentence."
+                },
+                "target": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The required or preferred translation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "target"
+              ],
+              "description": "A source and target text pair used to guide translation."
+            },
+            "description": "Required translations for terms appearing in the source text."
+          },
+          "translationMemory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source term or sentence."
+                },
+                "target": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The required or preferred translation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "target"
+              ],
+              "description": "A source and target text pair used to guide translation."
+            },
+            "description": "Previously translated sentence pairs whose style and phrasing should be followed."
+          },
+          "domainPrompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "English guidance describing the translation domain and preferred style."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "targetLanguage"
+        ],
+        "description": "A Qwen-MT text translation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The translated text."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qwen-MT model reported by Qwen."
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of input tokens billed by Qwen."
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of output tokens billed by Qwen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "model",
+          "inputTokens",
+          "outputTokens"
+        ],
+        "description": "The translated text and usage."
+      }
+    }
+  ]
+}

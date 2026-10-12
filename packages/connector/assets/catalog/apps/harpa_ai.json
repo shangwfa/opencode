@@ -1,0 +1,319 @@
+{
+  "service": "harpa_ai",
+  "displayName": "HARPA AI",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HARPA_API_KEY",
+      "description": "HARPA GRID API key from your HARPA AI account: https://harpa.ai/"
+    }
+  ],
+  "homepageUrl": "https://harpa.ai/",
+  "actions": [
+    {
+      "id": "harpa_ai.run_ai_command",
+      "service": "harpa_ai",
+      "name": "run_ai_command",
+      "description": "Run a built-in or custom HARPA AI command in a connected browser node and return its result.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The complete web page URL to open in the HARPA browser node.",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "description": "The built-in or custom HARPA command name to execute."
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One command input value."
+            },
+            "description": "Values supplied to successive user-input steps in the HARPA command."
+          },
+          "resultParam": {
+            "type": "string",
+            "description": "The HARPA parameter to return, using dot notation when needed; defaults to the last message."
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "One node ID or a space-separated list of node IDs."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of available nodes to use."
+              }
+            ],
+            "description": "The HARPA browser nodes to use."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "description": "The synchronous execution timeout in milliseconds."
+          },
+          "connection": {
+            "type": "string",
+            "description": "The title or ID of the HARPA AI connection to use; the default connection is used when omitted or not found."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HARPA AI command to run in a browser node."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON result returned by HARPA GRID; its shape depends on the selected nodes and action."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HARPA GRID action result."
+      }
+    },
+    {
+      "id": "harpa_ai.run_ai_prompt",
+      "service": "harpa_ai",
+      "name": "run_ai_prompt",
+      "description": "Run an AI prompt, optionally with a web page as context, in a connected HARPA browser node.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AI prompt to execute."
+          },
+          "url": {
+            "type": "string",
+            "description": "The complete web page URL to open in the HARPA browser node.",
+            "format": "uri"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "One node ID or a space-separated list of node IDs."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of available nodes to use."
+              }
+            ],
+            "description": "The HARPA browser nodes to use."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "description": "The synchronous execution timeout in milliseconds."
+          },
+          "connection": {
+            "type": "string",
+            "description": "The title or ID of the HARPA AI connection to use; the default connection is used when omitted or not found."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "The AI prompt and optional browser context to run through HARPA GRID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON result returned by HARPA GRID; its shape depends on the selected nodes and action."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HARPA GRID action result."
+      }
+    },
+    {
+      "id": "harpa_ai.scrape_web_page",
+      "service": "harpa_ai",
+      "name": "scrape_web_page",
+      "description": "Scrape a web page as Markdown or extract selected elements through a connected HARPA browser node.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The complete web page URL to open in the HARPA browser node.",
+            "format": "uri"
+          },
+          "grab": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A CSS, XPath, or text selector for the target element."
+                },
+                "selectorType": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "css",
+                    "xpath",
+                    "text"
+                  ],
+                  "description": "How HARPA should interpret selector."
+                },
+                "at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "first",
+                        "last"
+                      ],
+                      "description": "A named element position."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "A zero-based or negative element index."
+                    }
+                  ],
+                  "description": "Which matching element or elements to capture."
+                },
+                "take": {
+                  "type": "string",
+                  "description": "The element property, attribute, or style value to extract."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The key to use for this extracted value in the result."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "selector"
+              ],
+              "description": "A page element selector and the value to extract from matching elements."
+            },
+            "description": "The page elements to extract; omit this field to return page Markdown."
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "One node ID or a space-separated list of node IDs."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of available nodes to use."
+              }
+            ],
+            "description": "The HARPA browser nodes to use."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "description": "The synchronous execution timeout in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The web page and optional element selectors to scrape through HARPA GRID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON result returned by HARPA GRID; its shape depends on the selected nodes and action."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HARPA GRID action result."
+      }
+    },
+    {
+      "id": "harpa_ai.search_web",
+      "service": "harpa_ai",
+      "name": "search_web",
+      "description": "Search the web through a connected HARPA browser node.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query, including optional operators such as site:example.com or intitle:keyword."
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "One node ID or a space-separated list of node IDs."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of available nodes to use."
+              }
+            ],
+            "description": "The HARPA browser nodes to use."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300000,
+            "description": "The synchronous execution timeout in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The web search to run through HARPA GRID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON result returned by HARPA GRID; its shape depends on the selected nodes and action."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HARPA GRID action result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,335 @@
+{
+  "service": "reversecontact",
+  "displayName": "Reverse Contact",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "rc_...",
+      "description": "Reverse Contact V2 API key sent as a Bearer token. Manage keys at https://app.reversecontact.com/docs/public/guides/api-key-management.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.reversecontact.com/",
+  "actions": [
+    {
+      "id": "reversecontact.enrich_company",
+      "service": "reversecontact",
+      "name": "enrich_company",
+      "description": "Enrich one company profile synchronously from its domain using Reverse Contact V2.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company domain or full company URL to enrich, such as acme.com."
+          },
+          "fullProfile": {
+            "type": "boolean",
+            "description": "Whether to request the expanded company profile for one additional credit when matched."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Details used to match and enrich one company profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Reverse Contact processed the request successfully."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Reverse Contact company identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The company name in the light enrichment response."
+                  },
+                  "publicId": {
+                    "type": "string",
+                    "description": "The public company-profile slug."
+                  },
+                  "linkedinId": {
+                    "type": "string",
+                    "description": "The social-network company identifier."
+                  },
+                  "linkedinUrl": {
+                    "type": "string",
+                    "description": "The full social-network company URL."
+                  },
+                  "websiteUrl": {
+                    "type": "string",
+                    "description": "The official company website URL."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id"
+                ],
+                "description": "A Reverse Contact company profile. Light fields are stable, while fullProfile adds documented fetch-profile fields."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "company"
+            ],
+            "description": "The company enrichment payload."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "description": "The upstream error payload, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream error payload, or null on success."
+          },
+          "quotas": {
+            "type": "object",
+            "properties": {
+              "creditsConsumed": {
+                "type": "number",
+                "description": "The credits consumed by this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "creditsConsumed"
+            ],
+            "description": "Credit and rate-limit usage after the request."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "description": "The unique request identifier."
+              },
+              "executionTimeMs": {
+                "type": "number",
+                "description": "The total execution time in milliseconds."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "requestId",
+              "executionTimeMs"
+            ],
+            "description": "Request tracking metadata returned by Reverse Contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data",
+          "error"
+        ],
+        "description": "The Reverse Contact company enrichment response."
+      }
+    },
+    {
+      "id": "reversecontact.enrich_person",
+      "service": "reversecontact",
+      "name": "enrich_person",
+      "description": "Enrich one professional profile synchronously from an email, name, or company context using Reverse Contact V2.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "A professional email address used to identify the person.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The person's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The person's last name."
+          },
+          "companyDomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company domain or full company URL used to disambiguate the person."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name used to disambiguate the person."
+          },
+          "fullProfile": {
+            "type": "boolean",
+            "description": "Whether to request the expanded person profile for one additional credit when matched."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Details used to match and enrich one professional profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Reverse Contact processed the request successfully."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "person": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Reverse Contact person identifier."
+                  },
+                  "publicId": {
+                    "type": "string",
+                    "description": "The public professional-profile slug."
+                  },
+                  "linkedinUrl": {
+                    "type": "string",
+                    "description": "The full professional-profile URL."
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "description": "The person's first name."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "description": "The person's last name."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id"
+                ],
+                "description": "A Reverse Contact person profile. Light fields are stable, while fullProfile adds documented fetch-profile fields."
+              },
+              "alternativePersons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The Reverse Contact person identifier."
+                    },
+                    "publicId": {
+                      "type": "string",
+                      "description": "The public professional-profile slug."
+                    },
+                    "linkedinUrl": {
+                      "type": "string",
+                      "description": "The full professional-profile URL."
+                    },
+                    "firstName": {
+                      "type": "string",
+                      "description": "The person's first name."
+                    },
+                    "lastName": {
+                      "type": "string",
+                      "description": "The person's last name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id"
+                  ],
+                  "description": "A Reverse Contact person profile. Light fields are stable, while fullProfile adds documented fetch-profile fields."
+                },
+                "description": "Other matching people ranked best first."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "person",
+              "alternativePersons"
+            ],
+            "description": "The person enrichment payload."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "description": "The upstream error payload, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream error payload, or null on success."
+          },
+          "quotas": {
+            "type": "object",
+            "properties": {
+              "creditsConsumed": {
+                "type": "number",
+                "description": "The credits consumed by this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "creditsConsumed"
+            ],
+            "description": "Credit and rate-limit usage after the request."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "description": "The unique request identifier."
+              },
+              "executionTimeMs": {
+                "type": "number",
+                "description": "The total execution time in milliseconds."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "requestId",
+              "executionTimeMs"
+            ],
+            "description": "Request tracking metadata returned by Reverse Contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data",
+          "error"
+        ],
+        "description": "The Reverse Contact person enrichment response."
+      }
+    }
+  ]
+}

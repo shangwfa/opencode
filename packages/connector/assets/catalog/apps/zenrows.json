@@ -1,0 +1,608 @@
+{
+  "service": "zenrows",
+  "displayName": "ZenRows",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ZENROWS_API_KEY",
+      "description": "ZenRows API key used as the apikey query parameter for scraper requests and the X-API-Key header for usage lookup. Find or create it in your ZenRows Builder dashboard: https://app.zenrows.com/builder.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.zenrows.com/",
+  "actions": [
+    {
+      "id": "zenrows.extract_css",
+      "service": "zenrows",
+      "name": "extract_css",
+      "description": "Extract structured values from one public URL with ZenRows CSS selectors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2083,
+            "description": "The public URL ZenRows should request.",
+            "format": "uri"
+          },
+          "js_render": {
+            "type": "boolean",
+            "description": "Whether ZenRows should render JavaScript before returning the response."
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30000,
+            "description": "The time in milliseconds ZenRows should wait after page load before returning content."
+          },
+          "wait_for": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CSS selector ZenRows should wait for before returning content."
+          },
+          "premium_proxy": {
+            "type": "boolean",
+            "description": "Whether ZenRows should use premium proxies for the request."
+          },
+          "proxy_country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code for proxy geolocation. ZenRows requires premium_proxy when this is set.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZenRows session identifier used to keep the same IP across related requests."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom header value sent to the target website."
+            },
+            "description": "Custom HTTP headers ZenRows should send to the target website."
+          },
+          "css_selectors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A CSS selector expression accepted by ZenRows."
+            },
+            "description": "CSS selectors ZenRows should extract, keyed by output field name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "css_selectors"
+        ],
+        "description": "The input payload for extracting CSS selector values with ZenRows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A value extracted by ZenRows for one selector."
+            },
+            "description": "The CSS extraction result returned by ZenRows."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by ZenRows."
+              },
+              "content_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response content type returned by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response content type returned by ZenRows."
+              },
+              "original_status_code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The original target website status code reported by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The original target website status code reported by ZenRows."
+              },
+              "final_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final URL reported by ZenRows after redirects."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final URL reported by ZenRows after redirects."
+              },
+              "request_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ZenRows request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ZenRows request identifier when returned."
+              },
+              "concurrency_limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum concurrent requests allowed for the API key when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum concurrent requests allowed for the API key when returned."
+              },
+              "concurrency_remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining concurrent request slots when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining concurrent request slots when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from ZenRows response headers."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by ZenRows or the target website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when extracting CSS selector values with ZenRows."
+      }
+    },
+    {
+      "id": "zenrows.fetch_html",
+      "service": "zenrows",
+      "name": "fetch_html",
+      "description": "Fetch raw HTML from one public URL with optional JavaScript rendering and proxy controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2083,
+            "description": "The public URL ZenRows should request.",
+            "format": "uri"
+          },
+          "js_render": {
+            "type": "boolean",
+            "description": "Whether ZenRows should render JavaScript before returning the response."
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30000,
+            "description": "The time in milliseconds ZenRows should wait after page load before returning content."
+          },
+          "wait_for": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CSS selector ZenRows should wait for before returning content."
+          },
+          "premium_proxy": {
+            "type": "boolean",
+            "description": "Whether ZenRows should use premium proxies for the request."
+          },
+          "proxy_country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code for proxy geolocation. ZenRows requires premium_proxy when this is set.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZenRows session identifier used to keep the same IP across related requests."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom header value sent to the target website."
+            },
+            "description": "Custom HTTP headers ZenRows should send to the target website."
+          },
+          "original_status": {
+            "type": "boolean",
+            "description": "Whether ZenRows should expose the original target website status code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for fetching raw HTML with ZenRows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "The raw HTML content returned by ZenRows."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by ZenRows."
+              },
+              "content_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response content type returned by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response content type returned by ZenRows."
+              },
+              "original_status_code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The original target website status code reported by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The original target website status code reported by ZenRows."
+              },
+              "final_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final URL reported by ZenRows after redirects."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final URL reported by ZenRows after redirects."
+              },
+              "request_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ZenRows request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ZenRows request identifier when returned."
+              },
+              "concurrency_limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum concurrent requests allowed for the API key when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum concurrent requests allowed for the API key when returned."
+              },
+              "concurrency_remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining concurrent request slots when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining concurrent request slots when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from ZenRows response headers."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by ZenRows or the target website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching raw HTML with ZenRows."
+      }
+    },
+    {
+      "id": "zenrows.fetch_plaintext",
+      "service": "zenrows",
+      "name": "fetch_plaintext",
+      "description": "Fetch plain text extracted from one public URL with ZenRows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2083,
+            "description": "The public URL ZenRows should request.",
+            "format": "uri"
+          },
+          "js_render": {
+            "type": "boolean",
+            "description": "Whether ZenRows should render JavaScript before returning the response."
+          },
+          "wait": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30000,
+            "description": "The time in milliseconds ZenRows should wait after page load before returning content."
+          },
+          "wait_for": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CSS selector ZenRows should wait for before returning content."
+          },
+          "premium_proxy": {
+            "type": "boolean",
+            "description": "Whether ZenRows should use premium proxies for the request."
+          },
+          "proxy_country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code for proxy geolocation. ZenRows requires premium_proxy when this is set.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZenRows session identifier used to keep the same IP across related requests."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom header value sent to the target website."
+            },
+            "description": "Custom HTTP headers ZenRows should send to the target website."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for fetching plain text with ZenRows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The plain text content returned by ZenRows."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "The HTTP status code returned by ZenRows."
+              },
+              "content_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response content type returned by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response content type returned by ZenRows."
+              },
+              "original_status_code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The original target website status code reported by ZenRows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The original target website status code reported by ZenRows."
+              },
+              "final_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final URL reported by ZenRows after redirects."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final URL reported by ZenRows after redirects."
+              },
+              "request_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ZenRows request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ZenRows request identifier when returned."
+              },
+              "concurrency_limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum concurrent requests allowed for the API key when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum concurrent requests allowed for the API key when returned."
+              },
+              "concurrency_remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining concurrent request slots when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining concurrent request slots when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from ZenRows response headers."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by ZenRows or the target website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching plain text with ZenRows."
+      }
+    },
+    {
+      "id": "zenrows.get_usage",
+      "service": "zenrows",
+      "name": "get_usage",
+      "description": "Retrieve usage and plan details for the connected ZenRows API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving ZenRows usage details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "usage": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "The current subscription status returned by ZenRows."
+              },
+              "period_starts_at": {
+                "type": "string",
+                "description": "The start date of the current usage period."
+              },
+              "period_ends_at": {
+                "type": "string",
+                "description": "The end date of the current usage period."
+              },
+              "usage": {
+                "type": "number",
+                "description": "The current usage value."
+              },
+              "usage_percent": {
+                "type": "integer",
+                "description": "The usage percentage for the current period."
+              },
+              "plan": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The plan object returned by ZenRows usage details."
+              },
+              "top_ups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One top-up entry returned by ZenRows usage details."
+                },
+                "description": "Top-ups applied to the account."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "status",
+              "period_starts_at",
+              "period_ends_at",
+              "usage",
+              "usage_percent",
+              "plan",
+              "top_ups"
+            ],
+            "description": "The ZenRows API usage details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving ZenRows usage details."
+      }
+    }
+  ]
+}

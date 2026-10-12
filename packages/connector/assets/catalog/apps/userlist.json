@@ -1,0 +1,1235 @@
+{
+  "service": "userlist",
+  "displayName": "Userlist",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Push API Key",
+      "placeholder": "USERLIST_PUSH_KEY",
+      "description": "Userlist Push API key used with the Authorization: Push <key> header. Copy it from Push Settings in your Userlist account: https://app.userlist.com/settings/push."
+    }
+  ],
+  "homepageUrl": "https://userlist.com",
+  "actions": [
+    {
+      "id": "userlist.create_event",
+      "service": "userlist",
+      "name": "create_event",
+      "description": "Create a Userlist event for a user, company, or both.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event name."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user.",
+                    "format": "email"
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the user signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded user object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist user identifier or embedded user object."
+          },
+          "company": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the company signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded company object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist company identifier or embedded company object."
+          },
+          "occurred_at": {
+            "type": "string",
+            "description": "When the event occurred.",
+            "format": "date-time"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input for creating a Userlist event.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "user"
+                ]
+              },
+              {
+                "required": [
+                  "company"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Userlist accepted the request for asynchronous processing."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Userlist Push API acceptance result."
+      }
+    },
+    {
+      "id": "userlist.push_company",
+      "service": "userlist",
+      "name": "push_company",
+      "description": "Create or update a Userlist company through the Push API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A string identifier."
+              },
+              {
+                "type": "number",
+                "description": "A numeric identifier."
+              }
+            ],
+            "description": "A Userlist resource identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company name."
+          },
+          "signed_up_at": {
+            "type": "string",
+            "description": "When the company signed up.",
+            "format": "date-time"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string identifier."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric identifier."
+                        }
+                      ],
+                      "description": "A Userlist resource identifier."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "identifier": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A string identifier."
+                            },
+                            {
+                              "type": "number",
+                              "description": "A numeric identifier."
+                            }
+                          ],
+                          "description": "A Userlist resource identifier."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "The email address of the user.",
+                          "format": "email"
+                        },
+                        "signed_up_at": {
+                          "type": "string",
+                          "description": "When the user signed up.",
+                          "format": "date-time"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An embedded user object accepted by Userlist."
+                    }
+                  ],
+                  "description": "A Userlist user identifier or embedded user object."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "user"
+              ],
+              "description": "A relationship from this Userlist company to a user."
+            },
+            "description": "Relationships to users for this company.",
+            "minItems": 1
+          },
+          "user": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user.",
+                    "format": "email"
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the user signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded user object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist user identifier or embedded user object."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string identifier."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric identifier."
+                    }
+                  ],
+                  "description": "A Userlist resource identifier."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "identifier": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string identifier."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric identifier."
+                        }
+                      ],
+                      "description": "A Userlist resource identifier."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address of the user.",
+                      "format": "email"
+                    },
+                    "signed_up_at": {
+                      "type": "string",
+                      "description": "When the user signed up.",
+                      "format": "date-time"
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An embedded user object accepted by Userlist."
+                }
+              ],
+              "description": "A Userlist user identifier or embedded user object."
+            },
+            "description": "User identifiers or embedded users.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Input for creating or updating a Userlist company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Userlist accepted the request for asynchronous processing."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Userlist Push API acceptance result."
+      }
+    },
+    {
+      "id": "userlist.push_relationship",
+      "service": "userlist",
+      "name": "push_relationship",
+      "description": "Create or update a Userlist relationship between a user and a company.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user.",
+                    "format": "email"
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the user signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded user object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist user identifier or embedded user object."
+          },
+          "company": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the company signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded company object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist company identifier or embedded company object."
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user",
+          "company"
+        ],
+        "description": "A relationship between a Userlist user and company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Userlist accepted the request for asynchronous processing."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Userlist Push API acceptance result."
+      }
+    },
+    {
+      "id": "userlist.push_user",
+      "service": "userlist",
+      "name": "push_user",
+      "description": "Create or update a Userlist user through the Push API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A string identifier."
+              },
+              {
+                "type": "number",
+                "description": "A numeric identifier."
+              }
+            ],
+            "description": "A Userlist resource identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the user.",
+            "format": "email"
+          },
+          "signed_up_at": {
+            "type": "string",
+            "description": "When the user signed up.",
+            "format": "date-time"
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "company": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string identifier."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric identifier."
+                        }
+                      ],
+                      "description": "A Userlist resource identifier."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "identifier": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A string identifier."
+                            },
+                            {
+                              "type": "number",
+                              "description": "A numeric identifier."
+                            }
+                          ],
+                          "description": "A Userlist resource identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The company name."
+                        },
+                        "signed_up_at": {
+                          "type": "string",
+                          "description": "When the company signed up.",
+                          "format": "date-time"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An embedded company object accepted by Userlist."
+                    }
+                  ],
+                  "description": "A Userlist company identifier or embedded company object."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "company"
+              ],
+              "description": "A relationship from this Userlist user to a company."
+            },
+            "description": "Relationships to companies for this user.",
+            "minItems": 1
+          },
+          "company": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the company signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded company object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist company identifier or embedded company object."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string identifier."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric identifier."
+                    }
+                  ],
+                  "description": "A Userlist resource identifier."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "identifier": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string identifier."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric identifier."
+                        }
+                      ],
+                      "description": "A Userlist resource identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The company name."
+                    },
+                    "signed_up_at": {
+                      "type": "string",
+                      "description": "When the company signed up.",
+                      "format": "date-time"
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An embedded company object accepted by Userlist."
+                }
+              ],
+              "description": "A Userlist company identifier or embedded company object."
+            },
+            "description": "Company identifiers or embedded companies.",
+            "minItems": 1
+          },
+          "preferences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The topic identifier from Userlist topic settings."
+                },
+                "subscribed": {
+                  "type": "boolean",
+                  "description": "Whether the user is subscribed to the topic."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Userlist subscription preference update."
+            },
+            "description": "Subscription preference updates for this user.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for creating or updating a Userlist user.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "identifier"
+                ]
+              },
+              {
+                "required": [
+                  "email"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Userlist accepted the request for asynchronous processing."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Userlist Push API acceptance result."
+      }
+    },
+    {
+      "id": "userlist.send_message",
+      "service": "userlist",
+      "name": "send_message",
+      "description": "Send a Userlist transactional message to a user or email address.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The transactional message template identifier."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user.",
+                    "format": "email"
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the user signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded user object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist user identifier or embedded user object."
+          },
+          "company": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string identifier."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric identifier."
+                  }
+                ],
+                "description": "A Userlist resource identifier."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "identifier": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A string identifier."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric identifier."
+                      }
+                    ],
+                    "description": "A Userlist resource identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "signed_up_at": {
+                    "type": "string",
+                    "description": "When the company signed up.",
+                    "format": "date-time"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An embedded company object accepted by Userlist."
+              }
+            ],
+            "description": "A Userlist company identifier or embedded company object."
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom properties stored by Userlist. Keys are normalized to snake_case by Userlist."
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "web"
+            ],
+            "description": "The delivery channel for the message."
+          },
+          "to": {
+            "type": "string",
+            "description": "The recipient email address for email messages.",
+            "format": "email"
+          },
+          "from": {
+            "type": "string",
+            "description": "The sender email address for email messages.",
+            "format": "email"
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "The reply-to email address for email messages.",
+            "format": "email"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom message subject. Required when template is omitted."
+          },
+          "preheader": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom email preheader text."
+          },
+          "body": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "html",
+                    "type": "string",
+                    "description": "HTML message body."
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The HTML body content."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "An HTML Userlist message body."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "text",
+                    "type": "string",
+                    "description": "Plain-text message body."
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The plain-text body content."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A plain-text Userlist message body."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "multipart",
+                    "type": "string",
+                    "description": "Multipart message body."
+                  },
+                  "content": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "html",
+                            "text"
+                          ],
+                          "description": "The content type for this body part."
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The body part content."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "One multipart Userlist message body part."
+                    },
+                    "description": "Multipart body parts.",
+                    "minItems": 1
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A multipart Userlist message body."
+              }
+            ],
+            "description": "The Userlist transactional message body."
+          },
+          "sender": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sender identifier configured in Userlist."
+          },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The theme identifier configured in Userlist."
+              },
+              {
+                "const": false,
+                "type": "boolean",
+                "description": "Disable theming for this message."
+              }
+            ],
+            "description": "The theme identifier to apply, or false to disable theming."
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The topic identifier configured in Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for sending a Userlist transactional message.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "user"
+                ]
+              },
+              {
+                "required": [
+                  "to"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "template"
+                ]
+              },
+              {
+                "required": [
+                  "subject",
+                  "body"
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "required": [
+                "channel",
+                "to"
+              ],
+              "properties": {
+                "channel": {
+                  "const": "web"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Userlist accepted the request for asynchronous processing."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Userlist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Userlist Push API acceptance result."
+      }
+    }
+  ]
+}

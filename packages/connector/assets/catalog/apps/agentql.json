@@ -1,0 +1,821 @@
+{
+  "service": "agentql",
+  "displayName": "AgentQL",
+  "categories": [
+    "AI",
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "AGENTQL_API_KEY",
+      "description": "AgentQL API key used with the X-API-Key header. Get it from the AgentQL developer dashboard."
+    }
+  ],
+  "homepageUrl": "https://www.agentql.com",
+  "actions": [
+    {
+      "id": "agentql.create_browser_session",
+      "service": "agentql",
+      "name": "create_browser_session",
+      "description": "Create an AgentQL Tetra remote browser session and return the session, CDP, and base URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "browser_ua_preset": {
+            "type": "string",
+            "enum": [
+              "windows",
+              "macos",
+              "linux"
+            ],
+            "description": "Browser user agent preset used when creating a Tetra browser session."
+          },
+          "browser_profile": {
+            "type": "string",
+            "enum": [
+              "light",
+              "stealth",
+              "tf-browser"
+            ],
+            "description": "Browser profile used by AgentQL for the request or session."
+          },
+          "shutdown_mode": {
+            "type": "string",
+            "enum": [
+              "on_disconnect",
+              "on_inactivity_timeout"
+            ],
+            "description": "How AgentQL should stop the browser session after disconnect."
+          },
+          "inactivity_timeout_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 86400,
+            "description": "Inactivity timeout in seconds before AgentQL closes the session."
+          },
+          "proxy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "tetra",
+                  "custom"
+                ],
+                "description": "Proxy type for AgentQL browser-backed operations."
+              },
+              "country_code": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2,
+                "description": "Optional two-letter country code for the built-in Tetra proxy."
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Proxy server URL required by AgentQL custom proxy mode."
+              },
+              "username": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Optional username for proxy authentication."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Optional username for proxy authentication."
+              },
+              "password": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Optional password for proxy authentication."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Optional password for proxy authentication."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "Proxy configuration for AgentQL browser-backed operations."
+          },
+          "sub_user_id": {
+            "type": "string",
+            "description": "Optional sub-user identifier for AgentQL session tracking."
+          },
+          "branding": {
+            "type": "boolean",
+            "description": "Whether the session end screen should show TinyFish branding."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional AgentQL Tetra browser session configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "AgentQL browser session identifier."
+          },
+          "cdp_url": {
+            "type": "string",
+            "description": "CDP URL used to connect to the remote browser session."
+          },
+          "base_url": {
+            "type": "string",
+            "description": "Base URL used for viewing or streaming the remote browser session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "cdp_url",
+          "base_url"
+        ],
+        "description": "Newly created AgentQL browser session payload."
+      }
+    },
+    {
+      "id": "agentql.get_usage",
+      "service": "agentql",
+      "name": "get_usage",
+      "description": "Get AgentQL account and API key usage counters for the current billing cycle and lifetime totals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "current_subscription": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "lifetime_usage_limit": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "Lifetime usage limit for the current subscription when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Lifetime usage limit for the current subscription when available."
+                      },
+                      "current_cycle_free_usage_limit": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "Free usage allowance for the current billing cycle when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Free usage allowance for the current billing cycle when available."
+                      },
+                      "current_cycle_start": {
+                        "type": "string",
+                        "description": "Start timestamp of the current billing cycle.",
+                        "format": "date-time"
+                      },
+                      "current_cycle_end": {
+                        "type": "string",
+                        "description": "End timestamp of the current billing cycle.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "lifetime_usage_limit",
+                      "current_cycle_free_usage_limit",
+                      "current_cycle_start",
+                      "current_cycle_end"
+                    ],
+                    "description": "Current AgentQL subscription window and limits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current AgentQL subscription window and limits."
+              },
+              "api_key_usage": {
+                "type": "object",
+                "properties": {
+                  "current_cycle": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Usage count in the current billing cycle when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Usage count in the current billing cycle when available."
+                  },
+                  "lifetime": {
+                    "type": "integer",
+                    "description": "Lifetime usage count."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "current_cycle",
+                  "lifetime"
+                ],
+                "description": "AgentQL usage counters for the current cycle and lifetime totals."
+              },
+              "total_account_usage": {
+                "type": "object",
+                "properties": {
+                  "current_cycle": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Usage count in the current billing cycle when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Usage count in the current billing cycle when available."
+                  },
+                  "lifetime": {
+                    "type": "integer",
+                    "description": "Lifetime usage count."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "current_cycle",
+                  "lifetime"
+                ],
+                "description": "AgentQL usage counters for the current cycle and lifetime totals."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "current_subscription",
+              "api_key_usage",
+              "total_account_usage"
+            ],
+            "description": "AgentQL usage summary grouped by subscription, API key, and total account usage."
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "description": "AgentQL request identifier for the usage API call."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "request_id"
+                ],
+                "description": "Basic AgentQL response metadata for the usage endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Basic AgentQL response metadata for the usage endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "AgentQL usage payload returned by the usage endpoint."
+      }
+    },
+    {
+      "id": "agentql.list_session_usage",
+      "service": "agentql",
+      "name": "list_session_usage",
+      "description": "List AgentQL Tetra session telemetry entries with optional filters and pagination controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sub_user_id": {
+            "type": "string",
+            "description": "Only return telemetry entries for this sub-user identifier."
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Only return telemetry for this session identifier."
+          },
+          "start_after": {
+            "type": "string",
+            "description": "Only include sessions that started after this timestamp.",
+            "format": "date-time"
+          },
+          "end_before": {
+            "type": "string",
+            "description": "Only include sessions that ended before this timestamp.",
+            "format": "date-time"
+          },
+          "updated_after": {
+            "type": "string",
+            "description": "Only include sessions updated after this timestamp.",
+            "format": "date-time"
+          },
+          "updated_before": {
+            "type": "string",
+            "description": "Only include sessions updated before this timestamp.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "ended"
+            ],
+            "description": "AgentQL browser session status filter."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of entries to return per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for listing AgentQL Tetra session telemetry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string",
+                  "description": "AgentQL session identifier."
+                },
+                "user_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Owning AgentQL user identifier when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Owning AgentQL user identifier when available."
+                },
+                "sub_user_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Sub-user identifier attached to the session when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sub-user identifier attached to the session when available."
+                },
+                "base_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Base streaming URL for the session when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Base streaming URL for the session when available."
+                },
+                "cdp_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "CDP URL for the session when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "CDP URL for the session when available."
+                },
+                "mode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "light",
+                        "stealth",
+                        "tf-browser"
+                      ],
+                      "description": "Browser profile used by AgentQL for the request or session."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Browser profile used by AgentQL for the request or session."
+                },
+                "start_time": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Session start timestamp when available.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Session start timestamp when available."
+                },
+                "end_time": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Session end timestamp when available.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Session end timestamp when available."
+                },
+                "duration_ms": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Session duration in milliseconds when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Session duration in milliseconds when available."
+                },
+                "proxy_trg_rx_bytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Proxy receive bytes recorded for the session when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Proxy receive bytes recorded for the session when available."
+                },
+                "proxy_trg_tx_bytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Proxy transmit bytes recorded for the session when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Proxy transmit bytes recorded for the session when available."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "ended"
+                      ],
+                      "description": "AgentQL browser session status filter."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "AgentQL browser session status filter."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Telemetry record creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Telemetry record update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "session_id",
+                "user_id",
+                "sub_user_id",
+                "base_url",
+                "cdp_url",
+                "mode",
+                "start_time",
+                "end_time",
+                "duration_ms",
+                "proxy_trg_rx_bytes",
+                "proxy_trg_tx_bytes",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "Single AgentQL Tetra session telemetry entry."
+            },
+            "description": "Telemetry entries returned for the current page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of telemetry entries matching the request."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of telemetry entries returned per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages available."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether there are more pages after the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "page",
+          "total_pages",
+          "has_more"
+        ],
+        "description": "Paginated AgentQL Tetra session telemetry list."
+      }
+    },
+    {
+      "id": "agentql.query_data",
+      "service": "agentql",
+      "name": "query_data",
+      "description": "Query a webpage with AgentQL and return the extracted structured data plus AgentQL metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "AgentQL query string to execute."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "AgentQL query string to execute."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Natural-language extraction prompt for AgentQL to translate into a query."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Natural-language extraction prompt for AgentQL to translate into a query."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Target webpage URL to fetch and query.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target webpage URL to fetch and query."
+          },
+          "html": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Raw HTML content to query directly without fetching a URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw HTML content to query directly without fetching a URL."
+          },
+          "params": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "fast",
+                  "standard"
+                ],
+                "description": "AgentQL query response mode."
+              },
+              "wait_for": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10,
+                "description": "Seconds to wait for more page content before querying."
+              },
+              "is_scroll_to_bottom_enabled": {
+                "type": "boolean",
+                "description": "Whether AgentQL should scroll to the bottom of the page before snapshot capture."
+              },
+              "is_screenshot_enabled": {
+                "type": "boolean",
+                "description": "Whether AgentQL should capture a screenshot and return it in metadata when available."
+              },
+              "browser_profile": {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "stealth",
+                  "tf-browser"
+                ],
+                "description": "Browser profile used by AgentQL for the request or session."
+              },
+              "proxy": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "tetra",
+                      "custom"
+                    ],
+                    "description": "Proxy type for AgentQL browser-backed operations."
+                  },
+                  "country_code": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "description": "Optional two-letter country code for the built-in Tetra proxy."
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Proxy server URL required by AgentQL custom proxy mode."
+                  },
+                  "username": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Optional username for proxy authentication."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Optional username for proxy authentication."
+                  },
+                  "password": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Optional password for proxy authentication."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Optional password for proxy authentication."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "description": "Proxy configuration for AgentQL browser-backed operations."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional query execution settings forwarded to AgentQL query-data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for querying webpage data with AgentQL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Structured data returned by AgentQL for the query."
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "description": "AgentQL request identifier for the API call."
+                  },
+                  "generated_query": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Generated AgentQL query returned by AgentQL when prompt mode was used."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Generated AgentQL query returned by AgentQL when prompt mode was used."
+                  },
+                  "screenshot": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Screenshot payload or URL returned by AgentQL when screenshot capture was enabled."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Screenshot payload or URL returned by AgentQL when screenshot capture was enabled."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "AgentQL metadata returned alongside the query result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "AgentQL metadata returned alongside the query result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "AgentQL structured query result plus optional metadata."
+      }
+    }
+  ]
+}

@@ -1,0 +1,496 @@
+{
+  "service": "oksign",
+  "displayName": "OKSign",
+  "categories": [
+    "Productivity",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Account Number",
+      "placeholder": "100693",
+      "description": "The OKSign account number used as the first segment of x-oksign-authorization. Create or manage API access from the OKSign API Console after signing in: https://www.oksign.be/public/api/.",
+      "extraFields": [
+        {
+          "key": "authorizationToken",
+          "label": "Authorization Token",
+          "inputType": "password",
+          "placeholder": "463204-5BC1F362-85AD-34A3-9DB5-DC891D20979E",
+          "description": "The authorization token defined in your OKSign account and used as the second segment of x-oksign-authorization.",
+          "required": true,
+          "secret": true
+        },
+        {
+          "key": "organizationalToken",
+          "label": "Organizational Token",
+          "inputType": "password",
+          "placeholder": "marketing",
+          "description": "The organizational token defined in your OKSign account and used as the third segment of x-oksign-authorization.",
+          "required": true,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.oksign.be/en/",
+  "actions": [
+    {
+      "id": "oksign.get_credits",
+      "service": "oksign",
+      "name": "get_credits",
+      "description": "Get OKSign credits balance, expiry, and account storage details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountSize": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current storage usage in bytes."
+          },
+          "maxAccountSize": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum storage capacity in bytes."
+          },
+          "paid": {
+            "type": "boolean",
+            "description": "Whether the account is on a paid plan."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current credit balance quantity."
+          },
+          "subscription": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current OKSign subscription tier code."
+          },
+          "validUntil": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 8601 timestamp when the credit balance expires."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountSize",
+          "maxAccountSize",
+          "paid",
+          "quantity",
+          "subscription",
+          "validUntil"
+        ],
+        "description": "Credits and storage summary returned by OKSign."
+      }
+    },
+    {
+      "id": "oksign.get_document_metadata",
+      "service": "oksign",
+      "name": "get_document_metadata",
+      "description": "Get OKSign metadata v2 for a signed document by signed_docid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source_docid or signed_docid to send as x-oksign-docid."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId"
+        ],
+        "description": "Input parameters for an OKSign document identifier lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "filename": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The filename of the signed document."
+              },
+              "size": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The human-readable signed document size returned by OKSign."
+              },
+              "nbrOfSigaturesRequired": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of required signatures defined on the source document."
+              },
+              "nbrOfSigaturesValid": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of signatures already placed on the signed document."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "inputtype": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field type defined in the source form descriptor."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name defined in the source form descriptor."
+                    },
+                    "pagenbr": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The zero-based page number that contains the field."
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The completed value for a non-signature field."
+                            },
+                            {
+                              "type": "object",
+                              "properties": {},
+                              "additionalProperties": true,
+                              "description": "Signature metadata object returned for a completed CanvasSIG field."
+                            }
+                          ],
+                          "description": "The completed field value or signature metadata object returned by OKSign."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Completion metadata for the field when the field has been completed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "inputtype",
+                    "name",
+                    "pagenbr"
+                  ],
+                  "description": "One field entry from the OKSign metadata v2 response."
+                },
+                "description": "The field definitions and completion metadata."
+              },
+              "signersinfo": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mobile": {
+                      "type": "string",
+                      "description": "The signer mobile number as stored in OKSign, possibly empty."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The signer display name."
+                    },
+                    "actingas": {
+                      "type": "string",
+                      "description": "The signer role or qualification, possibly empty."
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The immutable signer identifier used in form descriptors."
+                    },
+                    "email": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The signer email address."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One signer reference returned by OKSign metadata v2."
+                },
+                "description": "The signer information array defined on the source document."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The signed document metadata payload returned by OKSign metadata v2."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "Metadata v2 response wrapper returned by OKSign."
+      }
+    },
+    {
+      "id": "oksign.get_linked_document",
+      "service": "oksign",
+      "name": "get_linked_document",
+      "description": "Resolve the corresponding source_docid and signed_docid pair for an OKSign document identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source_docid or signed_docid to send as x-oksign-docid."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId"
+        ],
+        "description": "Input parameters for an OKSign document identifier lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "source_docid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The source document identifier tied to the lookup result."
+                  },
+                  "signed_docid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The signed document identifier when a signed copy exists for the source document."
+                  },
+                  "ts": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The timestamp when the document was first signed or uploaded when no signed copy exists yet."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "source_docid",
+                  "ts"
+                ],
+                "description": "Linked source and signed document identifiers returned by OKSign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Linked source and signed document identifiers returned by OKSign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "Linked document lookup response wrapper returned by OKSign."
+      }
+    },
+    {
+      "id": "oksign.list_active_documents",
+      "service": "oksign",
+      "name": "list_active_documents",
+      "description": "List active OKSign documents visible in the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "createdate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO 8601 timestamp when the document was uploaded."
+                },
+                "creator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email address or identifier of the document creator."
+                },
+                "docid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source document identifier returned by OKSign."
+                },
+                "filename": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The filename of the active document."
+                },
+                "nbrOfSigaturesRequired": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of signatures required by the document workflow."
+                },
+                "nbrOfSigaturesValid": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of valid signatures currently placed on the document."
+                },
+                "orgtoken": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The organizational token used when the document was uploaded via the API."
+                },
+                "reusable": {
+                  "type": "boolean",
+                  "description": "Whether the document is marked as reusable."
+                },
+                "signed_docid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signed document identifier when the document has a signed copy."
+                },
+                "status": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The OKSign numeric status code for the document."
+                },
+                "viaapi": {
+                  "type": "boolean",
+                  "description": "Whether the document was uploaded via the REST API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "createdate",
+                "creator",
+                "docid",
+                "filename",
+                "nbrOfSigaturesRequired",
+                "nbrOfSigaturesValid",
+                "reusable",
+                "status",
+                "viaapi"
+              ],
+              "description": "Summary fields returned for one active OKSign document."
+            },
+            "description": "The active documents visible in the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents"
+        ],
+        "description": "Active document list returned by OKSign."
+      }
+    },
+    {
+      "id": "oksign.list_users",
+      "service": "oksign",
+      "name": "list_users",
+      "description": "List the users configured in the current OKSign account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actingas": {
+                  "type": "string",
+                  "description": "The user role or qualification as stored in OKSign."
+                },
+                "email": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user email address."
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The preferred language code configured for the user."
+                },
+                "mobile": {
+                  "type": "string",
+                  "description": "The user mobile number, possibly empty."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user display name."
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The account role assigned to the user."
+                },
+                "signerid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The immutable signer identifier assigned to the user."
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The current account status for the user."
+                },
+                "ts": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The timestamp when the user was created or updated."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One user returned by the OKSign users endpoint."
+            },
+            "description": "The users configured in the OKSign account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users"
+        ],
+        "description": "User list returned by OKSign."
+      }
+    }
+  ]
+}

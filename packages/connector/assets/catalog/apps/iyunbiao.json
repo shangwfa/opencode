@@ -1,0 +1,2047 @@
+{
+  "service": "iyunbiao",
+  "displayName": "Yunbiao",
+  "description": "Manage forms, templates, users, roles, attachments, and cloud files in a Yunbiao application space.",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "instanceUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://free.iyunbiao.cn",
+          "description": "The HTTP or HTTPS origin of your Yunbiao server, without the application space path."
+        },
+        {
+          "key": "spaceId",
+          "label": "Application Space ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "1538136",
+          "description": "The application space number in your Yunbiao login URL."
+        },
+        {
+          "key": "appName",
+          "label": "App Name",
+          "inputType": "text",
+          "required": true,
+          "secret": true,
+          "description": "The appName from a third-party application authorization. See https://docs.iyunbiao.com/openAPI/1"
+        },
+        {
+          "key": "appKey",
+          "label": "App Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "description": "The appKey from the same third-party application authorization."
+        },
+        {
+          "key": "account",
+          "label": "Account",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "description": "The Yunbiao account authorized for the required templates."
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "description": "The account password. Omit when the account is bound as the authorization's default account."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.iyunbiao.com",
+  "actions": [
+    {
+      "id": "iyunbiao.batch_save_forms",
+      "service": "iyunbiao",
+      "name": "batch_save_forms",
+      "description": "Create or update multiple Yunbiao forms. Inspect errorFormList for individual failures even when the request succeeds.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "objectId": {
+                  "type": "integer",
+                  "description": "The existing form ID; omit or use zero to create."
+                },
+                "objectVersion": {
+                  "type": "integer",
+                  "description": "The current version returned by get_form; preserve it when updating."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The complete form with business fields and detail rows. Omit objectId to create; to update, first get_form and preserve objectId and objectVersion."
+            },
+            "description": "Complete forms to create or update.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The forms to save in one template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formJsonList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "objectId": {
+                  "type": "integer",
+                  "description": "The existing form ID; omit or use zero to create."
+                },
+                "objectVersion": {
+                  "type": "integer",
+                  "description": "The current version returned by get_form; preserve it when updating."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The complete form with business fields and detail rows. Omit objectId to create; to update, first get_form and preserve objectId and objectVersion."
+            },
+            "description": "Successfully saved forms with updated versions."
+          },
+          "errorFormList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An upstream failure record."
+            },
+            "description": "Per-form failures returned by Yunbiao."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "formJsonList",
+          "errorFormList"
+        ],
+        "description": "Batch results, including any individual failures."
+      }
+    },
+    {
+      "id": "iyunbiao.download_attachment",
+      "service": "iyunbiao",
+      "name": "download_attachment",
+      "description": "Download a Yunbiao attachment to a usable file transit URL. Use the attachment file ID from get_form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "fileId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The attachment file ID, not the form or detail row ID."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment file name including its extension."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The attachment to download."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The transit file download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type."
+              }
+            },
+            "additionalProperties": false
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The file media type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The downloaded file."
+      }
+    },
+    {
+      "id": "iyunbiao.download_cloud_file",
+      "service": "iyunbiao",
+      "name": "download_cloud_file",
+      "description": "Download a Yunbiao enterprise cloud drive file to a usable file transit URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "fileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The cloud drive file ID as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The cloud drive file ID as a number."
+              }
+            ],
+            "description": "The cloud drive file ID, not a form or detail row ID."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name including its extension."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cloud drive file to download."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The transit file download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type."
+              }
+            },
+            "additionalProperties": false
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The file name."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The file media type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The downloaded file."
+      }
+    },
+    {
+      "id": "iyunbiao.get_form",
+      "service": "iyunbiao",
+      "name": "get_form",
+      "description": "Read a Yunbiao form with its current version, detail rows and attachment references.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "objectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The existing form ID returned by query_forms."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The form to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "description": "The existing form ID; omit or use zero to create."
+              },
+              "objectVersion": {
+                "type": "integer",
+                "description": "The current version returned by get_form; preserve it when updating."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete form with business fields and detail rows. Omit objectId to create; to update, first get_form and preserve objectId and objectVersion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The returned form, including its current version and detail rows."
+      }
+    },
+    {
+      "id": "iyunbiao.get_role",
+      "service": "iyunbiao",
+      "name": "get_role",
+      "description": "Read a complete Yunbiao role record.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The role object ID returned by list_roles."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The role to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The role object ID. Omit or use zero to create."
+              },
+              "name": {
+                "type": "string",
+                "description": "The role name."
+              },
+              "m_description": {
+                "type": "string",
+                "description": "The role description."
+              },
+              "isSys": {
+                "type": "boolean",
+                "description": "Whether this is a system role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao role record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The role returned by Yunbiao."
+      }
+    },
+    {
+      "id": "iyunbiao.get_template_structure",
+      "service": "iyunbiao",
+      "name": "get_template_structure",
+      "description": "Get Yunbiao template fields and detail table definitions. Requires server 3.3.45.43 or later.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The template to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "description": "The template name."
+          },
+          "fieldMapList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A field definition including its internal name and caption."
+            },
+            "description": "Main-table field definitions."
+          },
+          "childTableList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A detail table definition."
+            },
+            "description": "Detail table definitions and their fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The complete template structure."
+      }
+    },
+    {
+      "id": "iyunbiao.get_user",
+      "service": "iyunbiao",
+      "name": "get_user",
+      "description": "Read a complete Yunbiao user record, including roles and posts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The user object ID returned by list_users."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The user to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user object ID. Omit or set both IDs to zero when creating."
+              },
+              "formId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user ID returned by get_user or save_user."
+              },
+              "account": {
+                "type": "string",
+                "description": "The user account name."
+              },
+              "name": {
+                "type": "string",
+                "description": "The user display name."
+              },
+              "password": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 32,
+                "description": "The MD5-encoded password. Omit to preserve the current password."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao user record, including roles, posts and account settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The user returned by Yunbiao."
+      }
+    },
+    {
+      "id": "iyunbiao.list_roles",
+      "service": "iyunbiao",
+      "name": "list_roles",
+      "description": "List Yunbiao roles, optionally with filtering, sorting and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional role query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A matching record."
+            },
+            "description": "Matching records with template-defined fields."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination information returned by Yunbiao."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "The query results and upstream pagination metadata."
+      }
+    },
+    {
+      "id": "iyunbiao.list_templates",
+      "service": "iyunbiao",
+      "name": "list_templates",
+      "description": "List available Yunbiao templates. Requires Yunbiao server 3.3.45.43 or later.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The template name used in other actions."
+                },
+                "caption": {
+                  "type": "string",
+                  "description": "The display caption."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "Template metadata."
+            },
+            "description": "Templates available in this application space."
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of templates."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "templates"
+        ],
+        "description": "The available templates."
+      }
+    },
+    {
+      "id": "iyunbiao.list_users",
+      "service": "iyunbiao",
+      "name": "list_users",
+      "description": "List Yunbiao users, optionally with filtering, sorting and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional user query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A matching record."
+            },
+            "description": "Matching records with template-defined fields."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination information returned by Yunbiao."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "The query results and upstream pagination metadata."
+      }
+    },
+    {
+      "id": "iyunbiao.query_detail_rows",
+      "service": "iyunbiao",
+      "name": "query_detail_rows",
+      "description": "Query rows in a Yunbiao detail table across forms. Requires server 3.3.45.43 or later.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "detailTableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The detail table name."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateName",
+          "detailTableName"
+        ],
+        "description": "The detail table and query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A matching record."
+            },
+            "description": "Matching records with template-defined fields."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination information returned by Yunbiao."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "The query results and upstream pagination metadata."
+      }
+    },
+    {
+      "id": "iyunbiao.query_forms",
+      "service": "iyunbiao",
+      "name": "query_forms",
+      "description": "Find Yunbiao forms with filters, sorting and pagination. Use get_form to retrieve full detail rows before editing.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateName"
+        ],
+        "description": "The template and optional query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A matching record."
+            },
+            "description": "Matching records with template-defined fields."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination information returned by Yunbiao."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "The query results and upstream pagination metadata."
+      }
+    },
+    {
+      "id": "iyunbiao.query_global_interface",
+      "service": "iyunbiao",
+      "name": "query_global_interface",
+      "description": "Call a global Yunbiao data interface. Its configured business logic may modify data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interfaceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The configured global data interface name."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "interfaceName"
+        ],
+        "description": "The global interface to call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The complete result defined by the configured interface."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The upstream data interface result."
+      }
+    },
+    {
+      "id": "iyunbiao.query_template_interface",
+      "service": "iyunbiao",
+      "name": "query_template_interface",
+      "description": "Call a data interface configured on a Yunbiao template. Its configured business logic may modify data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "interfaceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The configured data interface name."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "pageInfo": {
+                "type": "object",
+                "properties": {
+                  "isUseRowIndex": {
+                    "type": "boolean",
+                    "description": "Whether to paginate by rowIndex instead of pageIndex."
+                  },
+                  "pageIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based page index."
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of records to return per page."
+                  },
+                  "rowIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Zero-based row offset when isUseRowIndex is true."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination by page index or row offset."
+              },
+              "paramList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The parameter name."
+                    },
+                    "value": {
+                      "description": "The parameter value accepted by the interface."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A named interface parameter."
+                },
+                "description": "Parameters defined by the data interface."
+              },
+              "filter": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterField": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name accepted by this template or interface."
+                    },
+                    "expressionList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "operator": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "$e",
+                                  "$ne",
+                                  "$gt",
+                                  "$gte",
+                                  "$lt",
+                                  "$lte"
+                                ],
+                                "description": "An equality or ordering operator."
+                              },
+                              {
+                                "type": "integer",
+                                "description": "A numeric comparison operator.",
+                                "enum": [
+                                  10,
+                                  11,
+                                  12,
+                                  13,
+                                  14,
+                                  15
+                                ]
+                              }
+                            ],
+                            "description": "Comparison: $e, $ne, $gt, $gte, $lt, $lte, or numeric operators 10 (like), 11 (not like), 12 (in), 13 (null), 14 (not null), 15 (not in)."
+                          },
+                          "isAnd": {
+                            "type": "boolean",
+                            "description": "Whether to combine with AND rather than OR."
+                          },
+                          "value": {
+                            "description": "The comparison value; may be omitted for null checks."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "operator"
+                        ],
+                        "description": "A comparison expression."
+                      },
+                      "description": "Comparisons for this field.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A filter on one field."
+                },
+                "description": "Field filters; expressions within a field support AND or OR."
+              },
+              "sortList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The internal field name, for example f1."
+                    },
+                    "isDesc": {
+                      "type": "boolean",
+                      "description": "Whether to sort in descending order."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One sort field."
+                },
+                "description": "Sort order using internal field names from get_template_structure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional pagination, parameters, filters and sorting for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateName",
+          "interfaceName"
+        ],
+        "description": "The configured template interface to call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The complete result defined by the configured interface."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The upstream data interface result."
+      }
+    },
+    {
+      "id": "iyunbiao.save_form",
+      "service": "iyunbiao",
+      "name": "save_form",
+      "description": "Create or update a Yunbiao form. Before updating, read the complete form and preserve its objectId and current objectVersion.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "form": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "description": "The existing form ID; omit or use zero to create."
+              },
+              "objectVersion": {
+                "type": "integer",
+                "description": "The current version returned by get_form; preserve it when updating."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete form with business fields and detail rows. Omit objectId to create; to update, first get_form and preserve objectId and objectVersion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The template and complete form to save."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "description": "The existing form ID; omit or use zero to create."
+              },
+              "objectVersion": {
+                "type": "integer",
+                "description": "The current version returned by get_form; preserve it when updating."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete form with business fields and detail rows. Omit objectId to create; to update, first get_form and preserve objectId and objectVersion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The returned form, including its current version and detail rows."
+      }
+    },
+    {
+      "id": "iyunbiao.save_role",
+      "service": "iyunbiao",
+      "name": "save_role",
+      "description": "Create or update a Yunbiao role. Read get_role before updating and preserve its fields.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The role object ID. Omit or use zero to create."
+              },
+              "name": {
+                "type": "string",
+                "description": "The role name."
+              },
+              "m_description": {
+                "type": "string",
+                "description": "The role description."
+              },
+              "isSys": {
+                "type": "boolean",
+                "description": "Whether this is a system role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao role record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The complete role record to save."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The role object ID. Omit or use zero to create."
+              },
+              "name": {
+                "type": "string",
+                "description": "The role name."
+              },
+              "m_description": {
+                "type": "string",
+                "description": "The role description."
+              },
+              "isSys": {
+                "type": "boolean",
+                "description": "Whether this is a system role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao role record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The role returned by Yunbiao."
+      }
+    },
+    {
+      "id": "iyunbiao.save_user",
+      "service": "iyunbiao",
+      "name": "save_user",
+      "description": "Create or update a Yunbiao user. Read get_user before updating and preserve its fields. Passwords in the user record must already be MD5-encoded.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user object ID. Omit or set both IDs to zero when creating."
+              },
+              "formId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user ID returned by get_user or save_user."
+              },
+              "account": {
+                "type": "string",
+                "description": "The user account name."
+              },
+              "name": {
+                "type": "string",
+                "description": "The user display name."
+              },
+              "password": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 32,
+                "description": "The MD5-encoded password. Omit to preserve the current password."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao user record, including roles, posts and account settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The complete user record to save."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user object ID. Omit or set both IDs to zero when creating."
+              },
+              "formId": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The user ID returned by get_user or save_user."
+              },
+              "account": {
+                "type": "string",
+                "description": "The user account name."
+              },
+              "name": {
+                "type": "string",
+                "description": "The user display name."
+              },
+              "password": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 32,
+                "description": "The MD5-encoded password. Omit to preserve the current password."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete Yunbiao user record, including roles, posts and account settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The user returned by Yunbiao."
+      }
+    },
+    {
+      "id": "iyunbiao.upload_attachment",
+      "service": "iyunbiao",
+      "name": "upload_attachment",
+      "description": "Upload a file from a URL to Yunbiao, returning an attachment entry to include in save_form. Upload alone does not attach it to a form. Connector upload limit: 64 MiB.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "A file uploaded to the local transit file API."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name including its extension."
+          },
+          "fileType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment type, for example pdf or txt."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The file and destination template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "integer",
+            "description": "The uploaded attachment ID, not a form record ID."
+          },
+          "attachment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Insert this entry into the form attachment table, usually named 附件, then call save_form."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The uploaded file and an entry ready for the form attachment table."
+      }
+    },
+    {
+      "id": "iyunbiao.upload_cloud_file",
+      "service": "iyunbiao",
+      "name": "upload_cloud_file",
+      "description": "Upload a file from a URL to the Yunbiao enterprise cloud drive. Upload alone does not associate it with a form. Connector upload limit: 64 MiB.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template name returned by list_templates."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "A file uploaded to the local transit file API."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name including its extension."
+          },
+          "fileType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment type, for example pdf or txt."
+          },
+          "fileFolderPath": {
+            "type": "string",
+            "description": "The enterprise cloud drive folder path. Omit to use the server default."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateName",
+          "file",
+          "fileName",
+          "fileType"
+        ],
+        "description": "The source file and cloud drive destination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The uploaded cloud drive file ID."
+          },
+          "file": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete cloud drive file metadata, including owner, fileId and any fields returned by Yunbiao."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The uploaded cloud drive file."
+      }
+    }
+  ]
+}

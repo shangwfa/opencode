@@ -1,0 +1,395 @@
+{
+  "service": "genderapi_io",
+  "displayName": "GenderAPI.io",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GENDERAPI_IO_API_KEY",
+      "description": "GenderAPI.io API key passed with the key query parameter. Register for an account and manage your key in the GenderAPI.io app: https://app.genderapi.io/user/register"
+    }
+  ],
+  "homepageUrl": "https://www.genderapi.io",
+  "actions": [
+    {
+      "id": "genderapi_io.get_gender_by_email_address",
+      "service": "genderapi_io",
+      "name": "get_gender_by_email_address",
+      "description": "Infer the likely gender for one email address after GenderAPI.io extracts a name from it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailAddress": {
+            "type": "string",
+            "description": "The email address to classify with GenderAPI.io.",
+            "format": "email"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the request.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "askToAI": {
+            "type": "boolean",
+            "description": "Whether GenderAPI.io should ask its AI model when the extracted name is missing from the database."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailAddress"
+        ],
+        "description": "The input payload for inferring gender from an email address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates that GenderAPI.io processed the request successfully."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original query value echoed back by GenderAPI.io."
+          },
+          "name": {
+            "type": "string",
+            "description": "The matched or extracted first name returned by GenderAPI.io."
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "const": "male",
+                "type": "string",
+                "description": "The inferred gender is male."
+              },
+              {
+                "const": "female",
+                "type": "string",
+                "description": "The inferred gender is female."
+              },
+              {
+                "type": "null",
+                "description": "GenderAPI.io could not determine the gender."
+              }
+            ],
+            "description": "The inferred gender value returned by GenderAPI.io."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The country code used or inferred by GenderAPI.io."
+          },
+          "probability": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The confidence score from 0 to 100 returned by GenderAPI.io."
+          },
+          "total_names": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching name samples used by GenderAPI.io."
+          },
+          "used_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of credits consumed by this request."
+          },
+          "remaining_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The credits remaining after this request."
+          },
+          "expires": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Unix timestamp when the current package expires."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The server-side processing time returned by GenderAPI.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "q",
+          "probability",
+          "total_names",
+          "used_credits",
+          "remaining_credits",
+          "expires",
+          "duration"
+        ],
+        "description": "A normalized gender inference result returned by GenderAPI.io."
+      }
+    },
+    {
+      "id": "genderapi_io.get_gender_by_first_name",
+      "service": "genderapi_io",
+      "name": "get_gender_by_first_name",
+      "description": "Infer the likely gender for one first name with optional country and AI fallback hints.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first name to classify with GenderAPI.io."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the request.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "askToAI": {
+            "type": "boolean",
+            "description": "Whether GenderAPI.io should ask its AI model when the name is missing from the database."
+          },
+          "forceToGenderize": {
+            "type": "boolean",
+            "description": "Whether GenderAPI.io should still guess a gender for unusual or non-human-looking names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "firstName"
+        ],
+        "description": "The input payload for inferring gender from a first name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates that GenderAPI.io processed the request successfully."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original query value echoed back by GenderAPI.io."
+          },
+          "name": {
+            "type": "string",
+            "description": "The matched or extracted first name returned by GenderAPI.io."
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "const": "male",
+                "type": "string",
+                "description": "The inferred gender is male."
+              },
+              {
+                "const": "female",
+                "type": "string",
+                "description": "The inferred gender is female."
+              },
+              {
+                "type": "null",
+                "description": "GenderAPI.io could not determine the gender."
+              }
+            ],
+            "description": "The inferred gender value returned by GenderAPI.io."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The country code used or inferred by GenderAPI.io."
+          },
+          "probability": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The confidence score from 0 to 100 returned by GenderAPI.io."
+          },
+          "total_names": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching name samples used by GenderAPI.io."
+          },
+          "used_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of credits consumed by this request."
+          },
+          "remaining_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The credits remaining after this request."
+          },
+          "expires": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Unix timestamp when the current package expires."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The server-side processing time returned by GenderAPI.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "q",
+          "probability",
+          "total_names",
+          "used_credits",
+          "remaining_credits",
+          "expires",
+          "duration"
+        ],
+        "description": "A normalized gender inference result returned by GenderAPI.io."
+      }
+    },
+    {
+      "id": "genderapi_io.get_gender_by_username",
+      "service": "genderapi_io",
+      "name": "get_gender_by_username",
+      "description": "Infer the likely gender for one username or nickname with optional country and AI fallback hints.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The username or nickname to classify with GenderAPI.io."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the request.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "askToAI": {
+            "type": "boolean",
+            "description": "Whether GenderAPI.io should ask its AI model when the username cannot be resolved from the database."
+          },
+          "forceToGenderize": {
+            "type": "boolean",
+            "description": "Whether GenderAPI.io should still guess a gender for unusual usernames."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "The input payload for inferring gender from a username or nickname."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates that GenderAPI.io processed the request successfully."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original query value echoed back by GenderAPI.io."
+          },
+          "name": {
+            "type": "string",
+            "description": "The matched or extracted first name returned by GenderAPI.io."
+          },
+          "gender": {
+            "anyOf": [
+              {
+                "const": "male",
+                "type": "string",
+                "description": "The inferred gender is male."
+              },
+              {
+                "const": "female",
+                "type": "string",
+                "description": "The inferred gender is female."
+              },
+              {
+                "type": "null",
+                "description": "GenderAPI.io could not determine the gender."
+              }
+            ],
+            "description": "The inferred gender value returned by GenderAPI.io."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The country code used or inferred by GenderAPI.io."
+          },
+          "probability": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The confidence score from 0 to 100 returned by GenderAPI.io."
+          },
+          "total_names": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching name samples used by GenderAPI.io."
+          },
+          "used_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of credits consumed by this request."
+          },
+          "remaining_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The credits remaining after this request."
+          },
+          "expires": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Unix timestamp when the current package expires."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The server-side processing time returned by GenderAPI.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "q",
+          "probability",
+          "total_names",
+          "used_credits",
+          "remaining_credits",
+          "expires",
+          "duration"
+        ],
+        "description": "A normalized gender inference result returned by GenderAPI.io."
+      }
+    }
+  ]
+}

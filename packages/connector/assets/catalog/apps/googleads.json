@@ -1,0 +1,1265 @@
+{
+  "service": "googleads",
+  "displayName": "Google Ads",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/adwords",
+        "openid",
+        "email",
+        "profile"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "access_type": "offline",
+        "prompt": "consent"
+      },
+      "clientConfigFields": [
+        {
+          "key": "customerId",
+          "label": "Customer ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "description": "The Google Ads customer ID used by most read and mutate requests."
+        },
+        {
+          "key": "developerToken",
+          "label": "Developer Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "location": "secretExtra",
+          "description": "The Google Ads API developer token sent as the developer-token header."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://ads.google.com",
+  "actions": [
+    {
+      "id": "googleads.add_or_remove_to_customer_list",
+      "service": "googleads",
+      "name": "add_or_remove_to_customer_list",
+      "description": "Submit Customer Match user identifiers to add users to or remove users from a Google Ads customer list.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "resourceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource name of the customer list, for example customers/1234567890/userLists/999."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A user email address.",
+              "format": "email"
+            },
+            "description": "The email addresses to add to or remove from the customer list.",
+            "minItems": 1
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "create",
+              "remove"
+            ],
+            "description": "Whether to add new users to the list or remove existing users.",
+            "default": "create"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "resourceName",
+          "emails"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The submission status returned by the connector."
+          },
+          "offlineUserDataJobResourceName": {
+            "type": "string",
+            "description": "The resource name of the created offline user data job."
+          },
+          "runOperationName": {
+            "type": "string",
+            "description": "The long-running operation resource name returned by the run request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "offlineUserDataJobResourceName"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.create_customer_list",
+      "service": "googleads",
+      "name": "create_customer_list",
+      "description": "Create a new Google Ads CRM-based customer list for Customer Match uploads.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the customer list to create."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The description of the customer list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceName": {
+            "type": "string",
+            "description": "The resource name of the created customer list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceName"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.get_campaign_by_id",
+      "service": "googleads",
+      "name": "get_campaign_by_id",
+      "description": "Retrieve one Google Ads campaign by its campaign ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads campaign ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "campaignId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resourceName": {
+                    "type": "string",
+                    "description": "The resource name of the campaign."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "The Google Ads campaign ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The campaign name."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The campaign status."
+                  },
+                  "advertisingChannelType": {
+                    "type": "string",
+                    "description": "The high-level advertising channel type."
+                  },
+                  "advertisingChannelSubType": {
+                    "type": "string",
+                    "description": "The advertising channel subtype."
+                  },
+                  "startDateTime": {
+                    "type": "string",
+                    "description": "The campaign start date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 00:00:00 for daily granularity."
+                  },
+                  "endDateTime": {
+                    "type": "string",
+                    "description": "The campaign end date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 23:59:59 for daily granularity."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "resourceName",
+                  "id",
+                  "name"
+                ],
+                "description": "A normalized Google Ads campaign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A normalized Google Ads campaign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.get_campaign_by_name",
+      "service": "googleads",
+      "name": "get_campaign_by_name",
+      "description": "Retrieve all Google Ads campaigns that exactly match a campaign name.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact campaign name to match."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceName": {
+                  "type": "string",
+                  "description": "The resource name of the campaign."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Google Ads campaign ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The campaign name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The campaign status."
+                },
+                "advertisingChannelType": {
+                  "type": "string",
+                  "description": "The high-level advertising channel type."
+                },
+                "advertisingChannelSubType": {
+                  "type": "string",
+                  "description": "The advertising channel subtype."
+                },
+                "startDateTime": {
+                  "type": "string",
+                  "description": "The campaign start date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 00:00:00 for daily granularity."
+                },
+                "endDateTime": {
+                  "type": "string",
+                  "description": "The campaign end date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 23:59:59 for daily granularity."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resourceName",
+                "id",
+                "name"
+              ],
+              "description": "A normalized Google Ads campaign."
+            },
+            "description": "The campaigns that exactly matched the requested name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaigns"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.list_accessible_customers",
+      "service": "googleads",
+      "name": "list_accessible_customers",
+      "description": "List Google Ads customer resource names accessible to the current OAuth credential.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The accessible customer resource names returned by Google Ads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceNames"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.list_customer_lists",
+      "service": "googleads",
+      "name": "list_customer_lists",
+      "description": "List Google Ads customer lists available under the specified customer account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The nextPageToken returned by a previous call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customerLists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceName": {
+                  "type": "string",
+                  "description": "The resource name of the customer list."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Google Ads user list ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The customer list name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The customer list description."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Google Ads user list type, such as CRM_BASED or RULE_BASED."
+                },
+                "readOnly": {
+                  "type": "boolean",
+                  "description": "Whether the user list is read-only and cannot be mutated."
+                },
+                "membershipStatus": {
+                  "type": "string",
+                  "description": "The membership status of the customer list."
+                },
+                "sizeForSearch": {
+                  "type": "string",
+                  "description": "The estimated search list size reported by Google Ads."
+                },
+                "sizeForDisplay": {
+                  "type": "string",
+                  "description": "The estimated display list size reported by Google Ads."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resourceName",
+                "id",
+                "name"
+              ],
+              "description": "A normalized Google Ads customer list."
+            },
+            "description": "The returned Google Ads customer lists."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when no more results exist."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when no more results exist."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerLists",
+          "nextPageToken"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.mutate_ad_groups",
+      "service": "googleads",
+      "name": "mutate_ad_groups",
+      "description": "Create, update, or remove Google Ads ad groups in a single mutate request.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "create": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The ad group name."
+                        },
+                        "campaign": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The resource name of the campaign that owns the ad group."
+                        },
+                        "status": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The ad group status."
+                        },
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The ad group type."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "campaign"
+                      ],
+                      "description": "The fields used to create an ad group."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "create"
+                  ],
+                  "description": "Create an ad group."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "update": {
+                      "type": "object",
+                      "properties": {
+                        "resourceName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The resource name of the ad group to update."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated ad group name."
+                        },
+                        "status": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated ad group status."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "resourceName"
+                      ],
+                      "description": "The mutable fields supported by the connector for ad group updates."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "update"
+                  ],
+                  "description": "Update an ad group."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "remove": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The resource name of the ad group to remove."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "remove"
+                  ],
+                  "description": "Remove an ad group."
+                }
+              ],
+              "description": "One mutate operation for ad groups."
+            },
+            "description": "The ad group operations to submit in one mutate request.",
+            "minItems": 1
+          },
+          "validateOnly": {
+            "type": "boolean",
+            "description": "Whether to validate the request without applying the mutation."
+          },
+          "partialFailure": {
+            "type": "boolean",
+            "description": "Whether successful operations should continue when one operation fails."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "operations"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceName": {
+                  "type": "string",
+                  "description": "The resource name returned for a successful ad group mutation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resourceName"
+              ],
+              "description": "One successful ad group mutation result."
+            },
+            "description": "The successful ad group mutation results."
+          },
+          "partialFailureError": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A JSON-like object with arbitrary string keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.mutate_campaigns",
+      "service": "googleads",
+      "name": "mutate_campaigns",
+      "description": "Create, update, or remove Google Ads campaigns in a single mutate request.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "operationType": {
+                      "const": "create",
+                      "type": "string",
+                      "description": "The mutate operation type."
+                    },
+                    "create": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign name."
+                        },
+                        "campaignBudget": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign budget resource name to attach."
+                        },
+                        "advertisingChannelType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The advertising channel type."
+                        },
+                        "status": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign status."
+                        },
+                        "startDateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign start date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 00:00:00 for daily granularity."
+                        },
+                        "endDateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign end date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 23:59:59 for daily granularity."
+                        },
+                        "manualCpc": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "A JSON-like object with arbitrary string keys."
+                        },
+                        "finalUrlSuffix": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The final URL suffix."
+                        },
+                        "networkSettings": {
+                          "type": "object",
+                          "properties": {
+                            "targetYoutube": {
+                              "type": "boolean",
+                              "description": "Whether to target YouTube inventory."
+                            },
+                            "targetGoogleSearch": {
+                              "type": "boolean",
+                              "description": "Whether to target Google Search results."
+                            },
+                            "targetSearchNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target Google Search partner inventory."
+                            },
+                            "targetContentNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target the Google Display Network."
+                            },
+                            "targetGoogleTvNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target Google TV inventory."
+                            },
+                            "targetPartnerSearchNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target partner search inventory."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The campaign network settings supported by the connector."
+                        },
+                        "trackingUrlTemplate": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The tracking URL template."
+                        },
+                        "urlCustomParameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The custom parameter key."
+                              },
+                              "value": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The custom parameter value."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "description": "One URL custom parameter for tracking templates."
+                          },
+                          "description": "The custom URL parameters.",
+                          "minItems": 1
+                        },
+                        "geoTargetTypeSetting": {
+                          "type": "object",
+                          "properties": {
+                            "negativeGeoTargetType": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The negative geo target type."
+                            },
+                            "positiveGeoTargetType": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The positive geo target type."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The campaign geo target type settings."
+                        },
+                        "campaignBiddingStrategy": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign bidding strategy resource name."
+                        },
+                        "containsEuPoliticalAdvertising": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The EU political advertising status."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "campaignBudget"
+                      ],
+                      "description": "The subset of campaign create fields supported by the connector."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "operationType",
+                    "create"
+                  ],
+                  "description": "Create a campaign."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "operationType": {
+                      "const": "update",
+                      "type": "string",
+                      "description": "The mutate operation type."
+                    },
+                    "update": {
+                      "type": "object",
+                      "properties": {
+                        "resourceName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The resource name of the campaign to update."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated campaign name."
+                        },
+                        "status": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated campaign status."
+                        },
+                        "startDateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign start date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 00:00:00 for daily granularity."
+                        },
+                        "endDateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The campaign end date and time in YYYY-MM-DD HH:mm:ss format in the customer's time zone. Use 23:59:59 for daily granularity."
+                        },
+                        "manualCpc": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "A JSON-like object with arbitrary string keys."
+                        },
+                        "campaignBudget": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated campaign budget resource name."
+                        },
+                        "finalUrlSuffix": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated final URL suffix."
+                        },
+                        "networkSettings": {
+                          "type": "object",
+                          "properties": {
+                            "targetYoutube": {
+                              "type": "boolean",
+                              "description": "Whether to target YouTube inventory."
+                            },
+                            "targetGoogleSearch": {
+                              "type": "boolean",
+                              "description": "Whether to target Google Search results."
+                            },
+                            "targetSearchNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target Google Search partner inventory."
+                            },
+                            "targetContentNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target the Google Display Network."
+                            },
+                            "targetGoogleTvNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target Google TV inventory."
+                            },
+                            "targetPartnerSearchNetwork": {
+                              "type": "boolean",
+                              "description": "Whether to target partner search inventory."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The campaign network settings supported by the connector."
+                        },
+                        "trackingUrlTemplate": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated tracking URL template."
+                        },
+                        "urlCustomParameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The custom parameter key."
+                              },
+                              "value": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "The custom parameter value."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "key",
+                              "value"
+                            ],
+                            "description": "One URL custom parameter for tracking templates."
+                          },
+                          "description": "The updated custom URL parameters.",
+                          "minItems": 1
+                        },
+                        "geoTargetTypeSetting": {
+                          "type": "object",
+                          "properties": {
+                            "negativeGeoTargetType": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The negative geo target type."
+                            },
+                            "positiveGeoTargetType": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The positive geo target type."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The campaign geo target type settings."
+                        },
+                        "advertisingChannelType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated advertising channel type."
+                        },
+                        "campaignBiddingStrategy": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated campaign bidding strategy resource name."
+                        },
+                        "containsEuPoliticalAdvertising": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The updated EU political advertising status."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "resourceName"
+                      ],
+                      "description": "The subset of campaign update fields supported by the connector."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "operationType",
+                    "update"
+                  ],
+                  "description": "Update a campaign."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "operationType": {
+                      "const": "remove",
+                      "type": "string",
+                      "description": "The mutate operation type."
+                    },
+                    "remove": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The resource name of the campaign to remove."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "operationType",
+                    "remove"
+                  ],
+                  "description": "Remove a campaign."
+                }
+              ],
+              "description": "One mutate operation for campaigns."
+            },
+            "description": "The campaign operations to submit in one mutate request.",
+            "minItems": 1
+          },
+          "validateOnly": {
+            "type": "boolean",
+            "description": "Whether to validate the request without applying the mutation."
+          },
+          "partialFailure": {
+            "type": "boolean",
+            "description": "Whether successful operations should continue when one operation fails."
+          },
+          "responseContentType": {
+            "type": "string",
+            "enum": [
+              "RESOURCE_NAME_ONLY",
+              "MUTABLE_RESOURCE"
+            ],
+            "description": "Whether the API should return only resource names or mutable resources."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "operations"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceName": {
+                  "type": "string",
+                  "description": "The resource name returned for a successful campaign mutation."
+                },
+                "campaign": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resourceName"
+              ],
+              "description": "One successful campaign mutation result."
+            },
+            "description": "The successful campaign mutation results."
+          },
+          "successfulCount": {
+            "type": "integer",
+            "description": "The number of campaign operations that succeeded."
+          },
+          "totalOperationsCount": {
+            "type": "integer",
+            "description": "The total number of campaign operations that were submitted."
+          },
+          "partialFailureError": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A JSON-like object with arbitrary string keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "successfulCount",
+          "totalOperationsCount"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "googleads.search_stream_gaql",
+      "service": "googleads",
+      "name": "search_stream_gaql",
+      "description": "Execute a GAQL streaming query and return the aggregated result rows in one response.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/adwords"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "developerToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads API developer token to send as the developer-token header."
+          },
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Ads customer ID. Spaces and hyphens are accepted and normalized."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GAQL query to execute."
+          },
+          "summaryRowSetting": {
+            "type": "string",
+            "enum": [
+              "UNSPECIFIED",
+              "UNKNOWN",
+              "NO_SUMMARY_ROW",
+              "SUMMARY_ROW_WITH_RESULTS",
+              "SUMMARY_ROW_ONLY",
+              "DONOT_POST",
+              "GENERATE"
+            ],
+            "description": "Whether to include a summary row in the streamed result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "developerToken",
+          "customerId",
+          "query"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON-like object with arbitrary string keys."
+            },
+            "description": "The aggregated result rows returned by the GAQL stream."
+          },
+          "fieldMask": {
+            "type": "string",
+            "description": "The field mask returned by the GAQL stream."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The request ID returned by the Google Ads API."
+          },
+          "summaryRow": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A JSON-like object with arbitrary string keys."
+          },
+          "queryResourceConsumption": {
+            "type": "string",
+            "description": "The query resource consumption reported by Google Ads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

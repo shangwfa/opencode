@@ -1,0 +1,902 @@
+{
+  "service": "btcpay_server",
+  "displayName": "BTCPay Server",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BTCPAY_API_KEY",
+      "description": "BTCPay Server API key sent with the Authorization header as token authentication. Create or manage API keys from your BTCPay Server user settings, or use the official Greenfield API documentation: https://docs.btcpayserver.org/API/Greenfield/v1/.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Server URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://btcpay.example.com",
+          "description": "Base URL of your BTCPay Server instance. URLs ending in /api/v1 are also accepted."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://btcpayserver.org",
+  "actions": [
+    {
+      "id": "btcpay_server.create_invoice",
+      "service": "btcpay_server",
+      "name": "create_invoice",
+      "description": "Create a BTCPay Server invoice and return its checkout link and invoice data.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.cancreateinvoice"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          },
+          "amount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice amount as a decimal string. Omit this for a top-up invoice."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Invoice currency code. If omitted, BTCPay Server uses the store default currency."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+          },
+          "additionalSearchTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Additional invoice search term."
+            },
+            "description": "Additional search terms used to find the invoice through text search."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId"
+        ],
+        "description": "Request body for creating a BTCPay Server invoice."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server invoice ID."
+              },
+              "storeId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server store ID."
+              },
+              "amount": {
+                "type": "string",
+                "description": "The invoice amount as a decimal string."
+              },
+              "paidAmount": {
+                "type": "string",
+                "description": "The paid amount as a decimal string."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The invoice currency code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The BTCPay Server invoice type."
+              },
+              "checkoutLink": {
+                "type": "string",
+                "description": "Checkout URL where the buyer can pay the invoice."
+              },
+              "createdTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "expirationTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "monitoringExpiration": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "Expired",
+                  "Invalid",
+                  "New",
+                  "Processing",
+                  "Settled"
+                ],
+                "description": "The BTCPay Server invoice status."
+              },
+              "additionalStatus": {
+                "type": "string",
+                "description": "Additional BTCPay Server invoice status detail when present."
+              },
+              "availableStatusesForManualMarking": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Expired",
+                    "Invalid",
+                    "New",
+                    "Processing",
+                    "Settled"
+                  ],
+                  "description": "The BTCPay Server invoice status."
+                },
+                "description": "Statuses this invoice can be manually marked as."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the invoice is archived."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "BTCPay Server invoice data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "BTCPay Server invoice creation result."
+      }
+    },
+    {
+      "id": "btcpay_server.get_invoice",
+      "service": "btcpay_server",
+      "name": "get_invoice",
+      "description": "Get details for a single BTCPay Server invoice.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canviewinvoices"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server invoice ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "invoiceId"
+        ],
+        "description": "Path parameters for reading a BTCPay Server invoice."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server invoice ID."
+              },
+              "storeId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server store ID."
+              },
+              "amount": {
+                "type": "string",
+                "description": "The invoice amount as a decimal string."
+              },
+              "paidAmount": {
+                "type": "string",
+                "description": "The paid amount as a decimal string."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The invoice currency code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The BTCPay Server invoice type."
+              },
+              "checkoutLink": {
+                "type": "string",
+                "description": "Checkout URL where the buyer can pay the invoice."
+              },
+              "createdTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "expirationTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "monitoringExpiration": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "Expired",
+                  "Invalid",
+                  "New",
+                  "Processing",
+                  "Settled"
+                ],
+                "description": "The BTCPay Server invoice status."
+              },
+              "additionalStatus": {
+                "type": "string",
+                "description": "Additional BTCPay Server invoice status detail when present."
+              },
+              "availableStatusesForManualMarking": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Expired",
+                    "Invalid",
+                    "New",
+                    "Processing",
+                    "Settled"
+                  ],
+                  "description": "The BTCPay Server invoice status."
+                },
+                "description": "Statuses this invoice can be manually marked as."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the invoice is archived."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "BTCPay Server invoice data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "BTCPay Server invoice details."
+      }
+    },
+    {
+      "id": "btcpay_server.get_store",
+      "service": "btcpay_server",
+      "name": "get_store",
+      "description": "Get details for a single BTCPay Server store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canviewstoresettings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId"
+        ],
+        "description": "Path parameters for reading a BTCPay Server store."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The store name."
+              },
+              "website": {
+                "type": "string",
+                "description": "The store website URL."
+              },
+              "supportUrl": {
+                "type": "string",
+                "description": "The store support URI."
+              },
+              "logoUrl": {
+                "type": "string",
+                "description": "The store logo URL or BTCPay file reference."
+              },
+              "defaultCurrency": {
+                "type": "string",
+                "description": "The default currency configured for the store."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the store is archived."
+              }
+            },
+            "additionalProperties": true,
+            "description": "BTCPay Server store data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "store"
+        ],
+        "description": "BTCPay Server store details."
+      }
+    },
+    {
+      "id": "btcpay_server.list_invoices",
+      "service": "btcpay_server",
+      "name": "list_invoices",
+      "description": "List invoices for a BTCPay Server store with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canviewinvoices"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          },
+          "orderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Order ID value."
+            },
+            "description": "Order IDs to fetch invoices for. BTCPay Server receives each value as an orderId query parameter."
+          },
+          "textSearch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search term that helps locate specific invoices."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Expired",
+              "Invalid",
+              "New",
+              "Processing",
+              "Settled"
+            ],
+            "description": "The BTCPay Server invoice status."
+          },
+          "startDate": {
+            "type": "number",
+            "description": "Unix timestamp in seconds."
+          },
+          "endDate": {
+            "type": "number",
+            "description": "Unix timestamp in seconds."
+          },
+          "includePaymentMethods": {
+            "type": "boolean",
+            "description": "Whether payment methods should be included in the invoice response."
+          },
+          "take": {
+            "type": "integer",
+            "description": "Number of records returned in the response."
+          },
+          "skip": {
+            "type": "integer",
+            "description": "Number of records to skip."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId"
+        ],
+        "description": "Query parameters for listing BTCPay Server invoices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The BTCPay Server invoice ID."
+                },
+                "storeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The BTCPay Server store ID."
+                },
+                "amount": {
+                  "type": "string",
+                  "description": "The invoice amount as a decimal string."
+                },
+                "paidAmount": {
+                  "type": "string",
+                  "description": "The paid amount as a decimal string."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "The invoice currency code."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The BTCPay Server invoice type."
+                },
+                "checkoutLink": {
+                  "type": "string",
+                  "description": "Checkout URL where the buyer can pay the invoice."
+                },
+                "createdTime": {
+                  "type": "number",
+                  "description": "Unix timestamp in seconds."
+                },
+                "expirationTime": {
+                  "type": "number",
+                  "description": "Unix timestamp in seconds."
+                },
+                "monitoringExpiration": {
+                  "type": "number",
+                  "description": "Unix timestamp in seconds."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "Expired",
+                    "Invalid",
+                    "New",
+                    "Processing",
+                    "Settled"
+                  ],
+                  "description": "The BTCPay Server invoice status."
+                },
+                "additionalStatus": {
+                  "type": "string",
+                  "description": "Additional BTCPay Server invoice status detail when present."
+                },
+                "availableStatusesForManualMarking": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "Expired",
+                      "Invalid",
+                      "New",
+                      "Processing",
+                      "Settled"
+                    ],
+                    "description": "The BTCPay Server invoice status."
+                  },
+                  "description": "Statuses this invoice can be manually marked as."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the invoice is archived."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+                }
+              },
+              "additionalProperties": true,
+              "description": "BTCPay Server invoice data."
+            },
+            "description": "Invoices returned by BTCPay Server."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoices"
+        ],
+        "description": "List of BTCPay Server invoices."
+      }
+    },
+    {
+      "id": "btcpay_server.list_stores",
+      "service": "btcpay_server",
+      "name": "list_stores",
+      "description": "List BTCPay Server stores available to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canviewstoresettings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for listing stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The BTCPay Server store ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The store name."
+                },
+                "website": {
+                  "type": "string",
+                  "description": "The store website URL."
+                },
+                "supportUrl": {
+                  "type": "string",
+                  "description": "The store support URI."
+                },
+                "logoUrl": {
+                  "type": "string",
+                  "description": "The store logo URL or BTCPay file reference."
+                },
+                "defaultCurrency": {
+                  "type": "string",
+                  "description": "The default currency configured for the store."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the store is archived."
+                }
+              },
+              "additionalProperties": true,
+              "description": "BTCPay Server store data."
+            },
+            "description": "Stores returned by BTCPay Server."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stores"
+        ],
+        "description": "List of BTCPay Server stores."
+      }
+    },
+    {
+      "id": "btcpay_server.mark_invoice_status",
+      "service": "btcpay_server",
+      "name": "mark_invoice_status",
+      "description": "Manually mark a BTCPay Server invoice as invalid or settled.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canmodifyinvoices"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server invoice ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Invalid",
+              "Settled"
+            ],
+            "description": "Status to manually assign to the invoice."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "invoiceId",
+          "status"
+        ],
+        "description": "Request body for manually marking a BTCPay Server invoice status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server invoice ID."
+              },
+              "storeId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server store ID."
+              },
+              "amount": {
+                "type": "string",
+                "description": "The invoice amount as a decimal string."
+              },
+              "paidAmount": {
+                "type": "string",
+                "description": "The paid amount as a decimal string."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The invoice currency code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The BTCPay Server invoice type."
+              },
+              "checkoutLink": {
+                "type": "string",
+                "description": "Checkout URL where the buyer can pay the invoice."
+              },
+              "createdTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "expirationTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "monitoringExpiration": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "Expired",
+                  "Invalid",
+                  "New",
+                  "Processing",
+                  "Settled"
+                ],
+                "description": "The BTCPay Server invoice status."
+              },
+              "additionalStatus": {
+                "type": "string",
+                "description": "Additional BTCPay Server invoice status detail when present."
+              },
+              "availableStatusesForManualMarking": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Expired",
+                    "Invalid",
+                    "New",
+                    "Processing",
+                    "Settled"
+                  ],
+                  "description": "The BTCPay Server invoice status."
+                },
+                "description": "Statuses this invoice can be manually marked as."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the invoice is archived."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "BTCPay Server invoice data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "BTCPay Server invoice after manual status update."
+      }
+    },
+    {
+      "id": "btcpay_server.update_invoice_metadata",
+      "service": "btcpay_server",
+      "name": "update_invoice_metadata",
+      "description": "Update metadata for an existing BTCPay Server invoice.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "btcpay.store.canmodifyinvoices"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server store ID."
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BTCPay Server invoice ID."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "invoiceId",
+          "metadata"
+        ],
+        "description": "Request body for updating BTCPay Server invoice metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server invoice ID."
+              },
+              "storeId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The BTCPay Server store ID."
+              },
+              "amount": {
+                "type": "string",
+                "description": "The invoice amount as a decimal string."
+              },
+              "paidAmount": {
+                "type": "string",
+                "description": "The paid amount as a decimal string."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The invoice currency code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The BTCPay Server invoice type."
+              },
+              "checkoutLink": {
+                "type": "string",
+                "description": "Checkout URL where the buyer can pay the invoice."
+              },
+              "createdTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "expirationTime": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "monitoringExpiration": {
+                "type": "number",
+                "description": "Unix timestamp in seconds."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "Expired",
+                  "Invalid",
+                  "New",
+                  "Processing",
+                  "Settled"
+                ],
+                "description": "The BTCPay Server invoice status."
+              },
+              "additionalStatus": {
+                "type": "string",
+                "description": "Additional BTCPay Server invoice status detail when present."
+              },
+              "availableStatusesForManualMarking": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Expired",
+                    "Invalid",
+                    "New",
+                    "Processing",
+                    "Settled"
+                  ],
+                  "description": "The BTCPay Server invoice status."
+                },
+                "description": "Statuses this invoice can be manually marked as."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the invoice is archived."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional invoice metadata accepted by BTCPay Server, such as orderId, buyerEmail, itemDesc, or custom JSON fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "BTCPay Server invoice data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "Updated BTCPay Server invoice."
+      }
+    }
+  ]
+}

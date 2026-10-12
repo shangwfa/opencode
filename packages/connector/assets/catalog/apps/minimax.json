@@ -1,0 +1,2126 @@
+{
+  "service": "minimax",
+  "displayName": "MiniMax",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MINIMAX_API_KEY",
+      "description": "MiniMax API key sent as an Authorization Bearer token. Create or view global keys at https://platform.minimax.io/user-center/basic-information/interface-key or China keys at https://platform.minimaxi.com/user-center/basic-information/interface-key.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "global",
+          "description": "Optional MiniMax API region for this key. Use global for api.minimax.io or china for api.minimaxi.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.minimax.io",
+  "actions": [
+    {
+      "id": "minimax.create_response",
+      "service": "minimax",
+      "name": "create_response",
+      "description": "Create a non-streaming MiniMax response using the OpenAI Responses API shape.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "MiniMax model name to invoke, for example MiniMax-M3.",
+            "pattern": "\\S"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Simple text input for MiniMax.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "message",
+                          "type": "string",
+                          "description": "Message item type. Omit it or set it to message."
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer",
+                            "tool"
+                          ],
+                          "description": "Message role."
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Text content for the message.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "role",
+                        "content"
+                      ],
+                      "description": "MiniMax Responses API message input item with text content."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "function_call",
+                          "type": "string",
+                          "description": "Function call item type."
+                        },
+                        "call_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool call identifier.",
+                          "pattern": "\\S"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Function name.",
+                          "pattern": "\\S"
+                        },
+                        "arguments": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Function arguments encoded as a JSON string.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API function call input item."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "function_call_output",
+                          "type": "string",
+                          "description": "Function call output item type."
+                        },
+                        "call_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool call identifier.",
+                          "pattern": "\\S"
+                        },
+                        "output": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool output text.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API function call output input item."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "reasoning",
+                          "type": "string",
+                          "description": "Reasoning input item type."
+                        },
+                        "summary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "summary_text",
+                                "type": "string",
+                                "description": "Reasoning summary item type."
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Reasoning summary text.",
+                                "pattern": "\\S"
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "MiniMax reasoning summary text item."
+                          },
+                          "description": "Reasoning summary items to include in conversation history.",
+                          "minItems": 1
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API reasoning input item."
+                    }
+                  ],
+                  "description": "Supported MiniMax Responses API conversation item."
+                },
+                "description": "Conversation history items to send to MiniMax.",
+                "minItems": 1
+              }
+            ],
+            "description": "MiniMax Responses API text or conversation input."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "System instructions for the response."
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum output token count."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Sampling temperature in the official range [0, 1]."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Nucleus sampling value in the official range [0, 1]."
+          },
+          "service_tier": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "priority"
+            ],
+            "description": "MiniMax service tier for request admission."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function",
+                  "type": "string",
+                  "description": "Tool type. MiniMax currently supports function tools."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Function tool name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable function tool description."
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "JSON Schema parameters for the function tool."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "name"
+              ],
+              "description": "MiniMax Responses API function tool definition."
+            },
+            "description": "Function tools available to MiniMax.",
+            "minItems": 1
+          },
+          "tool_choice": {
+            "type": "string",
+            "enum": [
+              "none",
+              "auto"
+            ],
+            "description": "Tool selection strategy."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Metadata value."
+            },
+            "description": "String metadata to attach to the MiniMax request."
+          },
+          "prompt_cache_key": {
+            "type": "string",
+            "description": "Prompt cache routing identifier."
+          },
+          "stream": {
+            "const": false,
+            "type": "boolean",
+            "description": "Set to false for the non-streaming connector action."
+          },
+          "text": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "text",
+                    "type": "string",
+                    "description": "Plain text output format."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "MiniMax response text format."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MiniMax output text format control."
+          },
+          "reasoning": {
+            "type": "object",
+            "properties": {
+              "effort": {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "none"
+                ],
+                "description": "Reasoning effort value."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MiniMax reasoning control. MiniMax-M3 defaults to none when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "Request body for creating a non-streaming MiniMax response."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MiniMax response identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "Object type returned by MiniMax, usually response."
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "Response creation time as Unix seconds."
+          },
+          "model": {
+            "type": "string",
+            "description": "MiniMax model that processed the request."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "incomplete",
+              "failed"
+            ],
+            "description": "MiniMax response status."
+          },
+          "output": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "MiniMax Responses API output item."
+            },
+            "description": "MiniMax response output items."
+          },
+          "output_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Concatenated response text returned by MiniMax."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Concatenated response text returned by MiniMax."
+          },
+          "usage": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "MiniMax usage object with token counts and details."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "MiniMax error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Human-readable MiniMax error message."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "MiniMax response error object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "MiniMax response error object."
+          },
+          "incomplete_details": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Reason MiniMax marked the response incomplete."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "MiniMax incomplete response details."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "MiniMax incomplete response details."
+          },
+          "parallel_tool_calls": {
+            "type": "boolean",
+            "description": "Whether MiniMax can run tool calls in parallel."
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Whether MiniMax stored the response."
+          },
+          "truncation": {
+            "type": "string",
+            "description": "MiniMax truncation mode used for the response."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "object",
+          "created_at",
+          "model",
+          "status",
+          "output"
+        ],
+        "description": "MiniMax response object."
+      }
+    },
+    {
+      "id": "minimax.create_video_generation_v2",
+      "service": "minimax",
+      "name": "create_video_generation_v2",
+      "description": "Create a MiniMax H3 video generation task with text, image, video, or audio content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "const": "MiniMax-H3",
+            "type": "string",
+            "description": "MiniMax H3 video generation model."
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "text",
+                      "type": "string",
+                      "description": "Text content item type."
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 7000,
+                      "description": "Text prompt content.",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "MiniMax H3 text content item."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "image_url",
+                      "type": "string",
+                      "description": "Image content item type."
+                    },
+                    "image_url": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Public URL, MiniMax file URI, or image data URI.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Image input location."
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "first_frame",
+                        "last_frame",
+                        "reference_image"
+                      ],
+                      "description": "Image purpose in the generated video."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "image_url"
+                  ],
+                  "description": "MiniMax H3 image content item."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "video_url",
+                      "type": "string",
+                      "description": "Video content item type."
+                    },
+                    "video_url": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Public URL, MiniMax file URI, or video data URI.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Reference video location."
+                    },
+                    "role": {
+                      "const": "reference_video",
+                      "type": "string",
+                      "description": "Reference video content role."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "MiniMax H3 reference video content item."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "audio_url",
+                      "type": "string",
+                      "description": "Audio content item type."
+                    },
+                    "audio_url": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Public URL, MiniMax file URI, or audio data URI.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Reference audio location."
+                    },
+                    "role": {
+                      "const": "reference_audio",
+                      "type": "string",
+                      "description": "Reference audio content role."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "MiniMax H3 reference audio content item."
+                }
+              ],
+              "description": "MiniMax H3 video generation content item."
+            },
+            "description": "Ordered text, image, video, or audio content for generation.",
+            "minItems": 1,
+            "contains": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "text",
+                  "type": "string",
+                  "description": "Text content item type."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 7000,
+                  "description": "Text prompt content.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": false,
+              "description": "MiniMax H3 text content item."
+            }
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "768P",
+              "2K"
+            ],
+            "description": "Generated video resolution.",
+            "default": "2K"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 15,
+            "description": "Generated video duration in seconds."
+          },
+          "ratio": {
+            "type": "string",
+            "enum": [
+              "adaptive",
+              "21:9",
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16"
+            ],
+            "description": "Generated video aspect ratio.",
+            "default": "adaptive"
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "URL MiniMax calls with asynchronous task status updates.",
+            "format": "uri"
+          },
+          "aigc_watermark": {
+            "type": "boolean",
+            "description": "Whether to add an AIGC watermark to the generated video."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "content",
+          "resolution",
+          "duration"
+        ],
+        "description": "Request body for creating a MiniMax H3 video generation task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Identifier of the asynchronous MiniMax H3 video generation task."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id"
+        ],
+        "description": "MiniMax H3 video task creation response."
+      }
+    },
+    {
+      "id": "minimax.delete_video_generation_v2",
+      "service": "minimax",
+      "name": "delete_video_generation_v2",
+      "description": "Delete a MiniMax H3 video generation task.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the MiniMax video generation task to query.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying a MiniMax video generation task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Identifier of the deleted MiniMax H3 video generation task."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "cancel",
+              "delete"
+            ],
+            "description": "Deletion action name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Deletion status."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task_id",
+          "action",
+          "status"
+        ],
+        "description": "MiniMax H3 video task deletion response."
+      }
+    },
+    {
+      "id": "minimax.download_video",
+      "service": "minimax",
+      "name": "download_video",
+      "description": "Retrieve the download URL and metadata for a generated MiniMax video file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the generated video file to retrieve.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a generated MiniMax video file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "file_id": {
+                "type": "string",
+                "description": "MiniMax file identifier."
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "Size of the file in bytes."
+              },
+              "created_at": {
+                "type": "integer",
+                "description": "File creation time as Unix seconds."
+              },
+              "filename": {
+                "type": "string",
+                "description": "File name assigned by MiniMax."
+              },
+              "purpose": {
+                "type": "string",
+                "description": "Purpose associated with the file."
+              },
+              "download_url": {
+                "type": "string",
+                "description": "Temporary URL to download the generated video."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax file object with download metadata."
+          },
+          "base_resp": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "MiniMax status code where 0 indicates success."
+              },
+              "status_msg": {
+                "type": "string",
+                "description": "Human-readable MiniMax status message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax base response wrapper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "MiniMax file retrieval response for a generated video."
+      }
+    },
+    {
+      "id": "minimax.estimate_input_tokens",
+      "service": "minimax",
+      "name": "estimate_input_tokens",
+      "description": "Estimate MiniMax response input tokens without invoking the model.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "MiniMax model name to estimate against, for example MiniMax-M3.",
+            "pattern": "\\S"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Simple text input for MiniMax.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "message",
+                          "type": "string",
+                          "description": "Message item type. Omit it or set it to message."
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system",
+                            "developer",
+                            "tool"
+                          ],
+                          "description": "Message role."
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Text content for the message.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "role",
+                        "content"
+                      ],
+                      "description": "MiniMax Responses API message input item with text content."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "function_call",
+                          "type": "string",
+                          "description": "Function call item type."
+                        },
+                        "call_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool call identifier.",
+                          "pattern": "\\S"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Function name.",
+                          "pattern": "\\S"
+                        },
+                        "arguments": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Function arguments encoded as a JSON string.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API function call input item."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "function_call_output",
+                          "type": "string",
+                          "description": "Function call output item type."
+                        },
+                        "call_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool call identifier.",
+                          "pattern": "\\S"
+                        },
+                        "output": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Tool output text.",
+                          "pattern": "\\S"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API function call output input item."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "reasoning",
+                          "type": "string",
+                          "description": "Reasoning input item type."
+                        },
+                        "summary": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "summary_text",
+                                "type": "string",
+                                "description": "Reasoning summary item type."
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Reasoning summary text.",
+                                "pattern": "\\S"
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "MiniMax reasoning summary text item."
+                          },
+                          "description": "Reasoning summary items to include in conversation history.",
+                          "minItems": 1
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "MiniMax Responses API reasoning input item."
+                    }
+                  ],
+                  "description": "Supported MiniMax Responses API conversation item."
+                },
+                "description": "Conversation history items to send to MiniMax.",
+                "minItems": 1
+              }
+            ],
+            "description": "MiniMax Responses API text or conversation input."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "System instructions included in the estimate."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function",
+                  "type": "string",
+                  "description": "Tool type. MiniMax currently supports function tools."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Function tool name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable function tool description."
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "JSON Schema parameters for the function tool."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "name"
+              ],
+              "description": "MiniMax Responses API function tool definition."
+            },
+            "description": "Function tools included in the estimate.",
+            "minItems": 1
+          },
+          "tool_choice": {
+            "type": "string",
+            "enum": [
+              "none",
+              "auto"
+            ],
+            "description": "Tool selection strategy."
+          },
+          "text": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "text",
+                    "type": "string",
+                    "description": "Plain text output format."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "MiniMax response text format."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MiniMax output text format control."
+          },
+          "reasoning": {
+            "type": "object",
+            "properties": {
+              "effort": {
+                "type": "string",
+                "enum": [
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "none"
+                ],
+                "description": "Reasoning effort value."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MiniMax reasoning control. MiniMax-M3 defaults to none when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "Request body for estimating MiniMax response input tokens."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Object type returned by MiniMax, usually response.input_tokens."
+          },
+          "input_tokens": {
+            "type": "integer",
+            "description": "Estimated input token count."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "object",
+          "input_tokens"
+        ],
+        "description": "MiniMax input token estimate response."
+      }
+    },
+    {
+      "id": "minimax.image_to_video",
+      "service": "minimax",
+      "name": "image_to_video",
+      "description": "Create a MiniMax asynchronous image-to-video generation task from a first frame image.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "MiniMax-Hailuo-2.3",
+              "MiniMax-Hailuo-2.3-Fast",
+              "MiniMax-Hailuo-02",
+              "I2V-01-Director",
+              "I2V-01-live",
+              "I2V-01"
+            ],
+            "description": "MiniMax image-to-video model to invoke, for example MiniMax-Hailuo-2.3.",
+            "default": "MiniMax-Hailuo-2.3"
+          },
+          "first_frame_image": {
+            "type": "string",
+            "minLength": 1,
+            "description": "First frame image as a public HTTPS URL or a data URI base64 string.",
+            "pattern": "\\S"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Text description that guides the generated video."
+          },
+          "prompt_optimizer": {
+            "type": "boolean",
+            "description": "Whether MiniMax may rewrite the prompt to improve the result."
+          },
+          "fast_pretreatment": {
+            "type": "boolean",
+            "description": "Whether MiniMax applies fast pre-processing to speed up generation."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "const": 6,
+                "type": "number"
+              },
+              {
+                "const": 10,
+                "type": "number"
+              }
+            ],
+            "description": "Length of the generated video in seconds. Model and resolution determine whether 6 or 10 is valid.",
+            "default": 6
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "512P",
+              "720P",
+              "768P",
+              "1080P"
+            ],
+            "description": "Resolution of the generated image-to-video result. Supported values depend on the model and duration."
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "URL MiniMax calls with asynchronous task status updates.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "first_frame_image"
+        ],
+        "description": "Request body for creating a MiniMax image-to-video generation task from a first frame image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Identifier of the asynchronous MiniMax video generation task."
+          },
+          "base_resp": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "MiniMax status code where 0 indicates success."
+              },
+              "status_msg": {
+                "type": "string",
+                "description": "Human-readable MiniMax status message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax base response wrapper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "MiniMax asynchronous video generation task creation response."
+      }
+    },
+    {
+      "id": "minimax.list_models",
+      "service": "minimax",
+      "name": "list_models",
+      "description": "List OpenAI-compatible MiniMax models available to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list MiniMax models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Object type returned by MiniMax, usually list."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "MiniMax model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "Object type returned by MiniMax, usually model."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "Unix timestamp when MiniMax created the model."
+                },
+                "owned_by": {
+                  "type": "string",
+                  "description": "Organization that owns the model."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "OpenAI-compatible MiniMax model object."
+            },
+            "description": "MiniMax models returned by the API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "object",
+          "data"
+        ],
+        "description": "MiniMax model list response."
+      }
+    },
+    {
+      "id": "minimax.list_video_generation_v2",
+      "service": "minimax",
+      "name": "list_video_generation_v2",
+      "description": "List MiniMax H3 video generation tasks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_num": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of tasks to retrieve per page."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled",
+                  "expired"
+                ],
+                "description": "Task status filter."
+              },
+              "task_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Task identifier.",
+                  "pattern": "\\S"
+                },
+                "description": "Task identifiers to include.",
+                "minItems": 1
+              },
+              "model": {
+                "const": "MiniMax-H3",
+                "type": "string",
+                "description": "MiniMax H3 video generation model."
+              },
+              "task_type": {
+                "type": "string",
+                "description": "Task type filter."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional MiniMax H3 video task filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing MiniMax H3 video generation tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "MiniMax H3 video task identifier."
+                },
+                "model": {
+                  "type": "string",
+                  "description": "MiniMax model that processed the task."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "cancelled",
+                    "expired"
+                  ],
+                  "description": "Current task status."
+                },
+                "error": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Task error details when generation fails."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp when MiniMax created the task."
+                },
+                "updated_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp when MiniMax last updated the task."
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "Generated video URL."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "url"
+                  ],
+                  "description": "Generated video content."
+                },
+                "resolution": {
+                  "type": "string",
+                  "description": "Generated video resolution."
+                },
+                "duration": {
+                  "type": "integer",
+                  "description": "Generated video duration in seconds."
+                },
+                "usage": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "MiniMax H3 video usage details."
+                },
+                "ratio": {
+                  "type": "string",
+                  "description": "Generated video aspect ratio."
+                },
+                "task_type": {
+                  "type": "string",
+                  "description": "MiniMax H3 video task type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "MiniMax H3 video generation task response."
+            },
+            "description": "MiniMax H3 video tasks."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total matching MiniMax H3 video task count."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "total"
+        ],
+        "description": "MiniMax H3 video task list response."
+      }
+    },
+    {
+      "id": "minimax.query_video_generation",
+      "service": "minimax",
+      "name": "query_video_generation",
+      "description": "Query the status of a MiniMax video generation task and read its file id when it completes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the MiniMax video generation task to query.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying a MiniMax video generation task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Identifier of the queried MiniMax video generation task."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current task status, for example Preparing, Queueing, Processing, Success, or Fail."
+          },
+          "file_id": {
+            "type": "string",
+            "description": "Identifier of the generated video file, present once the task succeeds."
+          },
+          "base_resp": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "MiniMax status code where 0 indicates success."
+              },
+              "status_msg": {
+                "type": "string",
+                "description": "Human-readable MiniMax status message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax base response wrapper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "MiniMax video generation task status response."
+      }
+    },
+    {
+      "id": "minimax.query_video_generation_v2",
+      "service": "minimax",
+      "name": "query_video_generation_v2",
+      "description": "Query a MiniMax H3 video generation task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identifier of the MiniMax video generation task to query.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying a MiniMax video generation task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "MiniMax H3 video task identifier."
+              },
+              "model": {
+                "type": "string",
+                "description": "MiniMax model that processed the task."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled",
+                  "expired"
+                ],
+                "description": "Current task status."
+              },
+              "error": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Task error details when generation fails."
+              },
+              "created_at": {
+                "type": "integer",
+                "description": "Unix timestamp when MiniMax created the task."
+              },
+              "updated_at": {
+                "type": "integer",
+                "description": "Unix timestamp when MiniMax last updated the task."
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "Generated video URL."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "url"
+                ],
+                "description": "Generated video content."
+              },
+              "resolution": {
+                "type": "string",
+                "description": "Generated video resolution."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "Generated video duration in seconds."
+              },
+              "usage": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "MiniMax H3 video usage details."
+              },
+              "ratio": {
+                "type": "string",
+                "description": "Generated video aspect ratio."
+              },
+              "task_type": {
+                "type": "string",
+                "description": "MiniMax H3 video task type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax H3 video generation task response."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "task"
+        ],
+        "description": "MiniMax H3 video task query response."
+      }
+    },
+    {
+      "id": "minimax.retrieve_model",
+      "service": "minimax",
+      "name": "retrieve_model",
+      "description": "Retrieve OpenAI-compatible metadata for one MiniMax model.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "MiniMax model identifier to retrieve.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a MiniMax model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MiniMax model identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "Object type returned by MiniMax, usually model."
+          },
+          "created": {
+            "type": "integer",
+            "description": "Unix timestamp when MiniMax created the model."
+          },
+          "owned_by": {
+            "type": "string",
+            "description": "Organization that owns the model."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "OpenAI-compatible MiniMax model object."
+      }
+    },
+    {
+      "id": "minimax.text_to_audio",
+      "service": "minimax",
+      "name": "text_to_audio",
+      "description": "Synthesize text into audio with the MiniMax T2A v2 API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "speech-2.8-hd",
+              "speech-2.8-turbo",
+              "speech-2.6-hd",
+              "speech-2.6-turbo",
+              "speech-02-hd",
+              "speech-02-turbo",
+              "speech-01-hd",
+              "speech-01-turbo"
+            ],
+            "description": "MiniMax speech model to invoke."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 9999,
+            "description": "Text to synthesize into audio. Must be shorter than 10,000 characters.",
+            "pattern": "\\S"
+          },
+          "stream": {
+            "const": false,
+            "type": "boolean",
+            "description": "Set to false for the non-streaming connector action."
+          },
+          "language_boost": {
+            "type": "string",
+            "enum": [
+              "Chinese",
+              "Chinese,Yue",
+              "English",
+              "Arabic",
+              "Russian",
+              "Spanish",
+              "French",
+              "Portuguese",
+              "German",
+              "Turkish",
+              "Dutch",
+              "Ukrainian",
+              "Vietnamese",
+              "Indonesian",
+              "Japanese",
+              "Italian",
+              "Korean",
+              "Thai",
+              "Polish",
+              "Romanian",
+              "Greek",
+              "Czech",
+              "Finnish",
+              "Hindi",
+              "Bulgarian",
+              "Danish",
+              "Hebrew",
+              "Malay",
+              "Persian",
+              "Slovak",
+              "Swedish",
+              "Croatian",
+              "Filipino",
+              "Hungarian",
+              "Norwegian",
+              "Slovenian",
+              "Catalan",
+              "Nynorsk",
+              "Tamil",
+              "Afrikaans",
+              "auto"
+            ],
+            "description": "Language or dialect hint that improves pronunciation. Set auto to let MiniMax detect it."
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "url",
+              "hex"
+            ],
+            "description": "How MiniMax delivers the audio. url returns a download link valid for 24 hours, while hex, the MiniMax default, inlines hex-encoded audio, so prefer url for long text."
+          },
+          "voice_setting": {
+            "type": "object",
+            "properties": {
+              "voice_id": {
+                "type": "string",
+                "description": "Identifier of the system, cloned, or generated voice to speak with. Required unless timbre_weights mixes voices."
+              },
+              "speed": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 2,
+                "description": "Speech speed where higher values speak faster. MiniMax defaults to 1."
+              },
+              "vol": {
+                "type": "number",
+                "maximum": 10,
+                "exclusiveMinimum": 0,
+                "description": "Speech volume where higher values are louder. MiniMax defaults to 1."
+              },
+              "pitch": {
+                "type": "integer",
+                "minimum": -12,
+                "maximum": 12,
+                "description": "Speech pitch offset where 0 keeps the original pitch."
+              },
+              "emotion": {
+                "type": "string",
+                "enum": [
+                  "happy",
+                  "sad",
+                  "angry",
+                  "fearful",
+                  "disgusted",
+                  "surprised",
+                  "calm",
+                  "fluent",
+                  "whisper"
+                ],
+                "description": "Emotion of the synthesized speech. MiniMax picks one from the text when omitted."
+              },
+              "text_normalization": {
+                "type": "boolean",
+                "description": "Whether to normalize Chinese and English text, which reads digits better at the cost of latency."
+              },
+              "latex_read": {
+                "type": "boolean",
+                "description": "Whether to read LaTeX formulas wrapped in double dollar signs. Chinese only, and it forces language_boost to Chinese."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax voice settings."
+          },
+          "timbre_weights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "voice_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Identifier of the voice to mix.",
+                  "pattern": "\\S"
+                },
+                "weight": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100,
+                  "description": "Weight of this voice, where a higher value sounds more like it."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One voice and its weight in the mixed timbre."
+            },
+            "description": "Voices to blend into one mixed timbre. Leave voice_setting.voice_id empty when mixing voices.",
+            "minItems": 1,
+            "maxItems": 4
+          },
+          "pronunciation_dict": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One original/replacement pronunciation rule."
+                },
+                "description": "Pronunciation rules written as original/replacement, for example omg/oh my god. Replacements accept plain text, parenthesized pinyin with tone digits, parenthesized IPA, or Japanese kana."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax pronunciation overrides."
+          },
+          "audio_setting": {
+            "type": "object",
+            "properties": {
+              "sample_rate": {
+                "anyOf": [
+                  {
+                    "const": 8000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 16000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 22050,
+                    "type": "number"
+                  },
+                  {
+                    "const": 24000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 32000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 44100,
+                    "type": "number"
+                  }
+                ],
+                "description": "Sample rate of the generated audio in hertz. MiniMax defaults to 32000."
+              },
+              "bitrate": {
+                "anyOf": [
+                  {
+                    "const": 32000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 64000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 128000,
+                    "type": "number"
+                  },
+                  {
+                    "const": 256000,
+                    "type": "number"
+                  }
+                ],
+                "description": "Bitrate of the generated audio, applied to mp3 output only. MiniMax defaults to 128000."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "mp3",
+                  "pcm",
+                  "flac",
+                  "wav",
+                  "pcmu_raw",
+                  "pcmu_wav",
+                  "opus"
+                ],
+                "description": "Format of the generated audio. MiniMax defaults to mp3, pcmu_raw and pcmu_wav are G.711 mu-law, and opus is Ogg/Opus."
+              },
+              "channel": {
+                "anyOf": [
+                  {
+                    "const": 1,
+                    "type": "number"
+                  },
+                  {
+                    "const": 2,
+                    "type": "number"
+                  }
+                ],
+                "description": "Number of audio channels where 1 is mono and 2 is stereo. MiniMax defaults to 1."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax audio settings."
+          },
+          "voice_modify": {
+            "type": "object",
+            "properties": {
+              "pitch": {
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100,
+                "description": "Voice depth where -100 is deepest and 100 is brightest."
+              },
+              "intensity": {
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100,
+                "description": "Voice intensity where -100 is strongest and 100 is softest."
+              },
+              "timbre": {
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100,
+                "description": "Voice timbre where -100 is fullest and 100 is crispest."
+              },
+              "sound_effects": {
+                "type": "string",
+                "enum": [
+                  "spacious_echo",
+                  "auditorium_echo",
+                  "lofi_telephone",
+                  "robotic"
+                ],
+                "description": "Sound effect to apply. Only one effect can be active at a time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax voice effect settings. Non-streaming synthesis supports mp3, wav, and flac output."
+          },
+          "subtitle_enable": {
+            "type": "boolean",
+            "description": "Whether MiniMax also generates a subtitle file and returns its download link."
+          },
+          "subtitle_type": {
+            "type": "string",
+            "enum": [
+              "sentence",
+              "word"
+            ],
+            "description": "Granularity of the generated subtitle timestamps. MiniMax defaults to sentence."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "text"
+        ],
+        "description": "Request body for MiniMax text-to-audio synthesis."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "audio": {
+                    "type": "string",
+                    "description": "Hex-encoded audio, or a download URL when output_format is url."
+                  },
+                  "status": {
+                    "type": "integer",
+                    "description": "Synthesis status where 1 means synthesizing and 2 means finished."
+                  },
+                  "subtitle_file": {
+                    "type": "string",
+                    "description": "Download link for the generated subtitle file."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Synthesized audio payload. MiniMax may return null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Synthesized audio payload. MiniMax may return null."
+          },
+          "extra_info": {
+            "type": "object",
+            "properties": {
+              "audio_length": {
+                "type": "integer",
+                "description": "Audio duration in milliseconds."
+              },
+              "audio_sample_rate": {
+                "type": "integer",
+                "description": "Sample rate of the generated audio."
+              },
+              "audio_size": {
+                "type": "integer",
+                "description": "Size of the generated audio in bytes."
+              },
+              "bitrate": {
+                "type": "integer",
+                "description": "Bitrate of the generated audio."
+              },
+              "audio_format": {
+                "type": "string",
+                "description": "Format of the generated audio, for example mp3, pcm, or flac."
+              },
+              "audio_channel": {
+                "type": "integer",
+                "description": "Number of audio channels where 1 is mono and 2 is stereo."
+              },
+              "invisible_character_ratio": {
+                "type": "number",
+                "description": "Share of invalid characters in the submitted text."
+              },
+              "usage_characters": {
+                "type": "integer",
+                "description": "Number of billable characters used by this synthesis."
+              },
+              "word_count": {
+                "type": "integer",
+                "description": "Spoken word count covering Chinese characters, digits, and letters, but not punctuation."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Additional information about the synthesized audio."
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "MiniMax session identifier used when reporting an issue."
+          },
+          "base_resp": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "MiniMax status code where 0 indicates success."
+              },
+              "status_msg": {
+                "type": "string",
+                "description": "Human-readable MiniMax status message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax base response wrapper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "MiniMax text-to-audio response."
+      }
+    },
+    {
+      "id": "minimax.text_to_video",
+      "service": "minimax",
+      "name": "text_to_video",
+      "description": "Create a MiniMax asynchronous text-to-video generation task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "MiniMax-Hailuo-2.3",
+              "MiniMax-Hailuo-02",
+              "T2V-01-Director",
+              "T2V-01"
+            ],
+            "description": "MiniMax text-to-video model to invoke, for example MiniMax-Hailuo-2.3.",
+            "default": "MiniMax-Hailuo-2.3"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text description of the video to generate.",
+            "pattern": "\\S"
+          },
+          "prompt_optimizer": {
+            "type": "boolean",
+            "description": "Whether MiniMax may rewrite the prompt to improve the result."
+          },
+          "fast_pretreatment": {
+            "type": "boolean",
+            "description": "Whether MiniMax applies fast pre-processing to speed up generation."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "const": 6,
+                "type": "number"
+              },
+              {
+                "const": 10,
+                "type": "number"
+              }
+            ],
+            "description": "Length of the generated video in seconds. Model and resolution determine whether 6 or 10 is valid.",
+            "default": 6
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720P",
+              "768P",
+              "1080P"
+            ],
+            "description": "Resolution of the generated text-to-video result. Supported values depend on the model and duration."
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "URL MiniMax calls with asynchronous task status updates.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "description": "Request body for creating a MiniMax text-to-video generation task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Identifier of the asynchronous MiniMax video generation task."
+          },
+          "base_resp": {
+            "type": "object",
+            "properties": {
+              "status_code": {
+                "type": "integer",
+                "description": "MiniMax status code where 0 indicates success."
+              },
+              "status_msg": {
+                "type": "string",
+                "description": "Human-readable MiniMax status message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "MiniMax base response wrapper."
+          }
+        },
+        "additionalProperties": true,
+        "description": "MiniMax asynchronous video generation task creation response."
+      }
+    }
+  ]
+}

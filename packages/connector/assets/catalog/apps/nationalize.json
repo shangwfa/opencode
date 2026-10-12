@@ -1,0 +1,190 @@
+{
+  "service": "nationalize",
+  "displayName": "Nationalize",
+  "homepageUrl": "https://nationalize.io/",
+  "iconUrl": "https://nationalize.io/favicon.ico",
+  "categories": [
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NATIONALIZE_API_KEY",
+      "description": "Get your Nationalize API key from the account dashboard at https://nationalize.io/login (register at https://nationalize.io/register). Connecting validates the key with one sample name lookup, consuming one name from your quota."
+    }
+  ],
+  "actions": [
+    {
+      "id": "nationalize.predict_nationality",
+      "service": "nationalize",
+      "name": "predict_nationality",
+      "description": "Predict ranked country candidates and probabilities for a last name or full name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A last name or full name to predict. Full names provide the most accurate predictions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The name to look up in Nationalize."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name echoed by Nationalize."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of data points behind the prediction."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of data points behind the prediction."
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "country_id": {
+                      "type": "string",
+                      "description": "The ISO 3166-1 alpha-2 country code."
+                    },
+                    "probability": {
+                      "type": "number",
+                      "description": "The probability of this country, between zero and one."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A candidate country and its probability."
+                },
+                "description": "Country candidates ordered by descending probability; empty or null when unknown."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Country candidates ordered by descending probability; empty or null when unknown."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A name-based nationality prediction from Nationalize."
+      }
+    },
+    {
+      "id": "nationalize.predict_nationality_batch",
+      "service": "nationalize",
+      "name": "predict_nationality_batch",
+      "description": "Predict country candidates for up to 100 names in input order. Each name consumes one lookup from the quota.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A last name or full name to predict. Full names provide the most accurate predictions."
+            },
+            "description": "The names in the desired result order; duplicates are allowed.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "names"
+        ],
+        "description": "The names to look up in one Nationalize request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "predictions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The name echoed by Nationalize."
+                },
+                "count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of data points behind the prediction."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of data points behind the prediction."
+                },
+                "country": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "country_id": {
+                            "type": "string",
+                            "description": "The ISO 3166-1 alpha-2 country code."
+                          },
+                          "probability": {
+                            "type": "number",
+                            "description": "The probability of this country, between zero and one."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A candidate country and its probability."
+                      },
+                      "description": "Country candidates ordered by descending probability; empty or null when unknown."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Country candidates ordered by descending probability; empty or null when unknown."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A name-based nationality prediction from Nationalize."
+            },
+            "description": "Predictions in the same order as the input names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "predictions"
+        ],
+        "description": "The batch nationality prediction results."
+      }
+    }
+  ]
+}

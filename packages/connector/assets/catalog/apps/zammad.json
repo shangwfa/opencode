@@ -1,0 +1,789 @@
+{
+  "service": "zammad",
+  "displayName": "Zammad",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "Your Zammad access token",
+      "description": "Create a token in your Zammad user profile under Token Access: https://user-docs.zammad.org/en/latest/extras/user-menu-profile-settings.html#token-access.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Zammad Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://support.example.com"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://zammad.com/en",
+  "actions": [
+    {
+      "id": "zammad.create_ticket",
+      "service": "zammad",
+      "name": "create_ticket",
+      "description": "Create a Zammad ticket with its initial text article.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket title."
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target group name."
+          },
+          "customer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer login or email address."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The initial article body."
+          },
+          "articleType": {
+            "type": "string",
+            "enum": [
+              "note",
+              "email",
+              "phone"
+            ],
+            "description": "The initial article type."
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "text/plain",
+              "text/html"
+            ],
+            "description": "The initial article content type."
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "Whether the initial article is internal."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The initial article subject."
+          },
+          "sender": {
+            "type": "string",
+            "enum": [
+              "Agent",
+              "Customer",
+              "System"
+            ],
+            "description": "The initial article sender role."
+          },
+          "priority": {
+            "type": "string",
+            "description": "The ticket priority name."
+          },
+          "state": {
+            "type": "string",
+            "description": "The ticket state name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "group",
+          "customer",
+          "body"
+        ],
+        "description": "The input for creating a Zammad ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Zammad resource ID."
+              },
+              "number": {
+                "type": "string",
+                "description": "The human-readable ticket number."
+              },
+              "title": {
+                "type": "string",
+                "description": "The ticket title."
+              },
+              "group_id": {
+                "type": "integer",
+                "description": "The assigned group ID."
+              },
+              "customer_id": {
+                "type": "integer",
+                "description": "The customer user ID."
+              },
+              "state_id": {
+                "type": "integer",
+                "description": "The ticket state ID."
+              },
+              "priority_id": {
+                "type": "integer",
+                "description": "The ticket priority ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zammad ticket object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Zammad ticket response."
+      }
+    },
+    {
+      "id": "zammad.create_ticket_article",
+      "service": "zammad",
+      "name": "create_ticket_article",
+      "description": "Add a text article to an existing Zammad ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zammad resource ID."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The article body."
+          },
+          "articleType": {
+            "type": "string",
+            "enum": [
+              "note",
+              "email",
+              "phone"
+            ],
+            "description": "The article type."
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "text/plain",
+              "text/html"
+            ],
+            "description": "The article content type."
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "Whether the article is internal."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The article subject when applicable."
+          },
+          "sender": {
+            "type": "string",
+            "enum": [
+              "Agent",
+              "Customer",
+              "System"
+            ],
+            "description": "The article sender role."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId",
+          "body"
+        ],
+        "description": "The input for creating a Zammad ticket article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "article": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Zammad resource ID."
+              },
+              "ticket_id": {
+                "type": "integer",
+                "description": "The parent ticket ID."
+              },
+              "body": {
+                "type": "string",
+                "description": "The article body."
+              },
+              "content_type": {
+                "type": "string",
+                "description": "The article body content type."
+              },
+              "internal": {
+                "type": "boolean",
+                "description": "Whether the article is internal."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zammad ticket article object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Zammad ticket article response."
+      }
+    },
+    {
+      "id": "zammad.get_current_user",
+      "service": "zammad",
+      "name": "get_current_user",
+      "description": "Retrieve the Zammad user associated with the connected access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for retrieving the current Zammad user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Zammad resource ID."
+              },
+              "login": {
+                "type": "string",
+                "description": "The user login."
+              },
+              "firstname": {
+                "type": "string",
+                "description": "The user's first name."
+              },
+              "lastname": {
+                "type": "string",
+                "description": "The user's last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zammad user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Zammad user response."
+      }
+    },
+    {
+      "id": "zammad.get_ticket",
+      "service": "zammad",
+      "name": "get_ticket",
+      "description": "Retrieve one Zammad ticket by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zammad resource ID."
+          },
+          "expand": {
+            "type": "boolean",
+            "description": "Whether to expand named relations in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "The input for retrieving a Zammad ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Zammad resource ID."
+              },
+              "number": {
+                "type": "string",
+                "description": "The human-readable ticket number."
+              },
+              "title": {
+                "type": "string",
+                "description": "The ticket title."
+              },
+              "group_id": {
+                "type": "integer",
+                "description": "The assigned group ID."
+              },
+              "customer_id": {
+                "type": "integer",
+                "description": "The customer user ID."
+              },
+              "state_id": {
+                "type": "integer",
+                "description": "The ticket state ID."
+              },
+              "priority_id": {
+                "type": "integer",
+                "description": "The ticket priority ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zammad ticket object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Zammad ticket response."
+      }
+    },
+    {
+      "id": "zammad.list_ticket_articles",
+      "service": "zammad",
+      "name": "list_ticket_articles",
+      "description": "List articles belonging to a Zammad ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zammad resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing Zammad ticket articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Zammad resource ID."
+                },
+                "ticket_id": {
+                  "type": "integer",
+                  "description": "The parent ticket ID."
+                },
+                "body": {
+                  "type": "string",
+                  "description": "The article body."
+                },
+                "content_type": {
+                  "type": "string",
+                  "description": "The article body content type."
+                },
+                "internal": {
+                  "type": "boolean",
+                  "description": "Whether the article is internal."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zammad ticket article object."
+            },
+            "description": "Articles belonging to the ticket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Zammad ticket article list response."
+      }
+    },
+    {
+      "id": "zammad.list_tickets",
+      "service": "zammad",
+      "name": "list_tickets",
+      "description": "List tickets visible to the connected Zammad user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return on this page."
+          },
+          "expand": {
+            "type": "boolean",
+            "description": "Whether to expand named relations in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing Zammad tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Zammad resource ID."
+                },
+                "number": {
+                  "type": "string",
+                  "description": "The human-readable ticket number."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The ticket title."
+                },
+                "group_id": {
+                  "type": "integer",
+                  "description": "The assigned group ID."
+                },
+                "customer_id": {
+                  "type": "integer",
+                  "description": "The customer user ID."
+                },
+                "state_id": {
+                  "type": "integer",
+                  "description": "The ticket state ID."
+                },
+                "priority_id": {
+                  "type": "integer",
+                  "description": "The ticket priority ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zammad ticket object."
+            },
+            "description": "Tickets returned by Zammad."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Zammad ticket list response."
+      }
+    },
+    {
+      "id": "zammad.search_tickets",
+      "service": "zammad",
+      "name": "search_tickets",
+      "description": "Search Zammad tickets with the endpoint search syntax.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zammad ticket search query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return on this page."
+          },
+          "expand": {
+            "type": "boolean",
+            "description": "Whether to expand named relations in the response."
+          },
+          "sortBy": {
+            "type": "string",
+            "description": "The upstream ticket field used to sort results."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input for searching Zammad tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Zammad resource ID."
+                },
+                "number": {
+                  "type": "string",
+                  "description": "The human-readable ticket number."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The ticket title."
+                },
+                "group_id": {
+                  "type": "integer",
+                  "description": "The assigned group ID."
+                },
+                "customer_id": {
+                  "type": "integer",
+                  "description": "The customer user ID."
+                },
+                "state_id": {
+                  "type": "integer",
+                  "description": "The ticket state ID."
+                },
+                "priority_id": {
+                  "type": "integer",
+                  "description": "The ticket priority ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zammad ticket object."
+            },
+            "description": "Tickets matching the query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Zammad ticket search response."
+      }
+    },
+    {
+      "id": "zammad.search_users",
+      "service": "zammad",
+      "name": "search_users",
+      "description": "Search Zammad users by login, email, name, or endpoint search expression.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zammad user search query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return on this page."
+          },
+          "expand": {
+            "type": "boolean",
+            "description": "Whether to expand named relations in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input for searching Zammad users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Zammad resource ID."
+                },
+                "login": {
+                  "type": "string",
+                  "description": "The user login."
+                },
+                "firstname": {
+                  "type": "string",
+                  "description": "The user's first name."
+                },
+                "lastname": {
+                  "type": "string",
+                  "description": "The user's last name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zammad user object."
+            },
+            "description": "Users matching the query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Zammad user search response."
+      }
+    },
+    {
+      "id": "zammad.update_ticket",
+      "service": "zammad",
+      "name": "update_ticket",
+      "description": "Update documented mutable fields on a Zammad ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zammad resource ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement ticket title."
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement group name."
+          },
+          "customer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement customer login or email address."
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement owner login or email address."
+          },
+          "priority": {
+            "type": "string",
+            "description": "The replacement priority name."
+          },
+          "state": {
+            "type": "string",
+            "description": "The replacement state name."
+          },
+          "pendingTime": {
+            "type": "string",
+            "description": "The pending-until timestamp expected by Zammad."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "The input for updating a Zammad ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Zammad resource ID."
+              },
+              "number": {
+                "type": "string",
+                "description": "The human-readable ticket number."
+              },
+              "title": {
+                "type": "string",
+                "description": "The ticket title."
+              },
+              "group_id": {
+                "type": "integer",
+                "description": "The assigned group ID."
+              },
+              "customer_id": {
+                "type": "integer",
+                "description": "The customer user ID."
+              },
+              "state_id": {
+                "type": "integer",
+                "description": "The ticket state ID."
+              },
+              "priority_id": {
+                "type": "integer",
+                "description": "The ticket priority ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zammad ticket object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Zammad ticket response."
+      }
+    }
+  ]
+}

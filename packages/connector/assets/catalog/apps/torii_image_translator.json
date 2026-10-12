@@ -1,0 +1,806 @@
+{
+  "service": "torii_image_translator",
+  "displayName": "Torii Image Translator",
+  "categories": [
+    "Artificial Intelligence",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TORII_API_KEY",
+      "description": "Torii API key used to translate and typeset images. Create or copy it from your Torii account at https://toriitranslate.com."
+    }
+  ],
+  "homepageUrl": "https://toriitranslate.com",
+  "actions": [
+    {
+      "id": "torii_image_translator.extract_text",
+      "service": "torii_image_translator",
+      "name": "extract_text",
+      "description": "Extract structured OCR text, geometry, orientation, colors, and confidence data from a public image with Torii.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for the JPG, PNG, or WebP image to analyze, no larger than 50 MB.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for extracting structured text from an image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The text recognized in the paragraph."
+                },
+                "polygon": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "description": "A pixel coordinate."
+                    },
+                    "description": "One polygon coordinate pair."
+                  },
+                  "description": "The paragraph polygon represented by coordinate pairs."
+                },
+                "fontsize": {
+                  "type": "number",
+                  "description": "The estimated median paragraph font size in pixels."
+                },
+                "angle": {
+                  "type": "number",
+                  "description": "The paragraph rotation angle in degrees."
+                },
+                "alignment": {
+                  "type": "string",
+                  "description": "The paragraph text alignment."
+                },
+                "direction": {
+                  "type": "string",
+                  "description": "The paragraph text flow direction."
+                },
+                "bg_color": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The blue channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The green channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The red channel from 0 to 255."
+                    }
+                  ],
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The detected paragraph background color in BGR order."
+                },
+                "text_color": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The blue channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The green channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The red channel from 0 to 255."
+                    }
+                  ],
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The detected paragraph text color in BGR order."
+                },
+                "stroke_color": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The blue channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The green channel from 0 to 255."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 255,
+                      "description": "The red channel from 0 to 255."
+                    }
+                  ],
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The detected paragraph stroke color in BGR order."
+                },
+                "has_dominant_bg_color": {
+                  "type": "boolean",
+                  "description": "Whether Torii detected a dominant paragraph background color."
+                },
+                "confidence": {
+                  "type": "number",
+                  "description": "The paragraph OCR confidence from 0 to 1."
+                },
+                "removed": {
+                  "type": "boolean",
+                  "description": "Whether Torii filtered the paragraph as noise or reading aid text."
+                },
+                "language_details": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The detected paragraph language and confidence."
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One detailed OCR line."
+                  },
+                  "description": "The detailed OCR lines within the paragraph."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Torii OCR paragraph with text, geometry, orientation, colors, confidence, and nested line details."
+            },
+            "description": "The paragraphs detected by Torii OCR."
+          },
+          "creditsRemaining": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The Torii credit balance remaining after the request, when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paragraphs"
+        ],
+        "description": "The structured Torii OCR result and credit balance."
+      }
+    },
+    {
+      "id": "torii_image_translator.get_credits",
+      "service": "torii_image_translator",
+      "name": "get_credits",
+      "description": "Retrieve the credit balance remaining for the connected Torii API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving the current Torii credit balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The Torii credit balance remaining after the request, when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Torii credit balance."
+      }
+    },
+    {
+      "id": "torii_image_translator.inpaint_image",
+      "service": "torii_image_translator",
+      "name": "inpaint_image",
+      "description": "Remove masked text or objects from a public image with Torii inpainting and return the cleaned PNG through transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for the source JPG, PNG, or WebP image, no larger than 50 MB.",
+            "format": "uri"
+          },
+          "maskUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for a mask image whose white areas should be removed and filled.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for removing masked text or objects from an image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated image filename."
+              },
+              "mimeType": {
+                "const": "image/png",
+                "type": "string",
+                "description": "The generated image MIME type."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local URL for downloading the generated image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The generated image size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A PNG image uploaded to connector transit storage."
+          },
+          "creditsRemaining": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The Torii credit balance remaining after the request, when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image"
+        ],
+        "description": "A generated image in connector transit storage and the remaining Torii credit balance."
+      }
+    },
+    {
+      "id": "torii_image_translator.translate_image",
+      "service": "torii_image_translator",
+      "name": "translate_image",
+      "description": "Translate text in a manga, comic, or other public image with Torii, remove the source text, re-typeset the translation, and return the downloadable translated image.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for the source JPG, PNG, or WebP image, no larger than 50 MB.",
+            "format": "uri"
+          },
+          "targetLanguage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The target language code, such as en, ja, ko, zh-cn for Simplified Chinese, or zh-tw for Traditional Chinese."
+          },
+          "translator": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The Torii translation model identifier. Defaults to gemini-3.1-flash-lite. Current examples include deepseek, gpt-5.6-luna, grok-4.20, kimi-k2.5, gpt-5.4, gemini-3-flash, claude-sonnet-4.6, and gemini-3.7-flash."
+          },
+          "font": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The Torii font identifier. Defaults to noto, which supports Chinese and the full advertised language set. Other current examples include wildwords, badcomic, mashanzheng, komika, bangers, shonen, and heroika."
+          },
+          "textAlign": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "left",
+              "center",
+              "right"
+            ],
+            "description": "The translated text alignment. Defaults to auto."
+          },
+          "strokeDisabled": {
+            "type": "boolean",
+            "description": "Whether to disable the detected text outline when rendering the translation. Defaults to false."
+          },
+          "minFontSize": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 100,
+            "description": "The minimum rendered font size. Defaults to 6."
+          },
+          "bubblesOnly": {
+            "type": "boolean",
+            "description": "Whether to translate only text detected inside speech bubbles, plus long high-confidence text. Defaults to false."
+          },
+          "customPrompt": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Additional translation instructions, terminology, character guidance, or style requirements."
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 10000,
+            "description": "Story, character, event, and dialogue context used to keep a translation consistent. Pass None to start a Torii context chain, then reuse the returned context for later pages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageUrl",
+          "targetLanguage"
+        ],
+        "description": "Input for translating and re-typesetting text in a manga, comic, or other image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "translatedImage": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated image filename."
+              },
+              "mimeType": {
+                "const": "image/png",
+                "type": "string",
+                "description": "The generated image MIME type."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local URL for downloading the generated image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The generated image size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A PNG image uploaded to connector transit storage."
+          },
+          "textRegions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "description": "The horizontal center coordinate of the translated text region."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "The vertical center coordinate of the translated text region."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The translated text region width in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The translated text region height in pixels."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The translated text rendered in the region."
+                },
+                "originalText": {
+                  "type": "string",
+                  "description": "The original text detected in the region."
+                },
+                "textAlign": {
+                  "type": "string",
+                  "description": "The translated text alignment."
+                },
+                "fillColor": {
+                  "type": "string",
+                  "description": "The translated text fill color."
+                },
+                "strokeColor": {
+                  "type": "string",
+                  "description": "The translated text stroke color."
+                },
+                "lineWidth": {
+                  "type": "number",
+                  "description": "The translated text outline width in pixels."
+                },
+                "font": {
+                  "type": "string",
+                  "description": "The CSS font value used to render the translated text."
+                },
+                "addFontBackground": {
+                  "type": "boolean",
+                  "description": "Whether Torii added a background behind the translated text."
+                },
+                "addFontBorder": {
+                  "type": "boolean",
+                  "description": "Whether Torii added a custom border around the translated text."
+                },
+                "addBackgroundColor": {
+                  "type": "string",
+                  "description": "The hexadecimal background color used when a text background is enabled."
+                },
+                "rotation": {
+                  "type": "number",
+                  "description": "The translated text block rotation in radians."
+                },
+                "angle": {
+                  "type": "number",
+                  "description": "The translated text block rotation in degrees."
+                },
+                "layout": {
+                  "type": "string",
+                  "description": "The translated text layout orientation."
+                },
+                "textDir": {
+                  "type": "string",
+                  "description": "The translated text reading direction."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A translated text region and its rendering metadata returned by Torii."
+            },
+            "description": "The translated text regions and rendering metadata returned by Torii."
+          },
+          "context": {
+            "type": "string",
+            "description": "The updated Torii translation context for continuing with later pages."
+          },
+          "creditsRemaining": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The Torii credit balance remaining after the request, when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "translatedImage",
+          "textRegions"
+        ],
+        "description": "The primary translated image, translated regions, context, and credit balance. Use inpaint_image separately when a cleaned image without rendered translations is needed."
+      }
+    },
+    {
+      "id": "torii_image_translator.typeset_image",
+      "service": "torii_image_translator",
+      "name": "typeset_image",
+      "description": "Render translated text boxes over a pre-cleaned public image with Torii and return the typeset PNG through transit storage.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for the pre-cleaned JPG, PNG, or WebP image, no larger than 50 MB.",
+            "format": "uri"
+          },
+          "textBoxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "description": "The top-left horizontal coordinate in pixels."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "The top-left vertical coordinate in pixels."
+                },
+                "width": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The text box width in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The text box height in pixels."
+                },
+                "polygon": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "description": "The horizontal pixel coordinate."
+                        },
+                        {
+                          "type": "number",
+                          "description": "The vertical pixel coordinate."
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "One polygon point as an x and y pixel coordinate."
+                    },
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "description": "The horizontal pixel coordinate."
+                        },
+                        {
+                          "type": "number",
+                          "description": "The vertical pixel coordinate."
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "One polygon point as an x and y pixel coordinate."
+                    },
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "description": "The horizontal pixel coordinate."
+                        },
+                        {
+                          "type": "number",
+                          "description": "The vertical pixel coordinate."
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "One polygon point as an x and y pixel coordinate."
+                    },
+                    {
+                      "type": "array",
+                      "prefixItems": [
+                        {
+                          "type": "number",
+                          "description": "The horizontal pixel coordinate."
+                        },
+                        {
+                          "type": "number",
+                          "description": "The vertical pixel coordinate."
+                        }
+                      ],
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "description": "One polygon point as an x and y pixel coordinate."
+                    }
+                  ],
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "description": "Four points describing an oriented text region."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 5000,
+                  "description": "The text to render."
+                },
+                "alignment": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "center",
+                    "right"
+                  ],
+                  "description": "The horizontal text alignment."
+                },
+                "textColor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text fill color as a hexadecimal color value."
+                },
+                "strokeColor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text outline color as a hexadecimal color value."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "left_to_right",
+                    "top_to_bottom"
+                  ],
+                  "description": "The rendered text direction."
+                },
+                "angle": {
+                  "type": "number",
+                  "description": "The text rotation angle in degrees."
+                },
+                "sourceLanguage": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "description": "The language code used for direction-aware rendering, such as ja or zh."
+                },
+                "fontSize": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The font size for this text box in pixels."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text",
+                "alignment",
+                "textColor",
+                "strokeColor"
+              ],
+              "description": "One translated text box to render over a pre-cleaned image.",
+              "anyOf": [
+                {
+                  "required": [
+                    "polygon"
+                  ]
+                },
+                {
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ]
+                }
+              ],
+              "dependentRequired": {
+                "x": [
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "y": [
+                  "x",
+                  "width",
+                  "height"
+                ],
+                "width": [
+                  "x",
+                  "y",
+                  "height"
+                ],
+                "height": [
+                  "x",
+                  "y",
+                  "width"
+                ]
+              }
+            },
+            "description": "The translated text boxes to render.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "font": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The Torii font identifier. Defaults to noto, which supports Chinese and the full advertised language set. Other current examples include wildwords, badcomic, mashanzheng, komika, bangers, shonen, and heroika."
+          },
+          "minFontSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The minimum rendered font size. Defaults to 12."
+          },
+          "strokeDisabled": {
+            "type": "boolean",
+            "description": "Whether to disable text outlines for all rendered text boxes. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageUrl",
+          "textBoxes"
+        ],
+        "description": "Input for rendering translated text boxes over a pre-cleaned image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated image filename."
+              },
+              "mimeType": {
+                "const": "image/png",
+                "type": "string",
+                "description": "The generated image MIME type."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local URL for downloading the generated image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The generated image size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A PNG image uploaded to connector transit storage."
+          },
+          "creditsRemaining": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The Torii credit balance remaining after the request, when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image"
+        ],
+        "description": "A generated image in connector transit storage and the remaining Torii credit balance."
+      }
+    }
+  ]
+}

@@ -1,0 +1,3056 @@
+{
+  "service": "fuxin",
+  "displayName": "Foxit Cloud API",
+  "categories": [
+    "Productivity",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Your Foxit Cloud API client ID",
+          "description": "Foxit Cloud API client ID. Create a project in the Foxit Cloud API developer console, then copy the Client ID from https://cloudapi.fuxinsoft.cn/dev-console/project."
+        },
+        {
+          "key": "secret",
+          "label": "Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your Foxit Cloud API secret",
+          "description": "Foxit Cloud API client secret from the same developer console project: https://cloudapi.fuxinsoft.cn/dev-console/project."
+        }
+      ],
+      "testAction": {
+        "actionName": "get_user_stock",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://cloudapi.fuxinsoft.cn",
+  "actions": [
+    {
+      "id": "fuxin.check_pages_are_scanned",
+      "service": "fuxin",
+      "name": "check_pages_are_scanned",
+      "description": "Submit one PDF for scanned-page detection in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "pageRange": {
+            "type": "string",
+            "description": "The optional page range, such as 1-30, 1,3,5, or all."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for requesting per-page PDF analysis in Foxit.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.compare_documents",
+      "service": "fuxin",
+      "name": "compare_documents",
+      "description": "Compare two PDF documents with Foxit and submit a diff task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseDocId": {
+            "type": "string",
+            "description": "The Foxit document ID for the baseline PDF when baseFile is omitted."
+          },
+          "baseFile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "compareDocId": {
+            "type": "string",
+            "description": "The Foxit document ID for the comparison PDF when compareFile is omitted."
+          },
+          "compareFile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "resultType": {
+            "type": "string",
+            "enum": [
+              "json",
+              "pdf"
+            ],
+            "description": "Whether Foxit should return a JSON diff or a rendered PDF diff."
+          },
+          "compareType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "text"
+            ],
+            "description": "Whether Foxit should compare all changes or only text changes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for comparing two PDF files.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "baseDocId"
+                ]
+              },
+              {
+                "required": [
+                  "baseFile"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "compareDocId"
+                ]
+              },
+              {
+                "required": [
+                  "compareFile"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.compress_document",
+      "service": "fuxin",
+      "name": "compress_document",
+      "description": "Compress one PDF with a chosen Foxit compression level.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "compressionLevel": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "description": "The Foxit compression level to apply."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "compressionLevel"
+        ],
+        "description": "The input payload for compressing a PDF.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.convert_document",
+      "service": "fuxin",
+      "name": "convert_document",
+      "description": "Convert one PDF into Word, Excel, PowerPoint, image, or text with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "word",
+              "excel",
+              "ppt",
+              "image",
+              "text"
+            ],
+            "description": "The target format that Foxit should convert the PDF into."
+          },
+          "imageConfig": {
+            "type": "object",
+            "properties": {
+              "dpi": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000,
+                "description": "The output image DPI between 1 and 1000 when outputFormat is image."
+              },
+              "pageRange": {
+                "type": "string",
+                "description": "The page range when outputFormat is image, such as 1,3,5, 1-89, all, even, or odd."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The image conversion options accepted by Foxit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "outputFormat"
+        ],
+        "description": "The input payload for converting a PDF into another format.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.convert_office_document_to_images",
+      "service": "fuxin",
+      "name": "convert_office_document_to_images",
+      "description": "Convert one Office document into a ZIP of page images with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "word",
+              "excel",
+              "ppt"
+            ],
+            "description": "The input Office document format that Foxit should convert to images."
+          },
+          "dpi": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The output image DPI between 1 and 1000."
+          },
+          "destImgSuffix": {
+            "type": "string",
+            "enum": [
+              ".bmp",
+              ".jpg",
+              ".jpeg",
+              ".png",
+              ".tif",
+              ".tiff",
+              ".jpx",
+              ".jp2"
+            ],
+            "description": "The image file suffix Foxit should generate for each page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "format"
+        ],
+        "description": "The input payload for converting an Office document into page images.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.create_pdf_from_document",
+      "service": "fuxin",
+      "name": "create_pdf_from_document",
+      "description": "Create a PDF from a Word, Excel, PowerPoint, image, or text source in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "inputFormat": {
+            "type": "string",
+            "enum": [
+              "word",
+              "excel",
+              "ppt",
+              "image",
+              "text"
+            ],
+            "description": "The source document format that Foxit should convert into PDF."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inputFormat"
+        ],
+        "description": "The input payload for creating a PDF from another document format.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.create_pdf_from_html",
+      "service": "fuxin",
+      "name": "create_pdf_from_html",
+      "description": "Create a PDF from HTML content, an HTML file, or a webpage URL in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "format": {
+                "const": "url",
+                "type": "string",
+                "description": "Use a webpage URL as the HTML source."
+              },
+              "url": {
+                "type": "string",
+                "description": "The webpage URL to convert.",
+                "format": "uri"
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "description": "The output page width, greater than 16."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "description": "The output page height, greater than 16."
+                  },
+                  "rotate": {
+                    "type": "integer",
+                    "description": "The page rotation where 0=0deg, 1=90deg, 2=180deg, and 3=270deg."
+                  },
+                  "pageMode": {
+                    "type": "integer",
+                    "description": "The page mode where 0=single page and 1=multi-page."
+                  },
+                  "pageScaling": {
+                    "type": "integer",
+                    "description": "The page scaling mode where 0=none, 1=fixed size, and 2=fit HTML content."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The HTML-to-PDF conversion options accepted by Foxit."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "format",
+              "url"
+            ],
+            "description": "The input payload for converting one webpage URL into a PDF."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "docId": {
+                "type": "string",
+                "description": "An existing Foxit document ID returned by upload_file or a previous task."
+              },
+              "file": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Optional file name to use when uploading a multipart source to Foxit."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "A public URL that the runtime can download before uploading to Foxit.",
+                    "format": "uri"
+                  },
+                  "contentBase64": {
+                    "type": "string",
+                    "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A file source provided as a public URL or Base64 payload.",
+                "anyOf": [
+                  {
+                    "required": [
+                      "url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "contentBase64"
+                    ]
+                  }
+                ],
+                "not": {
+                  "required": [
+                    "url",
+                    "contentBase64"
+                  ]
+                }
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "html",
+                  "htm",
+                  "shtml"
+                ],
+                "description": "The HTML document format that Foxit should read from the source file."
+              },
+              "config": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "description": "The output page width, greater than 16."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "description": "The output page height, greater than 16."
+                  },
+                  "rotate": {
+                    "type": "integer",
+                    "description": "The page rotation where 0=0deg, 1=90deg, 2=180deg, and 3=270deg."
+                  },
+                  "pageMode": {
+                    "type": "integer",
+                    "description": "The page mode where 0=single page and 1=multi-page."
+                  },
+                  "pageScaling": {
+                    "type": "integer",
+                    "description": "The page scaling mode where 0=none, 1=fixed size, and 2=fit HTML content."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The HTML-to-PDF conversion options accepted by Foxit."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "format"
+            ],
+            "description": "The input payload for converting one HTML document source into a PDF.",
+            "anyOf": [
+              {
+                "required": [
+                  "docId"
+                ]
+              },
+              {
+                "required": [
+                  "file"
+                ]
+              }
+            ]
+          }
+        ],
+        "description": "The input payload for creating a PDF from HTML content or a webpage URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.download_file",
+      "service": "fuxin",
+      "name": "download_file",
+      "description": "Download one Foxit result document and upload it to local transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "The Foxit document ID to download."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Optional output file name passed through to Foxit download."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId"
+        ],
+        "description": "The input payload for downloading one Foxit result file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The downloaded file name."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the downloaded file."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the file.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "description": "A downloadable file uploaded to local transit storage."
+          },
+          "contentLength": {
+            "type": "integer",
+            "description": "The downloaded file size in bytes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "contentLength"
+        ],
+        "description": "The normalized Foxit download response."
+      }
+    },
+    {
+      "id": "fuxin.extract_document",
+      "service": "fuxin",
+      "name": "extract_document",
+      "description": "Extract text or embedded images from one PDF with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "extractText",
+              "extractImages"
+            ],
+            "description": "Whether Foxit should extract text or embedded images."
+          },
+          "pageRange": {
+            "type": "string",
+            "description": "The optional page range, such as 1-30, 1,3,5, or all."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "description": "The input payload for extracting text or images from a PDF.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.flatten_document",
+      "service": "fuxin",
+      "name": "flatten_document",
+      "description": "Flatten annotations and form fields into the page content of one PDF with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "pageRange": {
+            "type": "string",
+            "description": "The optional page range, such as 1-30, 1,3,5, or all."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for flattening annotations and form fields in a PDF.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.get_pages_basic_info",
+      "service": "fuxin",
+      "name": "get_pages_basic_info",
+      "description": "Submit one PDF for page-size and rotation analysis in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "pageRange": {
+            "type": "string",
+            "description": "The optional page range, such as 1-30, 1,3,5, or all."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for requesting per-page PDF analysis in Foxit.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.get_task",
+      "service": "fuxin",
+      "name": "get_task",
+      "description": "Fetch one Foxit task status and return the normalized task progress details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task ID to query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The input payload for querying one Foxit task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The result document ID when the task has completed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The result document ID when the task has completed."
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The reported task completion percentage."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reported task completion percentage."
+          },
+          "isRunning": {
+            "type": "boolean",
+            "description": "Whether Foxit reports the task as still running."
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream detail message returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream detail message returned by Foxit, if any."
+          },
+          "pagesIsScannedResult": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "boolean",
+                  "description": "Whether the page is scanned."
+                },
+                "description": "The per-page scanned-page result returned by pages_is_scanned tasks."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The per-page scanned-page result returned by pages_is_scanned tasks."
+          },
+          "pagesInfo": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pageIndex": {
+                      "type": "integer",
+                      "description": "The 1-based page index."
+                    },
+                    "rotation": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The page rotation where 0=0deg, 1=90deg, 2=180deg, and 3=270deg."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The page rotation where 0=0deg, 1=90deg, 2=180deg, and 3=270deg."
+                    },
+                    "width": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The page width in 1/72 inch units."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The page width in 1/72 inch units."
+                    },
+                    "height": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The page height in 1/72 inch units."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The page height in 1/72 inch units."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One page metadata item returned by Foxit."
+                },
+                "description": "The page metadata returned by pages_basic_info tasks."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The page metadata returned by pages_basic_info tasks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "docId",
+          "percentage",
+          "isRunning",
+          "detail",
+          "pagesIsScannedResult",
+          "pagesInfo"
+        ],
+        "description": "The normalized Foxit task status response."
+      }
+    },
+    {
+      "id": "fuxin.get_user_stock",
+      "service": "fuxin",
+      "name": "get_user_stock",
+      "description": "Fetch the remaining Foxit Services API and Embed API quota for the connected credential.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceApiStock": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "totalNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total quota."
+                  },
+                  "usedNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The used quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The used quota."
+                  },
+                  "remainNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The remaining quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The remaining quota."
+                  },
+                  "expireTime": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The Unix timestamp in seconds when the quota expires."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Unix timestamp in seconds when the quota expires."
+                  },
+                  "type": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The Foxit stock type where 1=paid and 0=trial."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Foxit stock type where 1=paid and 0=trial."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "One Foxit stock summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One Foxit stock summary."
+          },
+          "embedApiStock": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "totalNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total quota."
+                  },
+                  "usedNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The used quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The used quota."
+                  },
+                  "remainNum": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The remaining quota."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The remaining quota."
+                  },
+                  "expireTime": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The Unix timestamp in seconds when the quota expires."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Unix timestamp in seconds when the quota expires."
+                  },
+                  "type": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The Foxit stock type where 1=paid and 0=trial."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Foxit stock type where 1=paid and 0=trial."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "One Foxit stock summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One Foxit stock summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceApiStock",
+          "embedApiStock"
+        ],
+        "description": "The normalized Foxit stock response."
+      }
+    },
+    {
+      "id": "fuxin.linearize_document",
+      "service": "fuxin",
+      "name": "linearize_document",
+      "description": "Linearize one PDF to improve incremental web viewing in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for linearizing a PDF.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.manipulate_document_pages",
+      "service": "fuxin",
+      "name": "manipulate_document_pages",
+      "description": "Delete, rotate, or move PDF pages with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "config": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pageAction": {
+                  "type": "string",
+                  "enum": [
+                    "delete",
+                    "rotate",
+                    "move"
+                  ],
+                  "description": "The page operation type."
+                },
+                "pages": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "One zero-based page index."
+                  },
+                  "description": "The zero-based page indexes affected by the operation."
+                },
+                "angle": {
+                  "type": "integer",
+                  "description": "The rotation angle where 0=0deg, 1=90deg, 2=180deg, and 3=270deg."
+                },
+                "destination": {
+                  "type": "integer",
+                  "description": "The target zero-based page index used by move operations."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "pageAction",
+                "pages"
+              ],
+              "description": "One Foxit page manipulation operation.",
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "pageAction": {
+                        "const": "rotate"
+                      }
+                    },
+                    "required": [
+                      "pageAction"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "angle"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "pageAction": {
+                        "const": "move"
+                      }
+                    },
+                    "required": [
+                      "pageAction"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "destination"
+                    ]
+                  }
+                }
+              ]
+            },
+            "description": "The ordered list of page manipulation operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The input payload for deleting, rotating, or moving PDF pages.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.merge_documents",
+      "service": "fuxin",
+      "name": "merge_documents",
+      "description": "Merge multiple PDF documents into a single PDF with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Foxit document ID to merge."
+            },
+            "description": "The document IDs to merge in order.",
+            "minItems": 1
+          },
+          "zipFile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "isAddBookmark": {
+                "type": "boolean",
+                "description": "Whether Foxit should add bookmarks."
+              },
+              "isAddTOC": {
+                "type": "boolean",
+                "description": "Whether Foxit should add a table of contents. Foxit requires isAddBookmark to stay true."
+              },
+              "isContinueMerge": {
+                "type": "boolean",
+                "description": "Whether Foxit should continue merging when one source document fails."
+              },
+              "isRetainPageNum": {
+                "type": "boolean",
+                "description": "Whether Foxit should retain logical page numbers."
+              },
+              "bookmarkLevels": {
+                "type": "string",
+                "description": "The bookmark level range used to generate a table of contents, such as 1 or 1-5."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The merge options accepted by Foxit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for merging multiple PDF files.",
+        "anyOf": [
+          {
+            "required": [
+              "docIds"
+            ]
+          },
+          {
+            "required": [
+              "zipFile"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.ocr_document",
+      "service": "fuxin",
+      "name": "ocr_document",
+      "description": "Run OCR on one PDF or image document with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "lang": {
+            "type": "string",
+            "enum": [
+              "eng",
+              "zho",
+              "zhs",
+              "zht",
+              "spa",
+              "fra",
+              "deu",
+              "jpn"
+            ],
+            "description": "The OCR language used by Foxit."
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "text",
+              "json"
+            ],
+            "description": "The OCR output format returned by Foxit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for running OCR on a PDF or image document.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.protect_document",
+      "service": "fuxin",
+      "name": "protect_document",
+      "description": "Protect one PDF with passwords and permissions in Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "passwordProtection": {
+            "type": "object",
+            "properties": {
+              "userPassword": {
+                "type": "string",
+                "description": "The PDF user password."
+              },
+              "ownerPassword": {
+                "type": "string",
+                "description": "The PDF owner password."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The password settings used when protecting a PDF."
+          },
+          "permission": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PRINT_LOW_QUALITY",
+                "PRINT_HIGH_QUALITY",
+                "EDIT_CONTENT",
+                "EDIT_FILL_AND_SIGN_FORM_FIELDS",
+                "EDIT_ANNOTATION",
+                "EDIT_DOCUMENT_ASSEMBLY",
+                "COPY_CONTENT"
+              ],
+              "description": "One Foxit permission flag."
+            },
+            "description": "The Foxit permission flags to keep on the protected PDF."
+          },
+          "encryptionAlgorithm": {
+            "type": "string",
+            "enum": [
+              "AES_128",
+              "AES_256",
+              "RC4"
+            ],
+            "description": "The Foxit encryption algorithm used to protect the PDF."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passwordProtection",
+          "encryptionAlgorithm"
+        ],
+        "description": "The input payload for protecting a PDF with passwords and permissions.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.remove_password_from_document",
+      "service": "fuxin",
+      "name": "remove_password_from_document",
+      "description": "Remove the password from one protected PDF with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "password": {
+            "type": "string",
+            "description": "The password used to open the protected document before Foxit removes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "password"
+        ],
+        "description": "The input payload for removing a PDF password.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.split_document",
+      "service": "fuxin",
+      "name": "split_document",
+      "description": "Split one PDF into multiple smaller files with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "pageCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of pages that each split file should contain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageCount"
+        ],
+        "description": "The input payload for splitting a PDF into smaller files.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    },
+    {
+      "id": "fuxin.upload_file",
+      "service": "fuxin",
+      "name": "upload_file",
+      "description": "Upload one source file to Foxit Cloud API and return the reusable Foxit document ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The input payload for uploading one file to Foxit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "The uploaded file name returned by Foxit."
+          },
+          "docId": {
+            "type": "string",
+            "description": "The uploaded Foxit document ID."
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "The uploaded file size in bytes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName",
+          "docId",
+          "fileSize"
+        ],
+        "description": "The normalized Foxit upload result."
+      }
+    },
+    {
+      "id": "fuxin.watermark_document",
+      "service": "fuxin",
+      "name": "watermark_document",
+      "description": "Add a text or image watermark to one PDF with Foxit.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "An existing Foxit document ID returned by upload_file or a previous task."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "imageDocId": {
+            "type": "string",
+            "description": "An existing Foxit document ID for the watermark image when type is imageObject."
+          },
+          "imageFile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Optional file name to use when uploading a multipart source to Foxit."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "Optional MIME type to use when uploading a multipart source to Foxit."
+              },
+              "url": {
+                "type": "string",
+                "description": "A public URL that the runtime can download before uploading to Foxit.",
+                "format": "uri"
+              },
+              "contentBase64": {
+                "type": "string",
+                "description": "The Base64-encoded file content uploaded to Foxit as multipart."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A file source provided as a public URL or Base64 payload.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "contentBase64"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "contentBase64"
+              ]
+            }
+          },
+          "pageRange": {
+            "type": "string",
+            "description": "The optional page range, such as 1-30, 1,3,5, or all."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "textObject",
+              "imageObject"
+            ],
+            "description": "Whether Foxit should use a text watermark or an image watermark."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The watermark anchor position between 0 and 8."
+          },
+          "offsetX": {
+            "type": "number",
+            "description": "The horizontal watermark offset in points."
+          },
+          "offsetY": {
+            "type": "number",
+            "description": "The vertical watermark offset in points."
+          },
+          "flagOnTopOfPage": {
+            "type": "integer",
+            "description": "Whether the watermark stays above page content where 1=true and 0=false."
+          },
+          "flagNoPrint": {
+            "type": "integer",
+            "description": "Whether the watermark is excluded from printing where 1=true and 0=false."
+          },
+          "flagInvisible": {
+            "type": "integer",
+            "description": "Whether the watermark is invisible where 1=true and 0=false."
+          },
+          "scaleX": {
+            "type": "number",
+            "description": "The horizontal watermark scale factor."
+          },
+          "scaleY": {
+            "type": "number",
+            "description": "The vertical watermark scale factor."
+          },
+          "rotation": {
+            "type": "number",
+            "description": "The watermark rotation angle."
+          },
+          "opacity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The watermark opacity between 0 and 100."
+          },
+          "font": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The watermark text content."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The watermark font size."
+              },
+              "fontName": {
+                "type": "string",
+                "description": "The watermark font name."
+              },
+              "color": {
+                "type": "string",
+                "description": "The watermark color such as #000000."
+              },
+              "style": {
+                "type": "integer",
+                "description": "The watermark font style where 0=normal and 1=underline."
+              },
+              "alignment": {
+                "type": "integer",
+                "description": "The text alignment where 0=left, 1=center, and 2=right."
+              },
+              "lineSpace": {
+                "type": "number",
+                "description": "The line spacing value between 0 and 10."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "The text watermark font configuration."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for adding a watermark to a PDF.",
+        "anyOf": [
+          {
+            "required": [
+              "docId"
+            ]
+          },
+          {
+            "required": [
+              "file"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "imageObject"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "imageDocId"
+                  ]
+                },
+                {
+                  "required": [
+                    "imageFile"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "textObject"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "font"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "The Foxit task identifier."
+          },
+          "checkParams": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One upstream issue item."
+                },
+                "description": "The upstream parameter validation issues returned by Foxit, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream parameter validation issues returned by Foxit, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "checkParams"
+        ],
+        "description": "The normalized task submission response returned by Foxit."
+      }
+    }
+  ]
+}

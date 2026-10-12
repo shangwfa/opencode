@@ -1,0 +1,3203 @@
+{
+  "service": "openweather_api",
+  "displayName": "OpenWeather",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OPENWEATHER_API_KEY",
+      "description": "OpenWeather API key sent as the appid query parameter. Find or create it on the API keys page in your OpenWeather account: https://openweathermap.org/faq.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://openweathermap.org",
+  "actions": [
+    {
+      "id": "openweather_api.add_weather_station",
+      "service": "openweather_api",
+      "name": "add_weather_station",
+      "description": "Create one OpenWeather weather station under the current account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The caller-defined external weather-station identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The weather-station display name."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The station latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The station longitude in decimal degrees."
+          },
+          "altitude": {
+            "type": "number",
+            "description": "The station altitude in metres."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "external_id",
+          "name",
+          "latitude",
+          "longitude",
+          "altitude"
+        ],
+        "description": "The input payload for creating a weather station."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The OpenWeather weather-station identifier."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The caller-supplied external weather-station identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The weather-station display name."
+          },
+          "latitude": {
+            "type": "number",
+            "description": "The station latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "The station longitude in decimal degrees."
+          },
+          "altitude": {
+            "type": "number",
+            "description": "The station altitude in metres."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "The station rank when available."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The station creation time in ISO 8601 format."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The station update time in ISO 8601 format."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The owner identifier when returned by OpenWeather."
+          },
+          "source_type": {
+            "type": "integer",
+            "description": "The internal source type value."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude"
+        ],
+        "description": "A weather station object returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.delete_weather_station",
+      "service": "openweather_api",
+      "name": "delete_weather_station",
+      "description": "Delete one OpenWeather weather station by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The weather-station identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "station_id"
+        ],
+        "description": "The input payload for selecting a weather station."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The confirmation message returned by the connector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "The weather-station deletion result."
+      }
+    },
+    {
+      "id": "openweather_api.get_5_day_forecast",
+      "service": "openweather_api",
+      "name": "get_5_day_forecast",
+      "description": "Retrieve the OpenWeather 5-day forecast in 3-hour steps for exactly one location selector.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name, optionally followed by state code and country code, such as London,GB."
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The OpenWeather city identifier."
+          },
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZIP or postal code followed by country code, such as 94040,US."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "mode": {
+            "const": "json",
+            "type": "string",
+            "description": "The upstream response mode. Only json is supported."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for 5-day, 3-hour forecast data.",
+        "oneOf": [
+          {
+            "required": [
+              "q"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "id"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "zip"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cod": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The internal response code as text."
+              },
+              {
+                "type": "number",
+                "description": "The internal response code as a number."
+              }
+            ],
+            "description": "The internal response code."
+          },
+          "message": {
+            "type": "number",
+            "description": "The internal message value returned by OpenWeather."
+          },
+          "cnt": {
+            "type": "integer",
+            "description": "The number of forecast entries returned."
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The forecast time as a Unix UTC timestamp."
+                },
+                "main": {
+                  "type": "object",
+                  "properties": {
+                    "temp": {
+                      "type": "number",
+                      "description": "The measured temperature."
+                    },
+                    "feels_like": {
+                      "type": "number",
+                      "description": "The human-perceived temperature."
+                    },
+                    "temp_min": {
+                      "type": "number",
+                      "description": "The minimum observed temperature."
+                    },
+                    "temp_max": {
+                      "type": "number",
+                      "description": "The maximum observed temperature."
+                    },
+                    "pressure": {
+                      "type": "number",
+                      "description": "The atmospheric pressure in hPa."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "The humidity percentage."
+                    },
+                    "sea_level": {
+                      "type": "number",
+                      "description": "The sea-level pressure in hPa."
+                    },
+                    "grnd_level": {
+                      "type": "number",
+                      "description": "The ground-level pressure in hPa."
+                    },
+                    "temp_kf": {
+                      "type": "number",
+                      "description": "The internal forecast temperature correction."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "temp",
+                    "feels_like",
+                    "temp_min",
+                    "temp_max",
+                    "pressure",
+                    "humidity"
+                  ],
+                  "description": "The forecast main weather metrics."
+                },
+                "weather": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The weather condition identifier."
+                      },
+                      "main": {
+                        "type": "string",
+                        "description": "The group of weather parameters."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "The localized condition description."
+                      },
+                      "icon": {
+                        "type": "string",
+                        "description": "The weather icon code."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "main",
+                      "description",
+                      "icon"
+                    ],
+                    "description": "A weather condition entry returned by OpenWeather."
+                  },
+                  "description": "The forecast weather conditions."
+                },
+                "clouds": {
+                  "type": "object",
+                  "properties": {
+                    "all": {
+                      "type": "number",
+                      "description": "The cloudiness percentage."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "all"
+                  ],
+                  "description": "The forecast cloud coverage summary."
+                },
+                "wind": {
+                  "type": "object",
+                  "properties": {
+                    "speed": {
+                      "type": "number",
+                      "description": "The wind speed."
+                    },
+                    "deg": {
+                      "type": "number",
+                      "description": "The wind direction in degrees."
+                    },
+                    "gust": {
+                      "type": "number",
+                      "description": "The wind gust speed."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "speed"
+                  ],
+                  "description": "The forecast wind metrics."
+                },
+                "visibility": {
+                  "type": "number",
+                  "description": "The visibility distance in metres."
+                },
+                "pop": {
+                  "type": "number",
+                  "description": "The precipitation probability from 0 to 1."
+                },
+                "rain": {
+                  "type": "object",
+                  "properties": {
+                    "1h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last hour."
+                    },
+                    "3h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last three hours."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The rain volume summary."
+                },
+                "snow": {
+                  "type": "object",
+                  "properties": {
+                    "1h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last hour."
+                    },
+                    "3h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last three hours."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The snow volume summary."
+                },
+                "sys": {
+                  "type": "object",
+                  "properties": {
+                    "pod": {
+                      "type": "string",
+                      "description": "The part-of-day flag returned by the forecast endpoint."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "pod"
+                  ],
+                  "description": "The forecast system metadata."
+                },
+                "dt_txt": {
+                  "type": "string",
+                  "description": "The forecast time in UTC text format."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "dt",
+                "main",
+                "weather",
+                "clouds",
+                "wind",
+                "sys",
+                "dt_txt"
+              ],
+              "description": "A 3-hour forecast entry returned by OpenWeather."
+            },
+            "description": "The ordered 3-hour forecast entries."
+          },
+          "city": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The OpenWeather city identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The city name."
+              },
+              "coord": {
+                "type": "object",
+                "properties": {
+                  "lon": {
+                    "type": "number",
+                    "description": "The longitude in decimal degrees."
+                  },
+                  "lat": {
+                    "type": "number",
+                    "description": "The latitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "lon",
+                  "lat"
+                ],
+                "description": "The city coordinates."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166 country code."
+              },
+              "population": {
+                "type": "integer",
+                "description": "The population when available."
+              },
+              "timezone": {
+                "type": "integer",
+                "description": "The shift in seconds from UTC."
+              },
+              "sunrise": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sunrise time as a Unix UTC timestamp."
+              },
+              "sunset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sunset time as a Unix UTC timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "coord",
+              "country",
+              "timezone",
+              "sunrise",
+              "sunset"
+            ],
+            "description": "The city metadata for the forecast."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "cod",
+          "message",
+          "cnt",
+          "list",
+          "city"
+        ],
+        "description": "The 5-day weather forecast payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_air_pollution_current",
+      "service": "openweather_api",
+      "name": "get_air_pollution_current",
+      "description": "Retrieve the current air-pollution snapshot for one latitude and longitude.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for air-pollution data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coord": {
+            "type": "object",
+            "properties": {
+              "lon": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              },
+              "lat": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "lon",
+              "lat"
+            ],
+            "description": "The coordinates for the requested place."
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "main": {
+                  "type": "object",
+                  "properties": {
+                    "aqi": {
+                      "type": "integer",
+                      "description": "The OpenWeather Air Quality Index from 1 to 5."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "aqi"
+                  ],
+                  "description": "The air quality index block."
+                },
+                "components": {
+                  "type": "object",
+                  "properties": {
+                    "co": {
+                      "type": "number",
+                      "description": "The carbon monoxide concentration in ug/m3."
+                    },
+                    "no": {
+                      "type": "number",
+                      "description": "The nitric oxide concentration in ug/m3."
+                    },
+                    "no2": {
+                      "type": "number",
+                      "description": "The nitrogen dioxide concentration in ug/m3."
+                    },
+                    "o3": {
+                      "type": "number",
+                      "description": "The ozone concentration in ug/m3."
+                    },
+                    "so2": {
+                      "type": "number",
+                      "description": "The sulphur dioxide concentration in ug/m3."
+                    },
+                    "pm2_5": {
+                      "type": "number",
+                      "description": "The PM2.5 concentration in ug/m3."
+                    },
+                    "pm10": {
+                      "type": "number",
+                      "description": "The PM10 concentration in ug/m3."
+                    },
+                    "nh3": {
+                      "type": "number",
+                      "description": "The ammonia concentration in ug/m3."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "co",
+                    "no",
+                    "no2",
+                    "o3",
+                    "so2",
+                    "pm2_5",
+                    "pm10",
+                    "nh3"
+                  ],
+                  "description": "The pollutant concentration metrics."
+                },
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The calculation time as a Unix UTC timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "main",
+                "components",
+                "dt"
+              ],
+              "description": "A current, forecast, or historical air-pollution data point."
+            },
+            "description": "The ordered air-pollution data points returned by OpenWeather."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "coord",
+          "list"
+        ],
+        "description": "The air-pollution payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_air_pollution_forecast",
+      "service": "openweather_api",
+      "name": "get_air_pollution_forecast",
+      "description": "Retrieve the air-pollution forecast for one latitude and longitude.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for air-pollution data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coord": {
+            "type": "object",
+            "properties": {
+              "lon": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              },
+              "lat": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "lon",
+              "lat"
+            ],
+            "description": "The coordinates for the requested place."
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "main": {
+                  "type": "object",
+                  "properties": {
+                    "aqi": {
+                      "type": "integer",
+                      "description": "The OpenWeather Air Quality Index from 1 to 5."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "aqi"
+                  ],
+                  "description": "The air quality index block."
+                },
+                "components": {
+                  "type": "object",
+                  "properties": {
+                    "co": {
+                      "type": "number",
+                      "description": "The carbon monoxide concentration in ug/m3."
+                    },
+                    "no": {
+                      "type": "number",
+                      "description": "The nitric oxide concentration in ug/m3."
+                    },
+                    "no2": {
+                      "type": "number",
+                      "description": "The nitrogen dioxide concentration in ug/m3."
+                    },
+                    "o3": {
+                      "type": "number",
+                      "description": "The ozone concentration in ug/m3."
+                    },
+                    "so2": {
+                      "type": "number",
+                      "description": "The sulphur dioxide concentration in ug/m3."
+                    },
+                    "pm2_5": {
+                      "type": "number",
+                      "description": "The PM2.5 concentration in ug/m3."
+                    },
+                    "pm10": {
+                      "type": "number",
+                      "description": "The PM10 concentration in ug/m3."
+                    },
+                    "nh3": {
+                      "type": "number",
+                      "description": "The ammonia concentration in ug/m3."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "co",
+                    "no",
+                    "no2",
+                    "o3",
+                    "so2",
+                    "pm2_5",
+                    "pm10",
+                    "nh3"
+                  ],
+                  "description": "The pollutant concentration metrics."
+                },
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The calculation time as a Unix UTC timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "main",
+                "components",
+                "dt"
+              ],
+              "description": "A current, forecast, or historical air-pollution data point."
+            },
+            "description": "The ordered air-pollution data points returned by OpenWeather."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "coord",
+          "list"
+        ],
+        "description": "The air-pollution payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_air_pollution_history",
+      "service": "openweather_api",
+      "name": "get_air_pollution_history",
+      "description": "Retrieve historical air-pollution data for one latitude and longitude over a time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The start time as a Unix UTC timestamp."
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The end time as a Unix UTC timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon",
+          "start",
+          "end"
+        ],
+        "description": "The input payload for historical air-pollution data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coord": {
+            "type": "object",
+            "properties": {
+              "lon": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              },
+              "lat": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "lon",
+              "lat"
+            ],
+            "description": "The coordinates for the requested place."
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "main": {
+                  "type": "object",
+                  "properties": {
+                    "aqi": {
+                      "type": "integer",
+                      "description": "The OpenWeather Air Quality Index from 1 to 5."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "aqi"
+                  ],
+                  "description": "The air quality index block."
+                },
+                "components": {
+                  "type": "object",
+                  "properties": {
+                    "co": {
+                      "type": "number",
+                      "description": "The carbon monoxide concentration in ug/m3."
+                    },
+                    "no": {
+                      "type": "number",
+                      "description": "The nitric oxide concentration in ug/m3."
+                    },
+                    "no2": {
+                      "type": "number",
+                      "description": "The nitrogen dioxide concentration in ug/m3."
+                    },
+                    "o3": {
+                      "type": "number",
+                      "description": "The ozone concentration in ug/m3."
+                    },
+                    "so2": {
+                      "type": "number",
+                      "description": "The sulphur dioxide concentration in ug/m3."
+                    },
+                    "pm2_5": {
+                      "type": "number",
+                      "description": "The PM2.5 concentration in ug/m3."
+                    },
+                    "pm10": {
+                      "type": "number",
+                      "description": "The PM10 concentration in ug/m3."
+                    },
+                    "nh3": {
+                      "type": "number",
+                      "description": "The ammonia concentration in ug/m3."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "co",
+                    "no",
+                    "no2",
+                    "o3",
+                    "so2",
+                    "pm2_5",
+                    "pm10",
+                    "nh3"
+                  ],
+                  "description": "The pollutant concentration metrics."
+                },
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The calculation time as a Unix UTC timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "main",
+                "components",
+                "dt"
+              ],
+              "description": "A current, forecast, or historical air-pollution data point."
+            },
+            "description": "The ordered air-pollution data points returned by OpenWeather."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "coord",
+          "list"
+        ],
+        "description": "The air-pollution payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_circle_city_weather",
+      "service": "openweather_api",
+      "name": "get_circle_city_weather",
+      "description": "Retrieve current weather for nearby cities around one latitude and longitude by using OpenWeather's compatibility city-search endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude of the circle centre in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude of the circle centre in decimal degrees."
+          },
+          "cnt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of nearby cities to return."
+          },
+          "mode": {
+            "const": "json",
+            "type": "string",
+            "description": "The upstream response mode. Only json is supported."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for nearby-city weather data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cod": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The internal response code as text."
+              },
+              {
+                "type": "number",
+                "description": "The internal response code as a number."
+              }
+            ],
+            "description": "The internal response code."
+          },
+          "message": {
+            "type": "number",
+            "description": "The internal message value returned by OpenWeather."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of city entries returned."
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The OpenWeather city identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The city name."
+                },
+                "coord": {
+                  "type": "object",
+                  "properties": {
+                    "lon": {
+                      "type": "number",
+                      "description": "The longitude in decimal degrees."
+                    },
+                    "lat": {
+                      "type": "number",
+                      "description": "The latitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "lon",
+                    "lat"
+                  ],
+                  "description": "The city coordinates."
+                },
+                "main": {
+                  "type": "object",
+                  "properties": {
+                    "temp": {
+                      "type": "number",
+                      "description": "The measured temperature."
+                    },
+                    "feels_like": {
+                      "type": "number",
+                      "description": "The human-perceived temperature."
+                    },
+                    "temp_min": {
+                      "type": "number",
+                      "description": "The minimum observed temperature."
+                    },
+                    "temp_max": {
+                      "type": "number",
+                      "description": "The maximum observed temperature."
+                    },
+                    "pressure": {
+                      "type": "number",
+                      "description": "The atmospheric pressure in hPa."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "The humidity percentage."
+                    },
+                    "sea_level": {
+                      "type": "number",
+                      "description": "The sea-level pressure in hPa."
+                    },
+                    "grnd_level": {
+                      "type": "number",
+                      "description": "The ground-level pressure in hPa."
+                    },
+                    "temp_kf": {
+                      "type": "number",
+                      "description": "The internal forecast temperature correction."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "temp",
+                    "feels_like",
+                    "temp_min",
+                    "temp_max",
+                    "pressure",
+                    "humidity"
+                  ],
+                  "description": "The main weather metrics."
+                },
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The calculation time as a Unix UTC timestamp."
+                },
+                "wind": {
+                  "type": "object",
+                  "properties": {
+                    "speed": {
+                      "type": "number",
+                      "description": "The wind speed."
+                    },
+                    "deg": {
+                      "type": "number",
+                      "description": "The wind direction in degrees."
+                    },
+                    "gust": {
+                      "type": "number",
+                      "description": "The wind gust speed."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "speed"
+                  ],
+                  "description": "The wind metrics."
+                },
+                "sys": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "type": "string",
+                      "description": "The ISO 3166 country code."
+                    },
+                    "sunrise": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The sunrise time as a Unix UTC timestamp."
+                    },
+                    "sunset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The sunset time as a Unix UTC timestamp."
+                    },
+                    "timezone": {
+                      "type": "integer",
+                      "description": "The shift in seconds from UTC."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The city-level system metadata."
+                },
+                "clouds": {
+                  "type": "object",
+                  "properties": {
+                    "all": {
+                      "type": "number",
+                      "description": "The cloudiness percentage."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "all"
+                  ],
+                  "description": "The cloud coverage summary."
+                },
+                "weather": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The weather condition identifier."
+                      },
+                      "main": {
+                        "type": "string",
+                        "description": "The group of weather parameters."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "The localized condition description."
+                      },
+                      "icon": {
+                        "type": "string",
+                        "description": "The weather icon code."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "main",
+                      "description",
+                      "icon"
+                    ],
+                    "description": "A weather condition entry returned by OpenWeather."
+                  },
+                  "description": "The weather conditions for the city."
+                },
+                "rain": {
+                  "type": "object",
+                  "properties": {
+                    "1h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last hour."
+                    },
+                    "3h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last three hours."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The rain volume summary."
+                },
+                "snow": {
+                  "type": "object",
+                  "properties": {
+                    "1h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last hour."
+                    },
+                    "3h": {
+                      "type": "number",
+                      "description": "The precipitation volume for the last three hours."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The snow volume summary."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "coord",
+                "main",
+                "dt",
+                "wind",
+                "sys",
+                "clouds",
+                "weather"
+              ],
+              "description": "A current weather entry returned by the circle city weather endpoint."
+            },
+            "description": "The current weather entries for nearby cities."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "cod",
+          "message",
+          "count",
+          "list"
+        ],
+        "description": "The current weather payload for nearby cities returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_current_weather",
+      "service": "openweather_api",
+      "name": "get_current_weather",
+      "description": "Retrieve the current weather for exactly one OpenWeather location selector.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name, optionally followed by state code and country code, such as London,GB."
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The OpenWeather city identifier."
+          },
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZIP or postal code followed by country code, such as 94040,US."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for current weather data.",
+        "oneOf": [
+          {
+            "required": [
+              "q"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "id"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "zip"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "lat"
+                  ]
+                },
+                {
+                  "required": [
+                    "lon"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "lat",
+              "lon"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "q"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                },
+                {
+                  "required": [
+                    "zip"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coord": {
+            "type": "object",
+            "properties": {
+              "lon": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              },
+              "lat": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "lon",
+              "lat"
+            ],
+            "description": "The coordinates for the requested place."
+          },
+          "weather": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The weather condition identifier."
+                },
+                "main": {
+                  "type": "string",
+                  "description": "The group of weather parameters."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The localized condition description."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The weather icon code."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "main",
+                "description",
+                "icon"
+              ],
+              "description": "A weather condition entry returned by OpenWeather."
+            },
+            "description": "The weather conditions for the requested place."
+          },
+          "base": {
+            "type": "string",
+            "description": "The internal base parameter returned by OpenWeather."
+          },
+          "main": {
+            "type": "object",
+            "properties": {
+              "temp": {
+                "type": "number",
+                "description": "The measured temperature."
+              },
+              "feels_like": {
+                "type": "number",
+                "description": "The human-perceived temperature."
+              },
+              "temp_min": {
+                "type": "number",
+                "description": "The minimum observed temperature."
+              },
+              "temp_max": {
+                "type": "number",
+                "description": "The maximum observed temperature."
+              },
+              "pressure": {
+                "type": "number",
+                "description": "The atmospheric pressure in hPa."
+              },
+              "humidity": {
+                "type": "number",
+                "description": "The humidity percentage."
+              },
+              "sea_level": {
+                "type": "number",
+                "description": "The sea-level pressure in hPa."
+              },
+              "grnd_level": {
+                "type": "number",
+                "description": "The ground-level pressure in hPa."
+              },
+              "temp_kf": {
+                "type": "number",
+                "description": "The internal forecast temperature correction."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "temp",
+              "feels_like",
+              "temp_min",
+              "temp_max",
+              "pressure",
+              "humidity"
+            ],
+            "description": "The main weather metrics."
+          },
+          "visibility": {
+            "type": "number",
+            "description": "The visibility distance in metres."
+          },
+          "wind": {
+            "type": "object",
+            "properties": {
+              "speed": {
+                "type": "number",
+                "description": "The wind speed."
+              },
+              "deg": {
+                "type": "number",
+                "description": "The wind direction in degrees."
+              },
+              "gust": {
+                "type": "number",
+                "description": "The wind gust speed."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "speed"
+            ],
+            "description": "The wind metrics."
+          },
+          "rain": {
+            "type": "object",
+            "properties": {
+              "1h": {
+                "type": "number",
+                "description": "The precipitation volume for the last hour."
+              },
+              "3h": {
+                "type": "number",
+                "description": "The precipitation volume for the last three hours."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The rain volume summary."
+          },
+          "snow": {
+            "type": "object",
+            "properties": {
+              "1h": {
+                "type": "number",
+                "description": "The precipitation volume for the last hour."
+              },
+              "3h": {
+                "type": "number",
+                "description": "The precipitation volume for the last three hours."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The snow volume summary."
+          },
+          "clouds": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "number",
+                "description": "The cloudiness percentage."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "all"
+            ],
+            "description": "The cloud coverage summary."
+          },
+          "dt": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The calculation time as a Unix UTC timestamp."
+          },
+          "sys": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "integer",
+                "description": "The internal system type."
+              },
+              "id": {
+                "type": "integer",
+                "description": "The internal system identifier."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166 country code."
+              },
+              "sunrise": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sunrise time as a Unix UTC timestamp."
+              },
+              "sunset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sunset time as a Unix UTC timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "country",
+              "sunrise",
+              "sunset"
+            ],
+            "description": "The current weather system metadata."
+          },
+          "timezone": {
+            "type": "integer",
+            "description": "The shift in seconds from UTC."
+          },
+          "id": {
+            "type": "integer",
+            "description": "The OpenWeather city identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The place name returned by OpenWeather."
+          },
+          "cod": {
+            "type": "integer",
+            "description": "The internal response code returned on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "coord",
+          "weather",
+          "base",
+          "main",
+          "wind",
+          "clouds",
+          "dt",
+          "sys",
+          "timezone",
+          "id",
+          "name",
+          "cod"
+        ],
+        "description": "The current weather payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_geocoding_by_zip",
+      "service": "openweather_api",
+      "name": "get_geocoding_by_zip",
+      "description": "Resolve one ZIP or postal code into a named OpenWeather location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZIP or postal code followed by country code, such as 94040,US."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zip"
+        ],
+        "description": "The input payload for ZIP or postal-code geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The localized place name."
+              },
+              "local_names": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Localized names keyed by language code."
+              },
+              "lat": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              },
+              "lon": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166 country code."
+              },
+              "state": {
+                "type": "string",
+                "description": "The state or region name when available."
+              },
+              "zip": {
+                "type": "string",
+                "description": "The ZIP or postal code when available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "lat",
+              "lon",
+              "country"
+            ],
+            "description": "The ZIP or postal-code geocoding result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location"
+        ],
+        "description": "The ZIP or postal-code geocoding result."
+      }
+    },
+    {
+      "id": "openweather_api.get_geocoding_direct",
+      "service": "openweather_api",
+      "name": "get_geocoding_direct",
+      "description": "Resolve one place name into one or more OpenWeather geocoding matches.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The location name to geocode."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The maximum number of place matches to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for direct geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The localized place name."
+                },
+                "local_names": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Localized names keyed by language code."
+                },
+                "lat": {
+                  "type": "number",
+                  "description": "The latitude in decimal degrees."
+                },
+                "lon": {
+                  "type": "number",
+                  "description": "The longitude in decimal degrees."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The ISO 3166 country code."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state or region name when available."
+                },
+                "zip": {
+                  "type": "string",
+                  "description": "The ZIP or postal code when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "lat",
+                "lon",
+                "country"
+              ],
+              "description": "A place result returned by the OpenWeather Geocoding API."
+            },
+            "description": "The geocoding matches returned by OpenWeather."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locations"
+        ],
+        "description": "The direct geocoding results."
+      }
+    },
+    {
+      "id": "openweather_api.get_geocoding_reverse",
+      "service": "openweather_api",
+      "name": "get_geocoding_reverse",
+      "description": "Resolve one latitude and longitude pair into one or more named places.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The maximum number of place matches to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for reverse geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The localized place name."
+                },
+                "local_names": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Localized names keyed by language code."
+                },
+                "lat": {
+                  "type": "number",
+                  "description": "The latitude in decimal degrees."
+                },
+                "lon": {
+                  "type": "number",
+                  "description": "The longitude in decimal degrees."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The ISO 3166 country code."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state or region name when available."
+                },
+                "zip": {
+                  "type": "string",
+                  "description": "The ZIP or postal code when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "lat",
+                "lon",
+                "country"
+              ],
+              "description": "A place result returned by the OpenWeather Geocoding API."
+            },
+            "description": "The reverse-geocoding matches returned by OpenWeather."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locations"
+        ],
+        "description": "The reverse geocoding results."
+      }
+    },
+    {
+      "id": "openweather_api.get_station_measurements",
+      "service": "openweather_api",
+      "name": "get_station_measurements",
+      "description": "List aggregated historical measurements for one OpenWeather weather station.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The weather-station identifier."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "m",
+              "h",
+              "d"
+            ],
+            "description": "The aggregation granularity: minute, hour, or day."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of aggregated records."
+          },
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The interval start as a Unix UTC timestamp."
+          },
+          "to": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The interval end as a Unix UTC timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "station_id",
+          "type",
+          "limit",
+          "from",
+          "to"
+        ],
+        "description": "The input payload for listing aggregated station measurements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The aggregated measurement time as a Unix UTC timestamp."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The aggregation granularity returned by OpenWeather."
+                },
+                "station_id": {
+                  "type": "string",
+                  "description": "The weather-station identifier."
+                },
+                "temp": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The aggregated temperature metrics."
+                },
+                "humidity": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The aggregated humidity metrics."
+                },
+                "pressure": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The aggregated pressure metrics."
+                },
+                "wind": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The aggregated wind metrics."
+                },
+                "precipitation": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The aggregated precipitation metrics."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "date",
+                "type",
+                "station_id"
+              ],
+              "description": "An aggregated weather-station measurement record returned by OpenWeather."
+            },
+            "description": "The aggregated station measurements returned by OpenWeather."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "measurements"
+        ],
+        "description": "The weather-station measurement list."
+      }
+    },
+    {
+      "id": "openweather_api.get_uv_index",
+      "service": "openweather_api",
+      "name": "get_uv_index",
+      "description": "Return the current UV index by sampling OpenWeather One Call 3.0, because the legacy UV Index API is retired.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for the current UV index compatibility helper."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "description": "The latitude used for the UV lookup."
+          },
+          "lon": {
+            "type": "number",
+            "description": "The longitude used for the UV lookup."
+          },
+          "date": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The sampled Unix UTC timestamp."
+          },
+          "dateIso": {
+            "type": "string",
+            "description": "The sampled timestamp encoded in ISO 8601 format."
+          },
+          "value": {
+            "type": "number",
+            "description": "The UV index value sampled from One Call 3.0."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon",
+          "date",
+          "dateIso",
+          "value"
+        ],
+        "description": "A UV index point synthesized from OpenWeather One Call 3.0."
+      }
+    },
+    {
+      "id": "openweather_api.get_uv_index_forecast",
+      "service": "openweather_api",
+      "name": "get_uv_index_forecast",
+      "description": "Return daily UV forecast points by sampling OpenWeather One Call 3.0, because the legacy UV Index API is retired.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "cnt": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "The maximum number of daily UV forecast points to return."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "description": "The input payload for the UV forecast compatibility helper."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lat": {
+                  "type": "number",
+                  "description": "The latitude used for the UV lookup."
+                },
+                "lon": {
+                  "type": "number",
+                  "description": "The longitude used for the UV lookup."
+                },
+                "date": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The sampled Unix UTC timestamp."
+                },
+                "dateIso": {
+                  "type": "string",
+                  "description": "The sampled timestamp encoded in ISO 8601 format."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "The UV index value sampled from One Call 3.0."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "lat",
+                "lon",
+                "date",
+                "dateIso",
+                "value"
+              ],
+              "description": "A UV index point synthesized from OpenWeather One Call 3.0."
+            },
+            "description": "The ordered daily UV forecast points synthesized from One Call 3.0."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "The UV forecast compatibility results."
+      }
+    },
+    {
+      "id": "openweather_api.get_uv_index_history",
+      "service": "openweather_api",
+      "name": "get_uv_index_history",
+      "description": "Return sampled historical UV index points by querying OpenWeather One Call 3.0 timemachine once per day in the requested range, because the legacy UV Index API is retired.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The start time as a Unix UTC timestamp."
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The end time as a Unix UTC timestamp."
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "metric",
+              "imperial"
+            ],
+            "description": "The units of measurement for the response."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response language code in ISO 639-1 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lon",
+          "start",
+          "end"
+        ],
+        "description": "The input payload for the UV history compatibility helper."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lat": {
+                  "type": "number",
+                  "description": "The latitude used for the UV lookup."
+                },
+                "lon": {
+                  "type": "number",
+                  "description": "The longitude used for the UV lookup."
+                },
+                "date": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The sampled Unix UTC timestamp."
+                },
+                "dateIso": {
+                  "type": "string",
+                  "description": "The sampled timestamp encoded in ISO 8601 format."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "The UV index value sampled from One Call 3.0."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "lat",
+                "lon",
+                "date",
+                "dateIso",
+                "value"
+              ],
+              "description": "A UV index point synthesized from OpenWeather One Call 3.0."
+            },
+            "description": "The sampled historical UV index points synthesized from One Call 3.0."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "The UV history compatibility results."
+      }
+    },
+    {
+      "id": "openweather_api.get_weather_map_tile",
+      "service": "openweather_api",
+      "name": "get_weather_map_tile",
+      "description": "Fetch one OpenWeather weather-map tile and return it as Base64 PNG bytes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": [
+              "clouds",
+              "clouds_new",
+              "precipitation",
+              "precipitation_new",
+              "pressure",
+              "pressure_new",
+              "wind",
+              "wind_new",
+              "temp",
+              "temp_new"
+            ],
+            "description": "The weather tile layer name."
+          },
+          "z": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The tile zoom level."
+          },
+          "x": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The tile X coordinate."
+          },
+          "y": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The tile Y coordinate."
+          },
+          "palette": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom palette string sent to the upstream tile API."
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The tile opacity sent to the upstream tile API."
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upstream tile colour schema."
+          },
+          "fill": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upstream empty-area fill colour."
+          },
+          "fill_bound": {
+            "type": "boolean",
+            "description": "Whether to request upstream fill outside the data boundary."
+          },
+          "scale": {
+            "oneOf": [
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              }
+            ],
+            "description": "The upstream tile scale factor."
+          },
+          "format": {
+            "const": "png",
+            "type": "string",
+            "description": "The requested tile format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "layer",
+          "z",
+          "x",
+          "y"
+        ],
+        "description": "The input payload for fetching a weather map tile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tileBase64": {
+            "type": "string",
+            "description": "The requested weather tile encoded as Base64 PNG bytes."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The content type returned by OpenWeather."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tileBase64",
+          "contentType"
+        ],
+        "description": "The weather map tile payload returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_weather_station",
+      "service": "openweather_api",
+      "name": "get_weather_station",
+      "description": "Retrieve one OpenWeather weather station by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The weather-station identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "station_id"
+        ],
+        "description": "The input payload for selecting a weather station."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The OpenWeather weather-station identifier."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The caller-supplied external weather-station identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The weather-station display name."
+          },
+          "latitude": {
+            "type": "number",
+            "description": "The station latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "The station longitude in decimal degrees."
+          },
+          "altitude": {
+            "type": "number",
+            "description": "The station altitude in metres."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "The station rank when available."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The station creation time in ISO 8601 format."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The station update time in ISO 8601 format."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The owner identifier when returned by OpenWeather."
+          },
+          "source_type": {
+            "type": "integer",
+            "description": "The internal source type value."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude"
+        ],
+        "description": "A weather station object returned by OpenWeather."
+      }
+    },
+    {
+      "id": "openweather_api.get_weather_triggers",
+      "service": "openweather_api",
+      "name": "get_weather_triggers",
+      "description": "Compatibility action for the retired OpenWeather Weather Triggers API. Execution always returns a deprecation error.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The trigger type, such as temperature or wind."
+                },
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    ">",
+                    "<",
+                    "=",
+                    "between"
+                  ],
+                  "description": "The comparison operator used by the trigger."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "A single threshold value for the trigger."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "A numeric bound."
+                      },
+                      "description": "The lower and upper threshold bounds for the trigger.",
+                      "minItems": 2,
+                      "maxItems": 2
+                    }
+                  ],
+                  "description": "The numeric threshold or threshold range for the trigger."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90,
+                      "description": "The trigger latitude in decimal degrees."
+                    },
+                    "lon": {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180,
+                      "description": "The trigger longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "lat",
+                    "lon"
+                  ],
+                  "description": "The location monitored by the trigger."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "condition",
+                "value",
+                "location"
+              ],
+              "description": "A weather-trigger definition kept for compatibility."
+            },
+            "description": "The trigger definitions requested for compatibility.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "triggers"
+        ],
+        "description": "The input payload for the retired weather-trigger compatibility action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The trigger identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The trigger status."
+                },
+                "details": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional trigger details."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "status",
+                "details"
+              ],
+              "description": "One weather-trigger compatibility result."
+            },
+            "description": "The trigger results returned by the compatibility action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "triggers"
+        ],
+        "description": "The weather-trigger compatibility result."
+      }
+    },
+    {
+      "id": "openweather_api.list_weather_stations",
+      "service": "openweather_api",
+      "name": "list_weather_stations",
+      "description": "List all OpenWeather weather stations available to the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing weather stations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The OpenWeather weather-station identifier."
+                },
+                "external_id": {
+                  "type": "string",
+                  "description": "The caller-supplied external weather-station identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The weather-station display name."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The station latitude in decimal degrees."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The station longitude in decimal degrees."
+                },
+                "altitude": {
+                  "type": "number",
+                  "description": "The station altitude in metres."
+                },
+                "rank": {
+                  "type": "integer",
+                  "description": "The station rank when available."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The station creation time in ISO 8601 format."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The station update time in ISO 8601 format."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "The owner identifier when returned by OpenWeather."
+                },
+                "source_type": {
+                  "type": "integer",
+                  "description": "The internal source type value."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "latitude",
+                "longitude"
+              ],
+              "description": "A weather station object returned by OpenWeather."
+            },
+            "description": "The weather stations returned by OpenWeather."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stations"
+        ],
+        "description": "The weather-station list."
+      }
+    },
+    {
+      "id": "openweather_api.submit_station_measurements",
+      "service": "openweather_api",
+      "name": "submit_station_measurements",
+      "description": "Submit one or more measurements for existing OpenWeather weather stations.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "measurements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "station_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The weather-station identifier."
+                },
+                "dt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The measurement time as a Unix UTC timestamp."
+                },
+                "temperature": {
+                  "type": "number",
+                  "description": "The air temperature in Celsius."
+                },
+                "humidity": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "The humidity percentage."
+                },
+                "pressure": {
+                  "type": "number",
+                  "description": "The atmospheric pressure in hPa."
+                },
+                "wind_speed": {
+                  "type": "number",
+                  "description": "The wind speed in metres per second."
+                },
+                "wind_deg": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 360,
+                  "description": "The wind direction in degrees."
+                },
+                "wind_gust": {
+                  "type": "number",
+                  "description": "The wind gust speed in metres per second."
+                },
+                "rain_1h": {
+                  "type": "number",
+                  "description": "The rainfall for the previous hour in millimetres."
+                },
+                "rain_6h": {
+                  "type": "number",
+                  "description": "The rainfall for the previous six hours in millimetres."
+                },
+                "rain_24h": {
+                  "type": "number",
+                  "description": "The rainfall for the previous twenty-four hours in millimetres."
+                },
+                "snow_1h": {
+                  "type": "number",
+                  "description": "The snowfall for the previous hour in millimetres."
+                },
+                "snow_6h": {
+                  "type": "number",
+                  "description": "The snowfall for the previous six hours in millimetres."
+                },
+                "snow_24h": {
+                  "type": "number",
+                  "description": "The snowfall for the previous twenty-four hours in millimetres."
+                },
+                "dew_point": {
+                  "type": "number",
+                  "description": "The dew-point temperature in Celsius."
+                },
+                "humidex": {
+                  "type": "number",
+                  "description": "The humidex value."
+                },
+                "heat_index": {
+                  "type": "number",
+                  "description": "The heat index value."
+                },
+                "visibility_distance": {
+                  "type": "number",
+                  "description": "The visibility distance in metres."
+                },
+                "visibility_prefix": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The visibility prefix string."
+                },
+                "clouds": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "One cloud-layer measurement object."
+                  },
+                  "description": "The cloud-layer measurements."
+                },
+                "weather": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "One observed weather phenomenon object."
+                  },
+                  "description": "The observed weather phenomena."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "station_id",
+                "dt"
+              ],
+              "description": "One weather-station measurement submitted to OpenWeather."
+            },
+            "description": "The list of weather-station measurements to submit.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "measurements"
+        ],
+        "description": "The input payload for submitting station measurements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The confirmation message returned by the connector."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the measurement submission succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message",
+          "success"
+        ],
+        "description": "The station-measurement submission result."
+      }
+    },
+    {
+      "id": "openweather_api.update_weather_station",
+      "service": "openweather_api",
+      "name": "update_weather_station",
+      "description": "Update one existing OpenWeather weather station.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The weather-station identifier to update."
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated external weather-station identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated weather-station display name."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The updated station latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The updated station longitude in decimal degrees."
+          },
+          "altitude": {
+            "type": "number",
+            "description": "The updated station altitude in metres."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "station_id"
+        ],
+        "description": "The input payload for updating a weather station.",
+        "anyOf": [
+          {
+            "required": [
+              "external_id"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "latitude"
+            ]
+          },
+          {
+            "required": [
+              "longitude"
+            ]
+          },
+          {
+            "required": [
+              "altitude"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The OpenWeather weather-station identifier."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The caller-supplied external weather-station identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The weather-station display name."
+          },
+          "latitude": {
+            "type": "number",
+            "description": "The station latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "description": "The station longitude in decimal degrees."
+          },
+          "altitude": {
+            "type": "number",
+            "description": "The station altitude in metres."
+          },
+          "rank": {
+            "type": "integer",
+            "description": "The station rank when available."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The station creation time in ISO 8601 format."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The station update time in ISO 8601 format."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The owner identifier when returned by OpenWeather."
+          },
+          "source_type": {
+            "type": "integer",
+            "description": "The internal source type value."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "latitude",
+          "longitude"
+        ],
+        "description": "A weather station object returned by OpenWeather."
+      }
+    }
+  ]
+}

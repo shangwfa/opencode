@@ -1,0 +1,1271 @@
+{
+  "service": "instagram",
+  "displayName": "Instagram",
+  "categories": [
+    "Social",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://www.instagram.com/oauth/authorize",
+      "tokenUrl": "https://api.instagram.com/oauth/access_token",
+      "scopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments",
+        "instagram_business_manage_insights",
+        "instagram_business_content_publish",
+        "instagram_business_manage_messages"
+      ],
+      "scopeSeparator": ",",
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "enable_fb_login": "0",
+        "force_authentication": "1"
+      },
+      "clientSetup": {
+        "docsUrl": "https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-instagram-login/business-login",
+        "steps": [
+          "Create a Meta Business app, add the Instagram product, and configure Business Login for Instagram.",
+          "Register this runtime's exact /oauth/callback URL as a valid OAuth redirect URI.",
+          "Copy the Instagram App ID and App Secret into the local OAuth client configuration."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://www.instagram.com/",
+  "actions": [
+    {
+      "id": "instagram.create_comment",
+      "service": "instagram",
+      "name": "create_comment",
+      "description": "Create a top-level comment on owned Instagram media. Live-video comments are unsupported and provider errors are returned as failures.",
+      "operationType": "write",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram media ID to comment on."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comment text.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaId",
+          "message"
+        ],
+        "description": "Top-level Instagram comment input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New Instagram comment ID."
+          },
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Commented media ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "commentId",
+          "mediaId"
+        ],
+        "description": "Created top-level comment result."
+      }
+    },
+    {
+      "id": "instagram.get_current_user",
+      "service": "instagram",
+      "name": "get_current_user",
+      "description": "Get the connected Instagram Business or Creator account profile and account counters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "instagram_business_basic"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action has no input fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "App-scoped Instagram account ID."
+              },
+              "userId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Professional Instagram account ID when Meta returns it."
+              },
+              "username": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Instagram username."
+              },
+              "name": {
+                "type": "string",
+                "description": "Instagram profile name."
+              },
+              "accountType": {
+                "type": "string",
+                "enum": [
+                  "Business",
+                  "Media_Creator"
+                ],
+                "description": "Professional account type."
+              },
+              "profilePictureUrl": {
+                "type": "string",
+                "description": "Instagram profile picture URL.",
+                "format": "uri"
+              },
+              "followersCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Follower count reported by Meta."
+              },
+              "followsCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Following count reported by Meta."
+              },
+              "mediaCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Published media count reported by Meta."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "username"
+            ],
+            "description": "Connected professional Instagram account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Connected Instagram account profile."
+      },
+      "followUpActions": [
+        "instagram.list_media"
+      ]
+    },
+    {
+      "id": "instagram.get_media",
+      "service": "instagram",
+      "name": "get_media",
+      "description": "Get normalized fields for one Instagram media item owned by the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "instagram_business_basic"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram media ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaId"
+        ],
+        "description": "Instagram media lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "media": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Instagram media ID."
+              },
+              "mediaType": {
+                "type": "string",
+                "enum": [
+                  "IMAGE",
+                  "VIDEO",
+                  "CAROUSEL_ALBUM"
+                ],
+                "description": "Instagram media type."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Media caption when available."
+              },
+              "mediaProductType": {
+                "type": "string",
+                "enum": [
+                  "AD",
+                  "FEED",
+                  "STORY",
+                  "REELS"
+                ],
+                "description": "Instagram media product type."
+              },
+              "mediaUrl": {
+                "type": "string",
+                "description": "Public media URL when Meta makes it available.",
+                "format": "uri"
+              },
+              "permalink": {
+                "type": "string",
+                "description": "Instagram permalink when available.",
+                "format": "uri"
+              },
+              "thumbnailUrl": {
+                "type": "string",
+                "description": "Video thumbnail URL when available.",
+                "format": "uri"
+              },
+              "timestamp": {
+                "type": "string",
+                "description": "Media creation timestamp.",
+                "format": "date-time"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username that owns the media when returned by Meta."
+              },
+              "commentsCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of comments reported by Meta."
+              },
+              "likeCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of likes reported by Meta."
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Instagram child media ID."
+                    },
+                    "mediaType": {
+                      "type": "string",
+                      "enum": [
+                        "IMAGE",
+                        "VIDEO"
+                      ],
+                      "description": "Instagram child media type."
+                    },
+                    "mediaUrl": {
+                      "type": "string",
+                      "description": "Public URL returned for the child media when available.",
+                      "format": "uri"
+                    },
+                    "permalink": {
+                      "type": "string",
+                      "description": "Instagram permalink returned for the child media when available.",
+                      "format": "uri"
+                    },
+                    "thumbnailUrl": {
+                      "type": "string",
+                      "description": "Thumbnail URL returned for a video child when available.",
+                      "format": "uri"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "description": "Child media creation timestamp.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "mediaType"
+                  ],
+                  "description": "Normalized Instagram carousel child media."
+                },
+                "description": "Carousel child media.",
+                "maxItems": 10
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "mediaType"
+            ],
+            "description": "Normalized Instagram professional-account media."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "media"
+        ],
+        "description": "Instagram media result."
+      }
+    },
+    {
+      "id": "instagram.get_media_insights",
+      "service": "instagram",
+      "name": "get_media_insights",
+      "description": "Get structured insights for owned Instagram media. Meta validates metric, period, breakdown, and media-type compatibility.",
+      "operationType": "read",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_insights"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_manage_insights"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram media ID whose insights should be read."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "comments",
+                "follows",
+                "ig_reels_avg_watch_time",
+                "ig_reels_video_view_total_time",
+                "impressions",
+                "likes",
+                "link_clicks",
+                "navigation",
+                "profile_activity",
+                "profile_visits",
+                "reach",
+                "reels_skip_rate",
+                "replies",
+                "reposts",
+                "saved",
+                "shares",
+                "total_interactions",
+                "views"
+              ],
+              "description": "Instagram Login insight metric."
+            },
+            "description": "Unique insight metrics to request.",
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "days_28",
+              "month",
+              "lifetime",
+              "total_over_range"
+            ],
+            "description": "Optional insight aggregation period."
+          },
+          "breakdown": {
+            "type": "string",
+            "enum": [
+              "action_type",
+              "story_navigation_action_type"
+            ],
+            "description": "Optional insight breakdown."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaId",
+          "metrics"
+        ],
+        "description": "Instagram media insights input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "insights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Insight result ID when returned."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Insight metric name."
+                },
+                "period": {
+                  "type": "string",
+                  "description": "Aggregation period returned by Meta."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Metric title returned by Meta."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Metric description returned by Meta."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Metric value and breakdown payload."
+                  }
+                },
+                "totalValue": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Metric total and breakdown payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "description": "Structured Instagram insight result."
+            },
+            "description": "Requested media insights."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "before": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the preceding page."
+              },
+              "after": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the following page."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a previous-page link."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a next-page link."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasPreviousPage",
+              "hasNextPage"
+            ],
+            "description": "Safe cursor-only pagination metadata. Provider paging URLs are never returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "insights",
+          "paging"
+        ],
+        "description": "Instagram media insight results."
+      }
+    },
+    {
+      "id": "instagram.list_media",
+      "service": "instagram",
+      "name": "list_media",
+      "description": "List media owned by the connected Instagram professional account using safe cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "instagram_business_basic"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Instagram list call."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Instagram list call."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional cursor pagination input.",
+        "not": {
+          "required": [
+            "after",
+            "before"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Instagram media ID."
+                },
+                "mediaType": {
+                  "type": "string",
+                  "enum": [
+                    "IMAGE",
+                    "VIDEO",
+                    "CAROUSEL_ALBUM"
+                  ],
+                  "description": "Instagram media type."
+                },
+                "caption": {
+                  "type": "string",
+                  "description": "Media caption when available."
+                },
+                "mediaProductType": {
+                  "type": "string",
+                  "enum": [
+                    "AD",
+                    "FEED",
+                    "STORY",
+                    "REELS"
+                  ],
+                  "description": "Instagram media product type."
+                },
+                "mediaUrl": {
+                  "type": "string",
+                  "description": "Public media URL when Meta makes it available.",
+                  "format": "uri"
+                },
+                "permalink": {
+                  "type": "string",
+                  "description": "Instagram permalink when available.",
+                  "format": "uri"
+                },
+                "thumbnailUrl": {
+                  "type": "string",
+                  "description": "Video thumbnail URL when available.",
+                  "format": "uri"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "Media creation timestamp.",
+                  "format": "date-time"
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Username that owns the media when returned by Meta."
+                },
+                "commentsCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of comments reported by Meta."
+                },
+                "likeCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of likes reported by Meta."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Instagram child media ID."
+                      },
+                      "mediaType": {
+                        "type": "string",
+                        "enum": [
+                          "IMAGE",
+                          "VIDEO"
+                        ],
+                        "description": "Instagram child media type."
+                      },
+                      "mediaUrl": {
+                        "type": "string",
+                        "description": "Public URL returned for the child media when available.",
+                        "format": "uri"
+                      },
+                      "permalink": {
+                        "type": "string",
+                        "description": "Instagram permalink returned for the child media when available.",
+                        "format": "uri"
+                      },
+                      "thumbnailUrl": {
+                        "type": "string",
+                        "description": "Thumbnail URL returned for a video child when available.",
+                        "format": "uri"
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "description": "Child media creation timestamp.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "mediaType"
+                    ],
+                    "description": "Normalized Instagram carousel child media."
+                  },
+                  "description": "Carousel child media.",
+                  "maxItems": 10
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "mediaType"
+              ],
+              "description": "Normalized Instagram professional-account media."
+            },
+            "description": "Owned Instagram media."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "before": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the preceding page."
+              },
+              "after": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the following page."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a previous-page link."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a next-page link."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasPreviousPage",
+              "hasNextPage"
+            ],
+            "description": "Safe cursor-only pagination metadata. Provider paging URLs are never returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "media",
+          "paging"
+        ],
+        "description": "Instagram media page."
+      },
+      "followUpActions": [
+        "instagram.get_media",
+        "instagram.list_media_comments",
+        "instagram.get_media_insights"
+      ]
+    },
+    {
+      "id": "instagram.list_media_comments",
+      "service": "instagram",
+      "name": "list_media_comments",
+      "description": "List top-level comments on owned Instagram media. Reply metadata is included only when Meta returns it; this is not a complete reply tree.",
+      "operationType": "read",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram media ID whose comments should be listed."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Instagram list call."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor returned by a previous Instagram list call."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaId"
+        ],
+        "description": "Optional cursor pagination input.",
+        "not": {
+          "required": [
+            "after",
+            "before"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Instagram comment ID."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Comment text."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "Comment creation timestamp.",
+                  "format": "date-time"
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Comment author's username when available."
+                },
+                "from": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Instagram-scoped author ID when available."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "Comment author's username when available."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Comment author metadata returned by Meta."
+                },
+                "parentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent comment ID when Meta includes reply metadata."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "text"
+              ],
+              "description": "Normalized top-level Instagram media comment."
+            },
+            "description": "Top-level Instagram comments."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "before": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the preceding page."
+              },
+              "after": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cursor for the following page."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a previous-page link."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether Meta returned a next-page link."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasPreviousPage",
+              "hasNextPage"
+            ],
+            "description": "Safe cursor-only pagination metadata. Provider paging URLs are never returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "comments",
+          "paging"
+        ],
+        "description": "Instagram comment page."
+      },
+      "followUpActions": [
+        "instagram.reply_to_comment"
+      ]
+    },
+    {
+      "id": "instagram.publish_media",
+      "service": "instagram",
+      "name": "publish_media",
+      "description": "Publish an image, feed video, Reel, or 2-10 item carousel through Meta's media-container workflow, or resume an existing container after an ambiguous failure.",
+      "operationType": "write",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_content_publish"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_content_publish"
+      ],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "image",
+                "type": "string",
+                "description": "Publish a single image."
+              },
+              "imageUrl": {
+                "type": "string",
+                "description": "Public HTTPS image URL that Meta can fetch.",
+                "format": "uri"
+              },
+              "caption": {
+                "type": "string",
+                "description": "Post caption."
+              },
+              "altText": {
+                "type": "string",
+                "description": "Accessibility text for the image."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "imageUrl"
+            ],
+            "description": "Single-image publishing input."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "video",
+                "type": "string",
+                "description": "Publish a feed video."
+              },
+              "videoUrl": {
+                "type": "string",
+                "description": "Public HTTPS video URL that Meta can fetch.",
+                "format": "uri"
+              },
+              "caption": {
+                "type": "string",
+                "description": "Post caption."
+              },
+              "coverUrl": {
+                "type": "string",
+                "description": "Public HTTPS cover image URL that Meta can fetch.",
+                "format": "uri"
+              },
+              "thumbOffsetMilliseconds": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Video thumbnail offset in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "videoUrl"
+            ],
+            "description": "Feed-video publishing input."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "reel",
+                "type": "string",
+                "description": "Publish an Instagram Reel."
+              },
+              "videoUrl": {
+                "type": "string",
+                "description": "Public HTTPS video URL that Meta can fetch.",
+                "format": "uri"
+              },
+              "caption": {
+                "type": "string",
+                "description": "Post caption."
+              },
+              "coverUrl": {
+                "type": "string",
+                "description": "Public HTTPS cover image URL that Meta can fetch.",
+                "format": "uri"
+              },
+              "thumbOffsetMilliseconds": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Video thumbnail offset in milliseconds."
+              },
+              "shareToFeed": {
+                "type": "boolean",
+                "description": "Whether to share the Reel to the profile feed."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "videoUrl"
+            ],
+            "description": "Reel publishing input."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "carousel",
+                "type": "string",
+                "description": "Publish a carousel post."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Carousel caption."
+              },
+              "children": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "const": "image",
+                          "type": "string"
+                        },
+                        "imageUrl": {
+                          "type": "string",
+                          "description": "Public HTTPS image URL that Meta can fetch.",
+                          "format": "uri"
+                        },
+                        "altText": {
+                          "type": "string",
+                          "description": "Accessibility text for this carousel image."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "imageUrl"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "const": "video",
+                          "type": "string"
+                        },
+                        "videoUrl": {
+                          "type": "string",
+                          "description": "Public HTTPS video URL that Meta can fetch.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "videoUrl"
+                      ]
+                    }
+                  ],
+                  "description": "One image or video carousel child."
+                },
+                "description": "Two through ten image or video carousel children.",
+                "minItems": 2,
+                "maxItems": 10
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "children"
+            ],
+            "description": "Carousel publishing input."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "container",
+                "type": "string",
+                "description": "Resume publishing an existing Meta media container."
+              },
+              "containerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Existing Meta media container ID."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "containerId"
+            ],
+            "description": "Existing-container publishing input."
+          }
+        ],
+        "description": "Instagram publishing input selected by kind."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Published Instagram media ID."
+          },
+          "containerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Meta media container ID used for publishing."
+          },
+          "status": {
+            "const": "PUBLISHED",
+            "type": "string",
+            "description": "Completed publishing status."
+          },
+          "permalink": {
+            "type": "string",
+            "description": "Published Instagram permalink when the follow-up read succeeds.",
+            "format": "uri"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "IMAGE",
+              "VIDEO",
+              "CAROUSEL_ALBUM"
+            ]
+          },
+          "mediaProductType": {
+            "type": "string",
+            "enum": [
+              "FEED",
+              "REELS"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaId",
+          "containerId",
+          "status"
+        ],
+        "description": "Completed Instagram publish result."
+      },
+      "followUpActions": [
+        "instagram.get_media"
+      ]
+    },
+    {
+      "id": "instagram.reply_to_comment",
+      "service": "instagram",
+      "name": "reply_to_comment",
+      "description": "Reply to an existing Instagram media comment and return the new reply ID.",
+      "operationType": "write",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_manage_comments"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Parent Instagram comment ID."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reply text.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "commentId",
+          "message"
+        ],
+        "description": "Instagram comment reply input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New Instagram reply comment ID."
+          },
+          "parentCommentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Parent Instagram comment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "commentId",
+          "parentCommentId"
+        ],
+        "description": "Created Instagram reply result."
+      }
+    },
+    {
+      "id": "instagram.send_message",
+      "service": "instagram",
+      "name": "send_message",
+      "description": "Reply with text to an Instagram-scoped recipient who already initiated a conversation, normally within Meta's 24-hour messaging window. This does not support cold outreach, recipient discovery, bulk messaging, webhooks, or inbox sync.",
+      "operationType": "write",
+      "requiredScopes": [
+        "instagram_business_basic",
+        "instagram_business_manage_messages"
+      ],
+      "providerPermissions": [
+        "instagram_business_basic",
+        "instagram_business_manage_messages"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recipientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram-scoped recipient ID obtained from the operator's Meta webhook integration; this is not a username."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "UTF-8 reply text or link, limited to 1,000 bytes by the runtime.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recipientId",
+          "text"
+        ],
+        "description": "Policy-constrained Instagram message reply input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recipientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram-scoped recipient ID returned by Meta."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instagram message ID returned by Meta."
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation or thread ID only when Meta returns one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recipientId",
+          "messageId"
+        ],
+        "description": "Instagram message reply result."
+      }
+    }
+  ]
+}

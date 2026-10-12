@@ -1,0 +1,574 @@
+{
+  "service": "vectorshift",
+  "displayName": "VectorShift",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_VECTORSHIFT_API_KEY",
+      "description": "VectorShift API key used with the Authorization Bearer header.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://vectorshift.ai",
+  "actions": [
+    {
+      "id": "vectorshift.bulk_run_pipeline",
+      "service": "vectorshift",
+      "name": "bulk_run_pipeline",
+      "description": "Run multiple instances of the same VectorShift pipeline with JSON-safe inputs in one request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The VectorShift pipeline identifier."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "inputs": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string value."
+                          },
+                          {
+                            "type": "integer",
+                            "description": "An integer value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A number value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null value."
+                          }
+                        ],
+                        "description": "A JSON-safe VectorShift scalar value."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "description": "One array item."
+                        },
+                        "description": "An array of JSON-safe values."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "map",
+                            "type": "string",
+                            "description": "The VectorShift datatype identifier for map values."
+                          },
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "One nested value."
+                            },
+                            "description": "The nested values inside the VectorShift map."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A VectorShift map datatype value."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A plain JSON object value."
+                      }
+                    ],
+                    "description": "A JSON-safe VectorShift input value."
+                  },
+                  "description": "Map of input names to their JSON-safe values."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One pipeline run request forwarded to VectorShift."
+            },
+            "description": "The list of run payloads sent to VectorShift.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pipeline_id",
+          "runs"
+        ],
+        "description": "The bulk pipeline run request sent to VectorShift."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "The VectorShift request status."
+          },
+          "run_outputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "description": "The VectorShift run identifier."
+                },
+                "outputs": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string value."
+                          },
+                          {
+                            "type": "integer",
+                            "description": "An integer value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A number value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null value."
+                          }
+                        ],
+                        "description": "A JSON-safe VectorShift scalar value."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "description": "One output array item."
+                        },
+                        "description": "An array output value."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "map",
+                            "type": "string",
+                            "description": "The VectorShift datatype identifier for map values."
+                          },
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "One nested value."
+                            },
+                            "description": "The nested values inside the VectorShift map."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A VectorShift map datatype value."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "file",
+                            "type": "string",
+                            "description": "The VectorShift datatype identifier for file inputs."
+                          },
+                          "raw_bytes": {
+                            "type": "string",
+                            "description": "The base64 payload for a file input."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": true,
+                            "description": "Optional VectorShift file metadata."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A VectorShift file value that may be returned in outputs."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A plain JSON object output value."
+                      }
+                    ],
+                    "description": "One VectorShift output value."
+                  },
+                  "description": "The outputs returned for this VectorShift pipeline run."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One VectorShift run output object."
+            },
+            "description": "The outputs returned for each VectorShift pipeline run."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "run_outputs"
+        ],
+        "description": "The VectorShift bulk pipeline run result."
+      }
+    },
+    {
+      "id": "vectorshift.get_pipeline",
+      "service": "vectorshift",
+      "name": "get_pipeline",
+      "description": "Fetch one VectorShift pipeline by pipeline ID or by pipeline name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The VectorShift pipeline identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The VectorShift pipeline name."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional username used by VectorShift when resolving a pipeline by name."
+          },
+          "org_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional organization name used by VectorShift when resolving a pipeline by name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pipeline selector for fetching one VectorShift pipeline."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "The VectorShift request status."
+          },
+          "pipeline": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The pipeline object returned by VectorShift."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "pipeline"
+        ],
+        "description": "The requested VectorShift pipeline object."
+      }
+    },
+    {
+      "id": "vectorshift.list_pipelines",
+      "service": "vectorshift",
+      "name": "list_pipelines",
+      "description": "List VectorShift pipelines that are accessible to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include_shared": {
+            "type": "boolean",
+            "description": "Whether shared pipelines should be included in the result."
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "Whether VectorShift should include full pipeline objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional flags for listing VectorShift pipelines."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "The VectorShift request status."
+          },
+          "pipeline_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One VectorShift pipeline identifier."
+            },
+            "description": "The pipeline identifiers returned by VectorShift."
+          },
+          "pipelines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One VectorShift pipeline object."
+            },
+            "description": "The full pipeline objects returned when verbose=true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "pipeline_ids",
+          "pipelines"
+        ],
+        "description": "The VectorShift pipeline list result."
+      }
+    },
+    {
+      "id": "vectorshift.run_pipeline",
+      "service": "vectorshift",
+      "name": "run_pipeline",
+      "description": "Run one VectorShift pipeline with JSON-safe inputs and return the resulting outputs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The VectorShift pipeline identifier."
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "An integer value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A number value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean value."
+                    },
+                    {
+                      "type": "null",
+                      "description": "A null value."
+                    }
+                  ],
+                  "description": "A JSON-safe VectorShift scalar value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "description": "One array item."
+                  },
+                  "description": "An array of JSON-safe values."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "map",
+                      "type": "string",
+                      "description": "The VectorShift datatype identifier for map values."
+                    },
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "One nested value."
+                      },
+                      "description": "The nested values inside the VectorShift map."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A VectorShift map datatype value."
+                },
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plain JSON object value."
+                }
+              ],
+              "description": "A JSON-safe VectorShift input value."
+            },
+            "description": "Map of input names to their JSON-safe values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pipeline_id",
+          "inputs"
+        ],
+        "description": "The pipeline run request sent to VectorShift."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "The VectorShift request status."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The VectorShift run identifier."
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "An integer value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A number value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean value."
+                    },
+                    {
+                      "type": "null",
+                      "description": "A null value."
+                    }
+                  ],
+                  "description": "A JSON-safe VectorShift scalar value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "description": "One output array item."
+                  },
+                  "description": "An array output value."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "map",
+                      "type": "string",
+                      "description": "The VectorShift datatype identifier for map values."
+                    },
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "One nested value."
+                      },
+                      "description": "The nested values inside the VectorShift map."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A VectorShift map datatype value."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "file",
+                      "type": "string",
+                      "description": "The VectorShift datatype identifier for file inputs."
+                    },
+                    "raw_bytes": {
+                      "type": "string",
+                      "description": "The base64 payload for a file input."
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Optional VectorShift file metadata."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A VectorShift file value that may be returned in outputs."
+                },
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plain JSON object output value."
+                }
+              ],
+              "description": "One VectorShift output value."
+            },
+            "description": "The pipeline outputs returned by VectorShift."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "run_id",
+          "outputs"
+        ],
+        "description": "The VectorShift pipeline run result."
+      }
+    }
+  ]
+}

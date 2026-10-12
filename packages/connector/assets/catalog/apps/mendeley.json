@@ -1,0 +1,611 @@
+{
+  "service": "mendeley",
+  "displayName": "Mendeley",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://api.mendeley.com/oauth/authorize",
+      "tokenUrl": "https://api.mendeley.com/oauth/token",
+      "scopes": [
+        "all"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://www.mendeley.com/",
+  "actions": [
+    {
+      "id": "mendeley.create_document",
+      "service": "mendeley",
+      "name": "create_document",
+      "description": "Create a document in the authorized user's Mendeley library from JSON metadata.",
+      "operationType": "write",
+      "requiredScopes": [
+        "mendeley.documents.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The document title."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley document type, such as journal, book, or report."
+          },
+          "source": {
+            "type": "string",
+            "description": "The publication or source name."
+          },
+          "year": {
+            "type": "integer",
+            "description": "The publication year."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "The document abstract."
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string",
+                  "description": "The author's first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The author's last name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An author attached to a Mendeley document."
+            },
+            "description": "The document authors."
+          },
+          "identifiers": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "External identifiers keyed by scheme, such as doi or isbn."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The user-defined document tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "type"
+        ],
+        "description": "Metadata for creating a Mendeley document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Mendeley document object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Mendeley document."
+      }
+    },
+    {
+      "id": "mendeley.delete_document",
+      "service": "mendeley",
+      "name": "delete_document",
+      "description": "Permanently delete a document from the authorized user's Mendeley library.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "mendeley.documents.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley document UUID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Mendeley document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mendeley accepted the permanent deletion."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deleted Mendeley document UUID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The document deletion result."
+      }
+    },
+    {
+      "id": "mendeley.get_catalog_document",
+      "service": "mendeley",
+      "name": "get_catalog_document",
+      "description": "Get a public Mendeley catalog document by its Mendeley ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mendeley.documents.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley catalog document UUID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a catalog document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Mendeley document object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Mendeley catalog document."
+      }
+    },
+    {
+      "id": "mendeley.get_document",
+      "service": "mendeley",
+      "name": "get_document",
+      "description": "Get document metadata from the authorized user's Mendeley library by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mendeley.documents.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley document UUID."
+          },
+          "view": {
+            "anyOf": [
+              {
+                "const": "bib",
+                "type": "string",
+                "description": "Return bibliographic fields."
+              },
+              {
+                "const": "client",
+                "type": "string",
+                "description": "Return client synchronization fields."
+              },
+              {
+                "const": "tags",
+                "type": "string",
+                "description": "Return tag fields."
+              },
+              {
+                "const": "patent",
+                "type": "string",
+                "description": "Return patent fields."
+              },
+              {
+                "const": "all",
+                "type": "string",
+                "description": "Return all available document fields."
+              }
+            ],
+            "description": "The Mendeley document view to request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId"
+        ],
+        "description": "Input parameters for getting a Mendeley document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Mendeley document object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Mendeley document."
+      }
+    },
+    {
+      "id": "mendeley.list_documents",
+      "service": "mendeley",
+      "name": "list_documents",
+      "description": "List document metadata from the authorized user's Mendeley library.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mendeley.documents.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "anyOf": [
+              {
+                "const": "bib",
+                "type": "string",
+                "description": "Return bibliographic fields."
+              },
+              {
+                "const": "client",
+                "type": "string",
+                "description": "Return client synchronization fields."
+              },
+              {
+                "const": "tags",
+                "type": "string",
+                "description": "Return tag fields."
+              },
+              {
+                "const": "patent",
+                "type": "string",
+                "description": "Return patent fields."
+              },
+              {
+                "const": "all",
+                "type": "string",
+                "description": "Return all available document fields."
+              }
+            ],
+            "description": "The Mendeley document view to request."
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The group UUID whose documents should be listed."
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Return documents modified since this ISO 8601 timestamp."
+          },
+          "deletedSince": {
+            "type": "string",
+            "description": "Return documents deleted since this ISO 8601 timestamp."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of documents on this page."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The documented Mendeley field used to sort results."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "const": "asc",
+                "type": "string",
+                "description": "Sort in ascending order."
+              },
+              {
+                "const": "desc",
+                "type": "string",
+                "description": "Sort in descending order."
+              }
+            ],
+            "description": "The result sort direction."
+          },
+          "marker": {
+            "type": "string",
+            "description": "A page marker returned by an earlier call."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Mendeley documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Mendeley document object."
+            },
+            "description": "The documents returned on this page."
+          },
+          "nextMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the next page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the next page, or null."
+          },
+          "previousMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the previous page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the previous page, or null."
+          },
+          "firstMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the first page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the first page, or null."
+          },
+          "lastMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the last page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the last page, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Mendeley documents."
+      }
+    },
+    {
+      "id": "mendeley.search_catalog",
+      "service": "mendeley",
+      "name": "search_catalog",
+      "description": "Search Mendeley's public catalog for document metadata.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mendeley.documents.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text matched against catalog titles, abstracts, and author names."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of catalog documents on this page."
+          },
+          "marker": {
+            "type": "string",
+            "description": "A page marker returned by an earlier call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching the Mendeley catalog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Mendeley document object."
+            },
+            "description": "The catalog documents returned on this page."
+          },
+          "nextMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the next page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the next page, or null."
+          },
+          "previousMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the previous page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the previous page, or null."
+          },
+          "firstMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the first page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the first page, or null."
+          },
+          "lastMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The marker for the last page, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The marker for the last page, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Mendeley catalog search results."
+      }
+    },
+    {
+      "id": "mendeley.update_document",
+      "service": "mendeley",
+      "name": "update_document",
+      "description": "Update selected metadata fields on a Mendeley library document.",
+      "operationType": "write",
+      "requiredScopes": [
+        "mendeley.documents.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley document UUID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The document title."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mendeley document type, such as journal, book, or report."
+          },
+          "source": {
+            "type": "string",
+            "description": "The publication or source name."
+          },
+          "year": {
+            "type": "integer",
+            "description": "The publication year."
+          },
+          "abstract": {
+            "type": "string",
+            "description": "The document abstract."
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string",
+                  "description": "The author's first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The author's last name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An author attached to a Mendeley document."
+            },
+            "description": "The document authors."
+          },
+          "identifiers": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "External identifiers keyed by scheme, such as doi or isbn."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The user-defined document tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId"
+        ],
+        "description": "Metadata fields to update on a Mendeley document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Mendeley document object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Mendeley document."
+      }
+    }
+  ]
+}

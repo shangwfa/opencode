@@ -1,0 +1,670 @@
+{
+  "service": "needle",
+  "displayName": "Needle",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ndl_...",
+      "description": "Needle API key used with the x-api-key header. Generate or manage it in Needle settings: https://needle.app/dashboard/settings."
+    }
+  ],
+  "homepageUrl": "https://needle.app",
+  "actions": [
+    {
+      "id": "needle.add_files_to_collection",
+      "service": "needle",
+      "name": "add_files_to_collection",
+      "description": "Import one or more URL-backed files into a Needle collection for indexing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Needle collection ID."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name for the file inside Needle."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public or signed URL that Needle should import.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "url"
+              ],
+              "description": "A file reference to add into a Needle collection."
+            },
+            "description": "The URL-backed files that Needle should import.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_id",
+          "files"
+        ],
+        "description": "The input payload for importing files into a Needle collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the file."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The file name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The MIME type of the file."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The source or signed URL for the file."
+                },
+                "user_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Needle user identifier that owns the file."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Needle user identifier that owns the file."
+                },
+                "connector_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The upstream connector identifier when the file is connector-managed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The upstream connector identifier when the file is connector-managed."
+                },
+                "size": {
+                  "type": "number",
+                  "description": "The size of the file in bytes."
+                },
+                "md5_hash": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The MD5 hash of the file content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The MD5 hash of the file content."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was last updated."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current indexing status of the file."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type",
+                "url",
+                "size",
+                "created_at",
+                "updated_at",
+                "status"
+              ],
+              "description": "A file attached to a Needle collection."
+            },
+            "description": "The files that Needle accepted for indexing."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "description": "The files accepted for indexing by Needle."
+      }
+    },
+    {
+      "id": "needle.create_collection",
+      "service": "needle",
+      "name": "create_collection",
+      "description": "Create a Needle collection and optionally attach existing Needle file IDs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the collection to create."
+          },
+          "file_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An existing Needle file ID to attach to the collection."
+            },
+            "description": "Existing Needle file IDs to attach when the collection is created."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for creating a Needle collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier of the collection."
+              },
+              "name": {
+                "type": "string",
+                "description": "The collection name."
+              },
+              "embedding_model": {
+                "type": "string",
+                "description": "The embedding model configured for the collection."
+              },
+              "embedding_dimensions": {
+                "type": "number",
+                "description": "The embedding vector dimension configured for the collection."
+              },
+              "search_queries": {
+                "type": "number",
+                "description": "The number of search queries performed against the collection."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the collection was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the collection was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Needle collection object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection"
+        ],
+        "description": "The created Needle collection."
+      }
+    },
+    {
+      "id": "needle.get_collection",
+      "service": "needle",
+      "name": "get_collection",
+      "description": "Get the details of a single Needle collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Needle collection ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_id"
+        ],
+        "description": "The collection identifier for the requested Needle collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier of the collection."
+              },
+              "name": {
+                "type": "string",
+                "description": "The collection name."
+              },
+              "embedding_model": {
+                "type": "string",
+                "description": "The embedding model configured for the collection."
+              },
+              "embedding_dimensions": {
+                "type": "number",
+                "description": "The embedding vector dimension configured for the collection."
+              },
+              "search_queries": {
+                "type": "number",
+                "description": "The number of search queries performed against the collection."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the collection was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the collection was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Needle collection object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection"
+        ],
+        "description": "The requested Needle collection."
+      }
+    },
+    {
+      "id": "needle.get_collection_stats",
+      "service": "needle",
+      "name": "get_collection_stats",
+      "description": "Get indexing and storage statistics for a Needle collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Needle collection ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_id"
+        ],
+        "description": "The collection identifier used to fetch Needle collection statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data_stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "description": "The status bucket represented by this stats row."
+                },
+                "files": {
+                  "type": "number",
+                  "description": "The number of files in this stats bucket."
+                },
+                "bytes": {
+                  "type": "number",
+                  "description": "The total byte size in this stats bucket."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "files",
+                "bytes"
+              ],
+              "description": "One collection data statistics bucket."
+            },
+            "description": "The file and byte distribution returned by Needle."
+          },
+          "chunks_count": {
+            "type": "number",
+            "description": "The total chunk count in the collection."
+          },
+          "characters": {
+            "type": "number",
+            "description": "The total character count in the collection."
+          },
+          "users": {
+            "type": "number",
+            "description": "The total user count in the collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_stats"
+        ],
+        "description": "Statistics for a Needle collection."
+      }
+    },
+    {
+      "id": "needle.list_collection_files",
+      "service": "needle",
+      "name": "list_collection_files",
+      "description": "List the files currently attached to a Needle collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Needle collection ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_id"
+        ],
+        "description": "The collection identifier used to list Needle collection files."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the file."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The file name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The MIME type of the file."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The source or signed URL for the file."
+                },
+                "user_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Needle user identifier that owns the file."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Needle user identifier that owns the file."
+                },
+                "connector_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The upstream connector identifier when the file is connector-managed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The upstream connector identifier when the file is connector-managed."
+                },
+                "size": {
+                  "type": "number",
+                  "description": "The size of the file in bytes."
+                },
+                "md5_hash": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The MD5 hash of the file content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The MD5 hash of the file content."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was last updated."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current indexing status of the file."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type",
+                "url",
+                "size",
+                "created_at",
+                "updated_at",
+                "status"
+              ],
+              "description": "A file attached to a Needle collection."
+            },
+            "description": "The files attached to the Needle collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "description": "The files attached to a Needle collection."
+      }
+    },
+    {
+      "id": "needle.list_collections",
+      "service": "needle",
+      "name": "list_collections",
+      "description": "List the Needle collections that the API key can access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for listing Needle collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the collection."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The collection name."
+                },
+                "embedding_model": {
+                  "type": "string",
+                  "description": "The embedding model configured for the collection."
+                },
+                "embedding_dimensions": {
+                  "type": "number",
+                  "description": "The embedding vector dimension configured for the collection."
+                },
+                "search_queries": {
+                  "type": "number",
+                  "description": "The number of search queries performed against the collection."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the collection was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the collection was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Needle collection object."
+            },
+            "description": "The collections returned by Needle."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collections"
+        ],
+        "description": "The collections visible to the API key."
+      }
+    },
+    {
+      "id": "needle.search_collection",
+      "service": "needle",
+      "name": "search_collection",
+      "description": "Search a Needle collection for the most relevant retrieved content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Needle collection ID."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query text."
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of results to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_id",
+          "text"
+        ],
+        "description": "The input payload for a Needle collection search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the search result or chunk."
+                },
+                "file_id": {
+                  "type": "string",
+                  "description": "The identifier of the source file for this result."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The retrieved content returned by Needle."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance or similarity score returned by Needle."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "content"
+              ],
+              "description": "A Needle collection search result."
+            },
+            "description": "The retrieved search results returned by Needle."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The retrieved search results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "service": "doubao_seedream",
+  "displayName": "Doubao Seedream",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Ark API Key",
+      "placeholder": "Your Doubao Seedream API key",
+      "description": "Doubao Seedream API key sent as a Bearer token. Create an API key in the Ark console: https://console.volcengine.com/ark/region:ark+cn-beijing/apikey."
+    }
+  ],
+  "homepageUrl": "https://www.volcengine.com/product/ark",
+  "actions": [
+    {
+      "id": "doubao_seedream.generate_image",
+      "service": "doubao_seedream",
+      "name": "generate_image",
+      "description": "Generate or edit one or more images with Doubao Seedream.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Doubao Seedream Model ID or Endpoint ID used for image generation.",
+            "default": "doubao-seedream-5-0-260128",
+            "examples": [
+              "doubao-seedream-5-0-260128"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "The image generation or editing prompt."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A public image URL or data URL."
+            },
+            "description": "Public image URLs or data URLs used as references for image editing or fusion.",
+            "maxItems": 10
+          },
+          "size": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "2K",
+                  "3K",
+                  "4K"
+                ],
+                "description": "A standard output resolution."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The output width in pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The output height in pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "width",
+                  "height"
+                ],
+                "description": "Custom output dimensions in pixels; width multiplied by height must be at least 3,686,400."
+              }
+            ],
+            "description": "The standard resolution or custom pixel dimensions for generated images.",
+            "default": "2K"
+          },
+          "maxImages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15,
+            "description": "The maximum number of images to generate. Use 1 for a single image.",
+            "default": 1
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether generated images include a watermark.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "A synchronous Doubao Seedream image generation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model reported by Doubao Seedream."
+          },
+          "createdAt": {
+            "type": "integer",
+            "description": "The response creation Unix timestamp in seconds."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The temporary generated image URL."
+                },
+                "size": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The generated image dimensions as WIDTHxHEIGHT."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url",
+                "size"
+              ],
+              "description": "A generated image."
+            },
+            "description": "The generated images."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "generatedImages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of generated images."
+              },
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The output token count."
+              },
+              "totalTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total token count."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "generatedImages",
+              "outputTokens",
+              "totalTokens"
+            ],
+            "description": "Image generation usage reported by Doubao Seedream."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "createdAt",
+          "images",
+          "usage"
+        ],
+        "description": "The generated Doubao Seedream images and usage."
+      }
+    }
+  ]
+}

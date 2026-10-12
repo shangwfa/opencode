@@ -1,0 +1,651 @@
+{
+  "service": "anymail_finder",
+  "displayName": "Anymail Finder",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ANYMAIL_FINDER_API_KEY",
+      "description": "Anymail Finder API key sent in the Authorization header. Create or copy it at https://app.anymailfinder.com/settings/api."
+    }
+  ],
+  "homepageUrl": "https://anymailfinder.com",
+  "actions": [
+    {
+      "id": "anymail_finder.find_company_emails",
+      "service": "anymail_finder",
+      "name": "find_company_emails",
+      "description": "Find up to 20 verified email addresses for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain, such as example.com. Preferred over companyName."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company name to resolve when the domain is unavailable."
+          },
+          "emailType": {
+            "type": "string",
+            "enum": [
+              "any",
+              "generic",
+              "personal"
+            ],
+            "description": "Type of company email addresses to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for finding company email addresses.",
+        "anyOf": [
+          {
+            "required": [
+              "domain"
+            ]
+          },
+          {
+            "required": [
+              "companyName"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "credits_charged": {
+                "type": "number",
+                "description": "Number of credits charged for the request."
+              },
+              "email_status": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "risky",
+                  "not_found",
+                  "blacklisted"
+                ],
+                "description": "Email status returned by Anymail Finder."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A found email address.",
+                  "format": "email"
+                },
+                "description": "Email addresses found for the company."
+              },
+              "mx_domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Root domain of the primary MX host, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Root domain of the primary MX host, if available."
+              },
+              "mx_host": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Primary MX host for the company domain, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Primary MX host for the company domain, if available."
+              },
+              "valid_emails": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A verified deliverable email address.",
+                  "format": "email"
+                },
+                "description": "Verified deliverable email addresses found for the company."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "email_status"
+            ],
+            "description": "Company email discovery result from Anymail Finder."
+          },
+          "raw": {
+            "description": "The raw JSON payload returned by Anymail Finder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Anymail Finder company result."
+      }
+    },
+    {
+      "id": "anymail_finder.find_decision_maker_email",
+      "service": "anymail_finder",
+      "name": "find_decision_maker_email",
+      "description": "Find a verified email for a decision maker at a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain, such as example.com. Preferred over companyName."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company name to resolve when the domain is unavailable."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A built-in or account-defined decision-maker category."
+            },
+            "description": "Decision-maker categories in priority order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categories"
+        ],
+        "description": "Input for finding a company decision maker.",
+        "anyOf": [
+          {
+            "required": [
+              "domain"
+            ]
+          },
+          {
+            "required": [
+              "companyName"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "credits_charged": {
+                "type": "number",
+                "description": "Number of credits charged for the request."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Email address found by Anymail Finder, if any.",
+                    "format": "email"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email address found by Anymail Finder, if any."
+              },
+              "email_status": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "risky",
+                  "not_found",
+                  "blacklisted"
+                ],
+                "description": "Email status returned by Anymail Finder."
+              },
+              "mx_domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Root domain of the primary MX host, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Root domain of the primary MX host, if available."
+              },
+              "mx_host": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Primary MX host for the email domain, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Primary MX host for the email domain, if available."
+              },
+              "valid_email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Verified deliverable email address, if one was found.",
+                    "format": "email"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Verified deliverable email address, if one was found."
+              },
+              "person_company_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Company name sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name sourced from the person's profile."
+              },
+              "person_full_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Full name sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full name sourced from the person's profile."
+              },
+              "person_job_title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Job title sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Job title sourced from the person's profile."
+              },
+              "person_linkedin_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "LinkedIn profile URL returned for the person."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "LinkedIn profile URL returned for the person."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "email_status"
+            ],
+            "description": "A person email discovery result from Anymail Finder."
+          },
+          "raw": {
+            "description": "The raw JSON payload returned by Anymail Finder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Anymail Finder person result."
+      }
+    },
+    {
+      "id": "anymail_finder.find_person_email",
+      "service": "anymail_finder",
+      "name": "find_person_email",
+      "description": "Find a person's work email from their name and company or LinkedIn profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain, such as example.com. Preferred over companyName."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company name to resolve when the domain is unavailable."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Person's first name. Use together with lastName."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Person's last name. Use together with firstName."
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Person's full name as an alternative to firstName and lastName."
+          },
+          "linkedinUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Person's LinkedIn profile URL."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for finding a person's work email.",
+        "anyOf": [
+          {
+            "required": [
+              "linkedinUrl"
+            ]
+          },
+          {
+            "required": [
+              "fullName",
+              "domain"
+            ]
+          },
+          {
+            "required": [
+              "fullName",
+              "companyName"
+            ]
+          },
+          {
+            "required": [
+              "firstName",
+              "lastName",
+              "domain"
+            ]
+          },
+          {
+            "required": [
+              "firstName",
+              "lastName",
+              "companyName"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "credits_charged": {
+                "type": "number",
+                "description": "Number of credits charged for the request."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Email address found by Anymail Finder, if any.",
+                    "format": "email"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email address found by Anymail Finder, if any."
+              },
+              "email_status": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "risky",
+                  "not_found",
+                  "blacklisted"
+                ],
+                "description": "Email status returned by Anymail Finder."
+              },
+              "mx_domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Root domain of the primary MX host, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Root domain of the primary MX host, if available."
+              },
+              "mx_host": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Primary MX host for the email domain, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Primary MX host for the email domain, if available."
+              },
+              "valid_email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Verified deliverable email address, if one was found.",
+                    "format": "email"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Verified deliverable email address, if one was found."
+              },
+              "person_company_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Company name sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name sourced from the person's profile."
+              },
+              "person_full_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Full name sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full name sourced from the person's profile."
+              },
+              "person_job_title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Job title sourced from the person's profile."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Job title sourced from the person's profile."
+              },
+              "person_linkedin_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "LinkedIn profile URL returned for the person."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "LinkedIn profile URL returned for the person."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "email_status"
+            ],
+            "description": "A person email discovery result from Anymail Finder."
+          },
+          "raw": {
+            "description": "The raw JSON payload returned by Anymail Finder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Anymail Finder person result."
+      }
+    },
+    {
+      "id": "anymail_finder.get_account",
+      "service": "anymail_finder",
+      "name": "get_account",
+      "description": "Get the Anymail Finder account email and remaining credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address associated with the Anymail Finder account.",
+            "format": "email"
+          },
+          "creditsLeft": {
+            "type": "integer",
+            "description": "Number of credits remaining in the account."
+          },
+          "raw": {
+            "description": "The raw JSON payload returned by Anymail Finder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Anymail Finder account details."
+      }
+    },
+    {
+      "id": "anymail_finder.verify_email",
+      "service": "anymail_finder",
+      "name": "verify_email",
+      "description": "Verify the deliverability status of an email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for verifying an email address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "credits_charged": {
+                "type": "number",
+                "description": "Number of credits charged for the request."
+              },
+              "email_status": {
+                "type": "string",
+                "enum": [
+                  "valid",
+                  "risky",
+                  "invalid"
+                ],
+                "description": "Email verification status returned by Anymail Finder."
+              },
+              "mx_domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Root domain of the primary MX host, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Root domain of the primary MX host, if available."
+              },
+              "mx_host": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Primary MX host for the email domain, if available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Primary MX host for the email domain, if available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "email_status"
+            ],
+            "description": "An email verification result from Anymail Finder."
+          },
+          "raw": {
+            "description": "The raw JSON payload returned by Anymail Finder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Anymail Finder verification result."
+      }
+    }
+  ]
+}

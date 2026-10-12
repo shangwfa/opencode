@@ -1,0 +1,369 @@
+{
+  "service": "keen_io",
+  "displayName": "Keen IO",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Master API Key",
+      "placeholder": "KEEN_MASTER_API_KEY",
+      "description": "Keen Master API Key sent with the Authorization header. Find it in your Keen project settings: https://keen.io/projects/.",
+      "extraFields": [
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "PROJECT_ID",
+          "description": "Keen project ID used in each API path. Find it in the same Keen project settings page: https://keen.io/projects/."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://keen.io/",
+  "actions": [
+    {
+      "id": "keen_io.add_event",
+      "service": "keen_io",
+      "name": "add_event",
+      "description": "Publish one JSON event to a Keen event collection.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventCollection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Keen event collection that receives the event."
+          },
+          "event": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The JSON event object published to Keen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCollection",
+          "event"
+        ],
+        "description": "The input payload for publishing one Keen event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Keen created the event."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Keen event publishing response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "created",
+          "raw"
+        ],
+        "description": "The Keen event publishing response."
+      }
+    },
+    {
+      "id": "keen_io.query_count",
+      "service": "keen_io",
+      "name": "query_count",
+      "description": "Count Keen events that match a required timeframe and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventCollection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Keen event collection to analyze."
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Keen relative timeframe such as this_7_days."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The inclusive ISO-8601 timestamp for the analysis timeframe."
+                  },
+                  "end": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The exclusive ISO-8601 timestamp for the analysis timeframe."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "description": "An absolute Keen analysis timeframe."
+              }
+            ],
+            "description": "The required analysis timeframe accepted by Keen."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "propertyName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The event property name to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Keen filter operator, such as eq or in."
+                },
+                "propertyValue": {
+                  "description": "The value compared against the event property."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "propertyName",
+                "operator",
+                "propertyValue"
+              ],
+              "description": "One Keen event-property filter."
+            },
+            "description": "The optional event-property filters applied by Keen."
+          },
+          "groupBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "One event property used to group Keen results."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One event property used to group Keen results."
+                },
+                "description": "The event properties used to group Keen results.",
+                "minItems": 1
+              }
+            ],
+            "description": "One or more event properties used to group Keen results."
+          },
+          "interval": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The interval used to group Keen results over time."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timezone assigned to relative Keen timeframes."
+          },
+          "includeMetadata": {
+            "type": "boolean",
+            "description": "Whether Keen should include execution metadata in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCollection",
+          "timeframe"
+        ],
+        "description": "The input payload for a Keen count analysis."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The analysis result returned by Keen."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Keen analysis response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result",
+          "raw"
+        ],
+        "description": "A Keen analysis response with a dynamic result value."
+      }
+    },
+    {
+      "id": "keen_io.query_sum",
+      "service": "keen_io",
+      "name": "query_sum",
+      "description": "Sum a numeric property across Keen events in a required timeframe.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventCollection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Keen event collection to analyze."
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Keen relative timeframe such as this_7_days."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The inclusive ISO-8601 timestamp for the analysis timeframe."
+                  },
+                  "end": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The exclusive ISO-8601 timestamp for the analysis timeframe."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "description": "An absolute Keen analysis timeframe."
+              }
+            ],
+            "description": "The required analysis timeframe accepted by Keen."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "propertyName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The event property name to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Keen filter operator, such as eq or in."
+                },
+                "propertyValue": {
+                  "description": "The value compared against the event property."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "propertyName",
+                "operator",
+                "propertyValue"
+              ],
+              "description": "One Keen event-property filter."
+            },
+            "description": "The optional event-property filters applied by Keen."
+          },
+          "groupBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "One event property used to group Keen results."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One event property used to group Keen results."
+                },
+                "description": "The event properties used to group Keen results.",
+                "minItems": 1
+              }
+            ],
+            "description": "One or more event properties used to group Keen results."
+          },
+          "interval": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The interval used to group Keen results over time."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timezone assigned to relative Keen timeframes."
+          },
+          "includeMetadata": {
+            "type": "boolean",
+            "description": "Whether Keen should include execution metadata in the response."
+          },
+          "targetProperty": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric event property that Keen sums."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventCollection",
+          "timeframe",
+          "targetProperty"
+        ],
+        "description": "The input payload for a Keen sum analysis."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The analysis result returned by Keen."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Keen analysis response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result",
+          "raw"
+        ],
+        "description": "A Keen analysis response with a dynamic result value."
+      }
+    }
+  ]
+}

@@ -1,0 +1,520 @@
+{
+  "service": "accuweather",
+  "displayName": "AccuWeather",
+  "description": "Weather locations, current conditions, and forecasts from AccuWeather.",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Your AccuWeather API key",
+      "description": "AccuWeather API key sent as an Authorization Bearer token. Create or copy a key from the AccuWeather developer portal subscriptions page: https://developer.accuweather.com/subscriptions."
+    }
+  ],
+  "homepageUrl": "https://www.accuweather.com",
+  "actions": [
+    {
+      "id": "accuweather.get_current_conditions",
+      "service": "accuweather",
+      "name": "get_current_conditions",
+      "description": "Retrieve current weather conditions for an AccuWeather location key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AccuWeather location key returned by a location search endpoint."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The AccuWeather language code used to localize results."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should include optional extended details in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locationKey"
+        ],
+        "description": "The input payload for an AccuWeather location-key request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "localObservationDateTime": {
+                  "type": "string",
+                  "description": "The local observation timestamp returned by AccuWeather."
+                },
+                "weatherText": {
+                  "type": "string",
+                  "description": "The current weather description."
+                },
+                "weatherIcon": {
+                  "type": "integer",
+                  "description": "The AccuWeather weather icon code."
+                },
+                "hasPrecipitation": {
+                  "type": "boolean",
+                  "description": "Whether precipitation is currently present."
+                },
+                "precipitationType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The precipitation type, when AccuWeather returns one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The precipitation type, when AccuWeather returns one."
+                },
+                "isDayTime": {
+                  "type": "boolean",
+                  "description": "Whether the observation is during local daytime."
+                },
+                "temperature": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw nested object returned by AccuWeather."
+                },
+                "mobileLink": {
+                  "type": "string",
+                  "description": "The AccuWeather mobile URL for this condition."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The AccuWeather web URL for this condition."
+                },
+                "raw": {
+                  "description": "The raw AccuWeather response payload."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "localObservationDateTime",
+                "weatherText",
+                "weatherIcon",
+                "hasPrecipitation",
+                "precipitationType",
+                "isDayTime",
+                "temperature",
+                "mobileLink",
+                "link",
+                "raw"
+              ],
+              "description": "A normalized current condition record."
+            },
+            "description": "The current condition records returned by AccuWeather."
+          },
+          "raw": {
+            "description": "The raw AccuWeather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conditions",
+          "raw"
+        ],
+        "description": "The AccuWeather current conditions response."
+      }
+    },
+    {
+      "id": "accuweather.get_daily_forecast",
+      "service": "accuweather",
+      "name": "get_daily_forecast",
+      "description": "Retrieve a daily forecast for an AccuWeather location key using an official duration endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AccuWeather location key returned by a location search endpoint."
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "1day",
+              "5day",
+              "7day",
+              "10day",
+              "15day"
+            ],
+            "description": "The AccuWeather daily forecast duration endpoint to call."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The AccuWeather language code used to localize results."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should include optional extended details in the response."
+          },
+          "metric": {
+            "type": "boolean",
+            "description": "Whether forecast values should be returned in metric units."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locationKey",
+          "duration"
+        ],
+        "description": "The input payload for an AccuWeather daily forecast request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw nested object returned by AccuWeather."
+          },
+          "dailyForecasts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw nested object returned by AccuWeather."
+            },
+            "description": "The daily forecast records returned by AccuWeather."
+          },
+          "raw": {
+            "description": "The raw AccuWeather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "headline",
+          "dailyForecasts",
+          "raw"
+        ],
+        "description": "The AccuWeather daily forecast response."
+      }
+    },
+    {
+      "id": "accuweather.get_hourly_forecast",
+      "service": "accuweather",
+      "name": "get_hourly_forecast",
+      "description": "Retrieve an hourly forecast for an AccuWeather location key using an official duration endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AccuWeather location key returned by a location search endpoint."
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "1hour",
+              "12hour",
+              "24hour",
+              "72hour",
+              "120hour"
+            ],
+            "description": "The AccuWeather hourly forecast duration endpoint to call."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The AccuWeather language code used to localize results."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should include optional extended details in the response."
+          },
+          "metric": {
+            "type": "boolean",
+            "description": "Whether forecast values should be returned in metric units."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locationKey",
+          "duration"
+        ],
+        "description": "The input payload for an AccuWeather hourly forecast request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forecasts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw nested object returned by AccuWeather."
+            },
+            "description": "The hourly forecast records returned by AccuWeather."
+          },
+          "raw": {
+            "description": "The raw AccuWeather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "forecasts",
+          "raw"
+        ],
+        "description": "The AccuWeather hourly forecast response."
+      }
+    },
+    {
+      "id": "accuweather.get_location_by_geoposition",
+      "service": "accuweather",
+      "name": "get_location_by_geoposition",
+      "description": "Resolve latitude and longitude coordinates to a single AccuWeather location key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The AccuWeather language code used to localize results."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should include optional extended details in the response."
+          },
+          "topLevel": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should return only top-level administrative data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "description": "The input payload for resolving an AccuWeather location by coordinates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "The AccuWeather location key."
+              },
+              "localizedName": {
+                "type": "string",
+                "description": "The localized location name returned by AccuWeather."
+              },
+              "englishName": {
+                "type": "string",
+                "description": "The English location name returned by AccuWeather."
+              },
+              "type": {
+                "type": "string",
+                "description": "The AccuWeather location type, such as City."
+              },
+              "rank": {
+                "type": "integer",
+                "description": "The AccuWeather ranking value for this location."
+              },
+              "country": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw nested object returned by AccuWeather."
+              },
+              "administrativeArea": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw nested object returned by AccuWeather."
+              },
+              "raw": {
+                "description": "The raw AccuWeather response payload."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "localizedName",
+              "englishName",
+              "type",
+              "rank",
+              "country",
+              "administrativeArea",
+              "raw"
+            ],
+            "description": "A normalized AccuWeather location result."
+          },
+          "raw": {
+            "description": "The raw AccuWeather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location",
+          "raw"
+        ],
+        "description": "The AccuWeather geoposition lookup response."
+      }
+    },
+    {
+      "id": "accuweather.search_locations",
+      "service": "accuweather",
+      "name": "search_locations",
+      "description": "Search AccuWeather locations by text and return normalized location keys for weather requests.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city, postal code, or place text to search for."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The AccuWeather language code used to localize results."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether AccuWeather should include optional extended details in the response."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result offset requested from AccuWeather."
+          },
+          "alias": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The AccuWeather alias mode: 0 for always, 1 for never, or 2 only when no official match exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching AccuWeather locations by text."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The AccuWeather location key."
+                },
+                "localizedName": {
+                  "type": "string",
+                  "description": "The localized location name returned by AccuWeather."
+                },
+                "englishName": {
+                  "type": "string",
+                  "description": "The English location name returned by AccuWeather."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The AccuWeather location type, such as City."
+                },
+                "rank": {
+                  "type": "integer",
+                  "description": "The AccuWeather ranking value for this location."
+                },
+                "country": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw nested object returned by AccuWeather."
+                },
+                "administrativeArea": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw nested object returned by AccuWeather."
+                },
+                "raw": {
+                  "description": "The raw AccuWeather response payload."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "key",
+                "localizedName",
+                "englishName",
+                "type",
+                "rank",
+                "country",
+                "administrativeArea",
+                "raw"
+              ],
+              "description": "A normalized AccuWeather location result."
+            },
+            "description": "The ordered AccuWeather location results."
+          },
+          "raw": {
+            "description": "The raw AccuWeather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locations",
+          "raw"
+        ],
+        "description": "The AccuWeather location search response."
+      }
+    }
+  ]
+}

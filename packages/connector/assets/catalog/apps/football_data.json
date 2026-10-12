@@ -1,0 +1,487 @@
+{
+  "service": "football_data",
+  "displayName": "football-data.org",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "FOOTBALL_DATA_API_TOKEN",
+      "description": "football-data.org API token sent with the X-Auth-Token header. Register and manage your token from the official client area: https://www.football-data.org/client/register"
+    }
+  ],
+  "homepageUrl": "https://www.football-data.org/",
+  "actions": [
+    {
+      "id": "football_data.get_match",
+      "service": "football_data",
+      "name": "get_match",
+      "description": "Retrieve one football-data.org match by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The football-data.org match identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a football-data.org match."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The match returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org match response."
+      }
+    },
+    {
+      "id": "football_data.get_standings",
+      "service": "football_data",
+      "name": "get_standings",
+      "description": "Get football-data.org standings for a competition such as WC.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The football-data.org competition code, such as WC for the World Cup.",
+            "pattern": "\\S"
+          },
+          "season": {
+            "type": "integer",
+            "minimum": 1930,
+            "description": "The season year used by football-data.org."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "competition"
+        ],
+        "description": "The input payload for reading a football-data.org competition resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The filters returned by football-data.org."
+          },
+          "competition": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The competition ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The competition name."
+              },
+              "code": {
+                "type": "string",
+                "description": "The competition code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The competition type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A competition returned by football-data.org."
+          },
+          "season": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The season returned by football-data.org."
+          },
+          "standings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One standings table."
+            },
+            "description": "The standings tables returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org standings response."
+      }
+    },
+    {
+      "id": "football_data.list_all_matches",
+      "service": "football_data",
+      "name": "list_all_matches",
+      "description": "List football-data.org matches across visible competitions with optional date, status, and competition filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateFrom": {
+            "type": "string",
+            "description": "A date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "A date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "LIVE",
+              "IN_PLAY",
+              "PAUSED",
+              "FINISHED",
+              "POSTPONED",
+              "SUSPENDED",
+              "CANCELED"
+            ],
+            "description": "The football-data.org match status filter."
+          },
+          "competitions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The football-data.org competition code, such as WC for the World Cup.",
+              "pattern": "\\S"
+            },
+            "description": "Competition codes used to filter matches, such as WC.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing football-data.org matches across visible competitions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of matches returned."
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The filters returned by football-data.org."
+          },
+          "resultSet": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The result set metadata returned by football-data.org."
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One match."
+            },
+            "description": "The matches returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org global matches response."
+      }
+    },
+    {
+      "id": "football_data.list_competitions",
+      "service": "football_data",
+      "name": "list_competitions",
+      "description": "List football competitions visible to the connected football-data.org API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing football-data.org competitions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of competitions returned."
+          },
+          "competitions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The competition ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The competition name."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The competition code."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The competition type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A competition returned by football-data.org."
+            },
+            "description": "The competitions returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org competitions response."
+      }
+    },
+    {
+      "id": "football_data.list_matches",
+      "service": "football_data",
+      "name": "list_matches",
+      "description": "List football-data.org matches for a competition such as WC, with optional season, date, status, stage, and group filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The football-data.org competition code, such as WC for the World Cup.",
+            "pattern": "\\S"
+          },
+          "season": {
+            "type": "integer",
+            "minimum": 1930,
+            "description": "The season year used by football-data.org."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "A date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "A date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SCHEDULED",
+              "LIVE",
+              "IN_PLAY",
+              "PAUSED",
+              "FINISHED",
+              "POSTPONED",
+              "SUSPENDED",
+              "CANCELED"
+            ],
+            "description": "The football-data.org match status filter."
+          },
+          "stage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The football-data.org stage filter."
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The football-data.org group filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "competition"
+        ],
+        "description": "The input payload for listing football-data.org competition matches."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of matches returned."
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The filters returned by football-data.org."
+          },
+          "competition": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The competition ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The competition name."
+              },
+              "code": {
+                "type": "string",
+                "description": "The competition code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The competition type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A competition returned by football-data.org."
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One match."
+            },
+            "description": "The matches returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org matches response."
+      }
+    },
+    {
+      "id": "football_data.list_teams",
+      "service": "football_data",
+      "name": "list_teams",
+      "description": "List football-data.org teams for a competition such as WC.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competition": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The football-data.org competition code, such as WC for the World Cup.",
+            "pattern": "\\S"
+          },
+          "season": {
+            "type": "integer",
+            "minimum": 1930,
+            "description": "The season year used by football-data.org."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "competition"
+        ],
+        "description": "The input payload for reading a football-data.org competition resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of teams returned."
+          },
+          "competition": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The competition ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The competition name."
+              },
+              "code": {
+                "type": "string",
+                "description": "The competition code."
+              },
+              "type": {
+                "type": "string",
+                "description": "The competition type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A competition returned by football-data.org."
+          },
+          "season": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The season returned by football-data.org."
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One team."
+            },
+            "description": "The teams returned by football-data.org."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw football-data.org response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The football-data.org teams response."
+      }
+    }
+  ]
+}

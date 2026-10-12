@@ -1,0 +1,347 @@
+{
+  "service": "datacite",
+  "displayName": "DataCite",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "Repository API Key",
+      "placeholder": "DC.xxxxxxxxxx_API_KEY",
+      "description": "Optional for public DOI metadata and required for authorized records. See https://support.datacite.org/docs/api-keys"
+    }
+  ],
+  "homepageUrl": "https://datacite.org/",
+  "actions": [
+    {
+      "id": "datacite.get_doi",
+      "service": "datacite",
+      "name": "get_doi",
+      "description": "Retrieve one DataCite DOI metadata record, including non-public states when the connected API key permits access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DOI name, such as 10.14454/qdd3-ps68. A doi.org URL is also accepted."
+          },
+          "affiliation": {
+            "type": "boolean",
+            "description": "Whether to include detailed affiliation identifier information."
+          },
+          "publisher": {
+            "type": "boolean",
+            "description": "Whether to include detailed publisher identifier information."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doi"
+        ],
+        "description": "Input parameters for retrieving one DataCite DOI record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The normalized DOI name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The JSON:API resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The DOI metadata attributes returned by DataCite."
+              },
+              "relationships": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The JSON:API relationships returned for the DOI when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "attributes"
+            ],
+            "description": "A DataCite DOI resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The DataCite response for one DOI."
+      }
+    },
+    {
+      "id": "datacite.list_dois",
+      "service": "datacite",
+      "name": "list_dois",
+      "description": "Search, filter, sort, and page through DataCite DOI metadata records with public or authenticated access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An OpenSearch query string over DOI metadata fields, such as titles.title:climate."
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One DOI prefix or a comma-separated list of prefixes, such as 10.5438."
+          },
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One repository ID or a comma-separated list of repository IDs."
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One member or consortium organization ID, or a comma-separated list of IDs."
+          },
+          "consortiumId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DataCite consortium ID to filter by."
+          },
+          "resourceTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "audiovisual",
+                "award",
+                "book",
+                "book-chapter",
+                "collection",
+                "computational-notebook",
+                "conference-paper",
+                "conference-proceeding",
+                "data-paper",
+                "dataset",
+                "dissertation",
+                "event",
+                "image",
+                "instrument",
+                "interactive-resource",
+                "journal",
+                "journal-article",
+                "model",
+                "output-management-plan",
+                "peer-review",
+                "physical-object",
+                "poster",
+                "preprint",
+                "presentation",
+                "project",
+                "report",
+                "service",
+                "software",
+                "sound",
+                "standard",
+                "study-registration",
+                "text",
+                "workflow",
+                "other"
+              ],
+              "description": "One DataCite resourceTypeGeneral value."
+            },
+            "description": "The DataCite resourceTypeGeneral values to include.",
+            "minItems": 1
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A free-text subject used to filter DOI metadata."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ORCID iD used to match creator identifiers."
+          },
+          "affiliationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A ROR ID used to match creator affiliations."
+          },
+          "funderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Crossref Funder ID used to match funding references."
+          },
+          "published": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A publication year or comma-separated publication years in YYYY format."
+          },
+          "created": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A creation year or comma-separated creation years in YYYY format."
+          },
+          "registered": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A registration year or comma-separated registration years in YYYY format."
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "registered",
+                "findable"
+              ],
+              "description": "One DataCite DOI state."
+            },
+            "description": "The DOI states to include. Draft and Registered records require API key authentication.",
+            "minItems": 1
+          },
+          "hasCitations": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum citation count to include."
+          },
+          "hasReferences": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum reference count to include."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "name",
+              "-name",
+              "created",
+              "-created",
+              "updated",
+              "-updated",
+              "published",
+              "-published",
+              "view-count",
+              "-view-count",
+              "download-count",
+              "-download-count",
+              "citation-count",
+              "-citation-count",
+              "title",
+              "-title"
+            ],
+            "description": "The ordering applied to matching DOI records."
+          },
+          "detail": {
+            "type": "boolean",
+            "description": "Whether to include extended DOI metadata and relationships."
+          },
+          "affiliation": {
+            "type": "boolean",
+            "description": "Whether to include detailed affiliation identifier information."
+          },
+          "publisher": {
+            "type": "boolean",
+            "description": "Whether to include detailed publisher identifier information."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number for numbered pagination."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "description": "The number of DOI records to return, from 0 through 1,000."
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by DataCite for cursor-based pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing DataCite DOI records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The normalized DOI name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The DOI metadata attributes returned by DataCite."
+                },
+                "relationships": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The JSON:API relationships returned for the DOI when present."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type",
+                "attributes"
+              ],
+              "description": "A DataCite DOI resource."
+            },
+            "description": "The matching DOI resources."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the DataCite JSON:API."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the DataCite JSON:API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The DataCite response for a DOI list."
+      }
+    }
+  ]
+}

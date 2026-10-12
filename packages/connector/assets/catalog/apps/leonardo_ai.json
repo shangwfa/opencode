@@ -1,0 +1,323 @@
+{
+  "service": "leonardo_ai",
+  "displayName": "Leonardo.Ai",
+  "description": "Create and inspect image, video, audio, and 3D generation jobs with Leonardo.Ai.",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+      "description": "Leonardo.Ai production API key used with the Authorization Bearer header. Create or copy it from the official API Access page: https://app.leonardo.ai/api-access."
+    }
+  ],
+  "homepageUrl": "https://leonardo.ai",
+  "actions": [
+    {
+      "id": "leonardo_ai.create_generation",
+      "service": "leonardo_ai",
+      "name": "create_generation",
+      "description": "Create a Leonardo.Ai image, video, audio, or 3D generation job using JSON model parameters.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Leonardo.Ai production model identifier, such as phoenix-v1.0."
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The model-specific generation parameters accepted by Leonardo.Ai."
+          },
+          "public": {
+            "type": "boolean",
+            "description": "Whether generated assets should appear in the Leonardo.Ai community feed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "parameters"
+        ],
+        "description": "Input for creating a Leonardo.Ai generation job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Leonardo.Ai generation job identifier."
+          },
+          "apiCreditCost": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The API credit cost reported by Leonardo.Ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The API credit cost reported by Leonardo.Ai."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Leonardo.Ai API object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "generationId",
+          "apiCreditCost",
+          "raw"
+        ],
+        "description": "The Leonardo.Ai generation creation response."
+      },
+      "followUpActions": [
+        "leonardo_ai.get_generation"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "leonardo_ai.create_generation",
+        "statusActionId": "leonardo_ai.get_generation"
+      }
+    },
+    {
+      "id": "leonardo_ai.get_generation",
+      "service": "leonardo_ai",
+      "name": "get_generation",
+      "description": "Retrieve a Leonardo.Ai generation job status and normalized generated image URLs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "generationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Leonardo.Ai generation job identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "generationId"
+        ],
+        "description": "Input for retrieving a Leonardo.Ai generation job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "generation": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Leonardo.Ai generation job identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The generation status when provided."
+              },
+              "prompt": {
+                "type": "string",
+                "description": "The generation prompt when provided."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The generation creation timestamp when provided."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The generation update timestamp when provided."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Leonardo.Ai generation job."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The generation status reported by Leonardo.Ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generation status reported by Leonardo.Ai."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A Leonardo.Ai image identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Leonardo.Ai image identifier."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The generated image URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The generated image URL."
+                },
+                "nsfw": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Leonardo.Ai marked the image as not safe for work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Leonardo.Ai marked the image as not safe for work."
+                },
+                "public": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the generated image is public."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the generated image is public."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Leonardo.Ai API object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized Leonardo.Ai generated image summary."
+            },
+            "description": "The generated images normalized from the Leonardo.Ai response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Leonardo.Ai API object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "generation",
+          "status",
+          "images",
+          "raw"
+        ],
+        "description": "The Leonardo.Ai generation status response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "leonardo_ai.create_generation",
+        "statusActionId": "leonardo_ai.get_generation"
+      }
+    },
+    {
+      "id": "leonardo_ai.list_models",
+      "service": "leonardo_ai",
+      "name": "list_models",
+      "description": "List Leonardo.Ai production API models and their model-specific parameter schemas.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Leonardo.Ai production models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable Leonardo.Ai model identifier when provided."
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model slug accepted by the Leonardo.Ai v2 generation API when provided."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable model name when provided."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The model description when provided."
+                },
+                "parameters": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The JSON Schema-like generation parameters accepted by this model when provided."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Leonardo.Ai production model and its generation parameter schema."
+            },
+            "description": "The production API models returned by Leonardo.Ai."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Leonardo.Ai API object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "models",
+          "raw"
+        ],
+        "description": "The Leonardo.Ai production model list response."
+      }
+    }
+  ]
+}

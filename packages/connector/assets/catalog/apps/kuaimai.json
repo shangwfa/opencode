@@ -1,0 +1,983 @@
+{
+  "service": "kuaimai",
+  "displayName": "Kuaimai ERP",
+  "categories": [
+    "Productivity",
+    "Data",
+    "Cross Border E-commerce"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "appKey",
+          "label": "APP Key",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "Paste your Kuaimai APP Key",
+          "description": "The application key issued after Kuaimai approves Open Platform access: https://open.kuaimai.com/applyApp/"
+        },
+        {
+          "key": "appSecret",
+          "label": "APP Secret",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "placeholder": "Paste your Kuaimai APP Secret",
+          "description": "The secret paired with the approved APP Key and used to sign requests. See https://open.kuaimai.com/docs/api/API%E5%AF%B9%E6%8E%A5%E8%AF%B4%E6%98%8E/%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97/"
+        },
+        {
+          "key": "accessToken",
+          "label": "Access Token",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "placeholder": "Paste your Kuaimai access token",
+          "description": "The Open Platform session token sent on each request. See https://open.kuaimai.com/docs/api/API%E5%AF%B9%E6%8E%A5%E8%AF%B4%E6%98%8E/%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97/"
+        },
+        {
+          "key": "refreshToken",
+          "label": "Refresh Token",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "placeholder": "Paste your Kuaimai refresh token",
+          "description": "The token used to extend the Open Platform session. See https://open.kuaimai.com/docs/api/API%E5%AF%B9%E6%8E%A5%E8%AF%B4%E6%98%8E/%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97/"
+        }
+      ],
+      "testAction": {
+        "actionName": "list_warehouses",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://www.kuaimai.com/",
+  "actions": [
+    {
+      "id": "kuaimai.get_product",
+      "service": "kuaimai",
+      "name": "get_product",
+      "description": "Get one Kuaimai ERP product by system ID or merchant product code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "systemProductId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Kuaimai ERP system product ID."
+          },
+          "merchantProductCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant product code."
+          },
+          "includePurchaseLinks": {
+            "type": "boolean",
+            "description": "Whether Kuaimai should include product purchase-link information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The identifier of the Kuaimai ERP product to retrieve.",
+        "anyOf": [
+          {
+            "required": [
+              "systemProductId"
+            ]
+          },
+          {
+            "required": [
+              "merchantProductCode"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The product record returned by Kuaimai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Kuaimai product."
+      }
+    },
+    {
+      "id": "kuaimai.list_inventory",
+      "service": "kuaimai",
+      "name": "list_inventory",
+      "description": "List warehouse inventory for a Kuaimai merchant product or SKU code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "merchantProductCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant product code to retrieve."
+          },
+          "merchantSkuCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant SKU code to retrieve."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records to return, from 1 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Kuaimai ERP warehouse inventory.",
+        "anyOf": [
+          {
+            "required": [
+              "merchantProductCode"
+            ]
+          },
+          {
+            "required": [
+              "merchantSkuCode"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inventory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product and warehouse inventory record returned by Kuaimai."
+            },
+            "description": "One product and warehouse inventory record returned by Kuaimai."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when omitted."
+          },
+          "hasNext": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether another result page is available, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether another result page is available, or null when omitted."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next request, or null when cursor mode is unused."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next request, or null when cursor mode is unused."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Kuaimai inventory result."
+      }
+    },
+    {
+      "id": "kuaimai.list_orders",
+      "service": "kuaimai",
+      "name": "list_orders",
+      "description": "List Kuaimai ERP orders, excluding Taobao/Tmall and Pinduoduo orders that require separate platform credentials.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "systemOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai ERP system order number."
+            },
+            "description": "Kuaimai ERP system order numbers to retrieve.",
+            "minItems": 1
+          },
+          "platformOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One platform order number."
+            },
+            "description": "Platform order numbers to retrieve.",
+            "minItems": 1
+          },
+          "timeType": {
+            "type": "string",
+            "enum": [
+              "created",
+              "pay_time",
+              "consign_time",
+              "audit_time",
+              "upd_time"
+            ],
+            "description": "The order time field used with startTime and endTime."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "shopIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai shop ID."
+            },
+            "description": "Shop IDs used to filter records.",
+            "minItems": 1
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Kuaimai ERP order status."
+            },
+            "description": "Kuaimai ERP system statuses used to filter records.",
+            "minItems": 1
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai order tag ID."
+            },
+            "description": "Order tag IDs used to filter records, with at most ten IDs.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai custom exception tag ID."
+            },
+            "description": "Custom exception tag IDs used to filter records, with at most ten IDs.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai system exception status."
+            },
+            "description": "System exception statuses used to filter records, with at most ten values.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionMatch": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "description": "How exception filters are applied: 1 only matching, 2 exclude matching, or 3 include both."
+          },
+          "orderTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Kuaimai order type code."
+            },
+            "description": "Kuaimai order type codes used to filter records.",
+            "minItems": 1
+          },
+          "buyerNick": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The platform buyer ID or nickname to retrieve."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to query orders older than three months instead of the recent-order store."
+          },
+          "trackingNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One logistics tracking number."
+            },
+            "description": "Logistics tracking numbers to retrieve.",
+            "minItems": 1
+          },
+          "useCursor": {
+            "type": "boolean",
+            "description": "Whether to use cursor pagination for recent orders."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the preceding cursor-mode request."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 200,
+            "description": "The number of records to return, from 20 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for querying Kuaimai ERP trade records.",
+        "oneOf": [
+          {
+            "required": [
+              "timeType",
+              "startTime",
+              "endTime"
+            ]
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "timeType"
+                  ]
+                },
+                {
+                  "required": [
+                    "startTime"
+                  ]
+                },
+                {
+                  "required": [
+                    "endTime"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One order record returned by Kuaimai."
+            },
+            "description": "One order record returned by Kuaimai."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when omitted."
+          },
+          "hasNext": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether another result page is available, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether another result page is available, or null when omitted."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next request, or null when cursor mode is unused."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next request, or null when cursor mode is unused."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Kuaimai order result."
+      }
+    },
+    {
+      "id": "kuaimai.list_products",
+      "service": "kuaimai",
+      "name": "list_products",
+      "description": "List products and their SKU records from Kuaimai ERP.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activeStatus": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "The availability status: 0 disabled or 1 enabled."
+          },
+          "modifiedAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "modifiedBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "productType": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              3,
+              6,
+              7,
+              8,
+              9,
+              10
+            ],
+            "description": "The documented Kuaimai product type filter."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "modified:desc",
+              "created:desc"
+            ],
+            "description": "The product sort order."
+          },
+          "includePurchaseLinks": {
+            "type": "boolean",
+            "description": "Whether Kuaimai should include product purchase-link information."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records to return, from 1 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Kuaimai ERP products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product record returned by Kuaimai, including nested SKUs when available."
+            },
+            "description": "One product record returned by Kuaimai, including nested SKUs when available."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when omitted."
+          },
+          "hasNext": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether another result page is available, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether another result page is available, or null when omitted."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next request, or null when cursor mode is unused."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next request, or null when cursor mode is unused."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Kuaimai product result."
+      }
+    },
+    {
+      "id": "kuaimai.list_sales_stockouts",
+      "service": "kuaimai",
+      "name": "list_sales_stockouts",
+      "description": "List Kuaimai ERP sales stockout records and their order details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "systemOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai ERP system order number."
+            },
+            "description": "Kuaimai ERP system order numbers to retrieve.",
+            "minItems": 1
+          },
+          "platformOrderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One platform order number."
+            },
+            "description": "Platform order numbers to retrieve.",
+            "minItems": 1
+          },
+          "timeType": {
+            "type": "string",
+            "enum": [
+              "created",
+              "pay_time",
+              "consign_time",
+              "audit_time",
+              "upd_time"
+            ],
+            "description": "The order time field used with startTime and endTime."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format."
+          },
+          "shopIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai shop ID."
+            },
+            "description": "Shop IDs used to filter records.",
+            "minItems": 1
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Kuaimai ERP order status."
+            },
+            "description": "Kuaimai ERP system statuses used to filter records.",
+            "minItems": 1
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai order tag ID."
+            },
+            "description": "Order tag IDs used to filter records, with at most ten IDs.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai custom exception tag ID."
+            },
+            "description": "Custom exception tag IDs used to filter records, with at most ten IDs.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Kuaimai system exception status."
+            },
+            "description": "System exception statuses used to filter records, with at most ten values.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "exceptionMatch": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "description": "How exception filters are applied: 1 only matching, 2 exclude matching, or 3 include both."
+          },
+          "orderTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Kuaimai order type code."
+            },
+            "description": "Kuaimai order type codes used to filter records.",
+            "minItems": 1
+          },
+          "buyerNick": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The platform buyer ID or nickname to retrieve."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to query orders older than three months instead of the recent-order store."
+          },
+          "trackingNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One logistics tracking number."
+            },
+            "description": "Logistics tracking numbers to retrieve.",
+            "minItems": 1
+          },
+          "useCursor": {
+            "type": "boolean",
+            "description": "Whether to use cursor pagination for recent orders."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the preceding cursor-mode request."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 200,
+            "description": "The number of records to return, from 20 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for querying Kuaimai ERP trade records.",
+        "oneOf": [
+          {
+            "required": [
+              "timeType",
+              "startTime",
+              "endTime"
+            ]
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "timeType"
+                  ]
+                },
+                {
+                  "required": [
+                    "startTime"
+                  ]
+                },
+                {
+                  "required": [
+                    "endTime"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stockouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sales stockout record returned by Kuaimai."
+            },
+            "description": "One sales stockout record returned by Kuaimai."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when omitted."
+          },
+          "hasNext": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether another result page is available, or null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether another result page is available, or null when omitted."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next request, or null when cursor mode is unused."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next request, or null when cursor mode is unused."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Kuaimai sales stockout result."
+      }
+    },
+    {
+      "id": "kuaimai.list_shops",
+      "service": "kuaimai",
+      "name": "list_shops",
+      "description": "List shops configured for the connected Kuaimai ERP company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop name to filter by."
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The shop ID to retrieve."
+          },
+          "shortName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop short name to filter by."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Kuaimai ERP shops."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One shop record returned by Kuaimai."
+            },
+            "description": "The matching shop records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Kuaimai shop records."
+      }
+    },
+    {
+      "id": "kuaimai.list_warehouses",
+      "service": "kuaimai",
+      "name": "list_warehouses",
+      "description": "List warehouses configured for the connected Kuaimai ERP company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact warehouse code to retrieve."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The warehouse name to filter by."
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The warehouse ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Kuaimai ERP warehouses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One warehouse record returned by Kuaimai."
+            },
+            "description": "The matching warehouse records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Kuaimai warehouse records."
+      }
+    },
+    {
+      "id": "kuaimai.refresh_session",
+      "service": "kuaimai",
+      "name": "refresh_session",
+      "description": "Extend the Kuaimai Open Platform session validity by another 30 days.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to refresh the configured Kuaimai session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The session metadata returned by Kuaimai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The refreshed Kuaimai session metadata."
+      }
+    }
+  ]
+}

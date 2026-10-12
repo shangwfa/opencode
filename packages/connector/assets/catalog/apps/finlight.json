@@ -1,0 +1,551 @@
+{
+  "service": "finlight",
+  "displayName": "Finlight",
+  "homepageUrl": "https://finlight.me/",
+  "categories": [
+    "Finance",
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Get your Finlight API key from the API Keys section at https://app.finlight.me. Requests authenticate with the X-API-KEY header."
+    }
+  ],
+  "actions": [
+    {
+      "id": "finlight.get_article_by_link",
+      "service": "finlight",
+      "name": "get_article_by_link",
+      "description": "Get a Finlight article by its original URL, optionally including company entities and full content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string",
+            "description": "Original article URL to look up in Finlight.",
+            "format": "uri"
+          },
+          "includeEntities": {
+            "type": "boolean",
+            "description": "Include company entities; requires a suitable subscription. Defaults to false."
+          },
+          "includeContent": {
+            "type": "boolean",
+            "description": "Deprecated upstream option to include full article content. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "link"
+        ],
+        "description": "Article lookup options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Upstream response status."
+          },
+          "article": {
+            "type": "object",
+            "properties": {
+              "link": {
+                "type": "string",
+                "description": "URL of the original article."
+              },
+              "source": {
+                "type": "string",
+                "description": "Publisher domain."
+              },
+              "title": {
+                "type": "string",
+                "description": "Article title."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Article summary when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Article summary when available."
+              },
+              "publishDate": {
+                "type": "string",
+                "description": "Publication date as an ISO date string."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Indexing date, returned when ordering by createdAt."
+              },
+              "revisedDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Last revision date, returned when ordering by revisedDate."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last revision date, returned when ordering by revisedDate."
+              },
+              "language": {
+                "type": "string",
+                "description": "Article language as an ISO 639-1 code."
+              },
+              "sentiment": {
+                "type": "string",
+                "description": "Sentiment: positive, neutral, or negative."
+              },
+              "confidence": {
+                "type": "string",
+                "description": "Sentiment confidence from 0 to 1 as a stringified number."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Full article content when available under the subscription."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full article content when available under the subscription."
+              },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An article image URL."
+                },
+                "description": "Article image URLs."
+              },
+              "countries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An ISO 3166-1 alpha-2 country code."
+                },
+                "description": "Countries related to the article."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An article category."
+                },
+                "description": "Article categories."
+              },
+              "companies": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Company identity, confidence, tickers, ISINs, and exchange listings."
+                    },
+                    "description": "Company entities, subject to subscription access."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company entities, subject to subscription access."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "link",
+              "title"
+            ],
+            "description": "A financial news article returned by Finlight."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "article"
+        ],
+        "description": "Finlight single article response."
+      }
+    },
+    {
+      "id": "finlight.list_sources",
+      "service": "finlight",
+      "name": "list_sources",
+      "description": "List Finlight news sources, their languages, countries, and default inclusion status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Options for listing available news sources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "description": "Publisher domain."
+                },
+                "isDefaultSource": {
+                  "type": "boolean",
+                  "description": "Whether the source is included by default."
+                },
+                "originCountry": {
+                  "type": "string",
+                  "description": "Publisher country code; may be empty."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An ISO 639-1 language code."
+                  },
+                  "description": "Publisher languages, primary language first."
+                },
+                "isCustomSource": {
+                  "type": "boolean",
+                  "description": "Whether this is a custom source enabled for the subscription."
+                },
+                "isContentAvailable": {
+                  "type": "boolean",
+                  "description": "Deprecated indication of full content availability on eligible plans."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "domain",
+                "isDefaultSource",
+                "originCountry",
+                "languages"
+              ],
+              "description": "A news source."
+            },
+            "description": "Supported sources; availability can change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sources"
+        ],
+        "description": "Available Finlight news sources."
+      }
+    },
+    {
+      "id": "finlight.search_articles",
+      "service": "finlight",
+      "name": "search_articles",
+      "description": "Search financial news with sentiment, source, ticker, country, category, date, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query, including Finlight advanced query syntax."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A source domain or *."
+            },
+            "description": "Restrict sources; use * to include all sources."
+          },
+          "optInSources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An additional source domain."
+            },
+            "description": "Additional sources to include beyond the default set."
+          },
+          "excludeSources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A source domain to exclude."
+            },
+            "description": "Sources to exclude."
+          },
+          "tickers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A stock ticker or *."
+            },
+            "description": "Stock tickers to match; supports *."
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An ISO 3166-1 alpha-2 country code."
+            },
+            "description": "Filter countries the article is about, not publisher or company domicile."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "markets",
+                "economy",
+                "business",
+                "politics",
+                "geopolitics",
+                "regulation",
+                "technology",
+                "energy",
+                "commodities",
+                "crypto",
+                "health",
+                "climate",
+                "security"
+              ],
+              "description": "An article category."
+            },
+            "description": "Filter by article categories."
+          },
+          "includeEntities": {
+            "type": "boolean",
+            "description": "Include company entities; requires a suitable subscription. Defaults to false."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Start date in YYYY-MM-DD or ISO date format."
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "End date in YYYY-MM-DD or ISO date format."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 639-1 language filter. Defaults to en, excluding other languages."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "publishDate",
+              "createdAt",
+              "revisedDate"
+            ],
+            "description": "Sort field. Defaults to publishDate."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "Sort direction. Defaults to DESC."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Results per page. Defaults to 20."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1. Defaults to 1."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Financial news search options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Upstream response status."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Requested page size."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "link": {
+                  "type": "string",
+                  "description": "URL of the original article."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Publisher domain."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Article title."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Article summary when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Article summary when available."
+                },
+                "publishDate": {
+                  "type": "string",
+                  "description": "Publication date as an ISO date string."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Indexing date, returned when ordering by createdAt."
+                },
+                "revisedDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Last revision date, returned when ordering by revisedDate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Last revision date, returned when ordering by revisedDate."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "Article language as an ISO 639-1 code."
+                },
+                "sentiment": {
+                  "type": "string",
+                  "description": "Sentiment: positive, neutral, or negative."
+                },
+                "confidence": {
+                  "type": "string",
+                  "description": "Sentiment confidence from 0 to 1 as a stringified number."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Full article content when available under the subscription."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Full article content when available under the subscription."
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An article image URL."
+                  },
+                  "description": "Article image URLs."
+                },
+                "countries": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An ISO 3166-1 alpha-2 country code."
+                  },
+                  "description": "Countries related to the article."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An article category."
+                  },
+                  "description": "Article categories."
+                },
+                "companies": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Company identity, confidence, tickers, ISINs, and exchange listings."
+                      },
+                      "description": "Company entities, subject to subscription access."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Company entities, subject to subscription access."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "link",
+                "title"
+              ],
+              "description": "A financial news article returned by Finlight."
+            },
+            "description": "Matching articles on this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "page",
+          "pageSize",
+          "articles"
+        ],
+        "description": "Finlight search response with pagination and articles."
+      }
+    }
+  ]
+}

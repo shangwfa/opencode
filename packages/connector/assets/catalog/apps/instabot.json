@@ -1,0 +1,730 @@
+{
+  "service": "instabot",
+  "displayName": "Instabot",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "INSTABOT_API_KEY",
+      "description": "Instabot API Key sent in the X-Instabot-Api-Key header. View it at https://app.instabot.io/.",
+      "extraFields": [
+        {
+          "key": "masterApiKey",
+          "label": "Master API Key",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "placeholder": "INSTABOT_MASTER_API_KEY",
+          "description": "Instabot Master API Key used for administrative Server API access."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.instabot.io/",
+  "actions": [
+    {
+      "id": "instabot.create_user",
+      "service": "instabot",
+      "name": "create_user",
+      "description": "Create a registered user in Instabot.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user name."
+          },
+          "userPassword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The initial user password."
+          },
+          "name": {
+            "type": "string",
+            "description": "The user's display name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The user description."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's email address.",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "description": "The user's phone number."
+          },
+          "photoFile": {
+            "type": "object",
+            "properties": {
+              "objectId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Instabot File Object ID used as the user's photo."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "objectId"
+            ],
+            "description": "A reference to an existing Instabot File Object."
+          },
+          "customProperties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom Instabot user properties keyed by property name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userName",
+          "userPassword"
+        ],
+        "description": "The Instabot user fields used for creation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Instabot user object ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "userId"
+        ],
+        "description": "The result returned after Instabot creates a user."
+      }
+    },
+    {
+      "id": "instabot.delete_user",
+      "service": "instabot",
+      "name": "delete_user",
+      "description": "Soft-delete an Instabot user.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Instabot user object ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The input for deleting an Instabot user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The response returned by an Instabot user mutation."
+      }
+    },
+    {
+      "id": "instabot.get_user",
+      "service": "instabot",
+      "name": "get_user",
+      "description": "Get one Instabot user by object ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Instabot user object ID."
+          },
+          "resolve": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "organizations",
+                "userSegments",
+                "conversations"
+              ],
+              "description": "One supported Instabot user relationship."
+            },
+            "description": "Related user resources to resolve in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The input for retrieving one Instabot user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          },
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An Instabot user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "user"
+        ],
+        "description": "The response returned for one Instabot user."
+      }
+    },
+    {
+      "id": "instabot.list_updated_users",
+      "service": "instabot",
+      "name": "list_updated_users",
+      "description": "List Instabot users changed since an ISO-8601 timestamp.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "description": "The ISO-8601 timestamp after which users must have changed.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of users to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of users to skip from the start of the result set."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Instabot sort expression, such as name desc,email asc."
+          },
+          "resolve": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "organizations",
+                "userSegments",
+                "conversations"
+              ],
+              "description": "One supported Instabot user relationship."
+            },
+            "description": "Related user resources to resolve in the response.",
+            "minItems": 1
+          },
+          "getTotalCount": {
+            "type": "boolean",
+            "description": "Whether Instabot should include totalCount in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "since"
+        ],
+        "description": "The input for listing recently updated Instabot users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Instabot user resource."
+            },
+            "description": "The users returned by Instabot."
+          },
+          "hasMoreRecords": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether more users remain after this response when supplied by Instabot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether more users remain after this response when supplied by Instabot."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching user count when requested and supplied by Instabot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching user count when requested and supplied by Instabot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "users",
+          "hasMoreRecords",
+          "totalCount"
+        ],
+        "description": "A page of Instabot users."
+      }
+    },
+    {
+      "id": "instabot.list_users",
+      "service": "instabot",
+      "name": "list_users",
+      "description": "List Instabot users with pagination, sorting, and optional related resources.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of users to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of users to skip from the start of the result set."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Instabot sort expression, such as name desc,email asc."
+          },
+          "resolve": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "organizations",
+                "userSegments",
+                "conversations"
+              ],
+              "description": "One supported Instabot user relationship."
+            },
+            "description": "Related user resources to resolve in the response.",
+            "minItems": 1
+          },
+          "getTotalCount": {
+            "type": "boolean",
+            "description": "Whether Instabot should include totalCount in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing Instabot users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Instabot user resource."
+            },
+            "description": "The users returned by Instabot."
+          },
+          "hasMoreRecords": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether more users remain after this response when supplied by Instabot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether more users remain after this response when supplied by Instabot."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching user count when requested and supplied by Instabot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching user count when requested and supplied by Instabot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "users",
+          "hasMoreRecords",
+          "totalCount"
+        ],
+        "description": "A page of Instabot users."
+      }
+    },
+    {
+      "id": "instabot.restore_user",
+      "service": "instabot",
+      "name": "restore_user",
+      "description": "Restore a previously deleted Instabot user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Instabot user object ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The input for restoring an Instabot user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The response returned by an Instabot user mutation."
+      }
+    },
+    {
+      "id": "instabot.update_user",
+      "service": "instabot",
+      "name": "update_user",
+      "description": "Update writable fields on an Instabot user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Instabot user object ID."
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique user name."
+          },
+          "name": {
+            "type": "string",
+            "description": "The user's display name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The user description."
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The user's email address.",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's email address."
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The user's phone number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's phone number."
+          },
+          "photoFile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "objectId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Instabot File Object ID used as the user's photo."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "objectId"
+                ],
+                "description": "A reference to an existing Instabot File Object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A reference to an existing Instabot File Object."
+          },
+          "customProperties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom Instabot user properties keyed by property name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The Instabot user fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "apiStatusCode": {
+                "type": "string",
+                "description": "The Instabot API status code."
+              },
+              "apiStatusMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Instabot API status message when the service supplies one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Instabot API status message when the service supplies one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "apiStatusCode",
+              "apiStatusMessage"
+            ],
+            "description": "The status envelope returned by Instabot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The response returned by an Instabot user mutation."
+      }
+    }
+  ]
+}

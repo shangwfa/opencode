@@ -1,0 +1,810 @@
+{
+  "service": "timebuzzer",
+  "displayName": "timeBuzzer",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_TIMEBUZZER_API_KEY",
+      "description": "timeBuzzer API key sent in the Authorization header. Create or copy it from your timeBuzzer account settings: https://my.timebuzzer.com/settings/api."
+    }
+  ],
+  "homepageUrl": "https://timebuzzer.com",
+  "actions": [
+    {
+      "id": "timebuzzer.create_activity",
+      "service": "timebuzzer",
+      "name": "create_activity",
+      "description": "Create a timeBuzzer activity for a user and an ordered set of tiles.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tiles": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A tile ID."
+            },
+            "description": "The tile IDs to assign in layer order, with at most one tile per layer.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The activity start time in UTC.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The activity end time in UTC.",
+            "format": "date-time"
+          },
+          "startUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity start, such as +02:00.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "endUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity end, such as +02:00.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "note": {
+            "type": "string",
+            "description": "The activity note."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who owns the activity."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Whether the activity is billed."
+          },
+          "customData": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional provider-defined custom data for the activity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-defined custom data for the activity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tiles",
+          "startDate",
+          "endDate",
+          "startUtcOffset",
+          "endUtcOffset",
+          "note",
+          "userId"
+        ],
+        "description": "The timeBuzzer activity to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The activity ID."
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A tile ID."
+            },
+            "description": "The tile IDs assigned in layer order.",
+            "maxItems": 3
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The activity start time in UTC.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The activity end time in UTC.",
+            "format": "date-time"
+          },
+          "startUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity start.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "endUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity end.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "note": {
+            "type": "string",
+            "description": "The activity note."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who owns the activity."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Whether the activity is billed."
+          },
+          "customData": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Provider-defined custom data attached to the activity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider-defined custom data attached to the activity."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "tiles",
+          "startDate",
+          "endDate",
+          "startUtcOffset",
+          "endUtcOffset",
+          "note",
+          "userId"
+        ],
+        "description": "A timeBuzzer time activity."
+      }
+    },
+    {
+      "id": "timebuzzer.delete_activity",
+      "service": "timebuzzer",
+      "name": "delete_activity",
+      "description": "Delete a timeBuzzer activity by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The activity ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "The activity to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether timeBuzzer accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a timeBuzzer mutation."
+      }
+    },
+    {
+      "id": "timebuzzer.get_activity",
+      "service": "timebuzzer",
+      "name": "get_activity",
+      "description": "Get one timeBuzzer activity by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The activity ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "The activity to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The activity ID."
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A tile ID."
+            },
+            "description": "The tile IDs assigned in layer order.",
+            "maxItems": 3
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The activity start time in UTC.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The activity end time in UTC.",
+            "format": "date-time"
+          },
+          "startUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity start.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "endUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity end.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "note": {
+            "type": "string",
+            "description": "The activity note."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who owns the activity."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Whether the activity is billed."
+          },
+          "customData": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Provider-defined custom data attached to the activity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider-defined custom data attached to the activity."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "tiles",
+          "startDate",
+          "endDate",
+          "startUtcOffset",
+          "endUtcOffset",
+          "note",
+          "userId"
+        ],
+        "description": "A timeBuzzer time activity."
+      }
+    },
+    {
+      "id": "timebuzzer.get_current_user",
+      "service": "timebuzzer",
+      "name": "get_current_user",
+      "description": "Get the timeBuzzer user associated with the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get the current user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The current user ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The current user's email address.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The current user's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The current user's last name."
+          },
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The timeBuzzer account ID."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A permission name."
+            },
+            "description": "The permissions granted to the current user."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current user state."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "accountId"
+        ],
+        "description": "The current timeBuzzer user profile."
+      }
+    },
+    {
+      "id": "timebuzzer.list_activities",
+      "service": "timebuzzer",
+      "name": "list_activities",
+      "description": "List timeBuzzer activities with offset-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of activities to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of activities to skip."
+          },
+          "embedTiles": {
+            "type": "boolean",
+            "description": "Whether each activity should include embedded tile details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count"
+        ],
+        "description": "Pagination and embedding options for listing activities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The activity ID."
+                },
+                "tiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "A tile ID."
+                  },
+                  "description": "The tile IDs assigned in layer order.",
+                  "maxItems": 3
+                },
+                "startDate": {
+                  "type": "string",
+                  "description": "The activity start time in UTC.",
+                  "format": "date-time"
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "The activity end time in UTC.",
+                  "format": "date-time"
+                },
+                "startUtcOffset": {
+                  "type": "string",
+                  "description": "The UTC offset at the activity start.",
+                  "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+                },
+                "endUtcOffset": {
+                  "type": "string",
+                  "description": "The UTC offset at the activity end.",
+                  "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The activity note."
+                },
+                "userId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The ID of the user who owns the activity."
+                },
+                "billed": {
+                  "type": "boolean",
+                  "description": "Whether the activity is billed."
+                },
+                "customData": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Provider-defined custom data attached to the activity."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Provider-defined custom data attached to the activity."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "tiles",
+                "startDate",
+                "endDate",
+                "startUtcOffset",
+                "endUtcOffset",
+                "note",
+                "userId"
+              ],
+              "description": "A timeBuzzer time activity."
+            },
+            "description": "The returned activities."
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching activities."
+          },
+          "totalDuration": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The total duration of matching activities in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activities",
+          "totalCount",
+          "totalDuration"
+        ],
+        "description": "A page of timeBuzzer activities and aggregate values."
+      }
+    },
+    {
+      "id": "timebuzzer.list_layers",
+      "service": "timebuzzer",
+      "name": "list_layers",
+      "description": "List the timeBuzzer layers that organize tiles in hierarchy order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list layers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "layers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The layer ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The layer name."
+                },
+                "visible": {
+                  "type": "boolean",
+                  "description": "Whether the layer is visible."
+                },
+                "index": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The layer's hierarchy index."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The layer's hierarchy index."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The parent layer ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent layer ID."
+                },
+                "child": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The child layer ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The child layer ID."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "visible"
+              ],
+              "description": "A timeBuzzer layer."
+            },
+            "description": "The returned layers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "layers"
+        ],
+        "description": "The timeBuzzer layers visible to the connected user."
+      }
+    },
+    {
+      "id": "timebuzzer.list_tiles",
+      "service": "timebuzzer",
+      "name": "list_tiles",
+      "description": "List timeBuzzer tiles available to the connected user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "all"
+            ],
+            "description": "Which archived state to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing timeBuzzer tiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The tile ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tile name."
+                },
+                "layer": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The layer ID containing the tile."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the tile is archived."
+                },
+                "parents": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "A parent tile ID."
+                      },
+                      "description": "The parent tile IDs."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent tile IDs."
+                },
+                "children": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "A child tile ID."
+                      },
+                      "description": "The child tile IDs."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The child tile IDs."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "layer"
+              ],
+              "description": "A timeBuzzer tile."
+            },
+            "description": "The returned tiles."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tiles"
+        ],
+        "description": "The timeBuzzer tiles visible to the connected user."
+      }
+    },
+    {
+      "id": "timebuzzer.update_activity",
+      "service": "timebuzzer",
+      "name": "update_activity",
+      "description": "Replace the editable fields of an existing timeBuzzer activity.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The activity ID to update."
+          },
+          "tiles": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A tile ID."
+            },
+            "description": "The tile IDs to assign in layer order, with at most one tile per layer.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The activity start time in UTC.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The activity end time in UTC.",
+            "format": "date-time"
+          },
+          "startUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity start, such as +02:00.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "endUtcOffset": {
+            "type": "string",
+            "description": "The UTC offset at the activity end, such as +02:00.",
+            "pattern": "^[+-][0-9]{2}:[0-9]{2}$"
+          },
+          "note": {
+            "type": "string",
+            "description": "The activity note."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who owns the activity."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Whether the activity is billed."
+          },
+          "customData": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Optional provider-defined custom data for the activity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional provider-defined custom data for the activity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId",
+          "tiles",
+          "startDate",
+          "endDate",
+          "startUtcOffset",
+          "endUtcOffset",
+          "note",
+          "userId"
+        ],
+        "description": "The activity ID and replacement activity fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether timeBuzzer accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a timeBuzzer mutation."
+      }
+    }
+  ]
+}

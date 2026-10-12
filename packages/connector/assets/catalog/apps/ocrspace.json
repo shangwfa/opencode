@@ -1,0 +1,279 @@
+{
+  "service": "ocrspace",
+  "displayName": "OCR.space",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OCRSPACE_API_KEY",
+      "description": "OCR.space API key sent with the apikey header. Get it from the API signup page: https://ocr.space/ocrapi",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://ocr.space",
+  "actions": [
+    {
+      "id": "ocrspace.extract_text",
+      "service": "ocrspace",
+      "name": "extract_text",
+      "description": "Extract text from a public image/PDF URL or uploaded transit file by calling OCR.space.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public image or PDF URL to parse with OCR.space.",
+            "format": "uri"
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "A local transit image or PDF file to upload to OCR.space."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OCR language code to send upstream."
+          },
+          "detectOrientation": {
+            "type": "boolean",
+            "description": "Whether OCR.space should auto-detect page orientation."
+          },
+          "scale": {
+            "type": "boolean",
+            "description": "Whether OCR.space should scale the input image."
+          },
+          "isOverlayRequired": {
+            "type": "boolean",
+            "description": "Whether OCR.space should return word-level overlay metadata."
+          },
+          "isTable": {
+            "type": "boolean",
+            "description": "Whether OCR.space should apply table-aware parsing when possible."
+          },
+          "ocrEngine": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3"
+            ],
+            "description": "The OCR engine version to request from OCR.space."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for extracting text with OCR.space. Provide exactly one of url or file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The concatenated OCR text from all successful pages."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pageNumber": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The 1-based page number in the OCR result."
+                },
+                "parsedText": {
+                  "type": "string",
+                  "description": "The parsed text returned for this page."
+                },
+                "fileParseExitCode": {
+                  "type": "integer",
+                  "description": "The page-level OCR parse exit code returned by OCR.space."
+                },
+                "errorMessage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page-level error message, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page-level error message, when present."
+                },
+                "errorDetails": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page-level error details, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page-level error details, when present."
+                },
+                "textOverlay": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Optional OCR text overlay metadata returned by OCR.space."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional OCR text overlay metadata returned by OCR.space."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "pageNumber",
+                "parsedText",
+                "fileParseExitCode",
+                "errorMessage",
+                "errorDetails",
+                "textOverlay"
+              ],
+              "description": "One normalized OCR page result."
+            },
+            "description": "The normalized OCR page results returned by OCR.space."
+          },
+          "ocrExitCode": {
+            "type": "integer",
+            "description": "The top-level OCR exit code returned by OCR.space."
+          },
+          "isErroredOnProcessing": {
+            "type": "boolean",
+            "description": "Whether OCR.space marked the request as errored during processing."
+          },
+          "errorMessage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The top-level OCR error message, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The top-level OCR error message, when present."
+          },
+          "errorDetails": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The top-level OCR error details, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The top-level OCR error details, when present."
+          },
+          "processingTimeInMilliseconds": {
+            "type": "string",
+            "description": "The OCR processing time in milliseconds returned by OCR.space."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "pages",
+          "ocrExitCode",
+          "isErroredOnProcessing",
+          "errorMessage",
+          "errorDetails",
+          "processingTimeInMilliseconds"
+        ],
+        "description": "The normalized OCR text extraction result returned by OCR.space."
+      }
+    },
+    {
+      "id": "ocrspace.get_conversion_stats",
+      "service": "ocrspace",
+      "name": "get_conversion_stats",
+      "description": "Fetch OCR.space conversion statistics for the current month or the previous month.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "const": "lastMonth",
+            "type": "string",
+            "description": "Set to lastMonth to fetch the previous month's conversion statistics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching OCR.space conversion statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "engine1": {
+            "type": "integer",
+            "description": "The OCR.space engine 1 conversion count."
+          },
+          "engine2": {
+            "type": "integer",
+            "description": "The OCR.space engine 2 conversion count."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total OCR.space conversion count."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "currentMonth",
+              "lastMonth"
+            ],
+            "description": "The logical period represented by the returned conversion counts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "engine1",
+          "engine2",
+          "total",
+          "period"
+        ],
+        "description": "The normalized OCR.space conversion statistics returned by OCR.space."
+      }
+    }
+  ]
+}

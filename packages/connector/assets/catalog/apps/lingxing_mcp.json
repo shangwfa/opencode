@@ -1,0 +1,176 @@
+{
+  "service": "lingxing_mcp",
+  "displayName": "Lingxing MCP",
+  "description": "Discover and call live Lingxing ERP tools through the official Lingxing Streamable HTTP MCP service.",
+  "categories": [
+    "Productivity",
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "serverUrl",
+          "label": "MCP Server URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://openmcp.lingxing.com/mcp-servers/lingxing-mcp",
+          "description": "The official Lingxing MCP Server URL for your current ERP account. Copy it from AI Assistant > Manage MCP as described at https://www.lingxing.com/help/article/mcp. Only openmcp.lingxing.com is accepted."
+        },
+        {
+          "key": "mcpKey",
+          "label": "X-Mcp-Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Paste your Lingxing X-Mcp-Key",
+          "description": "The X-Mcp-Key bound to your current Lingxing ERP account. Copy or regenerate it from AI Assistant > Manage MCP as described at https://www.lingxing.com/help/article/mcp."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_tools",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://www.lingxing.com/help/article/mcp",
+  "actions": [
+    {
+      "id": "lingxing_mcp.call_tool",
+      "service": "lingxing_mcp",
+      "name": "call_tool",
+      "description": "Call a current Lingxing ERP MCP tool with JSON arguments. Discover the tool first and confirm the user's intent because some Lingxing tools create or update ERP data.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current Lingxing MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Lingxing MCP tool."
+      },
+      "followUpActions": [
+        "lingxing_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "lingxing_mcp.list_tools",
+      "service": "lingxing_mcp",
+      "name": "list_tools",
+      "description": "Discover the current Lingxing ERP MCP tools, behavior annotations, and live input schemas before choosing a tool to call.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by Lingxing MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify Lingxing data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive updates."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to have no additional effect."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with external entities."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP hints supplied by Lingxing about the tool's behavior."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Lingxing MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected Lingxing MCP server."
+            },
+            "description": "Tools currently exposed to the connected Lingxing account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The current Lingxing MCP tool catalog."
+      },
+      "followUpActions": [
+        "lingxing_mcp.call_tool"
+      ]
+    }
+  ]
+}

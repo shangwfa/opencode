@@ -1,0 +1,1985 @@
+{
+  "service": "shopify",
+  "displayName": "Shopify REST Admin (Legacy)",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://{shopSubdomain}.myshopify.com/admin/oauth/authorize",
+      "tokenUrl": "https://{shopSubdomain}.myshopify.com/admin/oauth/access_token",
+      "scopes": [
+        "read_content"
+      ],
+      "scopeSeparator": ",",
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "clientConfigFields": [
+        {
+          "key": "shopSubdomain",
+          "label": "Shop subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "acme",
+          "description": "The store-specific part before .myshopify.com, such as acme for acme.myshopify.com."
+        }
+      ]
+    },
+    {
+      "type": "api_key",
+      "label": "Admin API access token",
+      "placeholder": "shpat_...",
+      "description": "Shopify Admin API access token sent with the X-Shopify-Access-Token header. Create or install a custom app and copy its Admin API access token.",
+      "extraFields": [
+        {
+          "key": "shopDomain",
+          "label": "Shop domain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "acme.myshopify.com",
+          "description": "The store's myshopify.com domain, such as acme.myshopify.com. A Shopify admin URL for the same shop is also accepted."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.shopify.com",
+  "actions": [
+    {
+      "id": "shopify.count_articles",
+      "service": "shopify",
+      "name": "count_articles",
+      "description": "Count Shopify REST articles in a blog with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blog_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify blog ID."
+          },
+          "published_status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "description": "The Shopify publication status filter."
+          },
+          "created_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "created_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blog_id"
+        ],
+        "description": "The input payload for counting Shopify REST articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The count returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST article count response."
+      }
+    },
+    {
+      "id": "shopify.count_blogs",
+      "service": "shopify",
+      "name": "count_blogs",
+      "description": "Count Shopify REST blogs in the connected shop.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to count Shopify REST blogs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The count returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST blog count response."
+      }
+    },
+    {
+      "id": "shopify.count_pages",
+      "service": "shopify",
+      "name": "count_pages",
+      "description": "Count Shopify REST pages with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Count pages with this exact Shopify page title."
+          },
+          "published_status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "description": "The Shopify publication status filter."
+          },
+          "created_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "created_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for counting Shopify REST pages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The count returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST page count response."
+      }
+    },
+    {
+      "id": "shopify.get_article",
+      "service": "shopify",
+      "name": "get_article",
+      "description": "Retrieve one Shopify REST article by blog ID and article ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blog_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify blog ID."
+          },
+          "article_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify article ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one Shopify REST article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "article": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Shopify article ID."
+              },
+              "blog_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Shopify blog ID that owns the article."
+              },
+              "title": {
+                "type": "string",
+                "description": "The article title."
+              },
+              "handle": {
+                "type": "string",
+                "description": "The article handle."
+              },
+              "body_html": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article body HTML returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article body HTML returned by Shopify."
+              },
+              "summary_html": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article summary HTML returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article summary HTML returned by Shopify."
+              },
+              "author": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article author returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article author returned by Shopify."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The comma-separated article tags returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The comma-separated article tags returned by Shopify."
+              },
+              "published_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article publication timestamp, or null when hidden."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article publication timestamp, or null when hidden."
+              },
+              "template_suffix": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Liquid template suffix used by the article."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Liquid template suffix used by the article."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article creation timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article creation timestamp returned by Shopify."
+              },
+              "updated_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The article update timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article update timestamp returned by Shopify."
+              },
+              "image": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The article image object returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The article image object returned by Shopify."
+              },
+              "admin_graphql_api_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Shopify Admin GraphQL ID for the article."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Shopify Admin GraphQL ID for the article."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "blog_id",
+              "title",
+              "handle",
+              "body_html",
+              "summary_html",
+              "author",
+              "tags",
+              "published_at",
+              "template_suffix",
+              "created_at",
+              "updated_at",
+              "admin_graphql_api_id"
+            ],
+            "description": "A Shopify REST article object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST article response."
+      }
+    },
+    {
+      "id": "shopify.get_blog",
+      "service": "shopify",
+      "name": "get_blog",
+      "description": "Retrieve one Shopify REST blog by numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blog_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify blog ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one Shopify REST blog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blog": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Shopify blog ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The blog title."
+              },
+              "handle": {
+                "type": "string",
+                "description": "The blog handle."
+              },
+              "commentable": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The blog comment policy returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The blog comment policy returned by Shopify."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The comma-separated tags from the 200 most recent articles."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The comma-separated tags from the 200 most recent articles."
+              },
+              "template_suffix": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Liquid template suffix used by the blog."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Liquid template suffix used by the blog."
+              },
+              "feedburner": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The FeedBurner identifier when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The FeedBurner identifier when configured."
+              },
+              "feedburner_location": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The FeedBurner URL when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The FeedBurner URL when configured."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The blog creation timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The blog creation timestamp returned by Shopify."
+              },
+              "updated_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The blog update timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The blog update timestamp returned by Shopify."
+              },
+              "admin_graphql_api_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Shopify Admin GraphQL ID for the blog."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Shopify Admin GraphQL ID for the blog."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "title",
+              "handle",
+              "commentable",
+              "tags",
+              "template_suffix",
+              "feedburner",
+              "feedburner_location",
+              "created_at",
+              "updated_at",
+              "admin_graphql_api_id"
+            ],
+            "description": "A Shopify REST blog object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST blog response."
+      }
+    },
+    {
+      "id": "shopify.get_page",
+      "service": "shopify",
+      "name": "get_page",
+      "description": "Retrieve one Shopify REST page by numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify page ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one Shopify REST page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Shopify page ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The page title."
+              },
+              "handle": {
+                "type": "string",
+                "description": "The page handle."
+              },
+              "body_html": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page body HTML returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page body HTML returned by Shopify."
+              },
+              "author": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page author returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page author returned by Shopify."
+              },
+              "published_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page publication timestamp, or null when hidden."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page publication timestamp, or null when hidden."
+              },
+              "template_suffix": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Liquid template suffix used by the page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Liquid template suffix used by the page."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page creation timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page creation timestamp returned by Shopify."
+              },
+              "updated_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page update timestamp returned by Shopify."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page update timestamp returned by Shopify."
+              },
+              "admin_graphql_api_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Shopify Admin GraphQL ID for the page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Shopify Admin GraphQL ID for the page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "title",
+              "handle",
+              "body_html",
+              "author",
+              "published_at",
+              "template_suffix",
+              "created_at",
+              "updated_at",
+              "admin_graphql_api_id"
+            ],
+            "description": "A Shopify REST page object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST page response."
+      }
+    },
+    {
+      "id": "shopify.get_shop",
+      "service": "shopify",
+      "name": "get_shop",
+      "description": "Retrieve the connected Shopify REST Admin shop configuration.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve the Shopify shop."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shop": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Shopify shop ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The shop display name."
+              },
+              "myshopify_domain": {
+                "type": "string",
+                "description": "The canonical myshopify.com domain for the shop."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "myshopify_domain"
+            ],
+            "description": "A Shopify REST shop object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST shop response."
+      }
+    },
+    {
+      "id": "shopify.list_article_authors",
+      "service": "shopify",
+      "name": "list_article_authors",
+      "description": "List Shopify REST article authors across the connected shop.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Shopify REST article authors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One article author."
+            },
+            "description": "Article authors returned by Shopify."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST article authors response."
+      }
+    },
+    {
+      "id": "shopify.list_article_tags",
+      "service": "shopify",
+      "name": "list_article_tags",
+      "description": "List Shopify REST article tags across all articles in the connected shop.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of records to return. Shopify REST supports values from 1 to 250."
+          },
+          "popular": {
+            "type": "boolean",
+            "description": "Whether Shopify should order tags by popularity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Shopify REST article tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One article tag."
+            },
+            "description": "Article tags returned by Shopify."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST article tags response."
+      }
+    },
+    {
+      "id": "shopify.list_articles",
+      "service": "shopify",
+      "name": "list_articles",
+      "description": "List Shopify REST articles in a blog with optional filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blog_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify blog ID."
+          },
+          "author": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter articles by author."
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Retrieve an article with this Shopify article handle."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter articles by tag."
+          },
+          "published_status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "description": "The Shopify publication status filter."
+          },
+          "since_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return records with Shopify numeric IDs greater than this value."
+          },
+          "created_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "created_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of records to return. Shopify REST supports values from 1 to 250."
+          },
+          "page_info": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Shopify REST page_info cursor from a previous response pagination value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blog_id"
+        ],
+        "description": "The input payload for listing Shopify REST articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Shopify article ID."
+                },
+                "blog_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Shopify blog ID that owns the article."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "handle": {
+                  "type": "string",
+                  "description": "The article handle."
+                },
+                "body_html": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article body HTML returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article body HTML returned by Shopify."
+                },
+                "summary_html": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article summary HTML returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article summary HTML returned by Shopify."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article author returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article author returned by Shopify."
+                },
+                "tags": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The comma-separated article tags returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The comma-separated article tags returned by Shopify."
+                },
+                "published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article publication timestamp, or null when hidden."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article publication timestamp, or null when hidden."
+                },
+                "template_suffix": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Liquid template suffix used by the article."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Liquid template suffix used by the article."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article creation timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article creation timestamp returned by Shopify."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article update timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article update timestamp returned by Shopify."
+                },
+                "image": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The article image object returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article image object returned by Shopify."
+                },
+                "admin_graphql_api_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Shopify Admin GraphQL ID for the article."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Shopify Admin GraphQL ID for the article."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "blog_id",
+                "title",
+                "handle",
+                "body_html",
+                "summary_html",
+                "author",
+                "tags",
+                "published_at",
+                "template_suffix",
+                "created_at",
+                "updated_at",
+                "admin_graphql_api_id"
+              ],
+              "description": "A Shopify REST article object."
+            },
+            "description": "Articles returned by Shopify."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "nextPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the next page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the next page when Shopify returned one."
+              },
+              "previousPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the previous page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the previous page when Shopify returned one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Shopify REST Link-header pagination cursors."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST article list response."
+      }
+    },
+    {
+      "id": "shopify.list_blog_article_tags",
+      "service": "shopify",
+      "name": "list_blog_article_tags",
+      "description": "List Shopify REST article tags for one blog.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blog_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Shopify blog ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of records to return. Shopify REST supports values from 1 to 250."
+          },
+          "popular": {
+            "type": "boolean",
+            "description": "Whether Shopify should order tags by popularity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blog_id"
+        ],
+        "description": "The input payload for listing Shopify REST article tags in one blog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One article tag."
+            },
+            "description": "Article tags returned by Shopify."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST blog article tags response."
+      }
+    },
+    {
+      "id": "shopify.list_blogs",
+      "service": "shopify",
+      "name": "list_blogs",
+      "description": "List Shopify REST blogs with optional handle filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter blogs by Shopify blog handle."
+          },
+          "since_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return records with Shopify numeric IDs greater than this value."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of records to return. Shopify REST supports values from 1 to 250."
+          },
+          "page_info": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Shopify REST page_info cursor from a previous response pagination value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Shopify REST blogs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blogs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Shopify blog ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The blog title."
+                },
+                "handle": {
+                  "type": "string",
+                  "description": "The blog handle."
+                },
+                "commentable": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The blog comment policy returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The blog comment policy returned by Shopify."
+                },
+                "tags": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The comma-separated tags from the 200 most recent articles."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The comma-separated tags from the 200 most recent articles."
+                },
+                "template_suffix": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Liquid template suffix used by the blog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Liquid template suffix used by the blog."
+                },
+                "feedburner": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The FeedBurner identifier when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The FeedBurner identifier when configured."
+                },
+                "feedburner_location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The FeedBurner URL when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The FeedBurner URL when configured."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The blog creation timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The blog creation timestamp returned by Shopify."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The blog update timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The blog update timestamp returned by Shopify."
+                },
+                "admin_graphql_api_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Shopify Admin GraphQL ID for the blog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Shopify Admin GraphQL ID for the blog."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "handle",
+                "commentable",
+                "tags",
+                "template_suffix",
+                "feedburner",
+                "feedburner_location",
+                "created_at",
+                "updated_at",
+                "admin_graphql_api_id"
+              ],
+              "description": "A Shopify REST blog object."
+            },
+            "description": "Blogs returned by Shopify."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "nextPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the next page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the next page when Shopify returned one."
+              },
+              "previousPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the previous page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the previous page when Shopify returned one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Shopify REST Link-header pagination cursors."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST blog list response."
+      }
+    },
+    {
+      "id": "shopify.list_pages",
+      "service": "shopify",
+      "name": "list_pages",
+      "description": "List Shopify REST pages with optional filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_content"
+      ],
+      "providerPermissions": [
+        "read_content"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Retrieve pages with this exact Shopify page title."
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Retrieve pages with this Shopify page handle."
+          },
+          "published_status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "description": "The Shopify publication status filter."
+          },
+          "since_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return records with Shopify numeric IDs greater than this value."
+          },
+          "created_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "created_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "updated_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_min": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "published_at_max": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 date-time filter accepted by Shopify REST Admin."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of records to return. Shopify REST supports values from 1 to 250."
+          },
+          "page_info": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Shopify REST page_info cursor from a previous response pagination value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Shopify REST pages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Shopify page ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The page title."
+                },
+                "handle": {
+                  "type": "string",
+                  "description": "The page handle."
+                },
+                "body_html": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page body HTML returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page body HTML returned by Shopify."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page author returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page author returned by Shopify."
+                },
+                "published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page publication timestamp, or null when hidden."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page publication timestamp, or null when hidden."
+                },
+                "template_suffix": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Liquid template suffix used by the page."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Liquid template suffix used by the page."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page creation timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page creation timestamp returned by Shopify."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The page update timestamp returned by Shopify."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page update timestamp returned by Shopify."
+                },
+                "admin_graphql_api_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Shopify Admin GraphQL ID for the page."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Shopify Admin GraphQL ID for the page."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "handle",
+                "body_html",
+                "author",
+                "published_at",
+                "template_suffix",
+                "created_at",
+                "updated_at",
+                "admin_graphql_api_id"
+              ],
+              "description": "A Shopify REST page object."
+            },
+            "description": "Pages returned by Shopify."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "nextPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the next page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the next page when Shopify returned one."
+              },
+              "previousPageInfo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The page_info cursor for the previous page when Shopify returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page_info cursor for the previous page when Shopify returned one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Shopify REST Link-header pagination cursors."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Shopify REST Admin."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shopify REST page list response."
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "configInputs": [
+        {
+          "handle": "topics",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "app/scopes_update",
+                "app/uninstalled",
+                "app_purchases_one_time/update",
+                "app_subscriptions/approaching_capped_amount",
+                "app_subscriptions/update",
+                "bulk_operations/finish",
+                "carts/create",
+                "carts/update",
+                "channels/delete",
+                "checkout_and_accounts_configurations/update",
+                "checkouts/create",
+                "checkouts/delete",
+                "checkouts/update",
+                "collection_listings/add",
+                "collection_listings/remove",
+                "collection_listings/update",
+                "collection_publications/create",
+                "collection_publications/delete",
+                "collection_publications/update",
+                "collections/create",
+                "collections/delete",
+                "collections/update",
+                "companies/create",
+                "companies/delete",
+                "companies/update",
+                "company_contact_roles/assign",
+                "company_contact_roles/revoke",
+                "company_contacts/create",
+                "company_contacts/delete",
+                "company_contacts/update",
+                "company_locations/create",
+                "company_locations/delete",
+                "company_locations/update",
+                "customer.joined_segment",
+                "customer.left_segment",
+                "customer.tags_added",
+                "customer.tags_removed",
+                "customer_account_settings/update",
+                "customer_groups/create",
+                "customer_groups/delete",
+                "customer_groups/update",
+                "customers/create",
+                "customers/delete",
+                "customers/disable",
+                "customers/enable",
+                "customers/purchasing_summary",
+                "customers/update",
+                "customers_email_marketing_consent/update",
+                "customers_marketing_consent/update",
+                "delivery_promise_settings/update",
+                "disputes/create",
+                "disputes/update",
+                "domains/create",
+                "domains/destroy",
+                "domains/update",
+                "draft_orders/create",
+                "draft_orders/delete",
+                "draft_orders/update",
+                "fulfillment_events/create",
+                "fulfillment_events/delete",
+                "fulfillment_holds/added",
+                "fulfillment_holds/released",
+                "fulfillment_orders/cancellation_request_accepted",
+                "fulfillment_orders/cancellation_request_rejected",
+                "fulfillment_orders/cancellation_request_submitted",
+                "fulfillment_orders/cancelled",
+                "fulfillment_orders/fulfillment_request_accepted",
+                "fulfillment_orders/fulfillment_request_rejected",
+                "fulfillment_orders/fulfillment_request_submitted",
+                "fulfillment_orders/fulfillment_service_failed_to_complete",
+                "fulfillment_orders/hold_released",
+                "fulfillment_orders/line_items_prepared_for_local_delivery",
+                "fulfillment_orders/line_items_prepared_for_pickup",
+                "fulfillment_orders/manually_reported_progress_stopped",
+                "fulfillment_orders/merged",
+                "fulfillment_orders/moved",
+                "fulfillment_orders/order_routing_complete",
+                "fulfillment_orders/placed_on_hold",
+                "fulfillment_orders/progress_reported",
+                "fulfillment_orders/rescheduled",
+                "fulfillment_orders/scheduled_fulfillment_order_ready",
+                "fulfillment_orders/split",
+                "fulfillments/create",
+                "fulfillments/update",
+                "inventory_items/create",
+                "inventory_items/delete",
+                "inventory_items/update",
+                "inventory_levels/connect",
+                "inventory_levels/disconnect",
+                "inventory_levels/update",
+                "locales/create",
+                "locales/destroy",
+                "locales/update",
+                "locations/activate",
+                "locations/create",
+                "locations/deactivate",
+                "locations/delete",
+                "locations/update",
+                "machine_translation_batch/completed",
+                "metafield_definitions/create",
+                "metafield_definitions/delete",
+                "metafield_definitions/update",
+                "order_transactions/create",
+                "orders/cancelled",
+                "orders/create",
+                "orders/delete",
+                "orders/edited",
+                "orders/fulfilled",
+                "orders/link_requested",
+                "orders/paid",
+                "orders/partially_fulfilled",
+                "orders/risk_assessment_changed",
+                "orders/shopify_protect_eligibility_changed",
+                "orders/updated",
+                "payment_schedules/due",
+                "payment_terms/create",
+                "payment_terms/delete",
+                "payment_terms/update",
+                "product_feeds/create",
+                "product_feeds/full_sync",
+                "product_feeds/full_sync_finish",
+                "product_feeds/incremental_sync",
+                "product_feeds/update",
+                "product_listings/add",
+                "product_listings/remove",
+                "product_listings/update",
+                "product_publications/create",
+                "product_publications/delete",
+                "product_publications/update",
+                "products/create",
+                "products/delete",
+                "products/update",
+                "profiles/create",
+                "profiles/delete",
+                "profiles/update",
+                "publications/delete",
+                "refunds/create",
+                "returns/approve",
+                "returns/cancel",
+                "returns/close",
+                "returns/decline",
+                "returns/process",
+                "returns/reopen",
+                "returns/request",
+                "returns/update",
+                "reverse_deliveries/attach_deliverable",
+                "reverse_fulfillment_orders/dispose",
+                "scheduled_product_listings/add",
+                "scheduled_product_listings/remove",
+                "scheduled_product_listings/update",
+                "segments/create",
+                "segments/delete",
+                "segments/update",
+                "selling_plan_groups/create",
+                "selling_plan_groups/delete",
+                "selling_plan_groups/update",
+                "shop/update",
+                "subscription_billing_attempts/challenged",
+                "subscription_billing_attempts/failure",
+                "subscription_billing_attempts/success",
+                "subscription_billing_cycle_edits/create",
+                "subscription_billing_cycle_edits/delete",
+                "subscription_billing_cycle_edits/update",
+                "subscription_billing_cycles/skip",
+                "subscription_billing_cycles/unskip",
+                "subscription_contracts/activate",
+                "subscription_contracts/cancel",
+                "subscription_contracts/create",
+                "subscription_contracts/expire",
+                "subscription_contracts/fail",
+                "subscription_contracts/pause",
+                "subscription_contracts/update",
+                "tax_partners/update",
+                "tax_summaries/create",
+                "tender_transactions/create",
+                "themes/create",
+                "themes/delete",
+                "themes/publish",
+                "themes/update",
+                "variants/in_stock",
+                "variants/out_of_stock"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected Shopify webhook topics occur in the connected store.",
+      "displayName": "Store Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": [
+            "json"
+          ]
+        },
+        "methods": [
+          "POST"
+        ],
+        "successStatus": 202
+      },
+      "key": "shopify.on_shop_event",
+      "name": "on_shop_event",
+      "outputs": [
+        {
+          "handle": "apiVersion",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "shopDomain",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "topic",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggeredAt",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "webhookId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "shopify",
+      "type": "integration"
+    }
+  ],
+  "triggerPermissions": [
+    {
+      "id": "shopify.on_shop_event",
+      "name": "Store Event",
+      "description": "Creates and deletes shop webhooks and receives the configured store event topic.",
+      "providerPermissions": [],
+      "instructions": "The Admin API token must have the access scopes required by the selected webhook topic; protected customer data topics may require additional approval. Topic-specific permissions are checked by Shopify."
+    }
+  ]
+}

@@ -1,0 +1,2491 @@
+{
+  "service": "canva",
+  "displayName": "Canva",
+  "categories": [
+    "Design & Media",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://www.canva.com/api/oauth/authorize",
+      "tokenUrl": "https://api.canva.com/rest/v1/oauth/token",
+      "scopes": [
+        "design:meta:read",
+        "design:content:read",
+        "design:content:write",
+        "asset:read",
+        "asset:write",
+        "folder:read",
+        "folder:write",
+        "profile:read"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic",
+      "pkce": {
+        "method": "S256"
+      }
+    }
+  ],
+  "homepageUrl": "https://www.canva.com",
+  "actions": [
+    {
+      "id": "canva.create_design",
+      "service": "canva",
+      "name": "create_design",
+      "description": "Create a new Canva design from a preset type, custom dimensions, an optional image asset, an existing design, or a brand template.",
+      "operationType": "write",
+      "requiredScopes": [
+        "design:content:write"
+      ],
+      "providerPermissions": [
+        "design:content:write"
+      ],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "type_and_asset",
+                "type": "string",
+                "description": "The Canva create-design mode for type and asset creation."
+              },
+              "designType": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "const": "preset",
+                        "type": "string",
+                        "description": "The preset design type discriminator."
+                      },
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "doc",
+                          "email",
+                          "presentation",
+                          "whiteboard"
+                        ],
+                        "description": "The preset design type name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A preset Canva design type."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "const": "custom",
+                        "type": "string",
+                        "description": "The custom design type discriminator."
+                      },
+                      "width": {
+                        "type": "integer",
+                        "minimum": 40,
+                        "maximum": 8000,
+                        "description": "The width of the design in pixels."
+                      },
+                      "height": {
+                        "type": "integer",
+                        "minimum": 40,
+                        "maximum": 8000,
+                        "description": "The height of the design in pixels."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A custom Canva design type with pixel dimensions."
+                  }
+                ],
+                "description": "The Canva design type to create."
+              },
+              "assetId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Canva image asset ID to insert into the created design."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "The name of the created Canva design."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Create a Canva design by specifying a preset or custom design type and optionally inserting an image asset."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "design",
+                "type": "string",
+                "description": "The Canva create-design mode for copying a design."
+              },
+              "designId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "The Canva design ID to copy."
+              },
+              "pageNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A 1-based page number."
+                },
+                "description": "The 1-based page numbers to copy from the source design. Omit to copy every page.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "designId"
+            ],
+            "description": "Create a copy of an existing Canva design."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "brand_template",
+                "type": "string",
+                "description": "The Canva create-design mode for copying a brand template."
+              },
+              "brandTemplateId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "The Canva brand template ID to copy."
+              },
+              "pageNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A 1-based page number."
+                },
+                "description": "The 1-based page numbers to copy from the brand template. Omit to copy every page.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "brandTemplateId"
+            ],
+            "description": "Create a Canva design from a brand template."
+          }
+        ],
+        "description": "Input parameters for creating a Canva design. For type_and_asset mode, designType or assetId is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "design": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva design ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva design title when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva design title when returned."
+              },
+              "editUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva URL for editing the design when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva URL for editing the design when returned."
+              },
+              "viewUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva URL for viewing the design when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva URL for viewing the design when returned."
+              },
+              "thumbnailUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva thumbnail URL when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva thumbnail URL when returned."
+              },
+              "thumbnailWidth": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail width in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail width in pixels when returned."
+              },
+              "thumbnailHeight": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail height in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail height in pixels when returned."
+              },
+              "ownerUserId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner user ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner user ID when returned."
+              },
+              "ownerTeamId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner team ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner team ID when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The design creation timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The design creation timestamp when returned."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The design update timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The design update timestamp when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva design metadata record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva design creation response."
+      }
+    },
+    {
+      "id": "canva.create_design_export_job",
+      "service": "canva",
+      "name": "create_design_export_job",
+      "description": "Start an asynchronous Canva export job for a design and return the job handle for polling.",
+      "operationType": "write",
+      "requiredScopes": [
+        "design:content:read"
+      ],
+      "providerPermissions": [
+        "design:content:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "designId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Canva design ID to export."
+          },
+          "format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "gif",
+                  "pptx",
+                  "mp4",
+                  "pdf",
+                  "csv",
+                  "html_bundle",
+                  "html_standalone"
+                ],
+                "description": "The export file type."
+              },
+              "size": {
+                "type": "string",
+                "enum": [
+                  "a4",
+                  "a3",
+                  "letter",
+                  "legal"
+                ],
+                "description": "The PDF size option when exporting PDF."
+              },
+              "pages": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A 1-based page number."
+                },
+                "description": "The 1-based design page numbers to export when Canva supports page selection.",
+                "minItems": 1
+              },
+              "exportQuality": {
+                "type": "string",
+                "enum": [
+                  "regular",
+                  "pro"
+                ],
+                "description": "The export quality option when Canva supports it."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 40,
+                "maximum": 25000,
+                "description": "The exported image width in pixels when Canva supports it."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 40,
+                "maximum": 25000,
+                "description": "The exported image height in pixels when Canva supports it."
+              },
+              "quality": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "The JPG compression quality from 1 to 100."
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "horizontal_480p",
+                      "horizontal_720p",
+                      "horizontal_1080p",
+                      "horizontal_4k",
+                      "vertical_480p",
+                      "vertical_720p",
+                      "vertical_1080p",
+                      "vertical_4k"
+                    ],
+                    "description": "The MP4 export quality."
+                  }
+                ],
+                "description": "The required quality field for JPG or MP4 exports."
+              },
+              "lossless": {
+                "type": "boolean",
+                "description": "Whether Canva should export a PNG without lossy compression."
+              },
+              "transparentBackground": {
+                "type": "boolean",
+                "description": "Whether the exported PNG should use a transparent background when supported."
+              },
+              "asSingleImage": {
+                "type": "boolean",
+                "description": "Whether Canva should merge a multi-page PNG export into one image."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "The Canva export format request. The fields map to Canva's documented export format object. Quality is required for Canva JPG and MP4 exports."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Canva design export job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva export job ID."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "in_progress",
+                  "success",
+                  "failed"
+                ],
+                "description": "The Canva export job status."
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A download URL.",
+                  "format": "uri"
+                },
+                "description": "The generated download URLs for a successful export job."
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error code for a failed export job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error code for a failed export job."
+              },
+              "errorMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error message for a failed export job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error message for a failed export job."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva export job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva design export job creation response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "canva.create_design_export_job",
+        "statusActionId": "canva.get_design_export_job"
+      }
+    },
+    {
+      "id": "canva.create_folder",
+      "service": "canva",
+      "name": "create_folder",
+      "description": "Create a Canva folder at the top level, in uploads, or inside another folder.",
+      "operationType": "write",
+      "requiredScopes": [
+        "folder:write"
+      ],
+      "providerPermissions": [
+        "folder:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The Canva folder name."
+          },
+          "parentFolderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The parent folder ID, root for the top-level projects area, or uploads for the user's Uploads folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Canva folder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva folder ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva folder name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva folder name when returned."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva folder title or legacy title when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva folder title or legacy title when returned."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva folder URL when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva folder URL when returned."
+              },
+              "thumbnailUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva folder thumbnail URL when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva folder thumbnail URL when returned."
+              },
+              "thumbnailWidth": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail width in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail width in pixels when returned."
+              },
+              "thumbnailHeight": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail height in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail height in pixels when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The folder creation timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The folder creation timestamp when returned."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The folder update timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The folder update timestamp when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva folder metadata record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva folder creation response."
+      }
+    },
+    {
+      "id": "canva.create_url_asset_upload_job",
+      "service": "canva",
+      "name": "create_url_asset_upload_job",
+      "description": "Start an asynchronous Canva asset upload job from a publicly accessible URL and return the job handle for polling.",
+      "operationType": "write",
+      "requiredScopes": [
+        "asset:write"
+      ],
+      "providerPermissions": [
+        "asset:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The asset name shown in Canva."
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "The publicly accessible URL of the file to upload to Canva.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for uploading a Canva asset from a URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva asset upload job ID."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "in_progress",
+                  "success",
+                  "failed"
+                ],
+                "description": "The Canva asset upload job status."
+              },
+              "asset": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Canva asset ID."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video"
+                            ],
+                            "description": "The Canva asset type when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset type when returned."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva asset name when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset name when returned."
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "An asset tag."
+                        },
+                        "description": "The user-facing tags attached to the asset."
+                      },
+                      "thumbnailUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva asset thumbnail URL when returned.",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset thumbnail URL when returned."
+                      },
+                      "thumbnailWidth": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The thumbnail width in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The thumbnail width in pixels when returned."
+                      },
+                      "thumbnailHeight": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The thumbnail height in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The thumbnail height in pixels when returned."
+                      },
+                      "ownerUserId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva owner user ID when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva owner user ID when returned."
+                      },
+                      "ownerTeamId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva owner team ID when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva owner team ID when returned."
+                      },
+                      "createdAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The asset creation timestamp when returned.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The asset creation timestamp when returned."
+                      },
+                      "updatedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The asset update timestamp when returned.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The asset update timestamp when returned."
+                      },
+                      "importStatus": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "failed",
+                                  "in_progress",
+                                  "success"
+                                ],
+                                "description": "The Canva asset import status state."
+                              },
+                              "errorCode": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "description": "The Canva import error code when the import failed."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The Canva import error code when the import failed."
+                              },
+                              "errorMessage": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "description": "The Canva import error message when the import failed."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The Canva import error message when the import failed."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "The deprecated Canva asset import status when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The deprecated Canva asset import status when returned."
+                      },
+                      "metadata": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "image",
+                                      "video"
+                                    ],
+                                    "description": "The metadata type when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The metadata type when returned."
+                              },
+                              "width": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The image or video width in pixels when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The image or video width in pixels when returned."
+                              },
+                              "height": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The image or video height in pixels when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The image or video height in pixels when returned."
+                              },
+                              "duration": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The video duration in seconds when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The video duration in seconds when returned."
+                              },
+                              "smartTags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "description": "A smart tag."
+                                },
+                                "description": "The AI-generated smart tags returned for an image asset."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "Type-specific Canva asset metadata when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Type-specific Canva asset metadata when returned."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Canva asset metadata record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A normalized Canva asset metadata record."
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error code for a failed asset upload job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error code for a failed asset upload job."
+              },
+              "errorMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error message for a failed asset upload job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error message for a failed asset upload job."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva asset upload job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva URL asset upload job creation response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "canva.create_url_asset_upload_job",
+        "statusActionId": "canva.get_url_asset_upload_job"
+      }
+    },
+    {
+      "id": "canva.get_asset",
+      "service": "canva",
+      "name": "get_asset",
+      "description": "Get metadata for a Canva asset, including owner, thumbnail, and type-specific metadata.",
+      "operationType": "read",
+      "requiredScopes": [
+        "asset:read"
+      ],
+      "providerPermissions": [
+        "asset:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The Canva asset ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Canva asset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva asset ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "video"
+                    ],
+                    "description": "The Canva asset type when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva asset type when returned."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva asset name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva asset name when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An asset tag."
+                },
+                "description": "The user-facing tags attached to the asset."
+              },
+              "thumbnailUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva asset thumbnail URL when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva asset thumbnail URL when returned."
+              },
+              "thumbnailWidth": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail width in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail width in pixels when returned."
+              },
+              "thumbnailHeight": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail height in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail height in pixels when returned."
+              },
+              "ownerUserId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner user ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner user ID when returned."
+              },
+              "ownerTeamId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner team ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner team ID when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The asset creation timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The asset creation timestamp when returned."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The asset update timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The asset update timestamp when returned."
+              },
+              "importStatus": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "failed",
+                          "in_progress",
+                          "success"
+                        ],
+                        "description": "The Canva asset import status state."
+                      },
+                      "errorCode": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva import error code when the import failed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva import error code when the import failed."
+                      },
+                      "errorMessage": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva import error message when the import failed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva import error message when the import failed."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The deprecated Canva asset import status when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The deprecated Canva asset import status when returned."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video"
+                            ],
+                            "description": "The metadata type when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The metadata type when returned."
+                      },
+                      "width": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The image or video width in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The image or video width in pixels when returned."
+                      },
+                      "height": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The image or video height in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The image or video height in pixels when returned."
+                      },
+                      "duration": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The video duration in seconds when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The video duration in seconds when returned."
+                      },
+                      "smartTags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A smart tag."
+                        },
+                        "description": "The AI-generated smart tags returned for an image asset."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Type-specific Canva asset metadata when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Type-specific Canva asset metadata when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva asset metadata record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Canva asset metadata response."
+      }
+    },
+    {
+      "id": "canva.get_current_user",
+      "service": "canva",
+      "name": "get_current_user",
+      "description": "Get the Canva user and profile associated with the current OAuth token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "profile:read"
+      ],
+      "providerPermissions": [
+        "profile:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The Canva user ID."
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Canva team ID when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Canva team ID when returned."
+          },
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Canva display name when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Canva display name when returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Canva current user profile."
+      }
+    },
+    {
+      "id": "canva.get_design",
+      "service": "canva",
+      "name": "get_design",
+      "description": "Get metadata for a Canva design, including owner, URLs, and thumbnail details.",
+      "operationType": "read",
+      "requiredScopes": [
+        "design:meta:read"
+      ],
+      "providerPermissions": [
+        "design:meta:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "designId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Canva design ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Canva design."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "design": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva design ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva design title when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva design title when returned."
+              },
+              "editUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva URL for editing the design when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva URL for editing the design when returned."
+              },
+              "viewUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva URL for viewing the design when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva URL for viewing the design when returned."
+              },
+              "thumbnailUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva thumbnail URL when returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva thumbnail URL when returned."
+              },
+              "thumbnailWidth": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail width in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail width in pixels when returned."
+              },
+              "thumbnailHeight": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The thumbnail height in pixels when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail height in pixels when returned."
+              },
+              "ownerUserId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner user ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner user ID when returned."
+              },
+              "ownerTeamId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva owner team ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva owner team ID when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The design creation timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The design creation timestamp when returned."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The design update timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The design update timestamp when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva design metadata record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Canva design metadata response."
+      }
+    },
+    {
+      "id": "canva.get_design_export_formats",
+      "service": "canva",
+      "name": "get_design_export_formats",
+      "description": "List the file formats currently available for exporting a Canva design.",
+      "operationType": "read",
+      "requiredScopes": [
+        "design:content:read"
+      ],
+      "providerPermissions": [
+        "design:content:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "designId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Canva design ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Canva design export formats."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Canva export format object."
+            },
+            "description": "The raw Canva export format objects supported by this design."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva design export format response."
+      }
+    },
+    {
+      "id": "canva.get_design_export_job",
+      "service": "canva",
+      "name": "get_design_export_job",
+      "description": "Get the current status and result URLs for a Canva design export job created by create_design_export_job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "design:content:read"
+      ],
+      "providerPermissions": [
+        "design:content:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "exportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Canva export job ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Canva design export job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva export job ID."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "in_progress",
+                  "success",
+                  "failed"
+                ],
+                "description": "The Canva export job status."
+              },
+              "urls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A download URL.",
+                  "format": "uri"
+                },
+                "description": "The generated download URLs for a successful export job."
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error code for a failed export job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error code for a failed export job."
+              },
+              "errorMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error message for a failed export job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error message for a failed export job."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva export job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva design export job response."
+      }
+    },
+    {
+      "id": "canva.get_url_asset_upload_job",
+      "service": "canva",
+      "name": "get_url_asset_upload_job",
+      "description": "Get the current status and uploaded asset metadata for a Canva URL asset upload job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "asset:read"
+      ],
+      "providerPermissions": [
+        "asset:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Canva asset upload job ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Canva URL asset upload job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Canva asset upload job ID."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "in_progress",
+                  "success",
+                  "failed"
+                ],
+                "description": "The Canva asset upload job status."
+              },
+              "asset": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Canva asset ID."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video"
+                            ],
+                            "description": "The Canva asset type when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset type when returned."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva asset name when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset name when returned."
+                      },
+                      "tags": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "An asset tag."
+                        },
+                        "description": "The user-facing tags attached to the asset."
+                      },
+                      "thumbnailUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva asset thumbnail URL when returned.",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva asset thumbnail URL when returned."
+                      },
+                      "thumbnailWidth": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The thumbnail width in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The thumbnail width in pixels when returned."
+                      },
+                      "thumbnailHeight": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The thumbnail height in pixels when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The thumbnail height in pixels when returned."
+                      },
+                      "ownerUserId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva owner user ID when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva owner user ID when returned."
+                      },
+                      "ownerTeamId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Canva owner team ID when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Canva owner team ID when returned."
+                      },
+                      "createdAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The asset creation timestamp when returned.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The asset creation timestamp when returned."
+                      },
+                      "updatedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The asset update timestamp when returned.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The asset update timestamp when returned."
+                      },
+                      "importStatus": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "failed",
+                                  "in_progress",
+                                  "success"
+                                ],
+                                "description": "The Canva asset import status state."
+                              },
+                              "errorCode": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "description": "The Canva import error code when the import failed."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The Canva import error code when the import failed."
+                              },
+                              "errorMessage": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "description": "The Canva import error message when the import failed."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The Canva import error message when the import failed."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "The deprecated Canva asset import status when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The deprecated Canva asset import status when returned."
+                      },
+                      "metadata": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "image",
+                                      "video"
+                                    ],
+                                    "description": "The metadata type when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The metadata type when returned."
+                              },
+                              "width": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The image or video width in pixels when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The image or video width in pixels when returned."
+                              },
+                              "height": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The image or video height in pixels when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The image or video height in pixels when returned."
+                              },
+                              "duration": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "description": "The video duration in seconds when returned."
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The video duration in seconds when returned."
+                              },
+                              "smartTags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "description": "A smart tag."
+                                },
+                                "description": "The AI-generated smart tags returned for an image asset."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "Type-specific Canva asset metadata when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Type-specific Canva asset metadata when returned."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Canva asset metadata record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A normalized Canva asset metadata record."
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error code for a failed asset upload job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error code for a failed asset upload job."
+              },
+              "errorMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Canva error message for a failed asset upload job."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Canva error message for a failed asset upload job."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Canva asset upload job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Canva URL asset upload job response."
+      }
+    },
+    {
+      "id": "canva.list_designs",
+      "service": "canva",
+      "name": "list_designs",
+      "description": "List metadata for the current Canva user's designs, with optional search, ownership, sorting, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "design:meta:read"
+      ],
+      "providerPermissions": [
+        "design:meta:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "A search term for filtering designs."
+          },
+          "continuation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list_designs call."
+          },
+          "ownership": {
+            "type": "string",
+            "enum": [
+              "any",
+              "owned",
+              "shared"
+            ],
+            "description": "Filter designs by the current user's ownership."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "modified_descending",
+              "modified_ascending",
+              "title_ascending",
+              "title_descending"
+            ],
+            "description": "The Canva sort order for the design list."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of designs to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Canva design metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "designs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Canva design ID."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva design title when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva design title when returned."
+                },
+                "editUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva URL for editing the design when returned.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva URL for editing the design when returned."
+                },
+                "viewUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva URL for viewing the design when returned.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva URL for viewing the design when returned."
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva thumbnail URL when returned.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva thumbnail URL when returned."
+                },
+                "thumbnailWidth": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The thumbnail width in pixels when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The thumbnail width in pixels when returned."
+                },
+                "thumbnailHeight": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The thumbnail height in pixels when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The thumbnail height in pixels when returned."
+                },
+                "ownerUserId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva owner user ID when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva owner user ID when returned."
+                },
+                "ownerTeamId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva owner team ID when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva owner team ID when returned."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The design creation timestamp when returned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The design creation timestamp when returned."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The design update timestamp when returned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The design update timestamp when returned."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Canva design metadata record."
+            },
+            "description": "The normalized Canva designs returned in this page."
+          },
+          "continuation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token to request the next page when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token to request the next page when available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Canva design listing page."
+      }
+    },
+    {
+      "id": "canva.list_folder_items",
+      "service": "canva",
+      "name": "list_folder_items",
+      "description": "List Canva folder contents, including folders, designs, and image assets, with pagination and filtering options.",
+      "operationType": "read",
+      "requiredScopes": [
+        "folder:read"
+      ],
+      "providerPermissions": [
+        "folder:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The Canva folder ID to list."
+          },
+          "continuation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list_folder_items call."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of folder items to return."
+          },
+          "itemTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "design",
+                "folder",
+                "image"
+              ],
+              "description": "One Canva folder item type."
+            },
+            "description": "The Canva folder item types to include.",
+            "minItems": 1
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "created_ascending",
+              "created_descending",
+              "modified_ascending",
+              "modified_descending",
+              "title_ascending",
+              "title_descending"
+            ],
+            "description": "The Canva sort order for folder items."
+          },
+          "pinStatus": {
+            "type": "string",
+            "enum": [
+              "any",
+              "pinned"
+            ],
+            "description": "Filter folder items by pinned status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folderId"
+        ],
+        "description": "Input parameters for listing Canva folder items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "folder",
+                    "design",
+                    "image"
+                  ],
+                  "description": "The Canva folder item type."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Canva item ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The item name when the item is a folder or asset."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The item name when the item is a folder or asset."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The item title or display name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The item title or display name when returned."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva URL for the item when returned.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva URL for the item when returned."
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Canva item thumbnail URL when returned.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Canva item thumbnail URL when returned."
+                },
+                "thumbnailWidth": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The thumbnail width in pixels when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The thumbnail width in pixels when returned."
+                },
+                "thumbnailHeight": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The thumbnail height in pixels when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The thumbnail height in pixels when returned."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The item creation timestamp when returned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The item creation timestamp when returned."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The item update timestamp when returned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The item update timestamp when returned."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Canva folder item."
+            },
+            "description": "The normalized Canva folder items returned in this page."
+          },
+          "continuation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token to request the next page when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token to request the next page when available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Canva folder item listing page."
+      }
+    },
+    {
+      "id": "canva.move_folder_item",
+      "service": "canva",
+      "name": "move_folder_item",
+      "description": "Move a Canva folder item to another Canva folder.",
+      "operationType": "write",
+      "requiredScopes": [
+        "folder:write"
+      ],
+      "providerPermissions": [
+        "folder:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The Canva item ID to move."
+          },
+          "toFolderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The destination Canva folder ID, or root for the top-level projects area."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for moving a Canva folder item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "moved": {
+            "type": "boolean",
+            "description": "Whether Canva accepted the move request."
+          },
+          "itemId": {
+            "type": "string",
+            "description": "The Canva item ID that was moved."
+          },
+          "toFolderId": {
+            "type": "string",
+            "description": "The destination Canva folder ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Canva folder item move acknowledgement."
+      }
+    }
+  ]
+}

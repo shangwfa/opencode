@@ -1,0 +1,434 @@
+{
+  "service": "weixin_bot",
+  "displayName": "Weixin Bot",
+  "description": "Receive and reply to Weixin messages through Tencent's iLink Bot API. Media encryption requires the Node.js runtime.",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "botToken",
+          "label": "Bot Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Paste the botToken from the QR login example",
+          "description": "The secret bot token returned after QR pairing. Run `node examples/weixin-bot-login.ts` locally to obtain it, and do not share it."
+        },
+        {
+          "key": "accountId",
+          "label": "Bot Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Paste the accountId from the QR login example",
+          "description": "The ilink_bot_id returned together with the bot token after QR pairing."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://github.com/Tencent/openclaw-weixin",
+  "actions": [
+    {
+      "id": "weixin_bot.download_media",
+      "service": "weixin_bot",
+      "name": "download_media",
+      "description": "Download and decrypt one image, voice, video, or file item returned by get_updates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Download media received by the connected Weixin bot"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete Weixin media item."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional output file name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item"
+        ],
+        "description": "A media item returned inside a Weixin message item_list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The new transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The decrypted file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The media MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "Decrypted media stored in local transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The locally stored decrypted media."
+      }
+    },
+    {
+      "id": "weixin_bot.get_updates",
+      "service": "weixin_bot",
+      "name": "get_updates",
+      "description": "Long-poll for inbound Weixin bot messages. Pass the returned cursor to the next call to avoid receiving the same updates again.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Receive messages sent to the connected Weixin bot"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the previous get_updates call."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message_id": {
+                  "type": "string",
+                  "description": "The message identifier returned by Weixin."
+                },
+                "from_user_id": {
+                  "type": "string",
+                  "description": "The Weixin user that sent the message."
+                },
+                "to_user_id": {
+                  "type": "string",
+                  "description": "The message recipient."
+                },
+                "create_time_ms": {
+                  "type": "number",
+                  "description": "The message creation time in milliseconds."
+                },
+                "message_type": {
+                  "type": "integer",
+                  "description": "The message sender type reported by Weixin."
+                },
+                "message_state": {
+                  "type": "integer",
+                  "description": "The message lifecycle state reported by Weixin."
+                },
+                "context_token": {
+                  "type": "string",
+                  "description": "The conversation token to pass back when replying."
+                },
+                "item_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Weixin message item."
+                  },
+                  "description": "The text or media items carried by the message."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Weixin iLink message, including its sender, content items, and reply context."
+            },
+            "description": "Messages received during this poll."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to pass to the next get_updates call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to pass to the next get_updates call."
+          },
+          "longPollingTimeoutMs": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next long-poll duration suggested by Weixin."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next long-poll duration suggested by Weixin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "nextCursor",
+          "longPollingTimeoutMs"
+        ],
+        "description": "Inbound messages and the state needed for the next long-poll."
+      }
+    },
+    {
+      "id": "weixin_bot.send_media",
+      "service": "weixin_bot",
+      "name": "send_media",
+      "description": "Encrypt, upload, and send an image, video, or file from local transit storage.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Upload and send media as the connected Weixin bot"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toUserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target user ID from an inbound Weixin message."
+          },
+          "contextToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The context_token from the inbound message being answered."
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "file"
+            ],
+            "description": "How Weixin should present the file."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "A file already uploaded to local transit storage."
+          },
+          "caption": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional text sent as a separate message before the media."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toUserId",
+          "contextToken",
+          "mediaType",
+          "file"
+        ],
+        "description": "A transit file and its Weixin reply context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The server-assigned message identifier when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The server-assigned message identifier when returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messageId"
+        ],
+        "description": "The accepted Weixin media message."
+      }
+    },
+    {
+      "id": "weixin_bot.send_message",
+      "service": "weixin_bot",
+      "name": "send_message",
+      "description": "Send a text reply from the connected Weixin bot to a user or conversation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Send messages as the connected Weixin bot"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toUserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target user ID from an inbound Weixin message."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to send."
+          },
+          "contextToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The context_token from the inbound message being answered."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toUserId",
+          "text",
+          "contextToken"
+        ],
+        "description": "A text message and its Weixin reply context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The server-assigned message identifier when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The server-assigned message identifier when returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messageId"
+        ],
+        "description": "The accepted Weixin message."
+      },
+      "followUpActions": [
+        "weixin_bot.get_updates"
+      ]
+    },
+    {
+      "id": "weixin_bot.send_typing",
+      "service": "weixin_bot",
+      "name": "send_typing",
+      "description": "Start or stop the typing indicator for a Weixin conversation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Update typing status as the connected Weixin bot"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Weixin user ID from an inbound message."
+          },
+          "contextToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The context_token from the inbound message."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "typing",
+              "cancel"
+            ],
+            "description": "Whether to start or stop the typing indicator."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "contextToken",
+          "status"
+        ],
+        "description": "A conversation and typing state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "typing",
+              "cancel"
+            ],
+            "description": "The typing state sent to Weixin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The typing state accepted by Weixin."
+      }
+    }
+  ]
+}

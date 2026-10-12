@@ -1,0 +1,1362 @@
+{
+  "service": "glyphic",
+  "displayName": "Glyphic",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GLYPHIC_API_KEY",
+      "description": "Glyphic Airspeed API key sent with the X-API-Key request header. Create it in Airspeed API Settings at https://app.goairspeed.com/settings/api and review the official API docs at https://api.glyphic.ai/docs."
+    }
+  ],
+  "homepageUrl": "https://www.goairspeed.com",
+  "actions": [
+    {
+      "id": "glyphic.get_call",
+      "service": "glyphic",
+      "name": "get_call",
+      "description": "Retrieve one Glyphic call by ID, including transcript, summary, media, and insights.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic call identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a Glyphic call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Glyphic call identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The call title."
+              },
+              "companies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The company name when Glyphic returns it."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The company name when Glyphic returns it."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The company domain."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A company associated with a Glyphic call."
+                },
+                "description": "Companies associated with the call."
+              },
+              "participants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The Glyphic participant identifier."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The participant name when Glyphic returns it."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The participant name when Glyphic returns it."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The participant email when Glyphic returns it."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The participant email when Glyphic returns it."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A participant associated with a Glyphic call."
+                },
+                "description": "Participants associated with the call."
+              },
+              "start_time": {
+                "type": "string",
+                "description": "The call start time.",
+                "format": "date-time"
+              },
+              "duration": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The call duration in seconds when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The call duration in seconds when available."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "in_progress",
+                          "completed",
+                          "failed",
+                          "cancelled"
+                        ],
+                        "description": "The Glyphic call processing status code, or null when unavailable."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Glyphic call processing status code, or null when unavailable."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Glyphic call processing status."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The Glyphic call tag identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The Glyphic call tag name."
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Glyphic call tag description when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Glyphic call tag description when available."
+                    },
+                    "group": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Glyphic call tag group when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Glyphic call tag group when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Glyphic call tag."
+                },
+                "description": "Tags attached to the call."
+              },
+              "transcript_turns": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "party_id": {
+                          "type": "integer",
+                          "description": "The participant party identifier for the transcript turn."
+                        },
+                        "turn_text": {
+                          "type": "string",
+                          "description": "The transcript text for this turn."
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "description": "The timestamp for this transcript turn."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A transcript turn returned by Glyphic."
+                    },
+                    "description": "Transcript turns returned for the call."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Transcript turns returned for the call."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Glyphic call summary when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Glyphic call summary when available."
+              },
+              "media": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "media_type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "audio",
+                              "video"
+                            ],
+                            "description": "The Glyphic media type."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Glyphic media type."
+                      },
+                      "media_url": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The presigned media URL returned by Glyphic when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The presigned media URL returned by Glyphic when available."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Glyphic media metadata for a call or snippet."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Glyphic media metadata for a call or snippet."
+              },
+              "url_link": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Glyphic call URL when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Glyphic call URL when available."
+              },
+              "insights": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The insight name."
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The insight value when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The insight value when available."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An insight extracted from a Glyphic call."
+                    },
+                    "description": "Insights extracted from the call."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Insights extracted from the call."
+              },
+              "crm_deal_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The related CRM deal identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The related CRM deal identifier when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Glyphic call detail."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Glyphic call."
+      }
+    },
+    {
+      "id": "glyphic.get_call_media",
+      "service": "glyphic",
+      "name": "get_call_media",
+      "description": "Retrieve presigned media URL metadata for a Glyphic call.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic call identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Glyphic call media."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "media": {
+            "type": "object",
+            "properties": {
+              "media_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "audio",
+                      "video"
+                    ],
+                    "description": "The Glyphic media type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Glyphic media type."
+              },
+              "media_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The presigned media URL returned by Glyphic when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The presigned media URL returned by Glyphic when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Glyphic media metadata for a call or snippet."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with Glyphic call media metadata."
+      }
+    },
+    {
+      "id": "glyphic.get_call_snippets",
+      "service": "glyphic",
+      "name": "get_call_snippets",
+      "description": "Retrieve snippets for a Glyphic call, including time ranges and transcript turns.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic call identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Glyphic call snippets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "snippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "media": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "media_type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "audio",
+                                "video"
+                              ],
+                              "description": "The Glyphic media type."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The Glyphic media type."
+                        },
+                        "media_url": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The presigned media URL returned by Glyphic when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The presigned media URL returned by Glyphic when available."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Glyphic media metadata for a call or snippet."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Glyphic media metadata for a call or snippet."
+                },
+                "start_seconds": {
+                  "type": "integer",
+                  "description": "The snippet start time in seconds."
+                },
+                "end_seconds": {
+                  "type": "integer",
+                  "description": "The snippet end time in seconds."
+                },
+                "transcript_turns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "party_id": {
+                        "type": "integer",
+                        "description": "The participant party identifier for the transcript turn."
+                      },
+                      "turn_text": {
+                        "type": "string",
+                        "description": "The transcript text for this turn."
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "description": "The timestamp for this transcript turn."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A transcript turn returned by Glyphic."
+                  },
+                  "description": "Transcript turns in the snippet time range."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Glyphic call snippet."
+            },
+            "description": "The Glyphic snippets returned for the call."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Glyphic response object."
+            },
+            "description": "The raw Glyphic snippet response array."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with Glyphic call snippets."
+      }
+    },
+    {
+      "id": "glyphic.get_playbook",
+      "service": "glyphic",
+      "name": "get_playbook",
+      "description": "Retrieve a Glyphic playbook by ID, including the latest version content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "playbookId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic playbook identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a Glyphic playbook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "playbook": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Glyphic playbook identifier."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The playbook title when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The playbook title when available."
+              },
+              "playbook_type": {
+                "type": "string",
+                "enum": [
+                  "sales",
+                  "customer_success",
+                  "autogen_us",
+                  "autogen_emea",
+                  "autogen_apac"
+                ],
+                "description": "The Glyphic playbook type."
+              },
+              "team_label": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The team label associated with the playbook."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team label associated with the playbook."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The playbook update timestamp.",
+                "format": "date-time"
+              },
+              "content": {
+                "type": "string",
+                "description": "The playbook version content."
+              },
+              "version_id": {
+                "type": "string",
+                "description": "The Glyphic playbook version identifier."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Glyphic playbook detail."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Glyphic playbook."
+      }
+    },
+    {
+      "id": "glyphic.get_playbook_version",
+      "service": "glyphic",
+      "name": "get_playbook_version",
+      "description": "Retrieve a specific Glyphic playbook version by playbook ID and version ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "playbookId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic playbook identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          },
+          "versionId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic playbook version identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a Glyphic playbook version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "playbook": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Glyphic playbook identifier."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The playbook title when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The playbook title when available."
+              },
+              "playbook_type": {
+                "type": "string",
+                "enum": [
+                  "sales",
+                  "customer_success",
+                  "autogen_us",
+                  "autogen_emea",
+                  "autogen_apac"
+                ],
+                "description": "The Glyphic playbook type."
+              },
+              "team_label": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The team label associated with the playbook."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team label associated with the playbook."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The playbook update timestamp.",
+                "format": "date-time"
+              },
+              "content": {
+                "type": "string",
+                "description": "The playbook version content."
+              },
+              "version_id": {
+                "type": "string",
+                "description": "The Glyphic playbook version identifier."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Glyphic playbook detail."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Glyphic playbook version."
+      }
+    },
+    {
+      "id": "glyphic.list_call_tags",
+      "service": "glyphic",
+      "name": "list_call_tags",
+      "description": "List all Glyphic call tags for the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Glyphic call tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Glyphic call tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Glyphic call tag name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Glyphic call tag description when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Glyphic call tag description when available."
+                },
+                "group": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Glyphic call tag group when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Glyphic call tag group when available."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Glyphic call tag."
+            },
+            "description": "The Glyphic call tags returned by the API."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Glyphic response object."
+            },
+            "description": "The raw Glyphic call tag response array."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Glyphic call tags."
+      }
+    },
+    {
+      "id": "glyphic.list_calls",
+      "service": "glyphic",
+      "name": "list_calls",
+      "description": "List public Glyphic calls with optional participant, time, title, tag, and cursor filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "participantEmail": {
+            "type": "string",
+            "description": "Filter calls by a participant email address.",
+            "format": "email"
+          },
+          "startTimeFrom": {
+            "type": "string",
+            "description": "Only return calls starting at or after this UTC ISO 8601 time.",
+            "format": "date-time"
+          },
+          "startTimeTo": {
+            "type": "string",
+            "description": "Only return calls starting at or before this UTC ISO 8601 time.",
+            "format": "date-time"
+          },
+          "titleFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Query text used to filter calls by title."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "description": "A Glyphic call tag identifier.",
+              "pattern": "^[0-9a-f]{24}$"
+            },
+            "description": "Glyphic call tag identifiers to filter by.",
+            "minItems": 1
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by a previous Glyphic list response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return per page."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "next",
+              "prev"
+            ],
+            "description": "The cursor pagination direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Glyphic calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Glyphic call identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The call title."
+                },
+                "companies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The company name when Glyphic returns it."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The company name when Glyphic returns it."
+                      },
+                      "domain": {
+                        "type": "string",
+                        "description": "The company domain."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A company associated with a Glyphic call."
+                  },
+                  "description": "Companies associated with the call."
+                },
+                "participants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The Glyphic participant identifier."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The participant name when Glyphic returns it."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The participant name when Glyphic returns it."
+                      },
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The participant email when Glyphic returns it."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The participant email when Glyphic returns it."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A participant associated with a Glyphic call."
+                  },
+                  "description": "Participants associated with the call."
+                },
+                "start_time": {
+                  "type": "string",
+                  "description": "The call start time.",
+                  "format": "date-time"
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The call duration in seconds when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The call duration in seconds when available."
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "in_progress",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                          ],
+                          "description": "The Glyphic call processing status code, or null when unavailable."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Glyphic call processing status code, or null when unavailable."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Glyphic call processing status."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Glyphic call tag identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The Glyphic call tag name."
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Glyphic call tag description when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Glyphic call tag description when available."
+                      },
+                      "group": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Glyphic call tag group when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Glyphic call tag group when available."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Glyphic call tag."
+                  },
+                  "description": "Tags attached to the call."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Glyphic call preview."
+            },
+            "description": "The Glyphic calls returned by the API."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to pass on the next request, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to pass on the next request, or null when no next page exists."
+          },
+          "previousCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to pass for the previous page, or null when no previous page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to pass for the previous page, or null when no previous page exists."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page, or null when no next page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page, or null when no next page is available."
+              },
+              "previous_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the previous page, or null when no previous page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the previous page, or null when no previous page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Glyphic cursor pagination metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Glyphic calls."
+      }
+    },
+    {
+      "id": "glyphic.list_playbook_versions",
+      "service": "glyphic",
+      "name": "list_playbook_versions",
+      "description": "List versions for a Glyphic playbook.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "playbookId": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 24,
+            "description": "The Glyphic playbook identifier.",
+            "pattern": "^[0-9a-f]{24}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Glyphic playbook versions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Glyphic playbook version identifier."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The playbook version creation timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Glyphic playbook version preview."
+            },
+            "description": "The Glyphic playbook versions returned by the API."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Glyphic response object."
+            },
+            "description": "The raw Glyphic playbook version response array."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Glyphic playbook versions."
+      }
+    },
+    {
+      "id": "glyphic.list_playbooks",
+      "service": "glyphic",
+      "name": "list_playbooks",
+      "description": "List Glyphic playbooks with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by a previous Glyphic list response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return per page."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "next",
+              "prev"
+            ],
+            "description": "The cursor pagination direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Glyphic playbooks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "playbooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Glyphic playbook identifier."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The playbook title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The playbook title when available."
+                },
+                "playbook_type": {
+                  "type": "string",
+                  "enum": [
+                    "sales",
+                    "customer_success",
+                    "autogen_us",
+                    "autogen_emea",
+                    "autogen_apac"
+                  ],
+                  "description": "The Glyphic playbook type."
+                },
+                "team_label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The team label associated with the playbook."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The team label associated with the playbook."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The playbook update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Glyphic playbook preview."
+            },
+            "description": "The Glyphic playbooks returned by the API."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to pass on the next request, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to pass on the next request, or null when no next page exists."
+          },
+          "previousCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to pass for the previous page, or null when no previous page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to pass for the previous page, or null when no previous page exists."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page, or null when no next page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page, or null when no next page is available."
+              },
+              "previous_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the previous page, or null when no previous page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the previous page, or null when no previous page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Glyphic cursor pagination metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Glyphic response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Glyphic playbooks."
+      }
+    }
+  ]
+}

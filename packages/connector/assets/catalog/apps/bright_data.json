@@ -1,0 +1,458 @@
+{
+  "service": "bright_data",
+  "displayName": "Bright Data",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BRIGHT_DATA_API_KEY",
+      "description": "Bright Data API key sent as a Bearer token in the Authorization header. Create or manage API keys from Bright Data account settings: https://brightdata.com/cp/setting/users."
+    }
+  ],
+  "homepageUrl": "https://brightdata.com",
+  "actions": [
+    {
+      "id": "bright_data.get_account_status",
+      "service": "bright_data",
+      "name": "get_account_status",
+      "description": "Fetch the Bright Data account status for the connected API key and return account request capability metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for fetching Bright Data account status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The Bright Data account status."
+          },
+          "customer": {
+            "type": "string",
+            "description": "The Bright Data customer identifier."
+          },
+          "canMakeRequests": {
+            "type": "boolean",
+            "description": "Whether the account can make requests."
+          },
+          "authFailReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream authentication failure reason, when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream authentication failure reason, when returned."
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The IP address Bright Data observed for the request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IP address Bright Data observed for the request."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Bright Data response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "customer",
+          "canMakeRequests",
+          "authFailReason",
+          "ip",
+          "raw"
+        ],
+        "description": "Bright Data account status response."
+      }
+    },
+    {
+      "id": "bright_data.get_dataset_metadata",
+      "service": "bright_data",
+      "name": "get_dataset_metadata",
+      "description": "Fetch Bright Data marketplace dataset field metadata for a dataset ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bright Data dataset identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Input parameters for fetching Bright Data dataset metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Bright Data dataset identifier."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The Bright Data field data type."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the field is currently active."
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether the field is required when present."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The field description returned by Bright Data."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Metadata for one Bright Data dataset field."
+            },
+            "description": "Dataset fields keyed by field name."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Bright Data response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "fields",
+          "raw"
+        ],
+        "description": "Bright Data dataset metadata response."
+      }
+    },
+    {
+      "id": "bright_data.get_snapshot_metadata",
+      "service": "bright_data",
+      "name": "get_snapshot_metadata",
+      "description": "Fetch metadata for a Bright Data marketplace dataset snapshot.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bright Data snapshot identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "snapshotId"
+        ],
+        "description": "Input parameters for fetching Bright Data snapshot metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "snapshot": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The snapshot identifier."
+              },
+              "created": {
+                "type": "string",
+                "description": "The timestamp when the snapshot was created.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "scheduled",
+                  "building",
+                  "ready",
+                  "failed"
+                ],
+                "description": "The Bright Data snapshot status."
+              },
+              "dataset_id": {
+                "type": "string",
+                "description": "The dataset identifier associated with the snapshot."
+              },
+              "customer_id": {
+                "type": "string",
+                "description": "The Bright Data customer identifier."
+              },
+              "dataset_size": {
+                "type": "integer",
+                "description": "The number of records in the snapshot."
+              },
+              "file_size": {
+                "type": "integer",
+                "description": "The snapshot file size in bytes."
+              },
+              "cost": {
+                "type": "number",
+                "description": "The snapshot cost."
+              },
+              "error": {
+                "type": "string",
+                "description": "The snapshot error message when available."
+              },
+              "error_code": {
+                "type": "string",
+                "description": "The snapshot error code when available."
+              },
+              "warning": {
+                "type": "string",
+                "description": "The snapshot warning message when available."
+              },
+              "warning_code": {
+                "type": "string",
+                "description": "The snapshot warning code when available."
+              },
+              "initiation_type": {
+                "type": "string",
+                "description": "The Bright Data initiation type for the snapshot."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Bright Data snapshot metadata."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Bright Data response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "snapshot",
+          "raw"
+        ],
+        "description": "Bright Data snapshot metadata response."
+      }
+    },
+    {
+      "id": "bright_data.get_snapshot_parts",
+      "service": "bright_data",
+      "name": "get_snapshot_parts",
+      "description": "Fetch the number of delivery parts for a ready Bright Data marketplace dataset snapshot.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bright Data snapshot identifier."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "ndjson",
+              "jsonl",
+              "csv"
+            ],
+            "description": "The snapshot delivery format."
+          },
+          "compress": {
+            "type": "boolean",
+            "description": "Whether the corresponding snapshot download uses gzip compression."
+          },
+          "batchSize": {
+            "type": "integer",
+            "minimum": 1000,
+            "description": "The record count used for each response batch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "snapshotId"
+        ],
+        "description": "Input parameters for fetching Bright Data snapshot parts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "parts": {
+            "type": "number",
+            "description": "The number of snapshot delivery parts."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Bright Data response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parts",
+          "raw"
+        ],
+        "description": "Bright Data snapshot parts response."
+      }
+    },
+    {
+      "id": "bright_data.list_dataset_views",
+      "service": "bright_data",
+      "name": "list_dataset_views",
+      "description": "List Bright Data dataset views available to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Bright Data dataset views."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique dataset view identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The customer-assigned dataset view name."
+                },
+                "dataset_id": {
+                  "type": "string",
+                  "description": "The underlying Bright Data dataset identifier."
+                },
+                "dataset_name": {
+                  "type": "string",
+                  "description": "The underlying Bright Data dataset name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The primary domain of the dataset."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Bright Data dataset view."
+            },
+            "description": "Dataset views returned by Bright Data."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "The raw Bright Data response object."
+            },
+            "description": "The raw Bright Data dataset views payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "views",
+          "raw"
+        ],
+        "description": "Bright Data dataset views response."
+      }
+    },
+    {
+      "id": "bright_data.list_datasets",
+      "service": "bright_data",
+      "name": "list_datasets",
+      "description": "List Bright Data marketplace dataset IDs available to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Bright Data datasets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique dataset identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The human-readable dataset name."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The number of records in the dataset."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Bright Data marketplace dataset summary."
+            },
+            "description": "Datasets returned by Bright Data."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "The raw Bright Data response object."
+            },
+            "description": "The raw Bright Data dataset list payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasets",
+          "raw"
+        ],
+        "description": "Bright Data dataset list response."
+      }
+    }
+  ]
+}

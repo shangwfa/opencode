@@ -1,0 +1,1389 @@
+{
+  "service": "y_gy",
+  "displayName": "Y.GY",
+  "description": "Create and manage Y.GY short links, QR codes, and routing settings.",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "y_gy_api_key",
+      "description": "Y.GY API key sent with the api-key header. Create one in Dashboard > My Account > API Keys as documented at https://app.y.gy/docs/api-docs/authenticate."
+    }
+  ],
+  "homepageUrl": "https://app.y.gy",
+  "actions": [
+    {
+      "id": "y_gy.create_link",
+      "service": "y_gy",
+      "name": "create_link",
+      "description": "Create a Y.GY short link with optional QR, security, and routing settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination URL or hostname/path that Y.GY should redirect to.",
+            "pattern": "\\S"
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A verified Y.GY custom domain, or y.gy when omitted."
+          },
+          "suffix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred custom suffix for the short link."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The password required to access the short link."
+          },
+          "og_title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated title used in social link previews."
+          },
+          "og_description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated description used in social link previews."
+          },
+          "og_image": {
+            "type": "string",
+            "description": "The updated image URL used in social link previews.",
+            "format": "uri"
+          },
+          "expiration_date": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the short link should expire.",
+            "format": "date-time"
+          },
+          "qr_code_foreground_hex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "The six-digit foreground color for the QR code."
+          },
+          "qr_code_background_hex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "The six-digit background color for the QR code."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An internal name for the short link."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Y.GY tag identifier."
+            },
+            "description": "Tag identifiers to associate with the short link.",
+            "minItems": 1
+          },
+          "android_link_destination": {
+            "type": "string",
+            "description": "The destination URL used for Android visitors.",
+            "format": "uri"
+          },
+          "ios_link_destination": {
+            "type": "string",
+            "description": "The destination URL used for iOS visitors.",
+            "format": "uri"
+          },
+          "webhook_url": {
+            "type": "string",
+            "description": "The URL that Y.GY should notify with real-time link updates.",
+            "format": "uri"
+          },
+          "webhook_auth_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The authentication key Y.GY should use for webhook requests."
+          },
+          "disable_png": {
+            "type": "boolean",
+            "description": "Whether Y.GY should skip PNG generation and return only the SVG QR code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "destination_url"
+        ],
+        "description": "Input payload for creating a Y.GY short link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique Y.GY link identifier."
+          },
+          "destination_url": {
+            "type": "string",
+            "description": "The destination URL reached through the short link.",
+            "format": "uri"
+          },
+          "url": {
+            "type": "string",
+            "description": "The complete shortened URL.",
+            "format": "uri"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp string returned by Y.GY for link creation."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain used by the short link."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "The path suffix used by the short link."
+          },
+          "organization_id": {
+            "type": "integer",
+            "description": "The organization identifier that owns the link."
+          },
+          "og_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph title, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph title, or null when none is configured."
+          },
+          "og_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph description, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph description, or null when none is configured."
+          },
+          "og_image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph image URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph image URL, or null when none is configured."
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The expiration timestamp, or null for no expiration."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The expiration timestamp, or null for no expiration."
+          },
+          "qr_code_svg": {
+            "type": "string",
+            "description": "The SVG markup for the generated QR code."
+          },
+          "qr_code_png": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+          },
+          "qr_code_foreground_hex": {
+            "type": "string",
+            "description": "The QR code foreground color returned by Y.GY."
+          },
+          "qr_code_background_hex": {
+            "type": "string",
+            "description": "The QR code background color returned by Y.GY."
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "Whether the link is password protected."
+          },
+          "android_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Android-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android-specific destination URL, or null when none is configured."
+          },
+          "ios_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The iOS-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The iOS-specific destination URL, or null when none is configured."
+          },
+          "bot_protection": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+          },
+          "captcha": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The internal link name, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The internal link name, or null when none is configured."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp string returned by Y.GY for tag creation."
+                },
+                "organization_id": {
+                  "type": "integer",
+                  "description": "The organization identifier that owns the tag."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "created_at",
+                "organization_id"
+              ],
+              "description": "A tag associated with a Y.GY link."
+            },
+            "description": "Tags associated with the link."
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The webhook destination URL, or null when no webhook is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The webhook destination URL, or null when no webhook is configured."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "destination_url",
+          "url"
+        ],
+        "description": "A normalized Y.GY short link."
+      },
+      "followUpActions": [
+        "y_gy.get_link",
+        "y_gy.update_link",
+        "y_gy.delete_link"
+      ]
+    },
+    {
+      "id": "y_gy.delete_link",
+      "service": "y_gy",
+      "name": "delete_link",
+      "description": "Delete a Y.GY short link by its identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric form of the Y.GY link identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive-integer string form of a Y.GY link identifier, containing decimal digits only.",
+                "pattern": "^[1-9][0-9]*$"
+              }
+            ],
+            "description": "The Y.GY link identifier returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input payload for deleting a Y.GY short link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Y.GY link identifier returned by the API."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the short link was deleted successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "deleted"
+        ],
+        "description": "Acknowledgement for a deleted Y.GY short link."
+      }
+    },
+    {
+      "id": "y_gy.get_link",
+      "service": "y_gy",
+      "name": "get_link",
+      "description": "Get one Y.GY short link by its identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric form of the Y.GY link identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive-integer string form of a Y.GY link identifier, containing decimal digits only.",
+                "pattern": "^[1-9][0-9]*$"
+              }
+            ],
+            "description": "The Y.GY link identifier returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input payload for reading a Y.GY short link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique Y.GY link identifier."
+          },
+          "destination_url": {
+            "type": "string",
+            "description": "The destination URL reached through the short link.",
+            "format": "uri"
+          },
+          "url": {
+            "type": "string",
+            "description": "The complete shortened URL.",
+            "format": "uri"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp string returned by Y.GY for link creation."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain used by the short link."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "The path suffix used by the short link."
+          },
+          "organization_id": {
+            "type": "integer",
+            "description": "The organization identifier that owns the link."
+          },
+          "og_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph title, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph title, or null when none is configured."
+          },
+          "og_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph description, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph description, or null when none is configured."
+          },
+          "og_image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph image URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph image URL, or null when none is configured."
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The expiration timestamp, or null for no expiration."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The expiration timestamp, or null for no expiration."
+          },
+          "qr_code_svg": {
+            "type": "string",
+            "description": "The SVG markup for the generated QR code."
+          },
+          "qr_code_png": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+          },
+          "qr_code_foreground_hex": {
+            "type": "string",
+            "description": "The QR code foreground color returned by Y.GY."
+          },
+          "qr_code_background_hex": {
+            "type": "string",
+            "description": "The QR code background color returned by Y.GY."
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "Whether the link is password protected."
+          },
+          "android_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Android-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android-specific destination URL, or null when none is configured."
+          },
+          "ios_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The iOS-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The iOS-specific destination URL, or null when none is configured."
+          },
+          "bot_protection": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+          },
+          "captcha": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The internal link name, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The internal link name, or null when none is configured."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp string returned by Y.GY for tag creation."
+                },
+                "organization_id": {
+                  "type": "integer",
+                  "description": "The organization identifier that owns the tag."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "created_at",
+                "organization_id"
+              ],
+              "description": "A tag associated with a Y.GY link."
+            },
+            "description": "Tags associated with the link."
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The webhook destination URL, or null when no webhook is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The webhook destination URL, or null when no webhook is configured."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "destination_url",
+          "url"
+        ],
+        "description": "A normalized Y.GY short link."
+      },
+      "followUpActions": [
+        "y_gy.update_link",
+        "y_gy.delete_link"
+      ]
+    },
+    {
+      "id": "y_gy.list_links",
+      "service": "y_gy",
+      "name": "list_links",
+      "description": "List Y.GY short links with offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of links to return; Y.GY defaults to 25."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of links to skip before collecting results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing Y.GY short links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique Y.GY link identifier."
+                },
+                "destination_url": {
+                  "type": "string",
+                  "description": "The destination URL reached through the short link.",
+                  "format": "uri"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The complete shortened URL.",
+                  "format": "uri"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp string returned by Y.GY for link creation."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain used by the short link."
+                },
+                "suffix": {
+                  "type": "string",
+                  "description": "The path suffix used by the short link."
+                },
+                "organization_id": {
+                  "type": "integer",
+                  "description": "The organization identifier that owns the link."
+                },
+                "og_title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Open Graph title, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Open Graph title, or null when none is configured."
+                },
+                "og_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Open Graph description, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Open Graph description, or null when none is configured."
+                },
+                "og_image": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Open Graph image URL, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Open Graph image URL, or null when none is configured."
+                },
+                "expiration_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The expiration timestamp, or null for no expiration."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The expiration timestamp, or null for no expiration."
+                },
+                "qr_code_svg": {
+                  "type": "string",
+                  "description": "The SVG markup for the generated QR code."
+                },
+                "qr_code_png": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+                },
+                "qr_code_foreground_hex": {
+                  "type": "string",
+                  "description": "The QR code foreground color returned by Y.GY."
+                },
+                "qr_code_background_hex": {
+                  "type": "string",
+                  "description": "The QR code background color returned by Y.GY."
+                },
+                "has_password": {
+                  "type": "boolean",
+                  "description": "Whether the link is password protected."
+                },
+                "android_link_destination": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Android-specific destination URL, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Android-specific destination URL, or null when none is configured."
+                },
+                "ios_link_destination": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The iOS-specific destination URL, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The iOS-specific destination URL, or null when none is configured."
+                },
+                "bot_protection": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+                },
+                "captcha": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The internal link name, or null when none is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The internal link name, or null when none is configured."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The unique tag identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The tag name."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "description": "The timestamp string returned by Y.GY for tag creation."
+                      },
+                      "organization_id": {
+                        "type": "integer",
+                        "description": "The organization identifier that owns the tag."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name",
+                      "created_at",
+                      "organization_id"
+                    ],
+                    "description": "A tag associated with a Y.GY link."
+                  },
+                  "description": "Tags associated with the link."
+                },
+                "webhook_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The webhook destination URL, or null when no webhook is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The webhook destination URL, or null when no webhook is configured."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "destination_url",
+                "url"
+              ],
+              "description": "A normalized Y.GY short link."
+            },
+            "description": "The links returned for the requested range."
+          },
+          "total_links": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of links in the Y.GY account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "links",
+          "total_links"
+        ],
+        "description": "A paginated Y.GY link collection."
+      }
+    },
+    {
+      "id": "y_gy.update_link",
+      "service": "y_gy",
+      "name": "update_link",
+      "description": "Update the documented mutable settings of a Y.GY short link.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric form of the Y.GY link identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive-integer string form of a Y.GY link identifier, containing decimal digits only.",
+                "pattern": "^[1-9][0-9]*$"
+              }
+            ],
+            "description": "The Y.GY link identifier returned by the API."
+          },
+          "destination_url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination URL or hostname/path that Y.GY should redirect to.",
+            "pattern": "\\S"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The password required to access the short link."
+          },
+          "og_title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated title used in social link previews."
+          },
+          "og_description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated description used in social link previews."
+          },
+          "og_image": {
+            "type": "string",
+            "description": "The updated image URL used in social link previews.",
+            "format": "uri"
+          },
+          "expiration_date": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the short link should expire.",
+            "format": "date-time"
+          },
+          "qr_code_foreground_hex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "The six-digit foreground color for the QR code."
+          },
+          "qr_code_background_hex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$",
+            "description": "The six-digit background color for the QR code."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated internal name for the short link."
+          },
+          "android_link_destination": {
+            "type": "string",
+            "description": "The destination URL used for Android visitors.",
+            "format": "uri"
+          },
+          "ios_link_destination": {
+            "type": "string",
+            "description": "The destination URL used for iOS visitors.",
+            "format": "uri"
+          },
+          "bot_protection": {
+            "type": "boolean",
+            "description": "Whether bots should be blocked from following the short link."
+          },
+          "captcha": {
+            "type": "boolean",
+            "description": "Whether visitors must pass a CAPTCHA before being redirected."
+          },
+          "webhook_url": {
+            "type": "string",
+            "description": "The URL that Y.GY should notify with real-time link updates.",
+            "format": "uri"
+          },
+          "webhook_auth_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The authentication key Y.GY should use for webhook requests."
+          },
+          "add_tags": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Y.GY tag identifier to add."
+            },
+            "description": "Tag identifiers to add to the short link.",
+            "minItems": 1
+          },
+          "remove_tags": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Y.GY tag identifier to remove."
+            },
+            "description": "Tag identifiers to remove from the short link.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input payload for updating a Y.GY short link.",
+        "anyOf": [
+          {
+            "required": [
+              "destination_url"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "og_title"
+            ]
+          },
+          {
+            "required": [
+              "og_description"
+            ]
+          },
+          {
+            "required": [
+              "og_image"
+            ]
+          },
+          {
+            "required": [
+              "expiration_date"
+            ]
+          },
+          {
+            "required": [
+              "qr_code_foreground_hex"
+            ]
+          },
+          {
+            "required": [
+              "qr_code_background_hex"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "android_link_destination"
+            ]
+          },
+          {
+            "required": [
+              "ios_link_destination"
+            ]
+          },
+          {
+            "required": [
+              "bot_protection"
+            ]
+          },
+          {
+            "required": [
+              "captcha"
+            ]
+          },
+          {
+            "required": [
+              "webhook_url"
+            ]
+          },
+          {
+            "required": [
+              "webhook_auth_key"
+            ]
+          },
+          {
+            "required": [
+              "add_tags"
+            ]
+          },
+          {
+            "required": [
+              "remove_tags"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique Y.GY link identifier."
+          },
+          "destination_url": {
+            "type": "string",
+            "description": "The destination URL reached through the short link.",
+            "format": "uri"
+          },
+          "url": {
+            "type": "string",
+            "description": "The complete shortened URL.",
+            "format": "uri"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp string returned by Y.GY for link creation."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain used by the short link."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "The path suffix used by the short link."
+          },
+          "organization_id": {
+            "type": "integer",
+            "description": "The organization identifier that owns the link."
+          },
+          "og_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph title, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph title, or null when none is configured."
+          },
+          "og_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph description, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph description, or null when none is configured."
+          },
+          "og_image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Open Graph image URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Open Graph image URL, or null when none is configured."
+          },
+          "expiration_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The expiration timestamp, or null for no expiration."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The expiration timestamp, or null for no expiration."
+          },
+          "qr_code_svg": {
+            "type": "string",
+            "description": "The SVG markup for the generated QR code."
+          },
+          "qr_code_png": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated QR code PNG URL, or null when PNG generation is disabled."
+          },
+          "qr_code_foreground_hex": {
+            "type": "string",
+            "description": "The QR code foreground color returned by Y.GY."
+          },
+          "qr_code_background_hex": {
+            "type": "string",
+            "description": "The QR code background color returned by Y.GY."
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "Whether the link is password protected."
+          },
+          "android_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Android-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android-specific destination URL, or null when none is configured."
+          },
+          "ios_link_destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The iOS-specific destination URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The iOS-specific destination URL, or null when none is configured."
+          },
+          "bot_protection": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether bot protection is enabled, or null when the setting is unavailable."
+          },
+          "captcha": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether CAPTCHA protection is enabled, or null when the setting is unavailable."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The internal link name, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The internal link name, or null when none is configured."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp string returned by Y.GY for tag creation."
+                },
+                "organization_id": {
+                  "type": "integer",
+                  "description": "The organization identifier that owns the tag."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "created_at",
+                "organization_id"
+              ],
+              "description": "A tag associated with a Y.GY link."
+            },
+            "description": "Tags associated with the link."
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The webhook destination URL, or null when no webhook is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The webhook destination URL, or null when no webhook is configured."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "destination_url",
+          "url"
+        ],
+        "description": "A normalized Y.GY short link."
+      },
+      "followUpActions": [
+        "y_gy.get_link"
+      ]
+    }
+  ]
+}

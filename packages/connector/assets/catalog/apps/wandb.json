@@ -1,0 +1,1785 @@
+{
+  "service": "wandb",
+  "displayName": "Weights & Biases",
+  "description": "Query W&B experiments, Weave traces, artifacts, registries, automations, and reports through the official W&B MCP server.",
+  "categories": [
+    "AI",
+    "Analytics",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "W&B API Key",
+      "placeholder": "Paste your W&B API key",
+      "description": "A W&B API key sent to the MCP server as an Authorization Bearer token. Create or copy a key at https://wandb.ai/authorize.",
+      "extraFields": [
+        {
+          "key": "mcpEndpoint",
+          "label": "MCP Endpoint URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://mcp.withwandb.com/mcp",
+          "description": "Optional full W&B MCP endpoint. Leave blank to use the hosted service for W&B Dedicated Cloud, or enter the /mcp URL of a separately deployed server for Self-Managed W&B. The hosted endpoint does not support W&B Multi-tenant Cloud."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://wandb.ai",
+  "actions": [
+    {
+      "id": "wandb.compare_artifact_versions",
+      "service": "wandb",
+      "name": "compare_artifact_versions",
+      "description": "Compare metadata, aliases, tags, lineage, sizes, and optionally files for two W&B artifact versions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "artifact_name_a": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first fully qualified artifact version name.",
+            "pattern": "\\S"
+          },
+          "artifact_name_b": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The second fully qualified artifact version name.",
+            "pattern": "\\S"
+          },
+          "type_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional artifact type name.",
+            "pattern": "\\S"
+          },
+          "include_file_diff": {
+            "type": "boolean",
+            "description": "Whether to include file-level differences.",
+            "default": true
+          },
+          "max_file_diff_entries": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum file-difference entries to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "artifact_name_a",
+          "artifact_name_b"
+        ],
+        "description": "Input for comparing W&B artifact versions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "artifact_a": {
+            "type": "string",
+            "description": "The first artifact version name."
+          },
+          "artifact_b": {
+            "type": "string",
+            "description": "The second artifact version name."
+          },
+          "metadata_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact metadata differences."
+          },
+          "tags_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact tag differences."
+          },
+          "aliases_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact alias differences."
+          },
+          "size_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact size differences."
+          },
+          "file_count_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact file-count differences."
+          },
+          "lineage_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact lineage differences."
+          },
+          "digest_match": {
+            "type": "boolean",
+            "description": "Whether both artifact versions have the same digest."
+          },
+          "file_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional file-level differences."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A comparison of two W&B artifact versions."
+      }
+    },
+    {
+      "id": "wandb.compare_runs",
+      "service": "wandb",
+      "name": "compare_runs",
+      "description": "Compare configuration, summary metrics, metadata, and optionally metric history for two W&B runs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "run_id_a": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first W&B run ID.",
+            "pattern": "\\S"
+          },
+          "run_id_b": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The second W&B run ID.",
+            "pattern": "\\S"
+          },
+          "include_history_overlap": {
+            "type": "boolean",
+            "description": "Whether to compare overlapping sampled metric history.",
+            "default": false
+          },
+          "history_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metric keys used for history comparison."
+          },
+          "history_samples": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum history samples per run.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "run_id_a",
+          "run_id_b"
+        ],
+        "description": "Input for comparing W&B runs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run_a": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Details for the first W&B run."
+          },
+          "run_b": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Details for the second W&B run."
+          },
+          "config_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Run configuration differences."
+          },
+          "summary_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Run summary metric differences."
+          },
+          "metadata_diff": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Run metadata differences."
+          },
+          "history_comparison": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional sampled history comparison."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A structured comparison of two W&B runs."
+      }
+    },
+    {
+      "id": "wandb.count_weave_traces",
+      "service": "wandb",
+      "name": "count_weave_traces",
+      "description": "Count matching classic Weave traces and root traces without returning trace payloads.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional provider-native filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name"
+        ],
+        "description": "Input for counting Weave traces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching traces."
+          },
+          "root_traces_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching root traces."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total_count",
+          "root_traces_count"
+        ],
+        "description": "Weave trace counts."
+      }
+    },
+    {
+      "id": "wandb.create_report",
+      "service": "wandb",
+      "name": "create_report",
+      "description": "Create a W&B report with narrative text, plots, and configurable panels.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The report title.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional report description."
+          },
+          "markdown_report_text": {
+            "type": "string",
+            "description": "Markdown narrative for the report.",
+            "default": ""
+          },
+          "plots_html": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A Plotly HTML document."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One Plotly HTML document."
+                },
+                "description": "Plotly HTML documents keyed by plot name."
+              }
+            ],
+            "description": "Plotly HTML supplied as one string or a name-to-HTML map."
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One report panel definition."
+            },
+            "description": "W&B report panel definitions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "title"
+        ],
+        "description": "Input for creating a W&B report."
+      },
+      "outputSchema": {
+        "type": "string",
+        "description": "A confirmation containing the saved W&B report URL."
+      }
+    },
+    {
+      "id": "wandb.diagnose_run",
+      "service": "wandb",
+      "name": "diagnose_run",
+      "description": "Inspect loss metrics and run state to diagnose the training health of a W&B run.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B run ID.",
+            "pattern": "\\S"
+          },
+          "loss_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional training-loss metric key.",
+            "pattern": "\\S"
+          },
+          "val_loss_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional validation-loss metric key.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "run_id"
+        ],
+        "description": "Input for diagnosing a W&B run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "The diagnosed W&B run ID."
+          },
+          "run_name": {
+            "type": "string",
+            "description": "The W&B run name."
+          },
+          "run_state": {
+            "type": "string",
+            "description": "The W&B run state."
+          },
+          "diagnosis": {
+            "description": "Training-health findings and recommendations."
+          },
+          "loss_stats": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Calculated loss statistics."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The W&B run health diagnosis."
+      }
+    },
+    {
+      "id": "wandb.get_artifact_details",
+      "service": "wandb",
+      "name": "get_artifact_details",
+      "description": "Get metadata, lineage, and optionally files for a W&B artifact version.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "artifact_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The fully qualified artifact version name.",
+            "pattern": "\\S"
+          },
+          "type_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional artifact type name.",
+            "pattern": "\\S"
+          },
+          "include_files": {
+            "type": "boolean",
+            "description": "Whether to include artifact file entries.",
+            "default": false
+          },
+          "max_files": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum files to return when file entries are included.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "artifact_name"
+        ],
+        "description": "Input for reading a W&B artifact version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "artifact": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact metadata."
+          },
+          "lineage": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Artifact lineage information."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Optional artifact file entries."
+          }
+        },
+        "additionalProperties": true,
+        "description": "W&B artifact version details."
+      }
+    },
+    {
+      "id": "wandb.get_run_history",
+      "service": "wandb",
+      "name": "get_run_history",
+      "description": "Retrieve sampled time-series metric history for a W&B run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B run ID.",
+            "pattern": "\\S"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metric keys to return."
+          },
+          "samples": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum sampled history points.",
+            "default": 500
+          },
+          "min_step": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional minimum training step."
+          },
+          "max_step": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional maximum training step."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "run_id"
+        ],
+        "description": "Input for retrieving W&B run history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sampled history row."
+            },
+            "description": "Sampled metric history rows."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The W&B run ID."
+          },
+          "run_name": {
+            "type": "string",
+            "description": "The W&B run name."
+          },
+          "total_steps": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total available run steps."
+          },
+          "sampled_points": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned points."
+          },
+          "keys_returned": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metric keys present in the result."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Sampled W&B run history."
+      }
+    },
+    {
+      "id": "wandb.infer_trace_schema",
+      "service": "wandb",
+      "name": "infer_trace_schema",
+      "description": "Sample classic Weave traces to discover field paths, types, and frequent values.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "sample_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of traces to sample.",
+            "default": 20
+          },
+          "top_n_values": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Frequent values retained per field.",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name"
+        ],
+        "description": "Input for inferring a Weave trace schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Discovered trace fields."
+          },
+          "total_traces": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total matching traces."
+          },
+          "root_traces": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total root traces."
+          },
+          "sample_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of sampled traces."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The inferred Weave trace schema."
+      }
+    },
+    {
+      "id": "wandb.list_artifact_versions",
+      "service": "wandb",
+      "name": "list_artifact_versions",
+      "description": "List versions of a W&B project artifact or registry collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collection_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The artifact collection name.",
+            "pattern": "\\S"
+          },
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "registry_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B registry name.",
+            "pattern": "\\S"
+          },
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B organization name.",
+            "pattern": "\\S"
+          },
+          "type_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional artifact type name.",
+            "pattern": "\\S"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "project",
+              "registry"
+            ],
+            "description": "Whether the collection belongs to a project or registry."
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum artifact versions to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection_name"
+        ],
+        "description": "Input for listing W&B artifact versions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string",
+            "description": "The selected artifact collection name."
+          },
+          "source": {
+            "type": "string",
+            "description": "The artifact source type."
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Artifact versions in the collection."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned versions."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether results were truncated."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Versions in a W&B artifact collection."
+      }
+    },
+    {
+      "id": "wandb.list_automations",
+      "service": "wandb",
+      "name": "list_automations",
+      "description": "List W&B Automations that trigger on artifact, run-state, or run-metric events.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B entity name.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional automation name filter.",
+            "pattern": "\\S"
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum automations to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing W&B Automations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "automations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Matching W&B Automations."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned automations."
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The filtered W&B entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The filtered W&B entity."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether results were truncated."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching W&B Automations."
+      }
+    },
+    {
+      "id": "wandb.list_entities",
+      "service": "wandb",
+      "name": "list_entities",
+      "description": "List W&B user and team entities accessible with the configured API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The entity name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The entity type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One W&B entity."
+            },
+            "description": "Accessible W&B entities."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned entities."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Accessible W&B entities."
+      }
+    },
+    {
+      "id": "wandb.list_integrations",
+      "service": "wandb",
+      "name": "list_integrations",
+      "description": "List Slack and webhook integrations available as W&B Automation targets.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B entity name.",
+            "pattern": "\\S"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "slack",
+              "webhook"
+            ],
+            "description": "Optional integration kind."
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum integrations to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing W&B integrations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "integrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Matching W&B integrations."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned integrations."
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The filtered W&B entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The filtered W&B entity."
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The filtered integration kind."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The filtered integration kind."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether results were truncated."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching W&B integrations."
+      }
+    },
+    {
+      "id": "wandb.list_projects",
+      "service": "wandb",
+      "name": "list_projects",
+      "description": "List W&B projects for one entity or for all entities accessible with the configured API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B entity name.",
+            "pattern": "\\S"
+          },
+          "max_projects": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum projects returned per entity.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing W&B projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "One W&B project."
+              }
+            },
+            "description": "Projects keyed by W&B entity."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether project results were truncated."
+          },
+          "max_projects_per_entity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The per-entity project limit."
+          }
+        },
+        "additionalProperties": true,
+        "description": "W&B projects grouped by entity."
+      }
+    },
+    {
+      "id": "wandb.list_registries",
+      "service": "wandb",
+      "name": "list_registries",
+      "description": "List W&B model registries for an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B organization name.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional provider-native filters."
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum registries to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing W&B registries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "registries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Matching W&B registries."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned registries."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether results were truncated."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching W&B registries."
+      }
+    },
+    {
+      "id": "wandb.list_registry_collections",
+      "service": "wandb",
+      "name": "list_registry_collections",
+      "description": "List artifact collections within a W&B model registry.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "registry_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B registry name.",
+            "pattern": "\\S"
+          },
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional W&B organization name.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional provider-native filters."
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum collections to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "registry_name"
+        ],
+        "description": "Input for listing W&B registry collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "registry": {
+            "type": "string",
+            "description": "The selected W&B registry name."
+          },
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Collections in the registry."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of returned collections."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether results were truncated."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Collections in a W&B registry."
+      }
+    },
+    {
+      "id": "wandb.log_analysis",
+      "service": "wandb",
+      "name": "log_analysis",
+      "description": "Log analysis rows, charts, and scalar metrics to W&B as a new run.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "analysis_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The analysis run name.",
+            "pattern": "\\S"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One analysis row."
+            },
+            "description": "Tabular analysis rows to log.",
+            "minItems": 1
+          },
+          "charts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One chart definition."
+            },
+            "description": "Chart definitions to log."
+          },
+          "scalars": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "One scalar metric value."
+            },
+            "description": "Scalar metrics keyed by metric name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "analysis_name",
+          "data"
+        ],
+        "description": "Input for logging an analysis run to W&B."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "The created W&B run ID."
+          },
+          "run_url": {
+            "type": "string",
+            "description": "The created W&B run URL.",
+            "format": "uri"
+          },
+          "logged_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The logged metric and data keys."
+          },
+          "table_columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The logged table columns."
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of logged analysis rows."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The W&B run created for the analysis."
+      }
+    },
+    {
+      "id": "wandb.probe_project",
+      "service": "wandb",
+      "name": "probe_project",
+      "description": "Sample W&B runs to discover a project's metrics, configuration keys, tags, groups, and structure.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "sample_runs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum runs to sample.",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name"
+        ],
+        "description": "Input for probing a W&B project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "description": "The W&B entity name."
+          },
+          "project": {
+            "type": "string",
+            "description": "The W&B project name."
+          },
+          "run_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The project run count."
+          },
+          "sampled_runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Sampled W&B runs."
+          },
+          "metric_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Discovered metric keys."
+          },
+          "config_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Discovered configuration keys."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Discovered run tags."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Discovered run groups."
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Suggested follow-up actions."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The discovered W&B project structure."
+      }
+    },
+    {
+      "id": "wandb.query_wandb",
+      "service": "wandb",
+      "name": "query_wandb",
+      "description": "Run a read-only GraphQL query against W&B experiment data with bounded pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A read-only W&B GraphQL query.",
+            "pattern": "\\S"
+          },
+          "variables": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "GraphQL variables."
+          },
+          "max_items": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum total items returned across pages.",
+            "default": 100
+          },
+          "items_per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Items requested per GraphQL page.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for querying W&B GraphQL data."
+      },
+      "outputSchema": {
+        "description": "The W&B GraphQL response selected by the query."
+      }
+    },
+    {
+      "id": "wandb.query_weave_traces",
+      "service": "wandb",
+      "name": "query_weave_traces",
+      "description": "Query classic Weave traces with filters, ordering, selected columns, cost data, feedback, and detail-level controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional provider-native filters."
+          },
+          "sort_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The trace field used for sorting.",
+            "default": "started_at",
+            "pattern": "\\S"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of traces to return."
+          },
+          "include_costs": {
+            "type": "boolean",
+            "description": "Whether to include calculated trace costs.",
+            "default": true
+          },
+          "include_feedback": {
+            "type": "boolean",
+            "description": "Whether to include trace feedback.",
+            "default": true
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Trace columns to return."
+          },
+          "expand_columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Nested trace columns to expand."
+          },
+          "truncate_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum string length before truncation.",
+            "default": 1000
+          },
+          "return_full_data": {
+            "type": "boolean",
+            "description": "Whether to return untruncated trace data.",
+            "default": false
+          },
+          "metadata_only": {
+            "type": "boolean",
+            "description": "Whether to return query metadata without trace rows.",
+            "default": false
+          },
+          "detail_level": {
+            "type": "string",
+            "enum": [
+              "schema",
+              "summary",
+              "full"
+            ],
+            "description": "The trace detail level."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name"
+        ],
+        "description": "Input for querying Weave traces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Trace query counts, distributions, time range, and truncation metadata."
+          },
+          "traces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Matching Weave traces."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching Weave traces and query metadata."
+      }
+    },
+    {
+      "id": "wandb.resolve_trace_roots",
+      "service": "wandb",
+      "name": "resolve_trace_roots",
+      "description": "Resolve the root spans for a batch of classic Weave trace IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "trace_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Child trace IDs to resolve.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name",
+          "trace_ids"
+        ],
+        "description": "Input for resolving Weave trace roots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roots": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One resolved root span."
+            },
+            "description": "Root span details keyed by requested trace ID."
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of resolved trace IDs."
+          },
+          "total_requested": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of requested trace IDs."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Resolved Weave trace roots."
+      }
+    },
+    {
+      "id": "wandb.search_docs",
+      "service": "wandb",
+      "name": "search_docs",
+      "description": "Search the official W&B documentation for relevant guidance and examples.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B documentation search query.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for searching W&B documentation."
+      },
+      "outputSchema": {
+        "type": "string",
+        "description": "Relevant excerpts from the official W&B documentation."
+      }
+    },
+    {
+      "id": "wandb.summarize_evaluation",
+      "service": "wandb",
+      "name": "summarize_evaluation",
+      "description": "Aggregate classic Weave evaluation results for a project or named evaluation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B entity or team name.",
+            "pattern": "\\S"
+          },
+          "project_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The W&B project name.",
+            "pattern": "\\S"
+          },
+          "eval_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional evaluation name filter.",
+            "pattern": "\\S"
+          },
+          "max_evals": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum evaluations to aggregate.",
+            "default": 5
+          },
+          "include_per_task": {
+            "type": "boolean",
+            "description": "Whether to include per-task aggregates.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_name",
+          "project_name"
+        ],
+        "description": "Input for summarizing Weave evaluations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One returned item."
+            },
+            "description": "Matching evaluation summaries."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of summarized evaluations."
+          },
+          "project": {
+            "type": "string",
+            "description": "The W&B project name."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Aggregated Weave evaluation results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,962 @@
+{
+  "service": "gladia",
+  "displayName": "Gladia",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "gladia_api_key",
+      "description": "Gladia API key sent with the x-gladia-key header. Create or copy it from the Gladia dashboard API Keys page: https://app.gladia.io/settings/api-keys",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://app.gladia.io/",
+  "actions": [
+    {
+      "id": "gladia.delete_transcription",
+      "service": "gladia",
+      "name": "delete_transcription",
+      "description": "Delete a Gladia pre-recorded transcription job and its associated data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the pre-recorded transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Gladia transcription job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Gladia."
+          },
+          "message": {
+            "type": "string",
+            "description": "The deletion response message, when provided."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statusCode"
+        ],
+        "description": "The deletion result returned by Gladia."
+      }
+    },
+    {
+      "id": "gladia.download_transcription_audio",
+      "service": "gladia",
+      "name": "download_transcription_audio",
+      "description": "Download the original audio file for a Gladia pre-recorded transcription and store it in local transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the pre-recorded transcription job."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name to use for the transit audio file."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional MIME type override for the transit audio file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for downloading a Gladia transcription audio file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Gladia pre-recorded transcription job ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The file name used for the transit upload."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The MIME type of the downloaded audio file."
+          },
+          "sizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The downloaded audio size in bytes, when reported by Gladia."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The downloaded audio size in bytes, when reported by Gladia."
+          },
+          "fileId": {
+            "type": "string",
+            "description": "The local transit file ID."
+          },
+          "downloadUrl": {
+            "type": "string",
+            "description": "A local transit URL for downloading the original audio file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "mimeType",
+          "sizeBytes",
+          "fileId",
+          "downloadUrl"
+        ],
+        "description": "The original transcription audio stored in local transit storage."
+      }
+    },
+    {
+      "id": "gladia.get_transcription",
+      "service": "gladia",
+      "name": "get_transcription",
+      "description": "Retrieve a Gladia pre-recorded transcription job by ID, including results when done.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the pre-recorded transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Gladia transcription job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique transcription job identifier."
+              },
+              "requestId": {
+                "type": "string",
+                "description": "The request identifier for debugging."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The Gladia API version used for this job."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "processing",
+                  "done",
+                  "error"
+                ],
+                "description": "The current transcription job status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the job was created."
+              },
+              "completedAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the job completed or failed."
+              },
+              "kind": {
+                "type": "string",
+                "description": "The Gladia job kind, usually pre-recorded."
+              },
+              "errorCode": {
+                "type": "integer",
+                "description": "The upstream error status code."
+              },
+              "file": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Gladia file identifier."
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "The original URI or source of the file."
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "The original file name."
+                  },
+                  "audioDuration": {
+                    "type": "number",
+                    "description": "The audio duration in seconds."
+                  },
+                  "numberOfChannels": {
+                    "type": "integer",
+                    "description": "The number of audio channels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "File metadata associated with a transcription job."
+              },
+              "result": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              },
+              "requestParams": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              },
+              "customMetadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              },
+              "postSessionMetadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "A normalized Gladia pre-recorded transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "job"
+        ],
+        "description": "The retrieved Gladia transcription job."
+      }
+    },
+    {
+      "id": "gladia.list_transcriptions",
+      "service": "gladia",
+      "name": "list_transcriptions",
+      "description": "List Gladia pre-recorded transcription jobs with optional pagination, date, status, and metadata filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of jobs to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The starting offset for pagination."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "processing",
+                "done",
+                "error"
+              ],
+              "description": "The current transcription job status."
+            },
+            "description": "Statuses to include in the result set."
+          },
+          "date": {
+            "type": "string",
+            "description": "Filter jobs relevant to a specific date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "afterDate": {
+            "type": "string",
+            "description": "Filter jobs after the specified ISO datetime.",
+            "format": "date-time"
+          },
+          "beforeDate": {
+            "type": "string",
+            "description": "Filter jobs before the specified ISO datetime.",
+            "format": "date-time"
+          },
+          "customMetadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by Gladia."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Gladia transcription jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "string",
+            "description": "The URL for the first result page."
+          },
+          "current": {
+            "type": "string",
+            "description": "The URL for the current result page."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next result page."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique transcription job identifier."
+                },
+                "requestId": {
+                  "type": "string",
+                  "description": "The request identifier for debugging."
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The Gladia API version used for this job."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "processing",
+                    "done",
+                    "error"
+                  ],
+                  "description": "The current transcription job status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the job was created."
+                },
+                "completedAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the job completed or failed."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "The Gladia job kind, usually pre-recorded."
+                },
+                "errorCode": {
+                  "type": "integer",
+                  "description": "The upstream error status code."
+                },
+                "file": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The Gladia file identifier."
+                    },
+                    "source": {
+                      "type": "string",
+                      "description": "The original URI or source of the file."
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "The original file name."
+                    },
+                    "audioDuration": {
+                      "type": "number",
+                      "description": "The audio duration in seconds."
+                    },
+                    "numberOfChannels": {
+                      "type": "integer",
+                      "description": "The number of audio channels."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "File metadata associated with a transcription job."
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A raw JSON object returned by Gladia."
+                },
+                "requestParams": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A raw JSON object returned by Gladia."
+                },
+                "customMetadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A raw JSON object returned by Gladia."
+                },
+                "postSessionMetadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A raw JSON object returned by Gladia."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "status"
+              ],
+              "description": "A normalized Gladia pre-recorded transcription job."
+            },
+            "description": "The returned transcription jobs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "A page of Gladia pre-recorded transcription jobs."
+      }
+    },
+    {
+      "id": "gladia.start_transcription",
+      "service": "gladia",
+      "name": "start_transcription",
+      "description": "Start an asynchronous Gladia pre-recorded transcription job from a public audio or video URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "audioUrl": {
+            "type": "string",
+            "description": "The URL to an audio or video file. This can be a public URL or a Gladia file URL from the upload endpoint.",
+            "format": "uri"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "solaria-1",
+              "solaria-2"
+            ],
+            "description": "The transcription model. solaria-1 is the default; solaria-2 may require a higher tier plan."
+          },
+          "sentences": {
+            "type": "boolean",
+            "description": "Whether to enable sentence segmentation."
+          },
+          "subtitles": {
+            "type": "boolean",
+            "description": "Whether to enable subtitle generation."
+          },
+          "diarization": {
+            "type": "boolean",
+            "description": "Whether to identify speakers in the audio."
+          },
+          "translation": {
+            "type": "boolean",
+            "description": "Whether to enable transcription translation."
+          },
+          "summarization": {
+            "type": "boolean",
+            "description": "Whether to enable transcription summarization."
+          },
+          "punctuationEnhanced": {
+            "type": "boolean",
+            "description": "Whether to enable enhanced punctuation and casing."
+          },
+          "callback": {
+            "type": "boolean",
+            "description": "Whether Gladia should send a callback. Defaults to true when callbackConfig is provided."
+          },
+          "callbackConfig": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The URL endpoint that receives the transcription callback.",
+                "format": "uri"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "POST",
+                  "PUT"
+                ],
+                "description": "The HTTP method Gladia uses for the callback request."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "url"
+            ],
+            "description": "Webhook callback configuration for a transcription job."
+          },
+          "customVocabulary": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "customSpelling": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "moderation": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "namedEntityRecognition": {
+            "type": "boolean",
+            "description": "Whether to enable named entity recognition."
+          },
+          "chapterization": {
+            "type": "boolean",
+            "description": "Whether to enable chapterization."
+          },
+          "nameConsistency": {
+            "type": "boolean",
+            "description": "Whether to improve speaker name consistency."
+          },
+          "structuredDataExtraction": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "sentimentAnalysis": {
+            "type": "boolean",
+            "description": "Whether to enable sentiment analysis."
+          },
+          "audioToLlm": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "displayMode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gladia display_mode value for transcript formatting."
+          },
+          "piiRedaction": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable the feature."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One feature-specific string value."
+                },
+                "description": "Feature-specific string values."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw JSON object returned by Gladia."
+              }
+            ],
+            "description": "A Gladia feature flag or official feature configuration."
+          },
+          "customMetadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by Gladia."
+          },
+          "languageConfig": {
+            "type": "object",
+            "properties": {
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One ISO 639 language code to recognize."
+                },
+                "description": "Preferred language codes for recognition."
+              },
+              "codeSwitching": {
+                "type": "boolean",
+                "description": "Whether multilingual code switching is enabled."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Preferred language handling for the transcription request."
+          },
+          "subtitlesConfig": {
+            "type": "object",
+            "properties": {
+              "style": {
+                "type": "string",
+                "description": "The subtitle styling option."
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One subtitle format, such as srt or vtt."
+                },
+                "description": "The subtitle formats Gladia should generate."
+              },
+              "maximumDuration": {
+                "type": "number",
+                "description": "The maximum caption duration in seconds."
+              },
+              "minimumDuration": {
+                "type": "number",
+                "description": "The minimum caption duration in seconds."
+              },
+              "maximumRowsPerCaption": {
+                "type": "integer",
+                "description": "The maximum number of rows per subtitle caption."
+              },
+              "maximumCharactersPerRow": {
+                "type": "integer",
+                "description": "The maximum number of characters per subtitle row."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Subtitle generation configuration."
+          },
+          "diarizationConfig": {
+            "type": "object",
+            "properties": {
+              "enhanced": {
+                "type": "boolean",
+                "description": "Whether enhanced speaker diarization is enabled."
+              },
+              "minSpeakers": {
+                "type": "integer",
+                "description": "The minimum number of speakers to detect."
+              },
+              "maxSpeakers": {
+                "type": "integer",
+                "description": "The maximum number of speakers to detect."
+              },
+              "numberOfSpeakers": {
+                "type": "integer",
+                "description": "The estimated number of speakers to detect."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Speaker diarization configuration."
+          },
+          "translationConfig": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "description": "The translation model to use."
+              },
+              "context": {
+                "type": "string",
+                "description": "Contextual prompt for the translation model."
+              },
+              "targetLanguages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One ISO 639 target language code."
+                },
+                "description": "Target languages for translation."
+              },
+              "contextAdaptation": {
+                "type": "boolean",
+                "description": "Whether context adaptation is enabled for translation."
+              },
+              "matchOriginalUtterances": {
+                "type": "boolean",
+                "description": "Whether translated utterances should match the original segmentation."
+              },
+              "informal": {
+                "type": "boolean",
+                "description": "Whether to use informal tone in translation."
+              },
+              "lipsync": {
+                "type": "boolean",
+                "description": "Whether to include lipsync metadata for subtitles."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Translation configuration for a transcription job."
+          },
+          "summarizationConfig": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The summarization type, such as general."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Summarization configuration for a transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audioUrl"
+        ],
+        "description": "Input parameters for starting a Gladia pre-recorded transcription job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The identifier of the created transcription job."
+          },
+          "resultUrl": {
+            "type": "string",
+            "description": "The URL to fetch the transcription result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "resultUrl"
+        ],
+        "description": "The created Gladia pre-recorded transcription job."
+      },
+      "followUpActions": [
+        "gladia.get_transcription"
+      ]
+    },
+    {
+      "id": "gladia.upload_file",
+      "service": "gladia",
+      "name": "upload_file",
+      "description": "Upload an audio or video file up to 100 MiB to Gladia from a local transit file, base64 content, or public URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "A local transit file to upload."
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The audio or video file content encoded as base64."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "description": "A public audio or video file URL to upload.",
+            "format": "uri"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional file name override for base64 or URL sources."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional MIME type override for base64 or URL sources."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for uploading media to Gladia."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "audioUrl": {
+            "type": "string",
+            "description": "The Gladia audio URL to pass to start_transcription."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by Gladia."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audioUrl",
+          "metadata"
+        ],
+        "description": "The uploaded Gladia media file."
+      },
+      "followUpActions": [
+        "gladia.start_transcription"
+      ]
+    }
+  ]
+}

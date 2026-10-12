@@ -1,0 +1,1202 @@
+{
+  "service": "kernel",
+  "displayName": "Kernel",
+  "categories": [
+    "Developer Tools",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "KERNEL_API_KEY",
+      "description": "Kernel API key sent as a bearer token. Create, view, and rotate keys from Kernel API Keys: https://kernel.sh/docs/info/api-keys."
+    }
+  ],
+  "homepageUrl": "https://kernel.sh",
+  "actions": [
+    {
+      "id": "kernel.create_browser_session",
+      "service": "kernel",
+      "name": "create_browser_session",
+      "description": "Create a Kernel browser session and return its connection URLs and metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invocation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kernel action invocation ID to associate with the session."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Optional human-readable name for the browser session.",
+            "pattern": "^[a-zA-Z0-9._-]{1,255}$"
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A Kernel tag value."
+            },
+            "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+          },
+          "stealth": {
+            "type": "boolean",
+            "description": "Whether to launch the browser in stealth mode."
+          },
+          "headless": {
+            "type": "boolean",
+            "description": "Whether to launch the browser using a headless image."
+          },
+          "gpu": {
+            "type": "boolean",
+            "description": "Whether to enable GPU acceleration for the browser session."
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 259200,
+            "description": "The inactivity timeout in seconds."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Kernel profile ID to load."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Kernel profile name to load."
+              },
+              "save_changes": {
+                "type": "boolean",
+                "description": "Whether Kernel should save browser state changes back to the profile."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Profile to load into the Kernel browser session."
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Kernel extension ID to load."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Kernel extension name to load."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Browser extension to load into the Kernel browser session."
+            },
+            "description": "Browser extensions to load into the session.",
+            "maxItems": 20
+          },
+          "proxy_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kernel proxy ID to associate with the browser session."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Viewport height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Viewport configuration for a Kernel browser session."
+          },
+          "kiosk_mode": {
+            "type": "boolean",
+            "description": "Whether to launch the browser in kiosk mode."
+          },
+          "start_url": {
+            "type": "string",
+            "description": "Optional URL to open when the browser session is created.",
+            "format": "uri"
+          },
+          "chrome_policy": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Chrome enterprise policy overrides for the session."
+          },
+          "telemetry": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Kernel telemetry request configuration."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kernel telemetry request configuration."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for creating a Kernel browser session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "browser_session": {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "description": "When the browser session was created.",
+                "format": "date-time"
+              },
+              "cdp_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for Chrome DevTools Protocol connections to the browser session."
+              },
+              "webdriver_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for WebDriver BiDi connections to the browser session."
+              },
+              "browser_live_view_url": {
+                "type": "string",
+                "description": "Remote URL for live viewing the browser session, when available."
+              },
+              "base_url": {
+                "type": "string",
+                "description": "Metro-API HTTP base URL for this browser session."
+              },
+              "headless": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in headless mode."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in stealth mode."
+              },
+              "gpu": {
+                "type": "boolean",
+                "description": "Whether GPU acceleration is enabled for the browser session."
+              },
+              "session_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique identifier for the browser session."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Human-readable browser session name, when one was set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Human-readable browser session name, when one was set."
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "description": "The inactivity timeout in seconds for the browser session."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile name."
+                  },
+                  "save_changes": {
+                    "type": "boolean",
+                    "description": "Whether Kernel should save browser state changes back to the profile."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Kernel browser profile reference."
+              },
+              "proxy_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ID of the proxy associated with this browser session, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ID of the proxy associated with this browser session, if any."
+              },
+              "pool": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel browser pool ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The Kernel browser pool name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser pool reference."
+              },
+              "viewport": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport width in pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport height in pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Viewport configuration for a Kernel browser session."
+              },
+              "kiosk_mode": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in kiosk mode."
+              },
+              "start_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL the session was asked to navigate to on creation, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL the session was asked to navigate to on creation, if any."
+              },
+              "chrome_policy": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Chrome enterprise policy overrides for the session."
+              },
+              "tags": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A Kernel tag value."
+                },
+                "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+              },
+              "deleted_at": {
+                "type": "string",
+                "description": "When the browser session was soft-deleted.",
+                "format": "date-time"
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "runtime_seconds": {
+                    "type": "integer",
+                    "description": "The browser session runtime in seconds."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser usage metadata."
+              },
+              "telemetry": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Kernel browser telemetry configuration."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Kernel browser telemetry configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Kernel browser session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Kernel browser session creation response."
+      }
+    },
+    {
+      "id": "kernel.delete_browser_session",
+      "service": "kernel",
+      "name": "delete_browser_session",
+      "description": "Delete a Kernel browser session by session ID or name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kernel browser session ID or name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting one Kernel browser session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Kernel accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Kernel browser session deletion result."
+      }
+    },
+    {
+      "id": "kernel.get_browser_session",
+      "service": "kernel",
+      "name": "get_browser_session",
+      "description": "Get one Kernel browser session by session ID or name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kernel browser session ID or name."
+          },
+          "include_deleted": {
+            "type": "boolean",
+            "description": "Whether to include soft-deleted browser sessions in the lookup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id_or_name"
+        ],
+        "description": "Parameters for retrieving one Kernel browser session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "browser_session": {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "description": "When the browser session was created.",
+                "format": "date-time"
+              },
+              "cdp_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for Chrome DevTools Protocol connections to the browser session."
+              },
+              "webdriver_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for WebDriver BiDi connections to the browser session."
+              },
+              "browser_live_view_url": {
+                "type": "string",
+                "description": "Remote URL for live viewing the browser session, when available."
+              },
+              "base_url": {
+                "type": "string",
+                "description": "Metro-API HTTP base URL for this browser session."
+              },
+              "headless": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in headless mode."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in stealth mode."
+              },
+              "gpu": {
+                "type": "boolean",
+                "description": "Whether GPU acceleration is enabled for the browser session."
+              },
+              "session_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique identifier for the browser session."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Human-readable browser session name, when one was set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Human-readable browser session name, when one was set."
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "description": "The inactivity timeout in seconds for the browser session."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile name."
+                  },
+                  "save_changes": {
+                    "type": "boolean",
+                    "description": "Whether Kernel should save browser state changes back to the profile."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Kernel browser profile reference."
+              },
+              "proxy_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ID of the proxy associated with this browser session, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ID of the proxy associated with this browser session, if any."
+              },
+              "pool": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel browser pool ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The Kernel browser pool name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser pool reference."
+              },
+              "viewport": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport width in pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport height in pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Viewport configuration for a Kernel browser session."
+              },
+              "kiosk_mode": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in kiosk mode."
+              },
+              "start_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL the session was asked to navigate to on creation, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL the session was asked to navigate to on creation, if any."
+              },
+              "chrome_policy": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Chrome enterprise policy overrides for the session."
+              },
+              "tags": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A Kernel tag value."
+                },
+                "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+              },
+              "deleted_at": {
+                "type": "string",
+                "description": "When the browser session was soft-deleted.",
+                "format": "date-time"
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "runtime_seconds": {
+                    "type": "integer",
+                    "description": "The browser session runtime in seconds."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser usage metadata."
+              },
+              "telemetry": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Kernel browser telemetry configuration."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Kernel browser telemetry configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Kernel browser session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Kernel browser session lookup response."
+      }
+    },
+    {
+      "id": "kernel.list_browser_sessions",
+      "service": "kernel",
+      "name": "list_browser_sessions",
+      "description": "List Kernel browser sessions with pagination, search, status, and tag filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "deleted",
+              "all"
+            ],
+            "description": "Filter sessions by status."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search browsers by name, session ID, profile ID, proxy ID, or pool name."
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A Kernel tag value."
+            },
+            "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing Kernel browser sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "browser_sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "description": "When the browser session was created.",
+                  "format": "date-time"
+                },
+                "cdp_ws_url": {
+                  "type": "string",
+                  "description": "WebSocket URL for Chrome DevTools Protocol connections to the browser session."
+                },
+                "webdriver_ws_url": {
+                  "type": "string",
+                  "description": "WebSocket URL for WebDriver BiDi connections to the browser session."
+                },
+                "browser_live_view_url": {
+                  "type": "string",
+                  "description": "Remote URL for live viewing the browser session, when available."
+                },
+                "base_url": {
+                  "type": "string",
+                  "description": "Metro-API HTTP base URL for this browser session."
+                },
+                "headless": {
+                  "type": "boolean",
+                  "description": "Whether the browser session is running in headless mode."
+                },
+                "stealth": {
+                  "type": "boolean",
+                  "description": "Whether the browser session is running in stealth mode."
+                },
+                "gpu": {
+                  "type": "boolean",
+                  "description": "Whether GPU acceleration is enabled for the browser session."
+                },
+                "session_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for the browser session."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Human-readable browser session name, when one was set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Human-readable browser session name, when one was set."
+                },
+                "timeout_seconds": {
+                  "type": "integer",
+                  "description": "The inactivity timeout in seconds for the browser session."
+                },
+                "profile": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Kernel profile ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Kernel profile name."
+                    },
+                    "save_changes": {
+                      "type": "boolean",
+                      "description": "Whether Kernel should save browser state changes back to the profile."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Kernel browser profile reference."
+                },
+                "proxy_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ID of the proxy associated with this browser session, if any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ID of the proxy associated with this browser session, if any."
+                },
+                "pool": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Kernel browser pool ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The Kernel browser pool name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Kernel browser pool reference."
+                },
+                "viewport": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Viewport width in pixels."
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Viewport height in pixels."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Viewport configuration for a Kernel browser session."
+                },
+                "kiosk_mode": {
+                  "type": "boolean",
+                  "description": "Whether the browser session is running in kiosk mode."
+                },
+                "start_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "URL the session was asked to navigate to on creation, if any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "URL the session was asked to navigate to on creation, if any."
+                },
+                "chrome_policy": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Chrome enterprise policy overrides for the session."
+                },
+                "tags": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "A Kernel tag value."
+                  },
+                  "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+                },
+                "deleted_at": {
+                  "type": "string",
+                  "description": "When the browser session was soft-deleted.",
+                  "format": "date-time"
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "runtime_seconds": {
+                      "type": "integer",
+                      "description": "The browser session runtime in seconds."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Kernel browser usage metadata."
+                },
+                "telemetry": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Kernel browser telemetry configuration."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Kernel browser telemetry configuration."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Kernel browser session."
+            },
+            "description": "Kernel browser sessions."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "The limit used for pagination."
+              },
+              "offset": {
+                "type": "integer",
+                "description": "The offset used for pagination."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether more results are available."
+              },
+              "next_offset": {
+                "type": "integer",
+                "description": "The offset where the next page starts."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Kernel pagination metadata parsed from response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Kernel browser sessions returned by the API."
+      }
+    },
+    {
+      "id": "kernel.update_browser_session",
+      "service": "kernel",
+      "name": "update_browser_session",
+      "description": "Update mutable Kernel browser session metadata and settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id_or_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Kernel browser session ID or name."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Human-readable name for the browser session, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human-readable name for the browser session, or null to clear it."
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A Kernel tag value."
+                },
+                "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+          },
+          "proxy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Kernel proxy ID to use, or an empty string to remove proxy."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kernel proxy ID to use, or an empty string to remove proxy."
+          },
+          "disable_default_proxy": {
+            "type": "boolean",
+            "description": "Whether stealth browsers should connect directly instead of using the default stealth proxy."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Kernel profile ID to load."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Kernel profile name to load."
+              },
+              "save_changes": {
+                "type": "boolean",
+                "description": "Whether Kernel should save browser state changes back to the profile."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Profile to load into the Kernel browser session."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Viewport width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Viewport height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Viewport configuration for a Kernel browser session."
+          },
+          "telemetry": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Kernel telemetry request configuration."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Kernel telemetry request configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id_or_name"
+        ],
+        "description": "Parameters for updating a Kernel browser session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "browser_session": {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "description": "When the browser session was created.",
+                "format": "date-time"
+              },
+              "cdp_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for Chrome DevTools Protocol connections to the browser session."
+              },
+              "webdriver_ws_url": {
+                "type": "string",
+                "description": "WebSocket URL for WebDriver BiDi connections to the browser session."
+              },
+              "browser_live_view_url": {
+                "type": "string",
+                "description": "Remote URL for live viewing the browser session, when available."
+              },
+              "base_url": {
+                "type": "string",
+                "description": "Metro-API HTTP base URL for this browser session."
+              },
+              "headless": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in headless mode."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in stealth mode."
+              },
+              "gpu": {
+                "type": "boolean",
+                "description": "Whether GPU acceleration is enabled for the browser session."
+              },
+              "session_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique identifier for the browser session."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Human-readable browser session name, when one was set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Human-readable browser session name, when one was set."
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "description": "The inactivity timeout in seconds for the browser session."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel profile name."
+                  },
+                  "save_changes": {
+                    "type": "boolean",
+                    "description": "Whether Kernel should save browser state changes back to the profile."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Kernel browser profile reference."
+              },
+              "proxy_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ID of the proxy associated with this browser session, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ID of the proxy associated with this browser session, if any."
+              },
+              "pool": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Kernel browser pool ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The Kernel browser pool name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser pool reference."
+              },
+              "viewport": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport width in pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport height in pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Viewport configuration for a Kernel browser session."
+              },
+              "kiosk_mode": {
+                "type": "boolean",
+                "description": "Whether the browser session is running in kiosk mode."
+              },
+              "start_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL the session was asked to navigate to on creation, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL the session was asked to navigate to on creation, if any."
+              },
+              "chrome_policy": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Chrome enterprise policy overrides for the session."
+              },
+              "tags": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A Kernel tag value."
+                },
+                "description": "Kernel browser session tags keyed by tag name. Values are serialized as tags[key] query parameters for list filtering."
+              },
+              "deleted_at": {
+                "type": "string",
+                "description": "When the browser session was soft-deleted.",
+                "format": "date-time"
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "runtime_seconds": {
+                    "type": "integer",
+                    "description": "The browser session runtime in seconds."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Kernel browser usage metadata."
+              },
+              "telemetry": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Kernel browser telemetry configuration."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Kernel browser telemetry configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Kernel browser session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Kernel browser session update response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,929 @@
+{
+  "service": "zylvie",
+  "displayName": "Zylvie",
+  "categories": [
+    "Marketing",
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ZYLVIE_API_KEY",
+      "description": "Zylvie API key sent as a Bearer token. Copy it from https://developers.zylvie.com/settings/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://zylvie.com/",
+  "actions": [
+    {
+      "id": "zylvie.create_coupon",
+      "service": "zylvie",
+      "name": "create_coupon",
+      "description": "Create a coupon in Zylvie.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "description": "The unique case-insensitive coupon code."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "percentage",
+              "fixed"
+            ],
+            "description": "The discount calculation type."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 999999.99,
+            "description": "The discount amount."
+          },
+          "isStorewide": {
+            "type": "boolean",
+            "description": "Whether the coupon applies to every product."
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Zylvie product ID."
+            },
+            "description": "The product IDs to which a non-storewide coupon applies.",
+            "minItems": 1
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "Whether the coupon is active."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of redemptions."
+          },
+          "durationInMonths": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of subscription months discounted."
+          },
+          "start": {
+            "type": "string",
+            "description": "The coupon start time in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "The coupon expiration time in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "affiliateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The affiliate ID associated with the coupon."
+          },
+          "requiredSubscriptionProductId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subscription product whose active subscribers may use the coupon."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "type",
+          "amount"
+        ],
+        "description": "The coupon fields accepted by Zylvie."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The coupon object returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.create_product",
+      "service": "zylvie",
+      "name": "create_product",
+      "description": "Create a product in Zylvie.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The product title."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The unique vanity URL slug.",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "The lowercase ISO 4217 currency code.",
+            "pattern": "^[a-z]{3}$"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The base product price."
+          },
+          "pricingModel": {
+            "type": "string",
+            "enum": [
+              "one-time",
+              "subscription",
+              "delayed"
+            ],
+            "description": "The product billing model."
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "featured",
+              "listed",
+              "unlisted",
+              "unpublished"
+            ],
+            "description": "How the product appears in the storefront."
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "The product subtitle."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product description in HTML."
+          },
+          "summary": {
+            "type": "string",
+            "description": "The product summary in HTML."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "description": "The recurring billing interval."
+          },
+          "intervalCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of billing intervals between charges."
+          },
+          "trialPeriodDays": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of free-trial days."
+          },
+          "collectAddressAndPhone": {
+            "type": "boolean",
+            "description": "Whether checkout collects the buyer address and phone number."
+          },
+          "shippingFee": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product shipping fee."
+          },
+          "shippingType": {
+            "type": "string",
+            "enum": [
+              "flat",
+              "per_quantity"
+            ],
+            "description": "How shipping fees scale with quantity."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One text value."
+            },
+            "description": "The categories assigned to the product."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One text value."
+            },
+            "description": "The tags assigned to the product."
+          },
+          "productImageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One publicly accessible URL.",
+              "format": "uri"
+            },
+            "description": "Public image URLs assigned to the product."
+          },
+          "productFileUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One publicly accessible URL.",
+              "format": "uri"
+            },
+            "description": "Public downloadable file URLs for the product."
+          },
+          "downloadEmailSubject": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The subject of the product download email."
+          },
+          "downloadEmailBody": {
+            "type": "string",
+            "description": "The HTML body of the product download email."
+          },
+          "successUrl": {
+            "type": "string",
+            "maxLength": 2500,
+            "description": "The post-purchase redirect URL or Zylvie-local path."
+          },
+          "successEmailSubject": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The subject of the post-purchase success email."
+          },
+          "successEmailBody": {
+            "type": "string",
+            "description": "The HTML body of the post-purchase success email."
+          },
+          "gatedPageUrl": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The unique slug for the gated product page."
+          },
+          "gatedPageBody": {
+            "type": "string",
+            "description": "The HTML body of the gated product page."
+          },
+          "isLicensed": {
+            "type": "boolean",
+            "description": "Whether purchases receive unique license keys."
+          },
+          "redemptionInstructions": {
+            "type": "string",
+            "description": "The HTML instructions for redeeming a license key."
+          },
+          "excludeFromAutomations": {
+            "type": "boolean",
+            "description": "Whether Zylvie workflow automations should ignore this product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "url",
+          "currency",
+          "price",
+          "pricingModel",
+          "display"
+        ],
+        "description": "The product fields accepted by Zylvie."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The product object returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.delete_coupon",
+      "service": "zylvie",
+      "name": "delete_coupon",
+      "description": "Delete a Zylvie coupon, or archive it when transaction history requires it.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zylvie object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The coupon to delete or archive."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status."
+          },
+          "message": {
+            "type": "string",
+            "description": "The deletion or archival result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message"
+        ],
+        "description": "The deletion result returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.delete_product",
+      "service": "zylvie",
+      "name": "delete_product",
+      "description": "Delete a Zylvie product, or archive it when transaction history requires it.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zylvie object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The product to delete or archive."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status."
+          },
+          "message": {
+            "type": "string",
+            "description": "The deletion or archival result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message"
+        ],
+        "description": "The deletion result returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.get_current_user",
+      "service": "zylvie",
+      "name": "get_current_user",
+      "description": "Get the Zylvie user and brand authenticated by the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the current Zylvie user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The account email address."
+          },
+          "brand": {
+            "type": "string",
+            "description": "The account brand name."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "email",
+          "brand"
+        ],
+        "description": "The authenticated Zylvie user."
+      }
+    },
+    {
+      "id": "zylvie.list_coupons",
+      "service": "zylvie",
+      "name": "list_coupons",
+      "description": "List active or archived coupons for the authenticated Zylvie brand.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived coupons instead of active coupons."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filter used to list Zylvie coupons."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of returned coupons."
+          },
+          "coupons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The coupon object returned by Zylvie."
+            },
+            "description": "The coupons returned by Zylvie."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "coupons"
+        ],
+        "description": "The Zylvie coupon list."
+      }
+    },
+    {
+      "id": "zylvie.redeem_license_key",
+      "service": "zylvie",
+      "name": "redeem_license_key",
+      "description": "Mark a Zylvie license key as redeemed.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The license key issued by Zylvie."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "licenseKey"
+        ],
+        "description": "The license key to redeem."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The license-key result returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.refund_license_key",
+      "service": "zylvie",
+      "name": "refund_license_key",
+      "description": "Mark a Zylvie license key as refunded.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The license key issued by Zylvie."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "licenseKey"
+        ],
+        "description": "The license key to refund."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The license-key result returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.update_coupon",
+      "service": "zylvie",
+      "name": "update_coupon",
+      "description": "Update selected fields on an existing Zylvie coupon.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zylvie object identifier."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "description": "The unique case-insensitive coupon code."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "percentage",
+              "fixed"
+            ],
+            "description": "The discount calculation type."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 999999.99,
+            "description": "The discount amount."
+          },
+          "isStorewide": {
+            "type": "boolean",
+            "description": "Whether the coupon applies to every product."
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Zylvie product ID."
+            },
+            "description": "The product IDs to which a non-storewide coupon applies.",
+            "minItems": 1
+          },
+          "isLive": {
+            "type": "boolean",
+            "description": "Whether the coupon is active."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of redemptions."
+          },
+          "durationInMonths": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of subscription months discounted."
+          },
+          "start": {
+            "type": "string",
+            "description": "The coupon start time in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "The coupon expiration time in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "affiliateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The affiliate ID associated with the coupon."
+          },
+          "requiredSubscriptionProductId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subscription product whose active subscribers may use the coupon."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The coupon identifier and fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The coupon object returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.update_product",
+      "service": "zylvie",
+      "name": "update_product",
+      "description": "Update selected fields on an existing Zylvie product.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zylvie object identifier."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The product title."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The unique vanity URL slug.",
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "The lowercase ISO 4217 currency code.",
+            "pattern": "^[a-z]{3}$"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The base product price."
+          },
+          "pricingModel": {
+            "type": "string",
+            "enum": [
+              "one-time",
+              "subscription",
+              "delayed"
+            ],
+            "description": "The product billing model."
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "featured",
+              "listed",
+              "unlisted",
+              "unpublished"
+            ],
+            "description": "How the product appears in the storefront."
+          },
+          "subtitle": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "The product subtitle."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product description in HTML."
+          },
+          "summary": {
+            "type": "string",
+            "description": "The product summary in HTML."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "description": "The recurring billing interval."
+          },
+          "intervalCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of billing intervals between charges."
+          },
+          "trialPeriodDays": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of free-trial days."
+          },
+          "collectAddressAndPhone": {
+            "type": "boolean",
+            "description": "Whether checkout collects the buyer address and phone number."
+          },
+          "shippingFee": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product shipping fee."
+          },
+          "shippingType": {
+            "type": "string",
+            "enum": [
+              "flat",
+              "per_quantity"
+            ],
+            "description": "How shipping fees scale with quantity."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One text value."
+            },
+            "description": "The categories assigned to the product."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One text value."
+            },
+            "description": "The tags assigned to the product."
+          },
+          "productImageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One publicly accessible URL.",
+              "format": "uri"
+            },
+            "description": "Public image URLs assigned to the product."
+          },
+          "productFileUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One publicly accessible URL.",
+              "format": "uri"
+            },
+            "description": "Public downloadable file URLs for the product."
+          },
+          "downloadEmailSubject": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The subject of the product download email."
+          },
+          "downloadEmailBody": {
+            "type": "string",
+            "description": "The HTML body of the product download email."
+          },
+          "successUrl": {
+            "type": "string",
+            "maxLength": 2500,
+            "description": "The post-purchase redirect URL or Zylvie-local path."
+          },
+          "successEmailSubject": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The subject of the post-purchase success email."
+          },
+          "successEmailBody": {
+            "type": "string",
+            "description": "The HTML body of the post-purchase success email."
+          },
+          "gatedPageUrl": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The unique slug for the gated product page."
+          },
+          "gatedPageBody": {
+            "type": "string",
+            "description": "The HTML body of the gated product page."
+          },
+          "isLicensed": {
+            "type": "boolean",
+            "description": "Whether purchases receive unique license keys."
+          },
+          "redemptionInstructions": {
+            "type": "string",
+            "description": "The HTML instructions for redeeming a license key."
+          },
+          "excludeFromAutomations": {
+            "type": "boolean",
+            "description": "Whether Zylvie workflow automations should ignore this product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The product identifier and fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The product object returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.verify_license_key",
+      "service": "zylvie",
+      "name": "verify_license_key",
+      "description": "Verify that a Zylvie license key is valid for a product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zylvie object identifier."
+          },
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The license key issued by Zylvie."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId",
+          "licenseKey"
+        ],
+        "description": "The product and license key to verify."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The license-key result returned by Zylvie."
+      }
+    },
+    {
+      "id": "zylvie.verify_subscriptions",
+      "service": "zylvie",
+      "name": "verify_subscriptions",
+      "description": "List Zylvie subscriptions associated with a subscriber email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The subscriber email address.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The subscriber whose subscriptions should be verified."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Zylvie subscription."
+            },
+            "description": "The subscriptions returned by Zylvie."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriptions"
+        ],
+        "description": "The matching Zylvie subscriptions."
+      }
+    }
+  ]
+}

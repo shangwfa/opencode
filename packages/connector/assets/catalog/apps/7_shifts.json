@@ -1,0 +1,987 @@
+{
+  "service": "7_shifts",
+  "displayName": "7shifts",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "7SHIFTS_ACCESS_TOKEN",
+      "description": "7shifts long-lived access token sent with the Authorization: Bearer header. Create or view access tokens in Company Settings > Developer Tools, as described in the 7shifts authentication docs: https://developers.7shifts.com/reference/authentication.",
+      "extraFields": [
+        {
+          "key": "companyGuid",
+          "label": "Company GUID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "1310bfe1-cb3f-4f24-98a2-fde2bc504108",
+          "description": "Optional 7shifts company GUID sent as x-company-guid for OAuth-issued bearer tokens or accounts that require it."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.7shifts.com/",
+  "actions": [
+    {
+      "id": "7_shifts.get_company",
+      "service": "7_shifts",
+      "name": "get_company",
+      "description": "Retrieve one 7shifts company by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "integer",
+            "description": "The 7shifts company ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for retrieving a 7shifts company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The 7shifts company ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The company name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The company status returned by 7shifts."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The company status returned by 7shifts."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw company object returned by 7shifts."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized 7shifts company."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a 7shifts company."
+      }
+    },
+    {
+      "id": "7_shifts.list_companies",
+      "service": "7_shifts",
+      "name": "list_companies",
+      "description": "List 7shifts companies available to the access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "modified_since": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing 7shifts companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The 7shifts company ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The company name."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company status returned by 7shifts."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company status returned by 7shifts."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw company object returned by 7shifts."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized 7shifts company."
+            },
+            "description": "The companies returned by 7shifts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing 7shifts companies."
+      }
+    },
+    {
+      "id": "7_shifts.list_departments",
+      "service": "7_shifts",
+      "name": "list_departments",
+      "description": "List 7shifts departments for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "The 7shifts company ID."
+          },
+          "modified_since": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "location_id": {
+            "type": "integer",
+            "description": "The 7shifts location ID."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor for the next or previous page of results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results desired per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_id"
+        ],
+        "description": "The input payload for listing 7shifts departments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "departments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The 7shifts department ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The department name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw department object returned by 7shifts."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized 7shifts department."
+            },
+            "description": "The departments returned by 7shifts."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current cursor."
+                  },
+                  "prev": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the next page."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total items in the current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total items in the current cursor."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The cursor metadata returned by 7shifts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor metadata returned by 7shifts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing 7shifts departments."
+      }
+    },
+    {
+      "id": "7_shifts.list_locations",
+      "service": "7_shifts",
+      "name": "list_locations",
+      "description": "List 7shifts locations for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "The 7shifts company ID."
+          },
+          "modified_since": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether to include deleted locations."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor for the next or previous page of results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results desired per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_id"
+        ],
+        "description": "The input payload for listing 7shifts locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The 7shifts location ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The location name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw location object returned by 7shifts."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized 7shifts location."
+            },
+            "description": "The locations returned by 7shifts."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current cursor."
+                  },
+                  "prev": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the next page."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total items in the current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total items in the current cursor."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The cursor metadata returned by 7shifts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor metadata returned by 7shifts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing 7shifts locations."
+      }
+    },
+    {
+      "id": "7_shifts.list_roles",
+      "service": "7_shifts",
+      "name": "list_roles",
+      "description": "List 7shifts roles for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "The 7shifts company ID."
+          },
+          "location_id": {
+            "type": "integer",
+            "description": "The 7shifts location ID."
+          },
+          "department_id": {
+            "type": "integer",
+            "description": "The 7shifts department ID."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "The 7shifts role ID."
+            },
+            "description": "The role IDs to include.",
+            "minItems": 1
+          },
+          "modified_since": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor for the next or previous page of results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results desired per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_id"
+        ],
+        "description": "The input payload for listing 7shifts roles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The 7shifts role ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The role name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw role object returned by 7shifts."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized 7shifts role."
+            },
+            "description": "The roles returned by 7shifts."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current cursor."
+                  },
+                  "prev": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the next page."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total items in the current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total items in the current cursor."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The cursor metadata returned by 7shifts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor metadata returned by 7shifts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing 7shifts roles."
+      }
+    },
+    {
+      "id": "7_shifts.list_users",
+      "service": "7_shifts",
+      "name": "list_users",
+      "description": "List 7shifts users for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "The 7shifts company ID."
+          },
+          "modified_since": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "location_id": {
+            "type": "integer",
+            "description": "The 7shifts location ID."
+          },
+          "department_id": {
+            "type": "integer",
+            "description": "The 7shifts department ID."
+          },
+          "role_id": {
+            "type": "integer",
+            "description": "The 7shifts role ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The user status to filter by."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A partial or full employee name to filter by."
+          },
+          "sort_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user sort expression, such as firstname.asc,lastname.desc."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor for the next or previous page of results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of results desired per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_id"
+        ],
+        "description": "The input payload for listing 7shifts users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The 7shifts user ID."
+                },
+                "firstName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's first name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's first name."
+                },
+                "lastName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's last name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's last name."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's email address."
+                },
+                "active": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is active."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is active."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw user object returned by 7shifts."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized 7shifts user."
+            },
+            "description": "The users returned by 7shifts."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current cursor."
+                  },
+                  "prev": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the previous page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A cursor for navigating to the next page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A cursor for navigating to the next page."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total items in the current cursor."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total items in the current cursor."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The cursor metadata returned by 7shifts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor metadata returned by 7shifts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing 7shifts users."
+      }
+    },
+    {
+      "id": "7_shifts.retrieve_identity",
+      "service": "7_shifts",
+      "name": "retrieve_identity",
+      "description": "Retrieve the 7shifts identity associated with the access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The 7shifts API version to send as x-api-version.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "companyGuid": {
+            "type": "string",
+            "description": "The 7shifts company GUID to send as x-company-guid.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a 7shifts identity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "type": "object",
+            "properties": {
+              "identityId": {
+                "type": "integer",
+                "description": "The authenticated 7shifts identity ID."
+              },
+              "users": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The 7shifts user ID."
+                    },
+                    "identityId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The 7shifts identity ID for the user."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The 7shifts identity ID for the user."
+                    },
+                    "companyId": {
+                      "type": "integer",
+                      "description": "The 7shifts company ID associated with the user."
+                    },
+                    "firstName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The user's first name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user's first name."
+                    },
+                    "lastName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The user's last name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user's last name."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The user's email address."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The user's email address."
+                    },
+                    "active": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the user is active."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the user is active."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw user object returned by 7shifts."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A normalized 7shifts user identity."
+                },
+                "description": "The 7shifts users associated with the identity."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw identity object returned by 7shifts."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized 7shifts identity response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a 7shifts identity."
+      }
+    }
+  ]
+}

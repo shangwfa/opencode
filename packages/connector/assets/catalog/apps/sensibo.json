@@ -1,0 +1,701 @@
+{
+  "service": "sensibo",
+  "displayName": "Sensibo",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SENSIBO_API_KEY",
+      "description": "Sensibo API key sent with the apiKey query parameter. Generate or rotate it in account settings: https://home.sensibo.com/me/api"
+    }
+  ],
+  "homepageUrl": "https://home.sensibo.com",
+  "actions": [
+    {
+      "id": "sensibo.get_ac_states",
+      "service": "sensibo",
+      "name": "get_ac_states",
+      "description": "Get current and previous AC states for one Sensibo device.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Sensibo device identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of state entries to retrieve, up to 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "device_id"
+        ],
+        "description": "Input parameters for retrieving current and previous AC states for one Sensibo device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "description": "The state transition status label."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "The reason for the state transition when provided."
+                },
+                "acState": {
+                  "type": "object",
+                  "properties": {
+                    "on": {
+                      "type": "boolean",
+                      "description": "Whether the AC is currently on."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "The operating mode, such as cool, heat, fan, auto, or dry."
+                    },
+                    "fanLevel": {
+                      "type": "string",
+                      "description": "The current fan level."
+                    },
+                    "targetTemperature": {
+                      "type": "integer",
+                      "description": "The configured target temperature."
+                    },
+                    "temperatureUnit": {
+                      "type": "string",
+                      "description": "The temperature unit, such as C or F."
+                    },
+                    "swing": {
+                      "type": "string",
+                      "description": "The swing mode when the remote supports it."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "on",
+                    "mode",
+                    "fanLevel",
+                    "targetTemperature"
+                  ],
+                  "description": "The AC state currently reported by Sensibo."
+                },
+                "changedProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One AC state property changed in this entry."
+                  },
+                  "description": "The AC state properties changed in this history entry."
+                },
+                "time": {
+                  "type": "object",
+                  "properties": {
+                    "time": {
+                      "type": "string",
+                      "description": "The history entry timestamp."
+                    },
+                    "secondsAgo": {
+                      "type": "number",
+                      "description": "How many seconds ago the history entry occurred."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Timestamp information for the history entry."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "acState"
+              ],
+              "description": "One AC state history entry returned by Sensibo."
+            },
+            "description": "The AC state history entries returned by Sensibo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "states"
+        ],
+        "description": "Current and previous AC states for one Sensibo device."
+      }
+    },
+    {
+      "id": "sensibo.get_device",
+      "service": "sensibo",
+      "name": "get_device",
+      "description": "Get detailed information for one Sensibo device.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Sensibo device identifier."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated fields to retrieve, or * to request all available fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "device_id"
+        ],
+        "description": "Input parameters for retrieving one Sensibo device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "device": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The device identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The device name."
+              },
+              "room": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The room identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The room name."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id"
+                ],
+                "description": "Room information associated with the Sensibo device."
+              },
+              "measurements": {
+                "type": "object",
+                "properties": {
+                  "temperature": {
+                    "type": "number",
+                    "description": "The measured ambient temperature."
+                  },
+                  "humidity": {
+                    "type": "number",
+                    "description": "The measured relative humidity percentage."
+                  },
+                  "time": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "type": "string",
+                        "description": "The measurement timestamp."
+                      },
+                      "secondsAgo": {
+                        "type": "number",
+                        "description": "How many seconds ago the measurement was captured."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Timestamp information for the measurement snapshot."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A measurement snapshot reported by the Sensibo device."
+              },
+              "acState": {
+                "type": "object",
+                "properties": {
+                  "on": {
+                    "type": "boolean",
+                    "description": "Whether the AC is currently on."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "The operating mode, such as cool, heat, fan, auto, or dry."
+                  },
+                  "fanLevel": {
+                    "type": "string",
+                    "description": "The current fan level."
+                  },
+                  "targetTemperature": {
+                    "type": "integer",
+                    "description": "The configured target temperature."
+                  },
+                  "temperatureUnit": {
+                    "type": "string",
+                    "description": "The temperature unit, such as C or F."
+                  },
+                  "swing": {
+                    "type": "string",
+                    "description": "The swing mode when the remote supports it."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "on",
+                  "mode",
+                  "fanLevel",
+                  "targetTemperature"
+                ],
+                "description": "The AC state currently reported by Sensibo."
+              },
+              "connectionStatus": {
+                "type": "object",
+                "properties": {
+                  "isAlive": {
+                    "type": "boolean",
+                    "description": "Whether the device is currently reachable."
+                  },
+                  "lastSeen": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "type": "string",
+                        "description": "The last seen timestamp."
+                      },
+                      "secondsAgo": {
+                        "type": "number",
+                        "description": "How many seconds ago the device was last seen."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Last seen timestamp information."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Connectivity information for the device."
+              },
+              "productModel": {
+                "type": "string",
+                "description": "The Sensibo product model."
+              },
+              "remoteCapabilities": {
+                "type": "object",
+                "properties": {
+                  "modes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "temperatures": {
+                          "type": "object",
+                          "properties": {
+                            "C": {
+                              "type": "object",
+                              "properties": {
+                                "values": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "description": "One supported Celsius target temperature."
+                                  },
+                                  "description": "The supported Celsius target temperatures."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "Supported Celsius temperature range."
+                            },
+                            "F": {
+                              "type": "object",
+                              "properties": {
+                                "values": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "description": "One supported Fahrenheit target temperature."
+                                  },
+                                  "description": "The supported Fahrenheit target temperatures."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "Supported Fahrenheit temperature range."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Temperature capability metadata for the mode."
+                        },
+                        "fanLevels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One supported fan level."
+                          },
+                          "description": "The fan levels supported in the selected mode."
+                        },
+                        "swing": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One supported swing state."
+                          },
+                          "description": "The swing states supported in the selected mode."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Remote capability details for one AC mode."
+                    },
+                    "description": "Mapping of supported AC modes to their capabilities."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Remote capabilities reported for the Sensibo device."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A Sensibo device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "device"
+        ],
+        "description": "The requested Sensibo device."
+      }
+    },
+    {
+      "id": "sensibo.list_devices",
+      "service": "sensibo",
+      "name": "list_devices",
+      "description": "List Sensibo devices linked to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated fields to retrieve, or * to request all available fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Sensibo devices linked to the authenticated user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The device identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The device name."
+                },
+                "room": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The room identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The room name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id"
+                  ],
+                  "description": "Room information associated with the Sensibo device."
+                },
+                "measurements": {
+                  "type": "object",
+                  "properties": {
+                    "temperature": {
+                      "type": "number",
+                      "description": "The measured ambient temperature."
+                    },
+                    "humidity": {
+                      "type": "number",
+                      "description": "The measured relative humidity percentage."
+                    },
+                    "time": {
+                      "type": "object",
+                      "properties": {
+                        "time": {
+                          "type": "string",
+                          "description": "The measurement timestamp."
+                        },
+                        "secondsAgo": {
+                          "type": "number",
+                          "description": "How many seconds ago the measurement was captured."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Timestamp information for the measurement snapshot."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A measurement snapshot reported by the Sensibo device."
+                },
+                "acState": {
+                  "type": "object",
+                  "properties": {
+                    "on": {
+                      "type": "boolean",
+                      "description": "Whether the AC is currently on."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "The operating mode, such as cool, heat, fan, auto, or dry."
+                    },
+                    "fanLevel": {
+                      "type": "string",
+                      "description": "The current fan level."
+                    },
+                    "targetTemperature": {
+                      "type": "integer",
+                      "description": "The configured target temperature."
+                    },
+                    "temperatureUnit": {
+                      "type": "string",
+                      "description": "The temperature unit, such as C or F."
+                    },
+                    "swing": {
+                      "type": "string",
+                      "description": "The swing mode when the remote supports it."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "on",
+                    "mode",
+                    "fanLevel",
+                    "targetTemperature"
+                  ],
+                  "description": "The AC state currently reported by Sensibo."
+                },
+                "connectionStatus": {
+                  "type": "object",
+                  "properties": {
+                    "isAlive": {
+                      "type": "boolean",
+                      "description": "Whether the device is currently reachable."
+                    },
+                    "lastSeen": {
+                      "type": "object",
+                      "properties": {
+                        "time": {
+                          "type": "string",
+                          "description": "The last seen timestamp."
+                        },
+                        "secondsAgo": {
+                          "type": "number",
+                          "description": "How many seconds ago the device was last seen."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Last seen timestamp information."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Connectivity information for the device."
+                },
+                "productModel": {
+                  "type": "string",
+                  "description": "The Sensibo product model."
+                },
+                "remoteCapabilities": {
+                  "type": "object",
+                  "properties": {
+                    "modes": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "temperatures": {
+                            "type": "object",
+                            "properties": {
+                              "C": {
+                                "type": "object",
+                                "properties": {
+                                  "values": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "description": "One supported Celsius target temperature."
+                                    },
+                                    "description": "The supported Celsius target temperatures."
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "Supported Celsius temperature range."
+                              },
+                              "F": {
+                                "type": "object",
+                                "properties": {
+                                  "values": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "description": "One supported Fahrenheit target temperature."
+                                    },
+                                    "description": "The supported Fahrenheit target temperatures."
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "Supported Fahrenheit temperature range."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "Temperature capability metadata for the mode."
+                          },
+                          "fanLevels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "description": "One supported fan level."
+                            },
+                            "description": "The fan levels supported in the selected mode."
+                          },
+                          "swing": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "description": "One supported swing state."
+                            },
+                            "description": "The swing states supported in the selected mode."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Remote capability details for one AC mode."
+                      },
+                      "description": "Mapping of supported AC modes to their capabilities."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Remote capabilities reported for the Sensibo device."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Sensibo device."
+            },
+            "description": "The devices returned by Sensibo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "devices"
+        ],
+        "description": "Sensibo devices linked to the authenticated user."
+      }
+    },
+    {
+      "id": "sensibo.set_ac_state",
+      "service": "sensibo",
+      "name": "set_ac_state",
+      "description": "Set the full AC state for one Sensibo device.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Sensibo device identifier."
+          },
+          "acState": {
+            "type": "object",
+            "properties": {
+              "on": {
+                "type": "boolean",
+                "description": "Whether the AC is currently on."
+              },
+              "mode": {
+                "type": "string",
+                "description": "The operating mode, such as cool, heat, fan, auto, or dry."
+              },
+              "fanLevel": {
+                "type": "string",
+                "description": "The current fan level."
+              },
+              "targetTemperature": {
+                "type": "integer",
+                "description": "The configured target temperature."
+              },
+              "temperatureUnit": {
+                "type": "string",
+                "description": "The temperature unit, such as C or F."
+              },
+              "swing": {
+                "type": "string",
+                "description": "The swing mode when the remote supports it."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "on",
+              "mode",
+              "fanLevel",
+              "targetTemperature"
+            ],
+            "description": "The AC state currently reported by Sensibo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "device_id",
+          "acState"
+        ],
+        "description": "Input parameters for setting the full AC state for one Sensibo device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Sensibo accepted the AC state update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Normalized result for setting the AC state."
+      }
+    }
+  ]
+}

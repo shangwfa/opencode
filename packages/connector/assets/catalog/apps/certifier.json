@@ -1,0 +1,560 @@
+{
+  "service": "certifier",
+  "displayName": "Certifier",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "cert_...",
+      "description": "Certifier access token used with the Authorization Bearer header. Create and manage it from the Certifier Dashboard: https://developers.certifier.io/reference/authentication"
+    }
+  ],
+  "homepageUrl": "https://certifier.io",
+  "actions": [
+    {
+      "id": "certifier.create_issue_send_credential",
+      "service": "certifier",
+      "name": "create_issue_send_credential",
+      "description": "Create, issue, and send one Certifier credential in a single request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Group ID the credential should belong to."
+          },
+          "recipient": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Recipient full name."
+              },
+              "email": {
+                "type": "string",
+                "description": "Recipient email address.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "email"
+            ],
+            "description": "Recipient details."
+          },
+          "issueDate": {
+            "type": "string",
+            "description": "Issue date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": "string",
+            "description": "Expiry date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "customAttributes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Custom attribute text value."
+            },
+            "description": "Custom attributes forwarded to Certifier as key-value text pairs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groupId",
+          "recipient"
+        ],
+        "description": "Input for creating, issuing, and sending one credential."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credential": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Certifier credential."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "certifier.list_credential_interactions",
+      "service": "certifier",
+      "name": "list_credential_interactions",
+      "description": "List Certifier credential interaction events with optional credential filtering and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "credentialId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Credential ID used to filter interaction events."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of interaction events to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing interactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "interactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Certifier credential interaction event."
+            },
+            "description": "Credential interaction events returned by Certifier."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there is none."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the previous page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the previous page, or null when there is none."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev"
+            ],
+            "description": "Cursor pagination metadata returned by Certifier."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "certifier.list_credentials",
+      "service": "certifier",
+      "name": "list_credentials",
+      "description": "List Certifier credentials with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a paginated Certifier list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Certifier credential."
+            },
+            "description": "Credentials returned by Certifier."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there is none."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the previous page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the previous page, or null when there is none."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev"
+            ],
+            "description": "Cursor pagination metadata returned by Certifier."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "certifier.list_designs",
+      "service": "certifier",
+      "name": "list_designs",
+      "description": "List Certifier certificate and badge designs with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a paginated Certifier list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "designs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the design."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The design name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The design type returned by Certifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Certifier design."
+            },
+            "description": "Designs returned by Certifier."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there is none."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the previous page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the previous page, or null when there is none."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev"
+            ],
+            "description": "Cursor pagination metadata returned by Certifier."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "certifier.list_groups",
+      "service": "certifier",
+      "name": "list_groups",
+      "description": "List Certifier groups with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a paginated Certifier list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the group."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The group name."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the group was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the group was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Certifier group."
+            },
+            "description": "Groups returned by Certifier."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there is none."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the previous page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the previous page, or null when there is none."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev"
+            ],
+            "description": "Cursor pagination metadata returned by Certifier."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "certifier.search_credentials",
+      "service": "certifier",
+      "name": "search_credentials",
+      "description": "Search Certifier credentials with structured filter, sorting, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Structured Certifier search filter object."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "type": "string",
+                "enum": [
+                  "id",
+                  "createdAt",
+                  "updatedAt",
+                  "issueDate",
+                  "expiryDate"
+                ],
+                "description": "Credential field used to sort the search result."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "Sort order for the search result."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "property"
+            ],
+            "description": "Sort configuration for credential search."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of credentials to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor from a previous search response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter"
+        ],
+        "description": "Input for searching Certifier credentials."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Certifier credential."
+            },
+            "description": "Credentials matching the search filter."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there is none."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the previous page, or null when there is none."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the previous page, or null when there is none."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev"
+            ],
+            "description": "Cursor pagination metadata returned by Certifier."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

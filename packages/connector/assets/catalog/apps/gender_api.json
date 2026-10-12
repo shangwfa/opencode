@@ -1,0 +1,800 @@
+{
+  "service": "gender_api",
+  "displayName": "Gender-API.com",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "GENDER_API_TOKEN",
+      "description": "Gender-API.com v2 API token sent as a Bearer token. Create or manage tokens in your Gender-API.com account: https://gender-api.com/en/account/auth-tokens"
+    }
+  ],
+  "homepageUrl": "https://gender-api.com/",
+  "actions": [
+    {
+      "id": "gender_api.get_country_of_origin",
+      "service": "gender_api",
+      "name": "get_country_of_origin",
+      "description": "Get likely country-of-origin and ethnicity metadata for one first name, full name, or email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The first name to analyze with Gender-API.com."
+          },
+          "full_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "The full name to analyze with Gender-API.com."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address to analyze with Gender-API.com.",
+            "format": "email"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "A caller-supplied string ID echoed by Gender-API.com."
+              },
+              {
+                "type": "integer",
+                "description": "A caller-supplied integer ID echoed by Gender-API.com."
+              }
+            ],
+            "description": "An optional caller-supplied ID echoed by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for querying country-of-origin metadata.",
+        "oneOf": [
+          {
+            "required": [
+              "first_name"
+            ]
+          },
+          {
+            "required": [
+              "full_name"
+            ]
+          },
+          {
+            "required": [
+              "email"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The submitted payload echoed by Gender-API.com."
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of credits consumed by this query."
+              },
+              "samples": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records that matched the query."
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country Gender-API.com found or applied to the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country Gender-API.com found or applied to the query."
+              },
+              "first_name_sanitized": {
+                "type": "string",
+                "description": "The first name after Gender-API.com normalization."
+              },
+              "full_name_sanitized": {
+                "type": "string",
+                "description": "The full name after Gender-API.com normalization."
+              },
+              "email_sanitized": {
+                "type": "string",
+                "description": "The email address after Gender-API.com normalization."
+              },
+              "duration": {
+                "type": "string",
+                "description": "The server-side processing duration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Technical details returned by Gender-API.com."
+          },
+          "result_found": {
+            "type": "boolean",
+            "description": "Whether Gender-API.com found origin metadata for the input."
+          },
+          "country_of_origin": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country_name": {
+                  "type": "string",
+                  "description": "The localized country name."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 2,
+                  "description": "The ISO 3166-1 alpha-2 country code."
+                },
+                "probability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "The probability that the queried name originates from this country."
+                },
+                "continental_region": {
+                  "type": "string",
+                  "description": "The continental region containing the country."
+                },
+                "statistical_region": {
+                  "type": "string",
+                  "description": "The statistical region containing the country."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One likely country of origin returned by Gender-API.com."
+            },
+            "description": "The likely countries of origin returned by Gender-API.com."
+          },
+          "country_of_origin_map_url": {
+            "type": "string",
+            "description": "A Gender-API.com map URL for the returned country-of-origin distribution.",
+            "format": "uri"
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name Gender-API.com used for the analysis."
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The probability score for the inferred gender."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ],
+            "description": "The inferred gender value returned by Gender-API.com."
+          },
+          "language_of_origin": {
+            "type": "string",
+            "description": "The likely language of origin when returned."
+          },
+          "meaning": {
+            "type": "string",
+            "description": "The documented name meaning when returned."
+          },
+          "ethnicity": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The primary ethnicity identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The primary ethnicity name."
+              },
+              "distribution": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The ethnicity identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The ethnicity name."
+                    },
+                    "percentage": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "The percentage for this ethnicity distribution entry."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One ethnicity distribution entry returned by Gender-API.com."
+                },
+                "description": "The ethnicity distribution entries returned by Gender-API.com."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Ethnicity details returned by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input",
+          "details",
+          "result_found"
+        ],
+        "description": "A country-of-origin response returned by Gender-API.com."
+      }
+    },
+    {
+      "id": "gender_api.get_statistics",
+      "service": "gender_api",
+      "name": "get_statistics",
+      "description": "Read remaining credits and recent usage statistics for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for querying Gender-API.com account statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "is_limit_reached": {
+            "type": "boolean",
+            "description": "Whether the account has reached its current usage limit."
+          },
+          "remaining_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The credits remaining on the account."
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of credits consumed by this statistics query."
+              },
+              "duration": {
+                "type": "string",
+                "description": "The server-side processing duration."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Technical details returned by the Gender-API.com statistics endpoint."
+          },
+          "usage_last_month": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "The month represented by this usage entry."
+              },
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The credits consumed during the previous month."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Gender-API.com usage information for the previous month."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "is_limit_reached",
+          "remaining_credits"
+        ],
+        "description": "Account usage statistics returned by Gender-API.com."
+      }
+    },
+    {
+      "id": "gender_api.query_gender_by_email_address",
+      "service": "gender_api",
+      "name": "query_gender_by_email_address",
+      "description": "Determine the likely gender for one email address after Gender-API.com extracts a name from it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to classify with Gender-API.com.",
+            "format": "email"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the query.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 35,
+            "description": "The optional browser locale used by Gender-API.com to localize the query."
+          },
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 45,
+            "description": "The optional IPv4 or IPv6 address used by Gender-API.com to localize the query."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "A caller-supplied string ID echoed by Gender-API.com."
+              },
+              {
+                "type": "integer",
+                "description": "A caller-supplied integer ID echoed by Gender-API.com."
+              }
+            ],
+            "description": "An optional caller-supplied ID echoed by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input for querying gender by email address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The submitted payload echoed by Gender-API.com."
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of credits consumed by this query."
+              },
+              "samples": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records that matched the query."
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country Gender-API.com found or applied to the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country Gender-API.com found or applied to the query."
+              },
+              "first_name_sanitized": {
+                "type": "string",
+                "description": "The first name after Gender-API.com normalization."
+              },
+              "full_name_sanitized": {
+                "type": "string",
+                "description": "The full name after Gender-API.com normalization."
+              },
+              "email_sanitized": {
+                "type": "string",
+                "description": "The email address after Gender-API.com normalization."
+              },
+              "duration": {
+                "type": "string",
+                "description": "The server-side processing duration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Technical details returned by Gender-API.com."
+          },
+          "result_found": {
+            "type": "boolean",
+            "description": "Whether Gender-API.com found a gender result for the input."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name Gender-API.com used for genderization."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name extracted by Gender-API.com when available."
+          },
+          "full_name": {
+            "type": "string",
+            "description": "The full name Gender-API.com used for genderization when available."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address Gender-API.com used for genderization when available.",
+            "format": "email"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The probability score for the inferred gender."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ],
+            "description": "The inferred gender value returned by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input",
+          "details",
+          "result_found"
+        ],
+        "description": "A gender lookup response returned by Gender-API.com."
+      }
+    },
+    {
+      "id": "gender_api.query_gender_by_first_name",
+      "service": "gender_api",
+      "name": "query_gender_by_first_name",
+      "description": "Determine the likely gender for one first name with optional country, locale, IP, and caller ID hints.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The first name to classify with Gender-API.com."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the query.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 35,
+            "description": "The optional browser locale used by Gender-API.com to localize the query."
+          },
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 45,
+            "description": "The optional IPv4 or IPv6 address used by Gender-API.com to localize the query."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "A caller-supplied string ID echoed by Gender-API.com."
+              },
+              {
+                "type": "integer",
+                "description": "A caller-supplied integer ID echoed by Gender-API.com."
+              }
+            ],
+            "description": "An optional caller-supplied ID echoed by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "first_name"
+        ],
+        "description": "Input for querying gender by first name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The submitted payload echoed by Gender-API.com."
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of credits consumed by this query."
+              },
+              "samples": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records that matched the query."
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country Gender-API.com found or applied to the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country Gender-API.com found or applied to the query."
+              },
+              "first_name_sanitized": {
+                "type": "string",
+                "description": "The first name after Gender-API.com normalization."
+              },
+              "full_name_sanitized": {
+                "type": "string",
+                "description": "The full name after Gender-API.com normalization."
+              },
+              "email_sanitized": {
+                "type": "string",
+                "description": "The email address after Gender-API.com normalization."
+              },
+              "duration": {
+                "type": "string",
+                "description": "The server-side processing duration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Technical details returned by Gender-API.com."
+          },
+          "result_found": {
+            "type": "boolean",
+            "description": "Whether Gender-API.com found a gender result for the input."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name Gender-API.com used for genderization."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name extracted by Gender-API.com when available."
+          },
+          "full_name": {
+            "type": "string",
+            "description": "The full name Gender-API.com used for genderization when available."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address Gender-API.com used for genderization when available.",
+            "format": "email"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The probability score for the inferred gender."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ],
+            "description": "The inferred gender value returned by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input",
+          "details",
+          "result_found"
+        ],
+        "description": "A gender lookup response returned by Gender-API.com."
+      }
+    },
+    {
+      "id": "gender_api.query_gender_by_full_name",
+      "service": "gender_api",
+      "name": "query_gender_by_full_name",
+      "description": "Determine the likely gender for one full name while letting Gender-API.com split the name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "description": "The full name to classify with Gender-API.com."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The optional ISO 3166-1 alpha-2 country code used to localize the query.",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 35,
+            "description": "The optional browser locale used by Gender-API.com to localize the query."
+          },
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 45,
+            "description": "The optional IPv4 or IPv6 address used by Gender-API.com to localize the query."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50,
+                "description": "A caller-supplied string ID echoed by Gender-API.com."
+              },
+              {
+                "type": "integer",
+                "description": "A caller-supplied integer ID echoed by Gender-API.com."
+              }
+            ],
+            "description": "An optional caller-supplied ID echoed by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "full_name"
+        ],
+        "description": "Input for querying gender by full name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The submitted payload echoed by Gender-API.com."
+          },
+          "details": {
+            "type": "object",
+            "properties": {
+              "credits_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of credits consumed by this query."
+              },
+              "samples": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records that matched the query."
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country Gender-API.com found or applied to the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country Gender-API.com found or applied to the query."
+              },
+              "first_name_sanitized": {
+                "type": "string",
+                "description": "The first name after Gender-API.com normalization."
+              },
+              "full_name_sanitized": {
+                "type": "string",
+                "description": "The full name after Gender-API.com normalization."
+              },
+              "email_sanitized": {
+                "type": "string",
+                "description": "The email address after Gender-API.com normalization."
+              },
+              "duration": {
+                "type": "string",
+                "description": "The server-side processing duration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Technical details returned by Gender-API.com."
+          },
+          "result_found": {
+            "type": "boolean",
+            "description": "Whether Gender-API.com found a gender result for the input."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name Gender-API.com used for genderization."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name extracted by Gender-API.com when available."
+          },
+          "full_name": {
+            "type": "string",
+            "description": "The full name Gender-API.com used for genderization when available."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address Gender-API.com used for genderization when available.",
+            "format": "email"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The probability score for the inferred gender."
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "unknown"
+            ],
+            "description": "The inferred gender value returned by Gender-API.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input",
+          "details",
+          "result_found"
+        ],
+        "description": "A gender lookup response returned by Gender-API.com."
+      }
+    }
+  ]
+}

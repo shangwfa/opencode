@@ -1,0 +1,189 @@
+{
+  "service": "gotify",
+  "displayName": "Gotify",
+  "description": "Send messages and inspect health and version information for a Gotify server.",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Application Token",
+      "placeholder": "GOTIFY_APPLICATION_TOKEN",
+      "description": "Gotify application token sent with the X-Gotify-Key header. In the Gotify WebUI, open Apps, create or select an application, and copy its token: https://gotify.net/docs/pushmsg.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Server Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://push.example.com",
+          "description": "The HTTP or HTTPS URL of your Gotify server. Public addresses work by default; private-network instances require the self-hosted runtime to enable OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK. Unsafe local, reserved, and cloud-metadata targets remain blocked."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://gotify.net",
+  "actions": [
+    {
+      "id": "gotify.get_health",
+      "service": "gotify",
+      "name": "get_health",
+      "description": "Fetch health information from the connected Gotify instance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "health": {
+            "type": "string",
+            "description": "The overall Gotify application health value."
+          },
+          "database": {
+            "type": "string",
+            "description": "The Gotify database health value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "health",
+          "database"
+        ],
+        "description": "Gotify instance health information."
+      }
+    },
+    {
+      "id": "gotify.get_version",
+      "service": "gotify",
+      "name": "get_version",
+      "description": "Fetch version information from the connected Gotify instance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The current Gotify server version."
+          },
+          "commit": {
+            "type": "string",
+            "description": "The git commit hash used to build the Gotify server."
+          },
+          "buildDate": {
+            "type": "string",
+            "description": "The date when the Gotify server binary was built."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "commit",
+          "buildDate"
+        ],
+        "description": "Gotify instance version information."
+      }
+    },
+    {
+      "id": "gotify.send_message",
+      "service": "gotify",
+      "name": "send_message",
+      "description": "Send a message through the connected Gotify application token and return the created message.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message body to send. Markdown excluding HTML is allowed."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional title for the Gotify message."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "An optional message priority. If omitted, Gotify uses the application default priority."
+          },
+          "extras": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Gotify message extras keyed by the official namespace format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "Input parameters for creating one Gotify message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The Gotify message id."
+          },
+          "appid": {
+            "type": "integer",
+            "description": "The id of the Gotify application that sent this message."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Gotify message body. Markdown excluding HTML is allowed."
+          },
+          "date": {
+            "type": "string",
+            "description": "The date and time when the message was created."
+          },
+          "title": {
+            "type": "string",
+            "description": "The optional Gotify message title."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "The Gotify message priority."
+          },
+          "extras": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Gotify message extras keyed by the official namespace format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "appid",
+          "message",
+          "date"
+        ],
+        "description": "A Gotify message returned by the REST API."
+      }
+    }
+  ]
+}

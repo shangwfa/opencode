@@ -1,0 +1,2424 @@
+{
+  "service": "fengshui",
+  "displayName": "Feng Shui API",
+  "homepageUrl": "https://fengshui-api.com/",
+  "iconUrl": "https://fengshui-api.com/favicon.svg",
+  "categories": [
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "fsk_…",
+      "description": "Get a free API key at https://fengshui-api.com/account without signing up. Save it when shown; lost keys cannot be recovered. Each key currently allows 1,000 requests per hour."
+    }
+  ],
+  "actions": [
+    {
+      "id": "fengshui.check_lucky_dimension",
+      "service": "fengshui",
+      "name": "check_lucky_dimension",
+      "description": "Check a positive length on the Lu Ban ruler and get nearest auspicious ranges when the length is inauspicious.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "length": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Positive length to check."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "cm",
+              "in"
+            ],
+            "description": "Measurement unit: millimeters, centimeters or inches.",
+            "default": "mm"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "length"
+        ],
+        "description": "Length and measurement unit for the Lu Ban ruler."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "length": {
+            "type": "number",
+            "description": "Requested length."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "mm",
+              "cm",
+              "in"
+            ],
+            "description": "Requested measurement unit."
+          },
+          "lengthMm": {
+            "type": "number",
+            "description": "Length converted to millimeters."
+          },
+          "auspicious": {
+            "type": "boolean",
+            "description": "Whether the length is traditionally auspicious."
+          },
+          "ruler": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Ruler name."
+              },
+              "cycleMm": {
+                "type": "integer",
+                "description": "Cycle length in millimeters."
+              },
+              "sectionMm": {
+                "type": "integer",
+                "description": "Section length in millimeters."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Lu Ban ruler cycle."
+          },
+          "section": {
+            "type": "object",
+            "properties": {
+              "index": {
+                "type": "integer",
+                "description": "Section number within the cycle."
+              },
+              "pinyin": {
+                "type": "string",
+                "description": "Traditional name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "meaning": {
+                "type": "string",
+                "description": "Traditional meaning of the ruler section."
+              },
+              "auspicious": {
+                "type": "boolean",
+                "description": "Whether the section is traditionally auspicious."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Traditional ruler section containing the length."
+          },
+          "positionInCycleMm": {
+            "type": "number",
+            "description": "Position within the ruler cycle in millimeters."
+          },
+          "alternatives": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "shorter": {
+                    "type": "object",
+                    "properties": {
+                      "fromMm": {
+                        "type": "number",
+                        "description": "Inclusive start of the range in millimeters."
+                      },
+                      "toMm": {
+                        "type": "number",
+                        "description": "Exclusive end of the range in millimeters."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Nearest auspicious length range in millimeters."
+                  },
+                  "longer": {
+                    "type": "object",
+                    "properties": {
+                      "fromMm": {
+                        "type": "number",
+                        "description": "Inclusive start of the range in millimeters."
+                      },
+                      "toMm": {
+                        "type": "number",
+                        "description": "Exclusive end of the range in millimeters."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Nearest auspicious length range in millimeters."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Nearest auspicious ranges when the requested length is inauspicious."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nearest auspicious ranges when the requested length is inauspicious."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "length",
+          "unit",
+          "lengthMm",
+          "auspicious",
+          "ruler",
+          "section",
+          "positionInCycleMm"
+        ],
+        "description": "Lu Ban ruler measurement result."
+      }
+    },
+    {
+      "id": "fengshui.get_compatibility",
+      "service": "fengshui",
+      "name": "get_compatibility",
+      "description": "Score traditional love or business compatibility from 1 (challenging) to 4 (excellent), using birth dates or zodiac animals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "love",
+              "business"
+            ],
+            "description": "Compatibility context."
+          },
+          "date1": {
+            "type": "string",
+            "description": "First person's Gregorian birth date, between 1700-01-01 and 2300-12-31; supply date1 or animal1.",
+            "format": "date"
+          },
+          "animal1": {
+            "type": "string",
+            "description": "First person's zodiac animal; supply date1 or animal1.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "date2": {
+            "type": "string",
+            "description": "Second person's Gregorian birth date, between 1700-01-01 and 2300-12-31; supply date2 or animal2.",
+            "format": "date"
+          },
+          "animal2": {
+            "type": "string",
+            "description": "Second person's zodiac animal; supply date2 or animal2.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "description": "Compatibility type and the birth date or animal of each person.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "date1"
+                ]
+              },
+              {
+                "required": [
+                  "animal1"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "date2"
+                ]
+              },
+              {
+                "required": [
+                  "animal2"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "love",
+              "business"
+            ],
+            "description": "Compatibility context."
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "first": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+                "format": "date"
+              },
+              "calendar": {
+                "type": "string",
+                "enum": [
+                  "lunar",
+                  "solar"
+                ],
+                "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+                "default": "lunar"
+              },
+              "animal": {
+                "type": "string",
+                "enum": [
+                  "Rat",
+                  "Ox",
+                  "Tiger",
+                  "Rabbit",
+                  "Dragon",
+                  "Snake",
+                  "Horse",
+                  "Goat",
+                  "Monkey",
+                  "Rooster",
+                  "Dog",
+                  "Pig"
+                ],
+                "description": "Chinese zodiac animal."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "animal"
+            ],
+            "description": "Zodiac sign and optional birth-date basis."
+          },
+          "second": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+                "format": "date"
+              },
+              "calendar": {
+                "type": "string",
+                "enum": [
+                  "lunar",
+                  "solar"
+                ],
+                "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+                "default": "lunar"
+              },
+              "animal": {
+                "type": "string",
+                "enum": [
+                  "Rat",
+                  "Ox",
+                  "Tiger",
+                  "Rabbit",
+                  "Dragon",
+                  "Snake",
+                  "Horse",
+                  "Goat",
+                  "Monkey",
+                  "Rooster",
+                  "Dog",
+                  "Pig"
+                ],
+                "description": "Chinese zodiac animal."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "animal"
+            ],
+            "description": "Zodiac sign and optional birth-date basis."
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Compatibility score from 1 to 4."
+          },
+          "maxScore": {
+            "type": "integer",
+            "description": "Maximum compatibility score."
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "challenging",
+              "average",
+              "good",
+              "excellent"
+            ],
+            "description": "Traditional compatibility rating."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "type",
+          "calendar",
+          "first",
+          "second",
+          "score",
+          "maxScore",
+          "rating"
+        ],
+        "description": "Traditional compatibility score."
+      }
+    },
+    {
+      "id": "fengshui.get_eight_mansions",
+      "service": "fengshui",
+      "name": "get_eight_mansions",
+      "description": "Calculate the house trigram and traditional Eight Mansions stars for the eight compass sectors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "facing": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "description": "Compass bearing in degrees, from 0 inclusive to 360 exclusive.",
+                "exclusiveMaximum": 360
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "NE",
+                  "E",
+                  "SE",
+                  "S",
+                  "SW",
+                  "W",
+                  "NW"
+                ],
+                "description": "Compass direction."
+              }
+            ],
+            "description": "Facing of the building as a compass bearing or one of eight directions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "facing"
+        ],
+        "description": "Building facing direction for Eight Mansions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "facing": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "NE",
+                  "E",
+                  "SE",
+                  "S",
+                  "SW",
+                  "W",
+                  "NW"
+                ],
+                "description": "Compass direction."
+              },
+              "degrees": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Compass bearing in degrees, from 0 inclusive to 360 exclusive.",
+                "exclusiveMaximum": 360
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "direction"
+            ],
+            "description": "Building facing direction."
+          },
+          "sitting": {
+            "type": "string",
+            "enum": [
+              "N",
+              "NE",
+              "E",
+              "SE",
+              "S",
+              "SW",
+              "W",
+              "NW"
+            ],
+            "description": "Compass direction."
+          },
+          "house": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Trigram name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "element": {
+                "type": "string",
+                "enum": [
+                  "Wood",
+                  "Fire",
+                  "Earth",
+                  "Metal",
+                  "Water"
+                ],
+                "description": "Five-element association."
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "East",
+                  "West"
+                ],
+                "description": "East or West group."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "hanzi",
+              "element",
+              "group"
+            ],
+            "description": "Eight Mansions trigram."
+          },
+          "sectors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "N",
+                    "NE",
+                    "E",
+                    "SE",
+                    "S",
+                    "SW",
+                    "W",
+                    "NW"
+                  ],
+                  "description": "Compass direction."
+                },
+                "star": {
+                  "type": "string",
+                  "description": "Traditional star name in pinyin."
+                },
+                "hanzi": {
+                  "type": "string",
+                  "description": "Traditional name in Chinese characters."
+                },
+                "auspicious": {
+                  "type": "boolean",
+                  "description": "Whether this star is traditionally auspicious."
+                },
+                "meaning": {
+                  "type": "string",
+                  "description": "Traditional meaning of this star."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "star",
+                "hanzi",
+                "meaning"
+              ],
+              "description": "Traditional Eight Mansions star and meaning."
+            },
+            "description": "Star of each compass sector, keyed N, NE, E, SE, S, SW, W and NW."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "facing",
+          "sitting",
+          "house",
+          "sectors"
+        ],
+        "description": "Eight Mansions house chart."
+      }
+    },
+    {
+      "id": "fengshui.get_flying_star",
+      "service": "fengshui",
+      "name": "get_flying_star",
+      "description": "Calculate the natal Flying Star chart for the nine palaces using the building facing and construction year or period. Replacement (Ti Gua) charts are not computed.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "facing": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "description": "Compass bearing in degrees, from 0 inclusive to 360 exclusive.",
+                "exclusiveMaximum": 360
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Mountain code or mountain name in pinyin.",
+                "pattern": "\\S"
+              }
+            ],
+            "description": "Facing as a compass bearing, a twenty-four-mountain code (N1 through NW3), or a mountain name in pinyin (Ren, Zi, Gui, etc.)."
+          },
+          "period": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9,
+            "description": "Twenty-year construction period from 1 to 9; period 9 covers 2024-2043. Mutually exclusive with constructionYear."
+          },
+          "constructionYear": {
+            "type": "integer",
+            "minimum": 1700,
+            "maximum": 2300,
+            "description": "Year the building was completed; the API derives the period. Mutually exclusive with period."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "facing"
+        ],
+        "description": "Building facing and exactly one construction period or construction year.",
+        "oneOf": [
+          {
+            "required": [
+              "period"
+            ]
+          },
+          {
+            "required": [
+              "constructionYear"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "integer",
+            "description": "Twenty-year construction period."
+          },
+          "periodYears": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "integer",
+                "description": "First year of the period."
+              },
+              "to": {
+                "type": "integer",
+                "description": "Last year of the period."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Gregorian years covered by the period."
+          },
+          "constructionYear": {
+            "type": "integer",
+            "description": "Requested construction year, when supplied."
+          },
+          "facing": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Mountain code such as N1 or NW3."
+              },
+              "pinyin": {
+                "type": "string",
+                "description": "Traditional name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "palace": {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "NE",
+                  "E",
+                  "SE",
+                  "S",
+                  "SW",
+                  "W",
+                  "NW"
+                ],
+                "description": "Compass direction."
+              },
+              "fromDegrees": {
+                "type": "number",
+                "description": "Start bearing of the mountain sector."
+              },
+              "toDegrees": {
+                "type": "number",
+                "description": "End bearing of the mountain sector."
+              },
+              "degrees": {
+                "type": "number",
+                "description": "Requested compass bearing when supplied."
+              },
+              "nearMountainBoundary": {
+                "type": "boolean",
+                "description": "Whether the bearing is within three degrees of a mountain boundary, where a replacement chart may apply."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "code",
+              "pinyin",
+              "hanzi",
+              "palace",
+              "fromDegrees",
+              "toDegrees"
+            ],
+            "description": "Facing or sitting mountain of the twenty-four mountains."
+          },
+          "sitting": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Mountain code such as N1 or NW3."
+              },
+              "pinyin": {
+                "type": "string",
+                "description": "Traditional name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "palace": {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "NE",
+                  "E",
+                  "SE",
+                  "S",
+                  "SW",
+                  "W",
+                  "NW"
+                ],
+                "description": "Compass direction."
+              },
+              "fromDegrees": {
+                "type": "number",
+                "description": "Start bearing of the mountain sector."
+              },
+              "toDegrees": {
+                "type": "number",
+                "description": "End bearing of the mountain sector."
+              },
+              "degrees": {
+                "type": "number",
+                "description": "Requested compass bearing when supplied."
+              },
+              "nearMountainBoundary": {
+                "type": "boolean",
+                "description": "Whether the bearing is within three degrees of a mountain boundary, where a replacement chart may apply."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "code",
+              "pinyin",
+              "hanzi",
+              "palace",
+              "fromDegrees",
+              "toDegrees"
+            ],
+            "description": "Facing or sitting mountain of the twenty-four mountains."
+          },
+          "chart": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "base": {
+                  "type": "integer",
+                  "description": "Base star number."
+                },
+                "mountain": {
+                  "type": "integer",
+                  "description": "Mountain star number."
+                },
+                "water": {
+                  "type": "integer",
+                  "description": "Water star number."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "base",
+                "mountain",
+                "water"
+              ],
+              "description": "Stars of one palace in the Flying Star chart."
+            },
+            "description": "Base, mountain and water stars, keyed NW, N, NE, W, C, E, SW, S and SE."
+          },
+          "mountainFlight": {
+            "type": "string",
+            "enum": [
+              "forward",
+              "backward"
+            ],
+            "description": "Mountain-star flight direction."
+          },
+          "waterFlight": {
+            "type": "string",
+            "enum": [
+              "forward",
+              "backward"
+            ],
+            "description": "Water-star flight direction."
+          },
+          "chartType": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Classical chart type name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Meaning of the classical chart type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Classical Flying Star chart type."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "period",
+          "periodYears",
+          "facing",
+          "sitting",
+          "chart",
+          "mountainFlight",
+          "waterFlight",
+          "chartType"
+        ],
+        "description": "Natal Flying Star chart."
+      }
+    },
+    {
+      "id": "fengshui.get_key_status",
+      "service": "fengshui",
+      "name": "get_key_status",
+      "description": "Get the current API key status and hourly request quota without accessing personal data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for reading the current key's quota."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKeyPrefix": {
+            "type": "string",
+            "description": "Non-secret prefix identifying the current API key."
+          },
+          "apiKeyIssuedAt": {
+            "type": "string",
+            "description": "Time the current API key was issued.",
+            "format": "date-time"
+          },
+          "rateLimit": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "Maximum requests per quota window."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "Requests remaining in the current window."
+              },
+              "windowSeconds": {
+                "type": "integer",
+                "description": "Quota window length in seconds."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Current hourly quota."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "apiKeyPrefix",
+          "apiKeyIssuedAt",
+          "rateLimit"
+        ],
+        "description": "Current key status and request quota."
+      }
+    },
+    {
+      "id": "fengshui.get_kua",
+      "service": "fengshui",
+      "name": "get_kua",
+      "description": "Calculate the personal Kua number, East or West group, and traditional favorable and unfavorable directions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female"
+            ],
+            "description": "Gender used by the traditional Kua formula."
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "gender"
+        ],
+        "description": "Birth date, gender used by the traditional formula, and calendar convention."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female"
+            ],
+            "description": "Gender used by the traditional Kua formula."
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "chineseYear": {
+            "type": "integer",
+            "description": "Chinese birth year under the chosen calendar convention."
+          },
+          "kua": {
+            "type": "integer",
+            "description": "Personal Kua number after remapping a Luo Shu number of 5."
+          },
+          "luoShuNumber": {
+            "type": "integer",
+            "description": "Luo Shu number before remapping."
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "East",
+              "West"
+            ],
+            "description": "East or West group."
+          },
+          "trigram": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Trigram name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "element": {
+                "type": "string",
+                "enum": [
+                  "Wood",
+                  "Fire",
+                  "Earth",
+                  "Metal",
+                  "Water"
+                ],
+                "description": "Five-element association."
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "East",
+                  "West"
+                ],
+                "description": "East or West group."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "hanzi",
+              "element",
+              "group"
+            ],
+            "description": "Eight Mansions trigram."
+          },
+          "favorableDirections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "N",
+                    "NE",
+                    "E",
+                    "SE",
+                    "S",
+                    "SW",
+                    "W",
+                    "NW"
+                  ],
+                  "description": "Compass direction."
+                },
+                "star": {
+                  "type": "string",
+                  "description": "Traditional star name in pinyin."
+                },
+                "hanzi": {
+                  "type": "string",
+                  "description": "Traditional name in Chinese characters."
+                },
+                "auspicious": {
+                  "type": "boolean",
+                  "description": "Whether this star is traditionally auspicious."
+                },
+                "meaning": {
+                  "type": "string",
+                  "description": "Traditional meaning of this star."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "star",
+                "hanzi",
+                "meaning"
+              ],
+              "description": "Traditional Eight Mansions star and meaning."
+            },
+            "description": "Four traditionally favorable directions."
+          },
+          "unfavorableDirections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "N",
+                    "NE",
+                    "E",
+                    "SE",
+                    "S",
+                    "SW",
+                    "W",
+                    "NW"
+                  ],
+                  "description": "Compass direction."
+                },
+                "star": {
+                  "type": "string",
+                  "description": "Traditional star name in pinyin."
+                },
+                "hanzi": {
+                  "type": "string",
+                  "description": "Traditional name in Chinese characters."
+                },
+                "auspicious": {
+                  "type": "boolean",
+                  "description": "Whether this star is traditionally auspicious."
+                },
+                "meaning": {
+                  "type": "string",
+                  "description": "Traditional meaning of this star."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "star",
+                "hanzi",
+                "meaning"
+              ],
+              "description": "Traditional Eight Mansions star and meaning."
+            },
+            "description": "Four traditionally unfavorable directions."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date",
+          "gender",
+          "calendar",
+          "chineseYear",
+          "kua",
+          "luoShuNumber",
+          "group",
+          "trigram",
+          "favorableDirections",
+          "unfavorableDirections"
+        ],
+        "description": "Personal Kua and Eight Mansions directions."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_allies",
+      "service": "fengshui",
+      "name": "get_zodiac_allies",
+      "description": "Get the two zodiac animals forming the traditional three-harmony group with a sign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "description": "Chinese zodiac animal; names are case-insensitive.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply a birth date or zodiac animal, with an optional calendar convention.",
+        "anyOf": [
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "animal"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "allies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Rat",
+                "Ox",
+                "Tiger",
+                "Rabbit",
+                "Dragon",
+                "Snake",
+                "Horse",
+                "Goat",
+                "Monkey",
+                "Rooster",
+                "Dog",
+                "Pig"
+              ],
+              "description": "Chinese zodiac animal."
+            },
+            "description": "The two allied zodiac animals."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "animal",
+          "allies"
+        ],
+        "description": "Traditional zodiac allies."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_day",
+      "service": "fengshui",
+      "name": "get_zodiac_day",
+      "description": "Get the day zodiac animal and stem-branch pillar for a date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Gregorian date for the day pillar."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "element": {
+            "type": "string",
+            "enum": [
+              "Wood",
+              "Fire",
+              "Earth",
+              "Metal",
+              "Water"
+            ],
+            "description": "Five-element association."
+          },
+          "pillar": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Combined stem-branch name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "stem": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Heavenly stem."
+              },
+              "branch": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "animal": {
+                    "type": "string",
+                    "enum": [
+                      "Rat",
+                      "Ox",
+                      "Tiger",
+                      "Rabbit",
+                      "Dragon",
+                      "Snake",
+                      "Horse",
+                      "Goat",
+                      "Monkey",
+                      "Rooster",
+                      "Dog",
+                      "Pig"
+                    ],
+                    "description": "Chinese zodiac animal."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "animal",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Earthly branch."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "hanzi",
+              "stem",
+              "branch"
+            ],
+            "description": "Stem-branch pillar."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date",
+          "animal",
+          "element",
+          "pillar"
+        ],
+        "description": "Day zodiac and pillar result."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_enemy",
+      "service": "fengshui",
+      "name": "get_zodiac_enemy",
+      "description": "Get the opposite, traditionally clashing zodiac animal for a sign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "description": "Chinese zodiac animal; names are case-insensitive.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply a birth date or zodiac animal, with an optional calendar convention.",
+        "anyOf": [
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "animal"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "enemy": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "animal",
+          "enemy"
+        ],
+        "description": "Traditional zodiac clash."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_hour",
+      "service": "fengshui",
+      "name": "get_zodiac_hour",
+      "description": "Get the zodiac animal and earthly branch for a local two-hour period; this does not calculate a full hour pillar.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "description": "Local time in 24-hour HH:MM format.",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time"
+        ],
+        "description": "Local time for the hour zodiac sign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "description": "Requested local time."
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "branch": {
+            "type": "object",
+            "properties": {
+              "pinyin": {
+                "type": "string",
+                "description": "Traditional name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "animal": {
+                "type": "string",
+                "enum": [
+                  "Rat",
+                  "Ox",
+                  "Tiger",
+                  "Rabbit",
+                  "Dragon",
+                  "Snake",
+                  "Horse",
+                  "Goat",
+                  "Monkey",
+                  "Rooster",
+                  "Dog",
+                  "Pig"
+                ],
+                "description": "Chinese zodiac animal."
+              },
+              "element": {
+                "type": "string",
+                "enum": [
+                  "Wood",
+                  "Fire",
+                  "Earth",
+                  "Metal",
+                  "Water"
+                ],
+                "description": "Five-element association."
+              },
+              "polarity": {
+                "type": "string",
+                "enum": [
+                  "Yin",
+                  "Yang"
+                ],
+                "description": "Yin or Yang polarity."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "pinyin",
+              "hanzi",
+              "animal",
+              "element",
+              "polarity"
+            ],
+            "description": "Earthly branch."
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "Start of the two-hour period in HH:MM format."
+          },
+          "endsAt": {
+            "type": "string",
+            "description": "End of the two-hour period in HH:MM format."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "time",
+          "animal",
+          "branch",
+          "startsAt",
+          "endsAt"
+        ],
+        "description": "Hour zodiac result."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_month",
+      "service": "fengshui",
+      "name": "get_zodiac_month",
+      "description": "Get the lunar month or solar-term month zodiac and pillar for a date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Birth date and optional calendar convention."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "startsOn": {
+            "type": "string",
+            "description": "First Gregorian date included in this calendar period.",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": "string",
+            "description": "Last Gregorian date included in this calendar period.",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "pillar": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Combined stem-branch name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "stem": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Heavenly stem."
+              },
+              "branch": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "animal": {
+                    "type": "string",
+                    "enum": [
+                      "Rat",
+                      "Ox",
+                      "Tiger",
+                      "Rabbit",
+                      "Dragon",
+                      "Snake",
+                      "Horse",
+                      "Goat",
+                      "Monkey",
+                      "Rooster",
+                      "Dog",
+                      "Pig"
+                    ],
+                    "description": "Chinese zodiac animal."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "animal",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Earthly branch."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "hanzi",
+              "stem",
+              "branch"
+            ],
+            "description": "Stem-branch pillar."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "Lunar month number, present for the lunar calendar."
+          },
+          "leap": {
+            "type": "boolean",
+            "description": "Whether this is a leap lunar month."
+          },
+          "term": {
+            "type": "object",
+            "properties": {
+              "pinyin": {
+                "type": "string",
+                "description": "Traditional name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "english": {
+                "type": "string",
+                "description": "English name of the solar term."
+              },
+              "longitude": {
+                "type": "integer",
+                "description": "Apparent solar longitude in degrees."
+              },
+              "occursAt": {
+                "type": "string",
+                "description": "Astronomical instant of the solar term.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "Solar term opening the month, present for the solar calendar."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date",
+          "calendar",
+          "startsOn",
+          "endsOn",
+          "animal",
+          "pillar"
+        ],
+        "description": "Chinese month zodiac result."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_peach_blossom",
+      "service": "fengshui",
+      "name": "get_zodiac_peach_blossom",
+      "description": "Get the traditional Peach Blossom zodiac animal and compass direction for a sign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "description": "Chinese zodiac animal; names are case-insensitive.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply a birth date or zodiac animal, with an optional calendar convention.",
+        "anyOf": [
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "animal"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "peachBlossom": {
+            "type": "object",
+            "properties": {
+              "animal": {
+                "type": "string",
+                "enum": [
+                  "Rat",
+                  "Ox",
+                  "Tiger",
+                  "Rabbit",
+                  "Dragon",
+                  "Snake",
+                  "Horse",
+                  "Goat",
+                  "Monkey",
+                  "Rooster",
+                  "Dog",
+                  "Pig"
+                ],
+                "description": "Chinese zodiac animal."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "N",
+                  "NE",
+                  "E",
+                  "SE",
+                  "S",
+                  "SW",
+                  "W",
+                  "NW"
+                ],
+                "description": "Compass direction."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "animal",
+              "direction"
+            ],
+            "description": "Peach Blossom animal and direction."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "animal",
+          "peachBlossom"
+        ],
+        "description": "Traditional Peach Blossom result."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_secret_friend",
+      "service": "fengshui",
+      "name": "get_zodiac_secret_friend",
+      "description": "Get the zodiac animal forming a traditional six-harmony pair with a sign.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "description": "Chinese zodiac animal; names are case-insensitive.",
+            "pattern": "^\\s*(?:[rR][aA][tT]|[oO][xX]|[tT][iI][gG][eE][rR]|[rR][aA][bB][bB][iI][tT]|[dD][rR][aA][gG][oO][nN]|[sS][nN][aA][kK][eE]|[hH][oO][rR][sS][eE]|[gG][oO][aA][tT]|[mM][oO][nN][kK][eE][yY]|[rR][oO][oO][sS][tT][eE][rR]|[dD][oO][gG]|[pP][iI][gG])\\s*$"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply a birth date or zodiac animal, with an optional calendar convention.",
+        "anyOf": [
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "animal"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "secretFriend": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "animal",
+          "secretFriend"
+        ],
+        "description": "Traditional zodiac six-harmony partner."
+      }
+    },
+    {
+      "id": "fengshui.get_zodiac_year",
+      "service": "fengshui",
+      "name": "get_zodiac_year",
+      "description": "Get the Chinese year zodiac animal, element and stem-branch pillar for a date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Birth date and optional calendar convention."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Gregorian date in YYYY-MM-DD format, from 1700-01-01 through 2300-12-31. Dates and calendar calculations use China Standard Time (UTC+8).",
+            "format": "date"
+          },
+          "calendar": {
+            "type": "string",
+            "enum": [
+              "lunar",
+              "solar"
+            ],
+            "description": "Calendar convention: lunar starts years at Chinese New Year; solar starts years at Li Chun and months at the twelve jie solar terms (Ba Zi convention). Input dates are always Gregorian.",
+            "default": "lunar"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Gregorian year in which the Chinese year began."
+          },
+          "startsOn": {
+            "type": "string",
+            "description": "First Gregorian date included in this calendar period.",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": "string",
+            "description": "Last Gregorian date included in this calendar period.",
+            "format": "date"
+          },
+          "animal": {
+            "type": "string",
+            "enum": [
+              "Rat",
+              "Ox",
+              "Tiger",
+              "Rabbit",
+              "Dragon",
+              "Snake",
+              "Horse",
+              "Goat",
+              "Monkey",
+              "Rooster",
+              "Dog",
+              "Pig"
+            ],
+            "description": "Chinese zodiac animal."
+          },
+          "element": {
+            "type": "string",
+            "enum": [
+              "Wood",
+              "Fire",
+              "Earth",
+              "Metal",
+              "Water"
+            ],
+            "description": "Five-element association."
+          },
+          "polarity": {
+            "type": "string",
+            "enum": [
+              "Yin",
+              "Yang"
+            ],
+            "description": "Yin or Yang polarity."
+          },
+          "pillar": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Combined stem-branch name in pinyin."
+              },
+              "hanzi": {
+                "type": "string",
+                "description": "Traditional name in Chinese characters."
+              },
+              "stem": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Heavenly stem."
+              },
+              "branch": {
+                "type": "object",
+                "properties": {
+                  "pinyin": {
+                    "type": "string",
+                    "description": "Traditional name in pinyin."
+                  },
+                  "hanzi": {
+                    "type": "string",
+                    "description": "Traditional name in Chinese characters."
+                  },
+                  "animal": {
+                    "type": "string",
+                    "enum": [
+                      "Rat",
+                      "Ox",
+                      "Tiger",
+                      "Rabbit",
+                      "Dragon",
+                      "Snake",
+                      "Horse",
+                      "Goat",
+                      "Monkey",
+                      "Rooster",
+                      "Dog",
+                      "Pig"
+                    ],
+                    "description": "Chinese zodiac animal."
+                  },
+                  "element": {
+                    "type": "string",
+                    "enum": [
+                      "Wood",
+                      "Fire",
+                      "Earth",
+                      "Metal",
+                      "Water"
+                    ],
+                    "description": "Five-element association."
+                  },
+                  "polarity": {
+                    "type": "string",
+                    "enum": [
+                      "Yin",
+                      "Yang"
+                    ],
+                    "description": "Yin or Yang polarity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "pinyin",
+                  "hanzi",
+                  "animal",
+                  "element",
+                  "polarity"
+                ],
+                "description": "Earthly branch."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name",
+              "hanzi",
+              "stem",
+              "branch"
+            ],
+            "description": "Stem-branch pillar."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date",
+          "calendar",
+          "year",
+          "startsOn",
+          "endsOn",
+          "animal",
+          "element",
+          "polarity",
+          "pillar"
+        ],
+        "description": "Chinese year zodiac result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,907 @@
+{
+  "service": "tikhub",
+  "displayName": "TikHub",
+  "categories": [
+    "Data",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "tikhub_api_token",
+      "description": "TikHub API token sent with the Authorization: Bearer header. Create it in the TikHub API key dashboard. Grant /api/v1/tikhub/user/ for validation and User actions. For invoke_endpoint, grant the requiredScope values returned by discover_endpoints for the functional endpoints you intend to call."
+    }
+  ],
+  "homepageUrl": "https://tikhub.io/",
+  "actions": [
+    {
+      "id": "tikhub.calculate_price",
+      "service": "tikhub",
+      "name": "calculate_price",
+      "description": "Calculate TikHub daily request pricing for one endpoint. Requires the /api/v1/tikhub/user/ TikHub path scope.",
+      "operationType": "read",
+      "requiredScopes": [
+        "/api/v1/tikhub/user/"
+      ],
+      "providerPermissions": [
+        "/api/v1/tikhub/user/"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TikHub endpoint path to inspect or price.",
+            "pattern": "^/"
+          },
+          "requestPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The expected number of daily requests used for the price calculation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpoint"
+        ],
+        "description": "The input payload for calculating TikHub endpoint pricing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The status-like code returned in the TikHub response body."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The status-like code returned in the TikHub response body."
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub request identifier when returned."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub response message when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub response message when returned."
+              },
+              "router": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub router path reported by the response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub router path reported by the response."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The request parameters echoed by TikHub when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request parameters echoed by TikHub when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized TikHub response envelope."
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "The endpoint path used for the calculation."
+          },
+          "requestPerDay": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The daily request count used for the calculation."
+          },
+          "price": {
+            "description": "The raw data payload returned by TikHub."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw TikHub response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when calculating TikHub endpoint pricing."
+      }
+    },
+    {
+      "id": "tikhub.discover_endpoints",
+      "service": "tikhub",
+      "name": "discover_endpoints",
+      "description": "Discover current TikHub functional API endpoints from the official OpenAPI catalog, excluding account APIs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Short title, operation ID, category, or path terms to match."
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "An exact TikHub functional API family name."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024,
+                "description": "An opaque cursor bound to the current catalog version and filters."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An opaque cursor bound to the current catalog version and filters."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The maximum number of OpenAPI operations to inspect in this page.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for discovering current TikHub endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string",
+            "description": "The SHA-256 digest of the current TikHub OpenAPI catalog."
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "description": "The OpenAPI operation identifier reported by TikHub."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The endpoint title from the TikHub OpenAPI catalog."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The TikHub API family from the OpenAPI catalog."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current endpoint description from the TikHub OpenAPI catalog."
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "GET",
+                    "POST"
+                  ],
+                  "description": "The HTTP method accepted by this endpoint."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The absolute TikHub API path or path template."
+                },
+                "requiredScope": {
+                  "type": "string",
+                  "description": "The TikHub token path scope required by this endpoint."
+                },
+                "contractHash": {
+                  "type": "string",
+                  "description": "The SHA-256 digest of the normalized operation contract."
+                },
+                "requestSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The dynamic path, query, and JSON body request schema."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One currently discovered TikHub endpoint contract."
+            },
+            "description": "The endpoints discovered in this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next opaque catalog cursor when more entries remain."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next opaque catalog cursor when more entries remain."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Whether discovery used a recent stale catalog after a refresh failure."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current page of TikHub functional endpoint contracts."
+      },
+      "followUpActions": [
+        "tikhub.invoke_endpoint"
+      ]
+    },
+    {
+      "id": "tikhub.get_all_endpoints_info",
+      "service": "tikhub",
+      "name": "get_all_endpoints_info",
+      "description": "Get TikHub cost and metadata for all endpoints. Requires the /api/v1/tikhub/user/ TikHub path scope.",
+      "operationType": "read",
+      "requiredScopes": [
+        "/api/v1/tikhub/user/"
+      ],
+      "providerPermissions": [
+        "/api/v1/tikhub/user/"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting all TikHub endpoint information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The status-like code returned in the TikHub response body."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The status-like code returned in the TikHub response body."
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub request identifier when returned."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub response message when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub response message when returned."
+              },
+              "router": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub router path reported by the response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub router path reported by the response."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The request parameters echoed by TikHub when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request parameters echoed by TikHub when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized TikHub response envelope."
+          },
+          "endpoints": {
+            "description": "The raw data payload returned by TikHub."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw TikHub response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting all TikHub endpoint information."
+      }
+    },
+    {
+      "id": "tikhub.get_endpoint_info",
+      "service": "tikhub",
+      "name": "get_endpoint_info",
+      "description": "Get TikHub cost and metadata for one endpoint. Requires the /api/v1/tikhub/user/ TikHub path scope.",
+      "operationType": "read",
+      "requiredScopes": [
+        "/api/v1/tikhub/user/"
+      ],
+      "providerPermissions": [
+        "/api/v1/tikhub/user/"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TikHub endpoint path to inspect or price.",
+            "pattern": "^/"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting TikHub endpoint information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The status-like code returned in the TikHub response body."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The status-like code returned in the TikHub response body."
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub request identifier when returned."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub response message when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub response message when returned."
+              },
+              "router": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub router path reported by the response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub router path reported by the response."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The request parameters echoed by TikHub when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request parameters echoed by TikHub when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized TikHub response envelope."
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "The endpoint path that was inspected."
+          },
+          "endpointInfo": {
+            "description": "The raw data payload returned by TikHub."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw TikHub response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting TikHub endpoint information."
+      }
+    },
+    {
+      "id": "tikhub.get_user_daily_usage",
+      "service": "tikhub",
+      "name": "get_user_daily_usage",
+      "description": "Get the current TikHub account daily API usage. Requires the /api/v1/tikhub/user/ TikHub path scope.",
+      "operationType": "read",
+      "requiredScopes": [
+        "/api/v1/tikhub/user/"
+      ],
+      "providerPermissions": [
+        "/api/v1/tikhub/user/"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting TikHub daily usage."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The status-like code returned in the TikHub response body."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The status-like code returned in the TikHub response body."
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub request identifier when returned."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub response message when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub response message when returned."
+              },
+              "router": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub router path reported by the response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub router path reported by the response."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The request parameters echoed by TikHub when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request parameters echoed by TikHub when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized TikHub response envelope."
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One TikHub daily usage entry."
+            },
+            "description": "The daily usage entries returned by TikHub."
+          },
+          "rawData": {
+            "description": "The raw data payload returned by TikHub."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw TikHub response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting TikHub daily usage."
+      }
+    },
+    {
+      "id": "tikhub.get_user_info",
+      "service": "tikhub",
+      "name": "get_user_info",
+      "description": "Get the current TikHub account and API key information. Requires the /api/v1/tikhub/user/ TikHub path scope.",
+      "operationType": "read",
+      "requiredScopes": [
+        "/api/v1/tikhub/user/"
+      ],
+      "providerPermissions": [
+        "/api/v1/tikhub/user/"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting TikHub user information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "envelope": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The status-like code returned in the TikHub response body."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The status-like code returned in the TikHub response body."
+              },
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub request identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub request identifier when returned."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub response message when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub response message when returned."
+              },
+              "router": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TikHub router path reported by the response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TikHub router path reported by the response."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The request parameters echoed by TikHub when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request parameters echoed by TikHub when returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized TikHub response envelope."
+          },
+          "apiKey": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "api_key_name": {
+                    "type": "string",
+                    "description": "The API key name."
+                  },
+                  "api_key_scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A TikHub path scope assigned to the API key."
+                    },
+                    "description": "The TikHub path scopes assigned to the API key."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "description": "The API key creation timestamp."
+                  },
+                  "expires_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The API key expiration timestamp when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The API key expiration timestamp when configured."
+                  },
+                  "api_key_status": {
+                    "type": "integer",
+                    "description": "The API key status value returned by TikHub."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "TikHub API key metadata returned for the current token."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "TikHub API key metadata returned for the current token."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The TikHub account email address."
+                  },
+                  "balance": {
+                    "type": "number",
+                    "description": "The current account balance."
+                  },
+                  "free_credit": {
+                    "type": "number",
+                    "description": "The remaining free credit balance."
+                  },
+                  "email_verified": {
+                    "type": "boolean",
+                    "description": "Whether the TikHub account email is verified."
+                  },
+                  "account_disabled": {
+                    "type": "boolean",
+                    "description": "Whether the TikHub account is disabled."
+                  },
+                  "is_active": {
+                    "type": "boolean",
+                    "description": "Whether the TikHub account is active."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "TikHub account metadata returned for the current token."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "TikHub account metadata returned for the current token."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A TikHub path scope assigned to the API key."
+            },
+            "description": "The TikHub path scopes assigned to the current API key."
+          },
+          "rawData": {
+            "description": "The raw data payload returned by TikHub."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw TikHub response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting TikHub user information."
+      }
+    },
+    {
+      "id": "tikhub.invoke_endpoint",
+      "service": "tikhub",
+      "name": "invoke_endpoint",
+      "description": "Invoke one TikHub functional API endpoint at the fixed TikHub API origin. TikHub account endpoints are excluded.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The approved TikHub endpoint HTTP method."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The absolute TikHub API path or OpenAPI path template."
+          },
+          "request": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Path placeholder values keyed by placeholder name."
+              },
+              "query": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Query values keyed by the exact upstream parameter name."
+              },
+              "body": {
+                "description": "The JSON request body for an approved POST endpoint, or null when absent."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The path, query, and optional JSON body sent to one TikHub endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A controlled dynamic TikHub endpoint invocation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The HTTP method used for the TikHub request."
+          },
+          "path": {
+            "type": "string",
+            "description": "The final encoded TikHub API path used for the request."
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599,
+            "description": "The successful upstream HTTP status."
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The TikHub request identifier when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The TikHub request identifier when returned."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete successful TikHub JSON response body."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized successful TikHub endpoint response."
+      },
+      "followUpActions": [
+        "tikhub.discover_endpoints"
+      ]
+    }
+  ]
+}

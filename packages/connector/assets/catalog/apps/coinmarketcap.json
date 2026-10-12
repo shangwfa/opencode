@@ -1,0 +1,1862 @@
+{
+  "service": "coinmarketcap",
+  "displayName": "CoinMarketCap",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Pro API Key",
+      "placeholder": "coinmarketcap_pro_api_key",
+      "description": "CoinMarketCap Pro API key used with the X-CMC_PRO_API_KEY header. Sign up at https://pro.coinmarketcap.com to receive it, as documented at https://coinmarketcap.com/api/documentation/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://coinmarketcap.com",
+  "actions": [
+    {
+      "id": "coinmarketcap.convert_price",
+      "service": "coinmarketcap",
+      "name": "convert_price",
+      "description": "Convert an asset amount into another fiat or cryptocurrency using CoinMarketCap pricing.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 1e-8,
+            "description": "Amount of the source asset to convert."
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "CoinMarketCap ID of the source asset."
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ticker symbol of the source asset."
+          },
+          "convert": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency symbol used for conversion."
+          },
+          "convert_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CoinMarketCap ID of the target currency used instead of convert."
+          },
+          "time": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Historical timestamp or date to use for conversion, when supported by the API plan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "amount"
+        ],
+        "description": "Input parameters for converting one asset amount into another currency. Exactly one of id or symbol is required.",
+        "oneOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "symbol"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "convert",
+                "convert_id"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "CoinMarketCap identifier of the source asset."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Source asset name."
+              },
+              "symbol": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Source asset ticker symbol."
+              },
+              "amount": {
+                "type": "number",
+                "description": "Input amount that was converted."
+              },
+              "last_updated": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp of the price used for conversion."
+              },
+              "quote": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "price": {
+                      "type": "number",
+                      "description": "Converted value for the requested amount."
+                    },
+                    "last_updated": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Timestamp of the converted quote."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Converted quote."
+                },
+                "description": "Mapping of target currency to converted quote."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Price conversion result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Price conversion response returned by CoinMarketCap."
+      }
+    },
+    {
+      "id": "coinmarketcap.get_cryptocurrency_map",
+      "service": "coinmarketcap",
+      "name": "get_cryptocurrency_map",
+      "description": "Retrieve CoinMarketCap asset IDs, symbols, and slugs for cryptocurrency discovery.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated CoinMarketCap asset IDs to filter by."
+          },
+          "listing_status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated listing statuses to include, such as active or inactive."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated asset slugs to filter by."
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated asset symbols to filter by."
+          },
+          "aux": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated auxiliary fields to include, such as platform or first_historical_data."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "id",
+              "cmc_rank"
+            ],
+            "description": "Field used to sort the response."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based offset of the first item to return."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of assets to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving CoinMarketCap asset mappings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "CoinMarketCap cryptocurrency identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset name."
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset ticker symbol."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset slug."
+                },
+                "rank": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Current market capitalization rank."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Current market capitalization rank."
+                },
+                "is_active": {
+                  "type": "integer",
+                  "description": "Whether the asset is active, using CoinMarketCap flags."
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "Internal CoinMarketCap listing status code."
+                },
+                "first_historical_data": {
+                  "type": "string",
+                  "description": "Timestamp of the first available historical data point."
+                },
+                "last_historical_data": {
+                  "type": "string",
+                  "description": "Timestamp of the last available historical data point."
+                },
+                "platform": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "CoinMarketCap platform identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform name."
+                        },
+                        "symbol": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform symbol."
+                        },
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform slug."
+                        },
+                        "token_address": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Token contract address on the platform."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Parent platform information for a token."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent platform information for a token."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "symbol",
+                "slug",
+                "is_active"
+              ],
+              "description": "One asset returned by the CoinMarketCap map endpoint."
+            },
+            "description": "Ordered list of CoinMarketCap asset mappings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Asset mapping response returned by CoinMarketCap."
+      }
+    },
+    {
+      "id": "coinmarketcap.get_key_info",
+      "service": "coinmarketcap",
+      "name": "get_key_info",
+      "description": "Retrieve plan limits and usage details for the current CoinMarketCap API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving API key information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "plan": {
+                "type": "object",
+                "properties": {
+                  "credit_limit_monthly": {
+                    "type": "integer",
+                    "description": "Monthly credit limit available to the API key."
+                  },
+                  "credit_limit_monthly_reset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Human-readable interval until the monthly credit limit resets."
+                  },
+                  "credit_limit_monthly_reset_timestamp": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Timestamp when the monthly credit limit resets."
+                  },
+                  "rate_limit_minute": {
+                    "type": "integer",
+                    "description": "Maximum number of requests allowed per minute."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Plan limits returned by CoinMarketCap."
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "current_minute": {
+                    "type": "object",
+                    "properties": {
+                      "credits_used": {
+                        "type": "integer",
+                        "description": "Credits used within the reported period."
+                      },
+                      "credits_left": {
+                        "type": "integer",
+                        "description": "Credits remaining within the reported period."
+                      },
+                      "requests_made": {
+                        "type": "integer",
+                        "description": "Requests already made within the reported minute bucket."
+                      },
+                      "requests_left": {
+                        "type": "integer",
+                        "description": "Requests remaining within the reported minute bucket."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Usage metrics for one CoinMarketCap billing bucket."
+                  },
+                  "current_day": {
+                    "type": "object",
+                    "properties": {
+                      "credits_used": {
+                        "type": "integer",
+                        "description": "Credits used within the reported period."
+                      },
+                      "credits_left": {
+                        "type": "integer",
+                        "description": "Credits remaining within the reported period."
+                      },
+                      "requests_made": {
+                        "type": "integer",
+                        "description": "Requests already made within the reported minute bucket."
+                      },
+                      "requests_left": {
+                        "type": "integer",
+                        "description": "Requests remaining within the reported minute bucket."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Usage metrics for one CoinMarketCap billing bucket."
+                  },
+                  "current_month": {
+                    "type": "object",
+                    "properties": {
+                      "credits_used": {
+                        "type": "integer",
+                        "description": "Credits used within the reported period."
+                      },
+                      "credits_left": {
+                        "type": "integer",
+                        "description": "Credits remaining within the reported period."
+                      },
+                      "requests_made": {
+                        "type": "integer",
+                        "description": "Requests already made within the reported minute bucket."
+                      },
+                      "requests_left": {
+                        "type": "integer",
+                        "description": "Requests remaining within the reported minute bucket."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Usage metrics for one CoinMarketCap billing bucket."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Current API key usage metrics."
+              }
+            },
+            "additionalProperties": false,
+            "description": "CoinMarketCap API key details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "CoinMarketCap API key information."
+      }
+    },
+    {
+      "id": "coinmarketcap.get_latest_cryptocurrency_quotes",
+      "service": "coinmarketcap",
+      "name": "get_latest_cryptocurrency_quotes",
+      "description": "Retrieve the latest quotes for one or more cryptocurrencies by id, symbol, or slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated CoinMarketCap asset IDs to query."
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated asset symbols to query."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated asset slugs to query."
+          },
+          "convert": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated quote currency symbols to convert into."
+          },
+          "convert_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated CoinMarketCap IDs of quote currencies to convert into."
+          },
+          "skip_invalid": {
+            "type": "boolean",
+            "description": "Whether invalid identifiers should be silently skipped by CoinMarketCap."
+          },
+          "aux": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated auxiliary asset fields to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving latest asset quotes. Exactly one of id, symbol, or slug is required.",
+        "oneOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "symbol"
+            ]
+          },
+          {
+            "required": [
+              "slug"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "convert",
+                "convert_id"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "CoinMarketCap cryptocurrency identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset name."
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset ticker symbol."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset slug."
+                },
+                "cmc_rank": {
+                  "type": "integer",
+                  "description": "Current market capitalization rank."
+                },
+                "num_market_pairs": {
+                  "type": "integer",
+                  "description": "Number of known market pairs for the asset."
+                },
+                "circulating_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Estimated circulating supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated circulating supply."
+                },
+                "total_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Reported total supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reported total supply."
+                },
+                "max_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Reported maximum supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reported maximum supply."
+                },
+                "is_active": {
+                  "type": "integer",
+                  "description": "Whether the asset is active."
+                },
+                "is_fiat": {
+                  "type": "integer",
+                  "description": "Whether the asset is fiat."
+                },
+                "date_added": {
+                  "type": "string",
+                  "description": "Timestamp when the asset was added to CoinMarketCap."
+                },
+                "tags": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Tag name."
+                      },
+                      "description": "Classification tags for the asset."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Classification tags for the asset."
+                },
+                "platform": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "CoinMarketCap platform identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform name."
+                        },
+                        "symbol": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform symbol."
+                        },
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform slug."
+                        },
+                        "token_address": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Token contract address on the platform."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Parent platform information for a token."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent platform information for a token."
+                },
+                "quote": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "price": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Latest converted price."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Latest converted price."
+                      },
+                      "volume_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Rolling 24-hour traded volume."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rolling 24-hour traded volume."
+                      },
+                      "volume_change_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage change of the 24-hour traded volume."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage change of the 24-hour traded volume."
+                      },
+                      "percent_change_1h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past hour."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past hour."
+                      },
+                      "percent_change_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 24 hours."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 24 hours."
+                      },
+                      "percent_change_7d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 7 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 7 days."
+                      },
+                      "percent_change_30d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 30 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 30 days."
+                      },
+                      "percent_change_60d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 60 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 60 days."
+                      },
+                      "percent_change_90d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 90 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 90 days."
+                      },
+                      "market_cap": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Current market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Current market capitalization."
+                      },
+                      "market_cap_dominance": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage dominance of the total market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage dominance of the total market capitalization."
+                      },
+                      "fully_diluted_market_cap": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Fully diluted market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Fully diluted market capitalization."
+                      },
+                      "tvl": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Total value locked when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Total value locked when available."
+                      },
+                      "last_updated": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Timestamp of the returned quote."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Timestamp of the returned quote."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Converted quote metrics keyed by conversion currency."
+                  },
+                  "description": "Mapping of conversion currency to quote metrics."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "symbol",
+                "slug",
+                "quote"
+              ],
+              "description": "Latest quote payload for one asset."
+            },
+            "description": "Mapping of requested identifiers to latest asset quotes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Latest quote response returned by CoinMarketCap."
+      }
+    },
+    {
+      "id": "coinmarketcap.get_latest_global_metrics_quotes",
+      "service": "coinmarketcap",
+      "name": "get_latest_global_metrics_quotes",
+      "description": "Retrieve the latest global cryptocurrency market metrics and quote aggregates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "convert": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Quote currency symbol to convert the metrics into."
+          },
+          "convert_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CoinMarketCap quote currency ID used instead of convert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the latest global market metrics.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "convert",
+                "convert_id"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "active_cryptocurrencies": {
+                "type": "integer",
+                "description": "Number of active cryptocurrencies tracked by CoinMarketCap."
+              },
+              "total_cryptocurrencies": {
+                "type": "integer",
+                "description": "Total number of cryptocurrencies tracked by CoinMarketCap."
+              },
+              "active_market_pairs": {
+                "type": "integer",
+                "description": "Number of active market pairs."
+              },
+              "active_exchanges": {
+                "type": "integer",
+                "description": "Number of active exchanges."
+              },
+              "total_exchanges": {
+                "type": "integer",
+                "description": "Total number of tracked exchanges."
+              },
+              "eth_dominance": {
+                "type": "number",
+                "description": "Ethereum market cap dominance."
+              },
+              "btc_dominance": {
+                "type": "number",
+                "description": "Bitcoin market cap dominance."
+              },
+              "eth_dominance_yesterday": {
+                "type": "number",
+                "description": "Ethereum market cap dominance reported for yesterday."
+              },
+              "btc_dominance_yesterday": {
+                "type": "number",
+                "description": "Bitcoin market cap dominance reported for yesterday."
+              },
+              "quote": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "price": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Latest converted price."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Latest converted price."
+                    },
+                    "volume_24h": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Rolling 24-hour traded volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Rolling 24-hour traded volume."
+                    },
+                    "volume_change_24h": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage change of the 24-hour traded volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage change of the 24-hour traded volume."
+                    },
+                    "percent_change_1h": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past hour."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past hour."
+                    },
+                    "percent_change_24h": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past 24 hours."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past 24 hours."
+                    },
+                    "percent_change_7d": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past 7 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past 7 days."
+                    },
+                    "percent_change_30d": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past 30 days."
+                    },
+                    "percent_change_60d": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past 60 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past 60 days."
+                    },
+                    "percent_change_90d": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage price change over the past 90 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage price change over the past 90 days."
+                    },
+                    "market_cap": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Current market capitalization."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Current market capitalization."
+                    },
+                    "market_cap_dominance": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Percentage dominance of the total market capitalization."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Percentage dominance of the total market capitalization."
+                    },
+                    "fully_diluted_market_cap": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Fully diluted market capitalization."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fully diluted market capitalization."
+                    },
+                    "tvl": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Total value locked when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Total value locked when available."
+                    },
+                    "last_updated": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Timestamp of the returned quote."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Timestamp of the returned quote."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Converted quote metrics keyed by conversion currency."
+                },
+                "description": "Mapping of conversion currency to quote metrics."
+              },
+              "last_updated": {
+                "type": "string",
+                "description": "Timestamp when the global metrics were updated."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "quote"
+            ],
+            "description": "Latest global cryptocurrency market metrics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Latest global market metrics response returned by CoinMarketCap."
+      }
+    },
+    {
+      "id": "coinmarketcap.list_latest_cryptocurrency_listings",
+      "service": "coinmarketcap",
+      "name": "list_latest_cryptocurrency_listings",
+      "description": "Retrieve the latest cryptocurrency listings ordered by CoinMarketCap ranking and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based offset of the first item to return."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of assets to return."
+          },
+          "price_min": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum asset price filter."
+          },
+          "price_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum asset price filter."
+          },
+          "market_cap_min": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum market capitalization filter."
+          },
+          "market_cap_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum market capitalization filter."
+          },
+          "volume_24h_min": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum 24-hour traded volume filter."
+          },
+          "volume_24h_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum 24-hour traded volume filter."
+          },
+          "circulating_supply_min": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum circulating supply filter."
+          },
+          "circulating_supply_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum circulating supply filter."
+          },
+          "percent_change_24h_min": {
+            "type": "number",
+            "description": "Minimum 24-hour percentage change filter."
+          },
+          "percent_change_24h_max": {
+            "type": "number",
+            "description": "Maximum 24-hour percentage change filter."
+          },
+          "convert": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Quote currency symbol to convert the listings into."
+          },
+          "convert_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CoinMarketCap quote currency ID used instead of convert."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "market_cap",
+              "price",
+              "volume_24h",
+              "percent_change_24h",
+              "name"
+            ],
+            "description": "Field used to sort the returned listings."
+          },
+          "sort_dir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction used by CoinMarketCap."
+          },
+          "cryptocurrency_type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "coins",
+              "tokens"
+            ],
+            "description": "Asset type filter used by CoinMarketCap."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated asset tags to filter by."
+          },
+          "aux": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated auxiliary asset fields to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the latest cryptocurrency listings.",
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "convert",
+                "convert_id"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Timestamp when CoinMarketCap generated the response."
+              },
+              "error_code": {
+                "type": "integer",
+                "description": "CoinMarketCap error code where 0 indicates success."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error message returned by CoinMarketCap, or null when the request succeeded."
+              },
+              "elapsed": {
+                "type": "integer",
+                "description": "Time spent by CoinMarketCap processing the request."
+              },
+              "credit_count": {
+                "type": "integer",
+                "description": "API credits consumed by the request."
+              },
+              "notice": {
+                "type": "string",
+                "description": "Additional notice returned by CoinMarketCap when present."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "timestamp",
+              "error_code",
+              "elapsed",
+              "credit_count"
+            ],
+            "description": "CoinMarketCap response status metadata."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "CoinMarketCap cryptocurrency identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset name."
+                },
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset ticker symbol."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Asset slug."
+                },
+                "cmc_rank": {
+                  "type": "integer",
+                  "description": "Current market capitalization rank."
+                },
+                "num_market_pairs": {
+                  "type": "integer",
+                  "description": "Number of known market pairs for the asset."
+                },
+                "circulating_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Estimated circulating supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Estimated circulating supply."
+                },
+                "total_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Reported total supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reported total supply."
+                },
+                "max_supply": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Reported maximum supply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Reported maximum supply."
+                },
+                "date_added": {
+                  "type": "string",
+                  "description": "Timestamp when the asset was added to CoinMarketCap."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Tag name."
+                  },
+                  "description": "Classification tags for the asset."
+                },
+                "platform": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "CoinMarketCap platform identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform name."
+                        },
+                        "symbol": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform symbol."
+                        },
+                        "slug": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Platform slug."
+                        },
+                        "token_address": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Token contract address on the platform."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Parent platform information for a token."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent platform information for a token."
+                },
+                "quote": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "price": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Latest converted price."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Latest converted price."
+                      },
+                      "volume_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Rolling 24-hour traded volume."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Rolling 24-hour traded volume."
+                      },
+                      "volume_change_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage change of the 24-hour traded volume."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage change of the 24-hour traded volume."
+                      },
+                      "percent_change_1h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past hour."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past hour."
+                      },
+                      "percent_change_24h": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 24 hours."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 24 hours."
+                      },
+                      "percent_change_7d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 7 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 7 days."
+                      },
+                      "percent_change_30d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 30 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 30 days."
+                      },
+                      "percent_change_60d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 60 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 60 days."
+                      },
+                      "percent_change_90d": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage price change over the past 90 days."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage price change over the past 90 days."
+                      },
+                      "market_cap": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Current market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Current market capitalization."
+                      },
+                      "market_cap_dominance": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Percentage dominance of the total market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Percentage dominance of the total market capitalization."
+                      },
+                      "fully_diluted_market_cap": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Fully diluted market capitalization."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Fully diluted market capitalization."
+                      },
+                      "tvl": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "Total value locked when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Total value locked when available."
+                      },
+                      "last_updated": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Timestamp of the returned quote."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Timestamp of the returned quote."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Converted quote metrics keyed by conversion currency."
+                  },
+                  "description": "Mapping of conversion currency to quote metrics."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "symbol",
+                "slug",
+                "quote"
+              ],
+              "description": "One asset returned by the latest listings endpoint."
+            },
+            "description": "Ordered list of latest cryptocurrency listings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Latest listings response returned by CoinMarketCap."
+      }
+    }
+  ]
+}

@@ -1,0 +1,619 @@
+{
+  "service": "lessonspace",
+  "displayName": "Lessonspace",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "LESSONSPACE_API_KEY",
+      "description": "Lessonspace API key sent with the Authorization: Organisation <API_KEY> header. Generate it in your Lessonspace dashboard under Settings > Developer: https://helpdesk.thelessonspace.com/article/86-does-lessonspace-have-an-api",
+      "extraFields": [
+        {
+          "key": "organisationId",
+          "label": "Organisation ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "org_123",
+          "description": "The Lessonspace organisation identifier used in organisation-scoped API paths. Use the organisation id from your Lessonspace environment when calling organisation session endpoints."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.thelessonspace.com",
+  "actions": [
+    {
+      "id": "lessonspace.create_unified_space",
+      "service": "lessonspace",
+      "name": "create_unified_space",
+      "description": "Create or retrieve a Lessonspace space through the official launch endpoint and return the join URL plus room credentials.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Lessonspace launch identifier for the space."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Lessonspace space name."
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The external user identifier used by the caller."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The display name shown inside Lessonspace."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address used by Lessonspace to identify the user.",
+                "format": "email"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "teacher",
+                  "student",
+                  "admin"
+                ],
+                "description": "The Lessonspace role assigned to the launched user."
+              },
+              "leader": {
+                "type": "boolean",
+                "description": "Whether the launched user should join as a leader."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "The Lessonspace user object passed to the launch endpoint."
+          },
+          "features": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "description": "A Lessonspace feature boolean value."
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Lessonspace feature string value."
+                },
+                {
+                  "type": "integer",
+                  "description": "A Lessonspace feature integer value."
+                }
+              ],
+              "description": "One Lessonspace feature flag value."
+            },
+            "description": "Lessonspace features passed directly to the launch payload."
+          },
+          "invite_url": {
+            "type": "string",
+            "description": "Custom invite URL used by the Lessonspace Invite Others button.",
+            "format": "uri"
+          },
+          "resource_url": {
+            "type": "string",
+            "description": "Custom resource library URL.",
+            "format": "uri"
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag value."
+            },
+            "description": "Key-value tags applied to the Lessonspace session."
+          },
+          "space_tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag value."
+            },
+            "description": "Key-value tags applied to the Lessonspace space."
+          },
+          "holodeck_parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Advanced Holodeck parameters passed through to Lessonspace."
+          },
+          "auth_external": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "External authentication settings passed through to Lessonspace."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for creating or retrieving a Lessonspace space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by the launch endpoint."
+          },
+          "clientUrl": {
+            "type": "string",
+            "description": "The URL used to open or embed the Lessonspace room.",
+            "format": "uri"
+          },
+          "apiBase": {
+            "type": "string",
+            "description": "The room.sh API base URL returned by Lessonspace.",
+            "format": "uri"
+          },
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The underlying room identifier."
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The room secret returned by Lessonspace."
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The session identifier returned by Lessonspace."
+          },
+          "userId": {
+            "type": "integer",
+            "description": "The internal Lessonspace user identifier."
+          },
+          "roomSettings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The room settings returned by Lessonspace."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw launch payload returned by Lessonspace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Lessonspace launch response."
+      }
+    },
+    {
+      "id": "lessonspace.get_organisation_session",
+      "service": "lessonspace",
+      "name": "get_organisation_session",
+      "description": "Get one Lessonspace organisation session by session UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organisation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Lessonspace organisation identifier."
+          },
+          "session_uuid": {
+            "type": "string",
+            "description": "The Lessonspace session UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session_uuid"
+        ],
+        "description": "Input parameters for reading one Lessonspace session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The internal Lessonspace session identifier."
+              },
+              "uuid": {
+                "type": "string",
+                "description": "The Lessonspace session UUID.",
+                "format": "uuid"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Lessonspace session name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Lessonspace session name when present."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The session start timestamp when present.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The session start timestamp when present."
+              },
+              "endTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The session end timestamp when present.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The session end timestamp when present."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Lessonspace AI lesson summary when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Lessonspace AI lesson summary when present."
+              },
+              "recordingAvailable": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the Lessonspace session recording is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the Lessonspace session recording is available."
+              },
+              "playbackUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The playback URL returned on the session object when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The playback URL returned on the session object when present."
+              },
+              "space": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Lessonspace space UUID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Lessonspace space UUID when present."
+                      },
+                      "slug": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Lessonspace space slug when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Lessonspace space slug when present."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Lessonspace space summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A normalized Lessonspace space summary."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw session payload returned by Lessonspace."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Lessonspace session record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Lessonspace session response."
+      }
+    },
+    {
+      "id": "lessonspace.get_session_recording_url",
+      "service": "lessonspace",
+      "name": "get_session_recording_url",
+      "description": "Get the Lessonspace playback URL for one recorded session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organisation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Lessonspace organisation identifier."
+          },
+          "session_uuid": {
+            "type": "string",
+            "description": "The Lessonspace session UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session_uuid"
+        ],
+        "description": "Input parameters for reading a Lessonspace session recording URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordingUrl": {
+            "type": "string",
+            "description": "The recording URL returned by Lessonspace.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Lessonspace recording URL response."
+      }
+    },
+    {
+      "id": "lessonspace.list_organisation_sessions",
+      "service": "lessonspace",
+      "name": "list_organisation_sessions",
+      "description": "List Lessonspace sessions for one organisation with official filter parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organisation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Lessonspace organisation identifier."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Lessonspace search term or UUID fragment used to filter sessions."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number within the paginated Lessonspace result set."
+          },
+          "include_single_user": {
+            "type": "boolean",
+            "description": "Whether to include sessions with one user only."
+          },
+          "duration_min": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum session duration in seconds."
+          },
+          "duration_max": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum session duration in seconds."
+          },
+          "start_time_after": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "start_time_before": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "end_time_after": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "end_time_before": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "date_after": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "date_before": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp used by the Lessonspace API.",
+            "format": "date-time"
+          },
+          "user": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Lessonspace user identifier."
+            },
+            "description": "Lessonspace user identifiers used to filter sessions.",
+            "minItems": 1
+          },
+          "space": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The Lessonspace space UUID.",
+              "format": "uuid"
+            },
+            "description": "Lessonspace space UUIDs used to filter sessions.",
+            "minItems": 1
+          },
+          "launch_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Launch endpoint id used to filter linked Lessonspace sessions."
+          },
+          "in_progress_only": {
+            "type": "boolean",
+            "description": "Whether to return only in-progress sessions."
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A Lessonspace tag value. Use an empty string to match key presence only."
+            },
+            "description": "Session tags that must match on the Lessonspace API."
+          },
+          "user_external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The external user id supplied to the Lessonspace launch payload."
+          },
+          "user_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial Lessonspace launch user name used to filter sessions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Lessonspace organisation sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The internal Lessonspace session identifier."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The Lessonspace session UUID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Lessonspace session name when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Lessonspace session name when present."
+                },
+                "startTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The session start timestamp when present.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session start timestamp when present."
+                },
+                "endTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The session end timestamp when present.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session end timestamp when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw session payload returned by Lessonspace."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Lessonspace session summary."
+            },
+            "description": "The normalized Lessonspace sessions returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Lessonspace organisation session list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,552 @@
+{
+  "service": "wappalyzer",
+  "displayName": "Wappalyzer",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WAPPALYZER_API_KEY",
+      "description": "Wappalyzer API key sent as the x-api-key header. Create or copy an API key from the Wappalyzer API dashboard: https://www.wappalyzer.com/app/api-key/"
+    }
+  ],
+  "homepageUrl": "https://www.wappalyzer.com/",
+  "actions": [
+    {
+      "id": "wappalyzer.find_subdomains",
+      "service": "wappalyzer",
+      "name": "find_subdomains",
+      "description": "Discover website-serving subdomains for one or more domains with Wappalyzer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "description": "The domains to inspect.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 10,
+            "description": "The maximum number of subdomains to return. Must be a multiple of 10.",
+            "multipleOf": 10
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned as moreAfter by a previous request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "description": "The domain returned by Wappalyzer."
+                },
+                "subdomains": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "createdAt": {
+                        "type": "integer",
+                        "description": "The timestamp when Wappalyzer first observed the subdomain."
+                      },
+                      "updatedAt": {
+                        "type": "integer",
+                        "description": "The timestamp when Wappalyzer last updated the subdomain."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A Wappalyzer subdomain timestamp record."
+                  },
+                  "description": "The subdomain records keyed by subdomain name."
+                },
+                "moreAfter": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The pagination cursor to pass as after when more subdomains are available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The pagination cursor to pass as after when more subdomains are available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Wappalyzer subdomain discovery result."
+            },
+            "description": "The subdomain results returned by Wappalyzer."
+          },
+          "creditHeaders": {
+            "type": "object",
+            "properties": {
+              "spent": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits spent by the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits spent by the request."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits remaining after the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits remaining after the request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Wappalyzer credit headers returned with the API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "creditHeaders"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "wappalyzer.get_credits_balance",
+      "service": "wappalyzer",
+      "name": "get_credits_balance",
+      "description": "Get the current Wappalyzer API credit balance for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "integer",
+            "description": "The current credit balance returned by Wappalyzer."
+          },
+          "creditHeaders": {
+            "type": "object",
+            "properties": {
+              "spent": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits spent by the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits spent by the request."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits remaining after the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits remaining after the request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Wappalyzer credit headers returned with the API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "credits",
+          "creditHeaders"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "wappalyzer.lookup_technologies",
+      "service": "wappalyzer",
+      "name": "lookup_technologies",
+      "description": "Look up website technologies and related intelligence with Wappalyzer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A website URL.",
+              "format": "uri"
+            },
+            "description": "The website URLs to inspect.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "live": {
+            "type": "boolean",
+            "description": "Whether Wappalyzer should scan websites in real time instead of using cached results."
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Wappalyzer result field set."
+            },
+            "description": "Additional result field sets to include. Use signals to request technologySpend and trafficLevel.",
+            "minItems": 1
+          },
+          "denoise": {
+            "type": "boolean",
+            "description": "Whether Wappalyzer should exclude low-confidence detections."
+          },
+          "minAge": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result age in months used to filter Wappalyzer data."
+          },
+          "maxAge": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "The maximum result age in months used to filter Wappalyzer data."
+          },
+          "squash": {
+            "type": "boolean",
+            "description": "Whether Wappalyzer should merge monthly results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "urls"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The website URL returned by Wappalyzer.",
+                  "format": "uri"
+                },
+                "technologies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string",
+                        "description": "The technology slug returned by Wappalyzer."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The technology name returned by Wappalyzer."
+                      },
+                      "cpe": {
+                        "type": "string",
+                        "description": "The CPE identifier returned by Wappalyzer when available."
+                      },
+                      "versions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A detected version."
+                        },
+                        "description": "The technology versions detected by Wappalyzer when available."
+                      },
+                      "categories": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "description": "The category identifier returned by Wappalyzer."
+                            },
+                            "slug": {
+                              "type": "string",
+                              "description": "The category slug returned by Wappalyzer."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The category name returned by Wappalyzer."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A Wappalyzer technology category."
+                        },
+                        "description": "The categories attached to the detected technology."
+                      },
+                      "trafficRank": {
+                        "type": "integer",
+                        "description": "The traffic rank returned by Wappalyzer when available."
+                      },
+                      "confirmedAt": {
+                        "type": "integer",
+                        "description": "The timestamp when Wappalyzer confirmed the detection."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A detected website technology returned by Wappalyzer."
+                  },
+                  "description": "The technologies detected for the website."
+                },
+                "technologySpend": {
+                  "type": "string",
+                  "enum": [
+                    "Very low",
+                    "Low",
+                    "Medium",
+                    "High",
+                    "Very high"
+                  ],
+                  "description": "The estimated technology spend level when requested and available."
+                },
+                "trafficLevel": {
+                  "type": "string",
+                  "enum": [
+                    "Very low",
+                    "Low",
+                    "Medium",
+                    "High",
+                    "Very high"
+                  ],
+                  "description": "The relative monthly traffic level when requested and available."
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One error message."
+                  },
+                  "description": "The lookup errors returned by Wappalyzer for this website."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Wappalyzer technology lookup result."
+            },
+            "description": "The normalized lookup results returned by Wappalyzer."
+          },
+          "creditHeaders": {
+            "type": "object",
+            "properties": {
+              "spent": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits spent by the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits spent by the request."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits remaining after the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits remaining after the request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Wappalyzer credit headers returned with the API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "creditHeaders"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "wappalyzer.verify_email",
+      "service": "wappalyzer",
+      "name": "verify_email",
+      "description": "Verify an email address with Wappalyzer deliverability signals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to verify.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The email address returned by Wappalyzer.",
+                "format": "email"
+              },
+              "domain": {
+                "type": "string",
+                "description": "The email domain returned by Wappalyzer."
+              },
+              "reachable": {
+                "type": "string",
+                "enum": [
+                  "safe",
+                  "risky",
+                  "invalid",
+                  "unknown"
+                ],
+                "description": "The reachability classification returned by Wappalyzer."
+              },
+              "disposable": {
+                "type": "boolean",
+                "description": "Whether the email address uses a disposable mailbox provider."
+              },
+              "roleAccount": {
+                "type": "boolean",
+                "description": "Whether the email address appears to be a role account."
+              },
+              "mxValid": {
+                "type": "boolean",
+                "description": "Whether the email domain has valid MX records."
+              },
+              "connection": {
+                "type": "boolean",
+                "description": "Whether Wappalyzer could connect to the mail server."
+              },
+              "inboxFull": {
+                "type": "boolean",
+                "description": "Whether the mailbox appears to be full."
+              },
+              "catchAll": {
+                "type": "boolean",
+                "description": "Whether the domain appears to accept catch-all email."
+              },
+              "deliverable": {
+                "type": "boolean",
+                "description": "Whether Wappalyzer considers the email deliverable."
+              },
+              "disabled": {
+                "type": "boolean",
+                "description": "Whether the mailbox appears disabled."
+              },
+              "syntaxValid": {
+                "type": "boolean",
+                "description": "Whether the email syntax is valid."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Wappalyzer email verification result."
+          },
+          "creditHeaders": {
+            "type": "object",
+            "properties": {
+              "spent": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits spent by the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits spent by the request."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of credits remaining after the request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of credits remaining after the request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Wappalyzer credit headers returned with the API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result",
+          "creditHeaders"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

@@ -1,0 +1,733 @@
+{
+  "service": "optimoroute",
+  "displayName": "OptimoRoute",
+  "categories": [
+    "Location",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "OPTIMOROUTE_API_KEY",
+      "description": "OptimoRoute API key passed with the key query parameter. Enable Web Service API and copy the generated key in Administration > Settings > WS API: https://optimoroute.com/api/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://optimoroute.com/",
+  "actions": [
+    {
+      "id": "optimoroute.create_or_update_orders",
+      "service": "optimoroute",
+      "name": "create_or_update_orders",
+      "description": "Create, update, merge, or sync one or more OptimoRoute orders in one request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OptimoRoute order identifier assigned by the platform."
+                },
+                "orderNo": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user-specified order identifier."
+                },
+                "relatedOrderNo": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The related order number for linked pickup and delivery pairs."
+                },
+                "relatedId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The related OptimoRoute order identifier."
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "MERGE",
+                    "SYNC",
+                    "CREATE",
+                    "UPDATE"
+                  ],
+                  "description": "The OptimoRoute bulk write mode for this order."
+                },
+                "acceptDuplicateOrderNo": {
+                  "type": "boolean",
+                  "description": "Whether CREATE should allow duplicate orderNo values in OptimoRoute."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The order date in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "duration": {
+                  "type": "number",
+                  "description": "The order duration in minutes."
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "L",
+                    "M",
+                    "H",
+                    "C"
+                  ],
+                  "description": "The OptimoRoute order priority."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "D",
+                    "P",
+                    "T"
+                  ],
+                  "description": "The OptimoRoute order type."
+                },
+                "load1": {
+                  "type": "number",
+                  "description": "The first load requirement."
+                },
+                "load2": {
+                  "type": "number",
+                  "description": "The second load requirement."
+                },
+                "load3": {
+                  "type": "number",
+                  "description": "The third load requirement."
+                },
+                "load4": {
+                  "type": "number",
+                  "description": "The fourth load requirement."
+                },
+                "assignedTo": {
+                  "type": "object",
+                  "properties": {
+                    "serial": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The driver serial recognized by OptimoRoute."
+                    },
+                    "externalId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The driver externalId recognized by OptimoRoute."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An OptimoRoute driver assignment selector."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "locationNo": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The location identifier."
+                    },
+                    "address": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The location address."
+                    },
+                    "locationName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The location name."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "The location latitude."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "The location longitude."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "The location notes."
+                    },
+                    "checkInTime": {
+                      "type": "number",
+                      "description": "The check-in time in minutes."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An OptimoRoute location object."
+                },
+                "timeWindows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "twFrom": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The earliest time in HH:MM format."
+                      },
+                      "twTo": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The latest time in HH:MM format."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "twFrom",
+                      "twTo"
+                    ],
+                    "description": "One OptimoRoute order time window."
+                  },
+                  "description": "The allowed service time windows."
+                },
+                "allowedWeekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "sun",
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri",
+                      "sat"
+                    ],
+                    "description": "One weekday code allowed by OptimoRoute."
+                  },
+                  "description": "The weekdays allowed for servicing the order."
+                },
+                "allowedDates": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "description": "The inclusive start date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "The inclusive end date in YYYY-MM-DD format.",
+                      "format": "date"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An OptimoRoute date range object with inclusive from and to dates."
+                },
+                "allowedDateTimes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The inclusive earliest datetime in ISO format.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The inclusive earliest datetime in ISO format."
+                      },
+                      "to": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The inclusive latest datetime in ISO format.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The inclusive latest datetime in ISO format."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "An OptimoRoute datetime restriction window."
+                  },
+                  "description": "The datetime windows when the order can be serviced."
+                },
+                "skills": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One OptimoRoute skill code."
+                  },
+                  "description": "The required driver skills."
+                },
+                "vehicleFeatures": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One OptimoRoute vehicle feature code."
+                  },
+                  "description": "The required vehicle features."
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "The free-form order note."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The customer email address."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "The customer phone number."
+                },
+                "customField1": {
+                  "type": "string",
+                  "description": "The legacy customField1 value."
+                },
+                "customField2": {
+                  "type": "string",
+                  "description": "The legacy customField2 value."
+                },
+                "customField3": {
+                  "type": "string",
+                  "description": "The legacy customField3 value."
+                },
+                "customField4": {
+                  "type": "string",
+                  "description": "The legacy customField4 value."
+                },
+                "customField5": {
+                  "type": "string",
+                  "description": "The legacy customField5 value."
+                },
+                "customFields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "One custom field value."
+                  },
+                  "description": "The OptimoRoute custom field values keyed by field code."
+                },
+                "notificationPreference": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "sms",
+                    "voice",
+                    "dont_notify"
+                  ],
+                  "description": "The OptimoRoute customer notification preference when specified."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An OptimoRoute order object."
+            },
+            "description": "The list of orders to write to OptimoRoute.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "The input payload for creating, updating, or syncing OptimoRoute orders in bulk."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether at least one order write succeeded."
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether the order write succeeded."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute order identifier when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute order identifier when returned."
+                },
+                "orderNo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute orderNo when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute orderNo when returned."
+                },
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error code when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error code when present."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error or warning message when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error or warning message when present."
+                },
+                "locationNo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The locationNo echoed for location-related errors when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The locationNo echoed for location-related errors when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw OptimoRoute result item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized OptimoRoute bulk write result."
+            },
+            "description": "The per-order write results returned by OptimoRoute."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized OptimoRoute create_or_update_orders response."
+      }
+    },
+    {
+      "id": "optimoroute.delete_orders",
+      "service": "optimoroute",
+      "name": "delete_orders",
+      "description": "Delete one or more OptimoRoute orders by orderNo or id.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orderNo": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user-specified order identifier."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OptimoRoute order identifier assigned by the platform."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An OptimoRoute order identifier object referencing an order by orderNo or id.",
+              "anyOf": [
+                {
+                  "required": [
+                    "orderNo"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            "description": "The list of orders to delete from OptimoRoute.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "deleteMultiple": {
+            "type": "boolean",
+            "description": "Whether delete_orders should remove all matches when one order selector matches multiple orders."
+          },
+          "forceDelete": {
+            "type": "boolean",
+            "description": "Whether delete_orders should ignore live-plan delete restrictions when possible."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "The input payload for deleting OptimoRoute orders in bulk."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether at least one order delete succeeded."
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether the order delete succeeded."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute order identifier when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute order identifier when returned."
+                },
+                "orderNo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute orderNo when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute orderNo when returned."
+                },
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error code when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error code when present."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error or warning message when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error or warning message when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw OptimoRoute result item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized OptimoRoute bulk delete result."
+            },
+            "description": "The per-order delete results returned by OptimoRoute."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized OptimoRoute delete_orders response."
+      }
+    },
+    {
+      "id": "optimoroute.get_orders",
+      "service": "optimoroute",
+      "name": "get_orders",
+      "description": "Retrieve one or more OptimoRoute orders by orderNo or id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orderNo": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user-specified order identifier."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OptimoRoute order identifier assigned by the platform."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An OptimoRoute order identifier object referencing an order by orderNo or id.",
+              "anyOf": [
+                {
+                  "required": [
+                    "orderNo"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                }
+              ]
+            },
+            "description": "The list of orders to retrieve from OptimoRoute.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "The input payload for retrieving OptimoRoute orders in bulk."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether at least one order retrieval succeeded."
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "description": "Whether the order retrieval succeeded."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute order identifier when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute order identifier when returned."
+                },
+                "orderNo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute orderNo when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute orderNo when returned."
+                },
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error code when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error code when present."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OptimoRoute per-order error or warning message when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OptimoRoute per-order error or warning message when present."
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw OptimoRoute order object when retrieval succeeded."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The raw OptimoRoute order object when retrieval succeeded."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw OptimoRoute result item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized OptimoRoute order read result."
+            },
+            "description": "The per-order retrieval results returned by OptimoRoute."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized OptimoRoute get_orders response."
+      }
+    }
+  ]
+}

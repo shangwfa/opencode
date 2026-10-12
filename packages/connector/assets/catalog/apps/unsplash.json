@@ -1,0 +1,897 @@
+{
+  "service": "unsplash",
+  "displayName": "Unsplash",
+  "categories": [
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Key",
+      "placeholder": "UNSPLASH_ACCESS_KEY",
+      "description": "Unsplash access key used with the Authorization Client-ID header. Register an application to get it as documented at https://unsplash.com/documentation.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://unsplash.com",
+  "actions": [
+    {
+      "id": "unsplash.get_photo",
+      "service": "unsplash",
+      "name": "get_photo",
+      "description": "Fetch the detailed payload for a single Unsplash photo.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Unsplash photo identifier to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for fetching a single Unsplash photo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "photo": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier of the photo."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The public slug of the photo."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The description of the photo when Unsplash provides it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The description of the photo when Unsplash provides it."
+              },
+              "alt_description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The alternative description of the photo when Unsplash provides it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The alternative description of the photo when Unsplash provides it."
+              },
+              "width": {
+                "type": "number",
+                "description": "The width of the photo in pixels."
+              },
+              "height": {
+                "type": "number",
+                "description": "The height of the photo in pixels."
+              },
+              "color": {
+                "type": "string",
+                "description": "The representative HEX color of the photo."
+              },
+              "blur_hash": {
+                "type": "string",
+                "description": "The blur hash value of the photo."
+              },
+              "urls": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The photo URLs returned by Unsplash in multiple sizes."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The related links attached to the Unsplash photo resource."
+              },
+              "user": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The user metadata attached to the photo."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The creation timestamp of the photo."
+              },
+              "liked_by_user": {
+                "type": "boolean",
+                "description": "Whether the authenticated user liked the photo."
+              },
+              "likes": {
+                "type": "number",
+                "description": "The total number of likes on the photo."
+              },
+              "current_user_collections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One current user collection reference."
+                },
+                "description": "The current user collections returned with the photo."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A detailed photo resource returned by Unsplash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "photo"
+        ],
+        "description": "The detailed photo payload returned by Unsplash."
+      }
+    },
+    {
+      "id": "unsplash.get_random_photo",
+      "service": "unsplash",
+      "name": "get_random_photo",
+      "description": "Fetch one or more random Unsplash photos using optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query used to constrain the random photo."
+          },
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One identifier value."
+            },
+            "description": "The collection identifiers used to constrain the random photo.",
+            "minItems": 1
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One identifier value."
+            },
+            "description": "The topic identifiers used to constrain the random photo.",
+            "minItems": 1
+          },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The username used to constrain the random photo."
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "portrait",
+              "squarish"
+            ],
+            "description": "The photo orientation filter to apply."
+          },
+          "contentFilter": {
+            "type": "string",
+            "enum": [
+              "low",
+              "high"
+            ],
+            "description": "The safety filter level to apply to supported Unsplash requests."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of random photos to request, between 1 and 30."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one or more random Unsplash photos."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the photo."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The public slug of the photo."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The description of the photo when Unsplash provides it."
+                },
+                "alt_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alternative description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alternative description of the photo when Unsplash provides it."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The width of the photo in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The height of the photo in pixels."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The representative HEX color of the photo."
+                },
+                "blur_hash": {
+                  "type": "string",
+                  "description": "The blur hash value of the photo."
+                },
+                "urls": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The photo URLs returned by Unsplash in multiple sizes."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The related links attached to the Unsplash photo resource."
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The user metadata attached to the photo."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The creation timestamp of the photo."
+                },
+                "liked_by_user": {
+                  "type": "boolean",
+                  "description": "Whether the authenticated user liked the photo."
+                },
+                "likes": {
+                  "type": "number",
+                  "description": "The total number of likes on the photo."
+                },
+                "current_user_collections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One current user collection reference."
+                  },
+                  "description": "The current user collections returned with the photo."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A detailed photo resource returned by Unsplash."
+            },
+            "description": "The random photo resources returned by Unsplash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "photos"
+        ],
+        "description": "The normalized random photo payload returned by Unsplash."
+      }
+    },
+    {
+      "id": "unsplash.get_topic_photos",
+      "service": "unsplash",
+      "name": "get_topic_photos",
+      "description": "List photos from a specific Unsplash topic.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topicIdOrSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The topic identifier or slug to read photos from."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of items to return per page, between 1 and 30."
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "portrait",
+              "squarish"
+            ],
+            "description": "The photo orientation filter to apply."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "latest",
+              "oldest",
+              "popular"
+            ],
+            "description": "The sort order supported by the Unsplash photo listing endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "topicIdOrSlug"
+        ],
+        "description": "The input payload for listing photos from an Unsplash topic."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the photo."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The public slug of the photo."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The description of the photo when Unsplash provides it."
+                },
+                "alt_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alternative description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alternative description of the photo when Unsplash provides it."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The width of the photo in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The height of the photo in pixels."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The representative HEX color of the photo."
+                },
+                "blur_hash": {
+                  "type": "string",
+                  "description": "The blur hash value of the photo."
+                },
+                "urls": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The photo URLs returned by Unsplash in multiple sizes."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The related links attached to the Unsplash photo resource."
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The user metadata attached to the photo."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A summary photo resource returned by Unsplash."
+            },
+            "description": "The photo summaries returned for the requested Unsplash topic."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "photos"
+        ],
+        "description": "The topic photo listing returned by Unsplash."
+      }
+    },
+    {
+      "id": "unsplash.list_photos",
+      "service": "unsplash",
+      "name": "list_photos",
+      "description": "List the latest public photos from Unsplash.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of items to return per page, between 1 and 30."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "latest",
+              "oldest",
+              "popular"
+            ],
+            "description": "The sort order supported by the Unsplash photo listing endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing the latest public photos from Unsplash."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the photo."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The public slug of the photo."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The description of the photo when Unsplash provides it."
+                },
+                "alt_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alternative description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alternative description of the photo when Unsplash provides it."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The width of the photo in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The height of the photo in pixels."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The representative HEX color of the photo."
+                },
+                "blur_hash": {
+                  "type": "string",
+                  "description": "The blur hash value of the photo."
+                },
+                "urls": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The photo URLs returned by Unsplash in multiple sizes."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The related links attached to the Unsplash photo resource."
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The user metadata attached to the photo."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A summary photo resource returned by Unsplash."
+            },
+            "description": "The public photo summaries returned by Unsplash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "photos"
+        ],
+        "description": "The latest public photos returned by Unsplash."
+      }
+    },
+    {
+      "id": "unsplash.list_topics",
+      "service": "unsplash",
+      "name": "list_topics",
+      "description": "List topics curated by Unsplash.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of items to return per page, between 1 and 30."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "position",
+              "latest",
+              "oldest",
+              "popular"
+            ],
+            "description": "The sort order supported by the Unsplash topic listing endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Unsplash topics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the topic."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The topic slug."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The display title of the topic."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The description of the topic when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The description of the topic when Unsplash provides it."
+                },
+                "featured": {
+                  "type": "boolean",
+                  "description": "Whether the topic is marked as featured."
+                },
+                "total_photos": {
+                  "type": "number",
+                  "description": "The total number of photos in the topic."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The related links attached to the Unsplash topic resource."
+                },
+                "cover_photo": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The cover photo attached to the topic when Unsplash provides it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "A topic resource returned by Unsplash."
+            },
+            "description": "The topics returned by Unsplash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "topics"
+        ],
+        "description": "The topic listing returned by Unsplash."
+      }
+    },
+    {
+      "id": "unsplash.search_photos",
+      "service": "unsplash",
+      "name": "search_photos",
+      "description": "Search photos on Unsplash using keyword and filter inputs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query to run against Unsplash photos."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of items to return per page, between 1 and 30."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "relevant",
+              "latest"
+            ],
+            "description": "The sort order supported by the Unsplash photo search endpoint."
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "black_and_white",
+              "black",
+              "white",
+              "yellow",
+              "orange",
+              "red",
+              "purple",
+              "magenta",
+              "green",
+              "teal",
+              "blue"
+            ],
+            "description": "The color filter to apply to photo search results."
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "landscape",
+              "portrait",
+              "squarish"
+            ],
+            "description": "The photo orientation filter to apply."
+          },
+          "contentFilter": {
+            "type": "string",
+            "enum": [
+              "low",
+              "high"
+            ],
+            "description": "The safety filter level to apply to supported Unsplash requests."
+          },
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One identifier value."
+            },
+            "description": "The collection identifiers to filter the search results by.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching photos on Unsplash."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "The total number of matching photo results."
+          },
+          "totalPages": {
+            "type": "number",
+            "description": "The total number of result pages."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the photo."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The public slug of the photo."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The description of the photo when Unsplash provides it."
+                },
+                "alt_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The alternative description of the photo when Unsplash provides it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The alternative description of the photo when Unsplash provides it."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The width of the photo in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The height of the photo in pixels."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The representative HEX color of the photo."
+                },
+                "blur_hash": {
+                  "type": "string",
+                  "description": "The blur hash value of the photo."
+                },
+                "urls": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The photo URLs returned by Unsplash in multiple sizes."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The related links attached to the Unsplash photo resource."
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The user metadata attached to the photo."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A summary photo resource returned by Unsplash."
+            },
+            "description": "The matching photo summaries returned by Unsplash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "totalPages",
+          "results"
+        ],
+        "description": "The photo search results returned by Unsplash."
+      }
+    }
+  ]
+}

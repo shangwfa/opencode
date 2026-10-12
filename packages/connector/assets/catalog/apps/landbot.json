@@ -1,0 +1,336 @@
+{
+  "service": "landbot",
+  "displayName": "Landbot",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Agent Token",
+      "placeholder": "landbot_agent_token",
+      "description": "Landbot agent token sent as Authorization: Token <token> for the Platform API. Find it in Settings > Account in the Landbot dashboard: https://app.landbot.io/gui/settings/account."
+    }
+  ],
+  "homepageUrl": "https://landbot.io",
+  "actions": [
+    {
+      "id": "landbot.get_customer_messages",
+      "service": "landbot",
+      "name": "get_customer_messages",
+      "description": "Fetch the message history for a Landbot customer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Landbot customer id."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying a Landbot customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Landbot accepted the request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Landbot customer message returned by the Platform API. Message fields vary by message type."
+            },
+            "description": "Messages returned for the customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Landbot customer message history."
+      }
+    },
+    {
+      "id": "landbot.list_channels",
+      "service": "landbot",
+      "name": "list_channels",
+      "description": "List channels in a Landbot workspace with optional pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning this page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Maximum number of items to return in this page. Landbot accepts up to 100."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter channels by Landbot channel type, such as webchat or whatsapp."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Filter channels by active state."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and optional filters for listing Landbot channels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Landbot accepted the request."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching resources before pagination."
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Landbot channel returned by the Platform API, including its id, name, type, token, active state, and timestamps when available."
+            },
+            "description": "Channels returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Landbot channels returned for the requested page."
+      }
+    },
+    {
+      "id": "landbot.list_customers",
+      "service": "landbot",
+      "name": "list_customers",
+      "description": "List Landbot customers with pagination and optional channel or search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning this page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Maximum number of items to return in this page. Landbot accepts up to 100."
+          },
+          "channel_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter customers by numeric Landbot channel id."
+          },
+          "agent_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter customers by numeric Landbot agent id."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Filter customers by archived state."
+          },
+          "opt_in": {
+            "type": "boolean",
+            "description": "Filter customers by opt-in state."
+          },
+          "search_by": {
+            "type": "string",
+            "enum": [
+              "name",
+              "email",
+              "phone"
+            ],
+            "description": "Customer field used for search."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search text matched against the selected customer field."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and optional filters for listing Landbot customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Landbot accepted the request."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching resources before pagination."
+          },
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Landbot customer returned by the Platform API, including identity, channel, assignment, field, and conversation state fields when available."
+            },
+            "description": "Customers returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Landbot customers returned for the requested page."
+      }
+    },
+    {
+      "id": "landbot.send_text",
+      "service": "landbot",
+      "name": "send_text",
+      "description": "Send a text message to a Landbot customer through their current channel.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Landbot customer id."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text message to send to the customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for sending a text message to a Landbot customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Landbot accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Landbot success response."
+      }
+    },
+    {
+      "id": "landbot.set_customer_field",
+      "service": "landbot",
+      "name": "set_customer_field",
+      "description": "Set a typed custom field value on a Landbot customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Landbot customer id."
+          },
+          "field_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Landbot field name to set on the customer."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "float",
+              "boolean",
+              "date",
+              "datetime"
+            ],
+            "description": "Landbot field type for the value."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "String field value."
+              },
+              {
+                "type": "number",
+                "description": "Number field value."
+              },
+              {
+                "type": "boolean",
+                "description": "Boolean field value."
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Null field value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null field value."
+              }
+            ],
+            "description": "Value to store in the Landbot customer field."
+          },
+          "extra": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional extra metadata passed through to Landbot for the field."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id",
+          "field_name",
+          "type",
+          "value"
+        ],
+        "description": "Input for setting a typed field value on a Landbot customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Landbot accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Landbot success response."
+      }
+    }
+  ]
+}

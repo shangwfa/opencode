@@ -1,0 +1,1356 @@
+{
+  "service": "signalbase",
+  "displayName": "Signalbase",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Signalbase API key",
+      "description": "Signalbase API key used as a bearer token. Get it from the Signalbase dashboard API page: https://www.trysignalbase.com/workspace/api."
+    }
+  ],
+  "homepageUrl": "https://www.trysignalbase.com",
+  "actions": [
+    {
+      "id": "signalbase.list_acquisition_signals",
+      "service": "signalbase",
+      "name": "list_acquisition_signals",
+      "description": "Fetch Signalbase acquisition signals with date, company, acquirer, amount, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter signals from this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter signals up to this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "date_preset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7d",
+              "last_14d",
+              "last_30d",
+              "last_60d",
+              "last_90d",
+              "last_6m",
+              "last_1y",
+              "last_2y",
+              "this_week",
+              "this_month",
+              "this_quarter",
+              "this_year",
+              "last_week",
+              "last_month",
+              "last_quarter",
+              "last_year"
+            ],
+            "description": "Relative date shorthand. Signalbase applies it before dateFrom and dateTo when provided."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "categories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pipe-separated company categories or industries to filter by."
+          },
+          "subcategories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Signalbase subcategory IDs to filter by."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across documented fields for this endpoint."
+          },
+          "industry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated exact industry names to filter by."
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial company-name search string."
+          },
+          "acquiring_company": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial acquiring-company search string."
+          },
+          "amount_min": {
+            "type": "integer",
+            "description": "Minimum transaction amount in USD cents."
+          },
+          "amount_max": {
+            "type": "integer",
+            "description": "Maximum transaction amount in USD cents."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency symbol filter, such as $, EUR, or GBP."
+          },
+          "verification_status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "pending"
+            ],
+            "description": "Verification status to filter by."
+          },
+          "employee_count_min": {
+            "type": "integer",
+            "description": "Minimum company employee count."
+          },
+          "employee_count_max": {
+            "type": "integer",
+            "description": "Maximum company employee count."
+          },
+          "founded_year_min": {
+            "type": "integer",
+            "description": "Minimum company founded year."
+          },
+          "founded_year_max": {
+            "type": "integer",
+            "description": "Maximum company founded year."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "occurred_at",
+              "discovered_at",
+              "amount",
+              "employee_count"
+            ],
+            "description": "Field used to sort acquisition signal results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for acquisition signal results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for Signalbase acquisition signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Acquisition signal records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase acquisition signals response."
+      }
+    },
+    {
+      "id": "signalbase.list_companies",
+      "service": "signalbase",
+      "name": "list_companies",
+      "description": "Browse and search Signalbase company profiles with pagination, filters, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across documented fields for this endpoint."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "industry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated exact industry names to filter by."
+          },
+          "employee_count_min": {
+            "type": "integer",
+            "description": "Minimum company employee count."
+          },
+          "employee_count_max": {
+            "type": "integer",
+            "description": "Maximum company employee count."
+          },
+          "founded_year_min": {
+            "type": "integer",
+            "description": "Minimum company founded year."
+          },
+          "founded_year_max": {
+            "type": "integer",
+            "description": "Maximum company founded year."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "name",
+              "employee_count",
+              "founded_year",
+              "created_at"
+            ],
+            "description": "Field used to sort company results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for company results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for browsing and searching Signalbase companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Company records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase companies list response."
+      }
+    },
+    {
+      "id": "signalbase.list_funding_signals",
+      "service": "signalbase",
+      "name": "list_funding_signals",
+      "description": "Fetch Signalbase funding signals with date, company, investor, amount, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter signals from this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter signals up to this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "date_preset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7d",
+              "last_14d",
+              "last_30d",
+              "last_60d",
+              "last_90d",
+              "last_6m",
+              "last_1y",
+              "last_2y",
+              "this_week",
+              "this_month",
+              "this_quarter",
+              "this_year",
+              "last_week",
+              "last_month",
+              "last_quarter",
+              "last_year"
+            ],
+            "description": "Relative date shorthand. Signalbase applies it before dateFrom and dateTo when provided."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "categories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pipe-separated company categories or industries to filter by."
+          },
+          "subcategories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Signalbase subcategory IDs to filter by."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across documented fields for this endpoint."
+          },
+          "industry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated exact industry names to filter by."
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial company-name search string."
+          },
+          "round": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated funding round types to filter by."
+          },
+          "round_flavor": {
+            "type": "string",
+            "enum": [
+              "bridge",
+              "extension",
+              "secondary"
+            ],
+            "description": "Funding round flavor to filter by."
+          },
+          "amount_min": {
+            "type": "integer",
+            "description": "Minimum transaction amount in USD cents."
+          },
+          "amount_max": {
+            "type": "integer",
+            "description": "Maximum transaction amount in USD cents."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency symbol filter, such as $, EUR, or GBP."
+          },
+          "verification_status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "pending"
+            ],
+            "description": "Verification status to filter by."
+          },
+          "investor_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial investor-name search string."
+          },
+          "employee_count_min": {
+            "type": "integer",
+            "description": "Minimum company employee count."
+          },
+          "employee_count_max": {
+            "type": "integer",
+            "description": "Maximum company employee count."
+          },
+          "founded_year_min": {
+            "type": "integer",
+            "description": "Minimum company founded year."
+          },
+          "founded_year_max": {
+            "type": "integer",
+            "description": "Maximum company founded year."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "occurred_at",
+              "discovered_at",
+              "amount",
+              "employee_count",
+              "founded_year"
+            ],
+            "description": "Field used to sort funding signal results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for funding signal results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for Signalbase funding signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Funding signal records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase funding signals response."
+      }
+    },
+    {
+      "id": "signalbase.list_hiring_signals",
+      "service": "signalbase",
+      "name": "list_hiring_signals",
+      "description": "Fetch Signalbase hiring signals with role, department, seniority, location, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter signals from this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter signals up to this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "date_preset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7d",
+              "last_14d",
+              "last_30d",
+              "last_60d",
+              "last_90d",
+              "last_6m",
+              "last_1y",
+              "last_2y",
+              "this_week",
+              "this_month",
+              "this_quarter",
+              "this_year",
+              "last_week",
+              "last_month",
+              "last_quarter",
+              "last_year"
+            ],
+            "description": "Relative date shorthand. Signalbase applies it before dateFrom and dateTo when provided."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across documented fields for this endpoint."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "states": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated US state codes to filter by."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search on hiring signal city, location, and region."
+          },
+          "categories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pipe-separated company categories or industries to filter by."
+          },
+          "subcategories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Signalbase subcategory IDs to filter by."
+          },
+          "positions": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated role or position filters."
+          },
+          "departments": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated department filters."
+          },
+          "seniorities": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated seniority filters."
+          },
+          "team_size": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated team size ranges to filter by."
+          },
+          "applicants": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated applicant count ranges to filter by."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "date_posted",
+              "created_at",
+              "title",
+              "company_name",
+              "location"
+            ],
+            "description": "Field used to sort hiring signal results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for hiring signal results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for Signalbase hiring signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Hiring signal records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase hiring signals response."
+      }
+    },
+    {
+      "id": "signalbase.list_investors",
+      "service": "signalbase",
+      "name": "list_investors",
+      "description": "Fetch Signalbase investor data with type, location, ticket-size, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter signals from this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter signals up to this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "date_preset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7d",
+              "last_14d",
+              "last_30d",
+              "last_60d",
+              "last_90d",
+              "last_6m",
+              "last_1y",
+              "last_2y",
+              "this_week",
+              "this_month",
+              "this_quarter",
+              "this_year",
+              "last_week",
+              "last_month",
+              "last_quarter",
+              "last_year"
+            ],
+            "description": "Relative date shorthand. Signalbase applies it before dateFrom and dateTo when provided."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across investor name and type."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "vc",
+              "angel",
+              "pe",
+              "corporate",
+              "government",
+              "accelerator",
+              "family_office",
+              "hedge_fund",
+              "crowdfunding"
+            ],
+            "description": "Investor type to filter by."
+          },
+          "categories": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Legacy pipe-separated investor type filter."
+          },
+          "headquarters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial headquarters location search string."
+          },
+          "ticket_size_min": {
+            "type": "integer",
+            "description": "Minimum ticket size in USD."
+          },
+          "ticket_size_max": {
+            "type": "integer",
+            "description": "Maximum ticket size in USD."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "name",
+              "created_at",
+              "ticket_size_min",
+              "ticket_size_max"
+            ],
+            "description": "Field used to sort investor results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for investor results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for Signalbase investor data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Investor records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase investors response."
+      }
+    },
+    {
+      "id": "signalbase.list_job_change_signals",
+      "service": "signalbase",
+      "name": "list_job_change_signals",
+      "description": "Fetch Signalbase job-change signals with person, role, company, LinkedIn, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for pagination. Signalbase defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results per page. Signalbase documents a maximum of 100."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Filter signals from this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Filter signals up to this date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "date_preset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "last_7d",
+              "last_14d",
+              "last_30d",
+              "last_60d",
+              "last_90d",
+              "last_6m",
+              "last_1y",
+              "last_2y",
+              "this_week",
+              "this_month",
+              "this_quarter",
+              "this_year",
+              "last_week",
+              "last_month",
+              "last_quarter",
+              "last_year"
+            ],
+            "description": "Relative date shorthand. Signalbase applies it before dateFrom and dateTo when provided."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search across documented fields for this endpoint."
+          },
+          "countries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes to filter by, such as US,GB,DE."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search on person city and person location."
+          },
+          "personLinkedinUrl": {
+            "type": "string",
+            "description": "Exact LinkedIn profile URL of the person.",
+            "format": "uri"
+          },
+          "companyLinkedinUrl": {
+            "type": "string",
+            "description": "Exact LinkedIn company page URL.",
+            "format": "uri"
+          },
+          "person_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial person-name search string."
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial company-name search string."
+          },
+          "new_role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial new-role or job-title search string."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "linkedin",
+              "press_release",
+              "other"
+            ],
+            "description": "Exact job-change signal source."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial keyword tag search string."
+          },
+          "positions": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated role or position filters."
+          },
+          "departments": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated department filters."
+          },
+          "seniorities": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated seniority filters."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "occurred_at",
+              "discovered_at",
+              "person_name",
+              "company_name"
+            ],
+            "description": "Field used to sort job-change signal results."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for job-change signal results."
+          },
+          "count": {
+            "type": "string",
+            "enum": [
+              "true"
+            ],
+            "description": "Set to \"true\" to return only pagination metadata with an empty data array. Signalbase documents this mode as zero-credit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for Signalbase job-change signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Signalbase reported the request as successful."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Signalbase result record."
+            },
+            "description": "Job-change signal records returned by Signalbase."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Current page number."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of available pages."
+              },
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of records matching the query."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Signalbase."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "Signalbase endpoint identifier."
+              },
+              "creditsUsed": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits consumed by this request."
+              },
+              "creditsRemaining": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Number of Signalbase API credits remaining after this request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "endpoint",
+              "creditsUsed"
+            ],
+            "description": "Usage metadata returned by Signalbase."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data",
+          "pagination",
+          "meta"
+        ],
+        "description": "Signalbase job-change signals response."
+      }
+    }
+  ]
+}

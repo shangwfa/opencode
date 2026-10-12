@@ -1,0 +1,1145 @@
+{
+  "service": "cartes",
+  "displayName": "Cartes.io",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "CARTES_IO_API_TOKEN",
+      "description": "Cartes.io API token sent in the Authorization header. Create or view API tokens from the Cartes.io account API token page: https://app.cartes.io/account/api-token"
+    }
+  ],
+  "homepageUrl": "https://cartes.io",
+  "actions": [
+    {
+      "id": "cartes.create_map",
+      "service": "cartes",
+      "name": "create_map",
+      "description": "Create a Cartes.io map.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 191,
+            "description": "Map title."
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Optional unique map slug."
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional map description."
+          },
+          "privacy": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "description": "The Cartes.io map privacy value."
+          },
+          "usersCanCreateMarkers": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "only_logged_in",
+              "no"
+            ],
+            "description": "Who can create markers on the map."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "map": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "map"
+        ],
+        "description": "A Cartes.io map response."
+      }
+    },
+    {
+      "id": "cartes.create_marker",
+      "service": "cartes",
+      "name": "create_marker",
+      "description": "Create a marker on one Cartes.io map.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 191,
+            "description": "Marker description."
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io category id."
+          },
+          "categoryName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 32,
+            "description": "Category name used when categoryId is not provided."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude coordinate in decimal degrees."
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude coordinate in decimal degrees."
+          },
+          "link": {
+            "type": "string",
+            "description": "Optional marker link URL.",
+            "format": "uri"
+          },
+          "zoom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "Map zoom level."
+          },
+          "elevation": {
+            "type": "number",
+            "minimum": -100000,
+            "maximum": 100000,
+            "description": "Elevation in meters."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Marker expiration timestamp.",
+            "format": "date-time"
+          },
+          "meta": {
+            "type": "array",
+            "items": {
+              "description": "A marker metadata value."
+            },
+            "description": "Optional marker metadata values.",
+            "maxItems": 25
+          },
+          "heading": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "Heading in degrees."
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Pitch in degrees."
+          },
+          "roll": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Roll in degrees."
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000,
+            "description": "Marker speed."
+          },
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid",
+          "lat",
+          "lng"
+        ],
+        "description": "Input parameters for creating a marker on a Cartes.io map.",
+        "oneOf": [
+          {
+            "required": [
+              "categoryId"
+            ],
+            "not": {
+              "required": [
+                "categoryName"
+              ]
+            }
+          },
+          {
+            "required": [
+              "categoryName"
+            ],
+            "not": {
+              "required": [
+                "categoryId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marker"
+        ],
+        "description": "A Cartes.io marker response."
+      }
+    },
+    {
+      "id": "cartes.create_marker_location",
+      "service": "cartes",
+      "name": "create_marker_location",
+      "description": "Append a new location point to one Cartes.io marker.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "markerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io marker id."
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude coordinate in decimal degrees."
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude coordinate in decimal degrees."
+          },
+          "zoom": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "Map zoom level."
+          },
+          "elevation": {
+            "type": "number",
+            "minimum": -100000,
+            "maximum": 100000,
+            "description": "Elevation in meters."
+          },
+          "heading": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "Heading in degrees."
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Pitch in degrees."
+          },
+          "roll": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Roll in degrees."
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000,
+            "description": "Marker speed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid",
+          "markerId",
+          "lat",
+          "lng"
+        ],
+        "description": "Input parameters for appending a location to a Cartes.io marker."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marker"
+        ],
+        "description": "A Cartes.io marker response."
+      }
+    },
+    {
+      "id": "cartes.delete_map",
+      "service": "cartes",
+      "name": "delete_map",
+      "description": "Delete one Cartes.io map.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid"
+        ],
+        "description": "Input parameters for selecting one Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Cartes.io confirmed the deletion."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "A Cartes.io deletion response."
+      }
+    },
+    {
+      "id": "cartes.delete_marker",
+      "service": "cartes",
+      "name": "delete_marker",
+      "description": "Delete one marker from a Cartes.io map.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "markerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io marker id."
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid",
+          "markerId"
+        ],
+        "description": "Input parameters for selecting one marker on a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Cartes.io confirmed the deletion."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "A Cartes.io deletion response."
+      }
+    },
+    {
+      "id": "cartes.get_current_user",
+      "service": "cartes",
+      "name": "get_current_user",
+      "description": "Get the current Cartes.io user for the connected API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "A Cartes.io user response."
+      }
+    },
+    {
+      "id": "cartes.get_map",
+      "service": "cartes",
+      "name": "get_map",
+      "description": "Get one Cartes.io map.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid"
+        ],
+        "description": "Input parameters for selecting one Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "map": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "map"
+        ],
+        "description": "A Cartes.io map response."
+      }
+    },
+    {
+      "id": "cartes.get_marker",
+      "service": "cartes",
+      "name": "get_marker",
+      "description": "Get one marker from a Cartes.io map.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "markerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io marker id."
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid",
+          "markerId"
+        ],
+        "description": "Input parameters for selecting one marker on a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marker"
+        ],
+        "description": "A Cartes.io marker response."
+      }
+    },
+    {
+      "id": "cartes.get_user",
+      "service": "cartes",
+      "name": "get_user",
+      "description": "Get one public Cartes.io user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cartes.io username."
+          },
+          "with": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "maps",
+                "maps.markers"
+              ],
+              "description": "A supported Cartes.io user include value."
+            },
+            "description": "Related resources to include with Cartes.io users.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "Input parameters for getting a public Cartes.io user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "A Cartes.io user response."
+      }
+    },
+    {
+      "id": "cartes.list_categories",
+      "service": "cartes",
+      "name": "list_categories",
+      "description": "List Cartes.io marker categories.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Categories returned by Cartes.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categories"
+        ],
+        "description": "A Cartes.io categories response."
+      }
+    },
+    {
+      "id": "cartes.list_maps",
+      "service": "cartes",
+      "name": "list_maps",
+      "description": "List public Cartes.io maps, optionally including maps owned by the account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The Cartes.io map UUID.",
+              "format": "uuid"
+            },
+            "description": "Map UUIDs to include in the listing.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "categoryIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The Cartes.io category id."
+            },
+            "description": "Category ids used to filter public maps.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "withMine": {
+            "type": "boolean",
+            "description": "Whether to include maps owned by the connected account."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cartes.io field used for descending ordering."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Cartes.io maps."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "maps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Maps returned by Cartes.io."
+          },
+          "page": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "maps",
+          "page"
+        ],
+        "description": "A paginated Cartes.io maps response."
+      }
+    },
+    {
+      "id": "cartes.list_markers",
+      "service": "cartes",
+      "name": "list_markers",
+      "description": "List markers on one Cartes.io map.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          },
+          "showExpired": {
+            "type": "boolean",
+            "description": "Whether expired markers should be included."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid"
+        ],
+        "description": "Input parameters for listing markers on a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Markers returned by Cartes.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "markers"
+        ],
+        "description": "A Cartes.io markers response."
+      }
+    },
+    {
+      "id": "cartes.list_public_markers",
+      "service": "cartes",
+      "name": "list_public_markers",
+      "description": "List public Cartes.io markers across public maps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io category id."
+          },
+          "showExpired": {
+            "type": "boolean",
+            "description": "Whether expired markers should be included."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing public Cartes.io markers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Markers returned by Cartes.io."
+          },
+          "page": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "markers",
+          "page"
+        ],
+        "description": "A paginated Cartes.io markers response."
+      }
+    },
+    {
+      "id": "cartes.list_related_maps",
+      "service": "cartes",
+      "name": "list_related_maps",
+      "description": "List Cartes.io maps related to one map.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid"
+        ],
+        "description": "Input parameters for listing maps related to a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "maps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Related maps returned by Cartes.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "maps"
+        ],
+        "description": "A Cartes.io related maps response."
+      }
+    },
+    {
+      "id": "cartes.list_users",
+      "service": "cartes",
+      "name": "list_users",
+      "description": "List public Cartes.io users.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "with": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "maps",
+                "maps.markers"
+              ],
+              "description": "A supported Cartes.io user include value."
+            },
+            "description": "Related resources to include with Cartes.io users.",
+            "minItems": 1
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing public Cartes.io users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Users returned by Cartes.io."
+          },
+          "page": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "page"
+        ],
+        "description": "A paginated Cartes.io users response."
+      }
+    },
+    {
+      "id": "cartes.search_maps",
+      "service": "cartes",
+      "name": "search_maps",
+      "description": "Search public Cartes.io maps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255,
+            "description": "Search query. Cartes.io requires at least 3 characters."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching public Cartes.io maps."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "maps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Cartes.io JSON object."
+            },
+            "description": "Maps returned by Cartes.io."
+          },
+          "page": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "maps",
+          "page"
+        ],
+        "description": "A paginated Cartes.io maps response."
+      }
+    },
+    {
+      "id": "cartes.update_map",
+      "service": "cartes",
+      "name": "update_map",
+      "description": "Update one Cartes.io map.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 191,
+            "description": "Map title."
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Optional unique map slug."
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated map description."
+          },
+          "privacy": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "description": "The Cartes.io map privacy value."
+          },
+          "usersCanCreateMarkers": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "only_logged_in",
+              "no"
+            ],
+            "description": "Who can create markers on the map."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid"
+        ],
+        "description": "Input parameters for updating a Cartes.io map."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "map": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "map"
+        ],
+        "description": "A Cartes.io map response."
+      }
+    },
+    {
+      "id": "cartes.update_marker",
+      "service": "cartes",
+      "name": "update_marker",
+      "description": "Update one marker on a Cartes.io map.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mapUuid": {
+            "type": "string",
+            "description": "The Cartes.io map UUID.",
+            "format": "uuid"
+          },
+          "markerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Cartes.io marker id."
+          },
+          "mapToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional map token for anonymous or token-protected map operations."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 191,
+            "description": "Marker description."
+          },
+          "isSpam": {
+            "type": "boolean",
+            "description": "Whether the marker should be marked as spam."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mapUuid",
+          "markerId"
+        ],
+        "description": "Input parameters for updating a Cartes.io marker description or spam state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Cartes.io JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marker"
+        ],
+        "description": "A Cartes.io marker response."
+      }
+    }
+  ]
+}

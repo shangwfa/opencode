@@ -1,0 +1,861 @@
+{
+  "service": "browserless",
+  "displayName": "Browserless",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "YOUR_API_TOKEN_HERE",
+      "description": "Browserless API token appended as the token query parameter. Create or copy it from the Browserless dashboard and REST API quickstart: https://docs.browserless.io/rest-apis/intro."
+    }
+  ],
+  "homepageUrl": "https://www.browserless.io",
+  "actions": [
+    {
+      "id": "browserless.fetch_content",
+      "service": "browserless",
+      "name": "fetch_content",
+      "description": "Fetch fully rendered HTML content from Browserless.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public URL Browserless should navigate to.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inline HTML Browserless should render instead of navigating to a URL."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Browserless should continue when asynchronous wait steps fail or time out."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum navigation time in milliseconds."
+              },
+              "waitUntil": {
+                "type": "string",
+                "enum": [
+                  "load",
+                  "domcontentloaded",
+                  "networkidle0",
+                  "networkidle2"
+                ],
+                "description": "When Browserless should consider navigation successful."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Navigation options forwarded to Browserless gotoOptions."
+          },
+          "waitForEvent": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The page event name Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the event."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "event"
+            ],
+            "description": "A Browserless waitForEvent configuration."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed time in milliseconds Browserless should wait before returning."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The CSS selector Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the selector."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether the selector must become visible before continuing."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether the selector must become hidden before continuing."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "A Browserless waitForSelector configuration."
+          },
+          "rejectResourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Browserless resource type to block."
+            },
+            "description": "The browser resource types Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "rejectRequestPattern": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One request URL pattern to block."
+            },
+            "description": "The request URL patterns Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "addScriptTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The scripts Browserless should inject before producing the final output.",
+            "minItems": 1
+          },
+          "addStyleTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The stylesheets Browserless should inject before producing the final output.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching rendered HTML content with Browserless.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "The fully rendered HTML content returned by Browserless."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "html"
+        ],
+        "description": "The output payload for a Browserless rendered HTML response."
+      }
+    },
+    {
+      "id": "browserless.generate_pdf",
+      "service": "browserless",
+      "name": "generate_pdf",
+      "description": "Generate a Browserless PDF file and store it in local transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public URL Browserless should render into a PDF.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inline HTML Browserless should render into a PDF."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "Letter",
+                  "Legal",
+                  "Tabloid",
+                  "Ledger",
+                  "A0",
+                  "A1",
+                  "A2",
+                  "A3",
+                  "A4",
+                  "A5",
+                  "A6"
+                ],
+                "description": "The paper format Browserless should use."
+              },
+              "printBackground": {
+                "type": "boolean",
+                "description": "Whether Browserless should print CSS backgrounds."
+              },
+              "displayHeaderFooter": {
+                "type": "boolean",
+                "description": "Whether Browserless should include header and footer templates."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The PDF options forwarded to Browserless."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Browserless should continue when asynchronous wait steps fail or time out."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum navigation time in milliseconds."
+              },
+              "waitUntil": {
+                "type": "string",
+                "enum": [
+                  "load",
+                  "domcontentloaded",
+                  "networkidle0",
+                  "networkidle2"
+                ],
+                "description": "When Browserless should consider navigation successful."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Navigation options forwarded to Browserless gotoOptions."
+          },
+          "waitForEvent": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The page event name Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the event."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "event"
+            ],
+            "description": "A Browserless waitForEvent configuration."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed time in milliseconds Browserless should wait before returning."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The CSS selector Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the selector."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether the selector must become visible before continuing."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether the selector must become hidden before continuing."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "A Browserless waitForSelector configuration."
+          },
+          "rejectResourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Browserless resource type to block."
+            },
+            "description": "The browser resource types Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "rejectRequestPattern": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One request URL pattern to block."
+            },
+            "description": "The request URL patterns Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "addScriptTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The scripts Browserless should inject before producing the final output.",
+            "minItems": 1
+          },
+          "addStyleTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The stylesheets Browserless should inject before producing the final output.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for generating a PDF with Browserless.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the generated file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The generated file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Browserless-generated file stored in local transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The output payload for a Browserless-generated file."
+      }
+    },
+    {
+      "id": "browserless.take_screenshot",
+      "service": "browserless",
+      "name": "take_screenshot",
+      "description": "Generate a Browserless screenshot and store it in local transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public URL Browserless should capture.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inline HTML Browserless should capture instead of navigating to a URL."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "png",
+                  "jpeg",
+                  "webp"
+                ],
+                "description": "The screenshot image format."
+              },
+              "fullPage": {
+                "type": "boolean",
+                "description": "Whether Browserless should capture the full scrollable page."
+              },
+              "quality": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The output image quality from 0 to 100."
+              },
+              "omitBackground": {
+                "type": "boolean",
+                "description": "Whether Browserless should omit the page background."
+              },
+              "clip": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The X coordinate in CSS pixels."
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The Y coordinate in CSS pixels."
+                  },
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The clip width in CSS pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The clip height in CSS pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The clipping rectangle for the captured screenshot."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The screenshot options forwarded to Browserless."
+          },
+          "bestAttempt": {
+            "type": "boolean",
+            "description": "Whether Browserless should continue when asynchronous wait steps fail or time out."
+          },
+          "gotoOptions": {
+            "type": "object",
+            "properties": {
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum navigation time in milliseconds."
+              },
+              "waitUntil": {
+                "type": "string",
+                "enum": [
+                  "load",
+                  "domcontentloaded",
+                  "networkidle0",
+                  "networkidle2"
+                ],
+                "description": "When Browserless should consider navigation successful."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Navigation options forwarded to Browserless gotoOptions."
+          },
+          "waitForEvent": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The page event name Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the event."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "event"
+            ],
+            "description": "A Browserless waitForEvent configuration."
+          },
+          "waitForTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The fixed time in milliseconds Browserless should wait before returning."
+          },
+          "waitForSelector": {
+            "type": "object",
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The CSS selector Browserless should wait for."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum time in milliseconds to wait for the selector."
+              },
+              "visible": {
+                "type": "boolean",
+                "description": "Whether the selector must become visible before continuing."
+              },
+              "hidden": {
+                "type": "boolean",
+                "description": "Whether the selector must become hidden before continuing."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "selector"
+            ],
+            "description": "A Browserless waitForSelector configuration."
+          },
+          "rejectResourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Browserless resource type to block."
+            },
+            "description": "The browser resource types Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "rejectRequestPattern": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One request URL pattern to block."
+            },
+            "description": "The request URL patterns Browserless should block during navigation.",
+            "minItems": 1
+          },
+          "addScriptTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The scripts Browserless should inject before producing the final output.",
+            "minItems": 1
+          },
+          "addStyleTag": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The absolute URL of the external script or stylesheet to inject.",
+                  "format": "uri"
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inline script or stylesheet content to inject."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Browserless script or style tag injection entry.",
+              "oneOf": [
+                {
+                  "required": [
+                    "url"
+                  ]
+                },
+                {
+                  "required": [
+                    "content"
+                  ]
+                }
+              ]
+            },
+            "description": "The stylesheets Browserless should inject before producing the final output.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for generating a screenshot with Browserless.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "html"
+              ]
+            }
+          },
+          {
+            "required": [
+              "html"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the generated file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The generated file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Browserless-generated file stored in local transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The output payload for a Browserless-generated file."
+      }
+    }
+  ]
+}

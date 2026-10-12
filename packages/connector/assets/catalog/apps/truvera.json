@@ -1,0 +1,1086 @@
+{
+  "service": "truvera",
+  "displayName": "Truvera",
+  "categories": [
+    "Security",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "truvera_api_key",
+      "description": "Truvera API key used with the Authorization Bearer header. Match the server to where the key was created: https://api-testnet.truvera.io for test-mode keys or https://api.truvera.io for production keys.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api-testnet.truvera.io",
+          "description": "Optional Truvera API server root. Use https://api-testnet.truvera.io for test-mode keys or https://api.truvera.io for production keys."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://truvera.io",
+  "actions": [
+    {
+      "id": "truvera.create_credential_schema",
+      "service": "truvera",
+      "name": "create_credential_schema",
+      "description": "Create a credential schema in Truvera and return the background job handle for polling blockchain completion.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "$schema": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The JSON Schema dialect URI."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The schema name."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The schema description."
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The JSON Schema type, typically `object`."
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One JSON Schema property definition."
+                },
+                "description": "The credential subject properties defined by the schema."
+              },
+              "required": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One required property name."
+                },
+                "description": "The required credential subject property names."
+              },
+              "additionalProperties": {
+                "type": "boolean",
+                "description": "Whether additional properties are allowed by the schema."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The JSON Schema body Truvera stores for a credential schema."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Truvera credential schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The immediate submit payload returned with the background job handle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The background job handle returned by Truvera submit endpoints."
+      },
+      "asyncLifecycle": {
+        "startActionId": "truvera.create_credential_schema",
+        "statusActionId": "truvera.get_job"
+      }
+    },
+    {
+      "id": "truvera.create_did",
+      "service": "truvera",
+      "name": "create_did",
+      "description": "Create a new Truvera DID and return the background job handle for polling blockchain completion.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "cheqd",
+              "dock",
+              "key"
+            ],
+            "description": "The DID method to create or filter, as documented by Truvera."
+          },
+          "did": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fully qualified decentralized identifier."
+          },
+          "controller": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fully qualified decentralized identifier."
+          },
+          "keyType": {
+            "type": "string",
+            "enum": [
+              "ed25519",
+              "bjj",
+              "secp256k1",
+              "sr25519"
+            ],
+            "description": "The public key type used for the DID."
+          },
+          "didcommServiceUrl": {
+            "type": "string",
+            "description": "An optional DIDComm service URL to publish in the DID document.",
+            "format": "uri"
+          },
+          "includeDidcommService": {
+            "type": "boolean",
+            "description": "Whether Truvera should include a DIDComm service endpoint in the DID document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a DID in Truvera."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The immediate submit payload returned with the background job handle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The background job handle returned by Truvera submit endpoints."
+      },
+      "asyncLifecycle": {
+        "startActionId": "truvera.create_did",
+        "statusActionId": "truvera.get_job"
+      }
+    },
+    {
+      "id": "truvera.delete_credential_schema",
+      "service": "truvera",
+      "name": "delete_credential_schema",
+      "description": "Delete a Truvera credential schema and return the background job handle for polling completion.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schemaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The credential schema identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Truvera credential schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The immediate submit payload returned with the background job handle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The background job handle returned by Truvera submit endpoints."
+      },
+      "asyncLifecycle": {
+        "startActionId": "truvera.delete_credential_schema",
+        "statusActionId": "truvera.get_job"
+      }
+    },
+    {
+      "id": "truvera.delete_did",
+      "service": "truvera",
+      "name": "delete_did",
+      "description": "Delete a Truvera DID and return the background job handle for polling blockchain completion.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "did": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fully qualified decentralized identifier."
+          },
+          "fromBlockchain": {
+            "type": "boolean",
+            "description": "Whether to delete the DID from the blockchain instead of only from the Truvera account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "did"
+        ],
+        "description": "Input parameters for deleting a DID from Truvera."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The immediate submit payload returned with the background job handle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The background job handle returned by Truvera submit endpoints."
+      },
+      "asyncLifecycle": {
+        "startActionId": "truvera.delete_did",
+        "statusActionId": "truvera.get_job"
+      }
+    },
+    {
+      "id": "truvera.get_credential_schema",
+      "service": "truvera",
+      "name": "get_credential_schema",
+      "description": "Get one Truvera credential schema by schema identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schemaId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The credential schema identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Truvera credential schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The schema identifier."
+              },
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "$schema": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The JSON Schema dialect URI."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The schema name."
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The schema description."
+                      },
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The JSON Schema type, typically `object`."
+                      },
+                      "properties": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "One JSON Schema property definition."
+                        },
+                        "description": "The credential subject properties defined by the schema."
+                      },
+                      "required": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "One required property name."
+                        },
+                        "description": "The required credential subject property names."
+                      },
+                      "additionalProperties": {
+                        "type": "boolean",
+                        "description": "Whether additional properties are allowed by the schema."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The JSON Schema body Truvera stores for a credential schema."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The JSON Schema body Truvera stores for a credential schema."
+              },
+              "uri": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The schema URI."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The schema URI."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the schema was created.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the schema was created."
+              },
+              "isOwner": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the authenticated user owns the schema."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the authenticated user owns the schema."
+              },
+              "ownerName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The schema owner display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The schema owner display name."
+              },
+              "ownerLogo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The schema owner logo URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The schema owner logo URL."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One credential schema summary returned by Truvera."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Truvera credential schema response."
+      }
+    },
+    {
+      "id": "truvera.get_did",
+      "service": "truvera",
+      "name": "get_did",
+      "description": "Get one DID document from Truvera by DID value.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "did": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fully qualified decentralized identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one DID document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "didDocument": {
+            "type": "object",
+            "properties": {
+              "@context": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A single JSON-LD context URI."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "description": "One JSON-LD context value."
+                    },
+                    "description": "An array of JSON-LD context values."
+                  }
+                ],
+                "description": "The JSON-LD context for the DID document."
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A fully qualified decentralized identifier."
+              },
+              "authentication": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A DID URL reference to a verification method."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An inline verification method object returned by Truvera."
+                    }
+                  ],
+                  "description": "A DID verification method expressed either as an inline object or a DID URL string."
+                },
+                "description": "The DID authentication verification methods."
+              },
+              "assertionMethod": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A DID URL reference to a verification method."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An inline verification method object returned by Truvera."
+                    }
+                  ],
+                  "description": "A DID verification method expressed either as an inline object or a DID URL string."
+                },
+                "description": "The DID assertion verification methods."
+              },
+              "capabilityInvocation": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A DID URL reference to a verification method."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An inline verification method object returned by Truvera."
+                    }
+                  ],
+                  "description": "A DID verification method expressed either as an inline object or a DID URL string."
+                },
+                "description": "The DID capability invocation verification methods."
+              },
+              "publicKey": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID URL identifier for the public key."
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The verification key type returned by Truvera."
+                    },
+                    "controller": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID that controls the key."
+                    },
+                    "publicKeyBase58": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Base58-encoded public key material."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One public key entry from a Truvera DID document."
+                },
+                "description": "The public keys published in the DID document."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A DID document returned by Truvera."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The DID document returned by Truvera."
+      }
+    },
+    {
+      "id": "truvera.get_job",
+      "service": "truvera",
+      "name": "get_job",
+      "description": "Get the latest status and result payload for a Truvera background job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Truvera background job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Truvera background job identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "todo",
+              "finalized",
+              "in_progress",
+              "error"
+            ],
+            "description": "The Truvera job status."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The blockchain or API result associated with the job."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "status"
+        ],
+        "description": "The Truvera job status payload."
+      }
+    },
+    {
+      "id": "truvera.get_profile",
+      "service": "truvera",
+      "name": "get_profile",
+      "description": "Get the authenticated Truvera account profile for the configured API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the authenticated Truvera profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Truvera profile display name."
+              },
+              "image": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Truvera profile image URL or asset path."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The authenticated Truvera account profile returned by the profile endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated Truvera profile response."
+      }
+    },
+    {
+      "id": "truvera.list_credential_schemas",
+      "service": "truvera",
+      "name": "list_credential_schemas",
+      "description": "List credential schemas created by the authenticated Truvera account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many schema results to skip before listing."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "description": "How many schema results to return, up to the Truvera maximum of 64."
+          },
+          "includeEcosystems": {
+            "type": "boolean",
+            "description": "Whether Truvera should include ecosystem metadata in schema results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Truvera credential schemas."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The schema identifier."
+                },
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "$schema": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The JSON Schema dialect URI."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The schema name."
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The schema description."
+                        },
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The JSON Schema type, typically `object`."
+                        },
+                        "properties": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": true,
+                            "description": "One JSON Schema property definition."
+                          },
+                          "description": "The credential subject properties defined by the schema."
+                        },
+                        "required": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "One required property name."
+                          },
+                          "description": "The required credential subject property names."
+                        },
+                        "additionalProperties": {
+                          "type": "boolean",
+                          "description": "Whether additional properties are allowed by the schema."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The JSON Schema body Truvera stores for a credential schema."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The JSON Schema body Truvera stores for a credential schema."
+                },
+                "uri": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The schema URI."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The schema URI."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the schema was created.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the schema was created."
+                },
+                "isOwner": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the authenticated user owns the schema."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the authenticated user owns the schema."
+                },
+                "ownerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The schema owner display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The schema owner display name."
+                },
+                "ownerLogo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The schema owner logo URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The schema owner logo URL."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One credential schema summary returned by Truvera."
+            },
+            "description": "The credential schema summaries returned by Truvera."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The list of credential schemas returned by Truvera."
+      }
+    },
+    {
+      "id": "truvera.list_dids",
+      "service": "truvera",
+      "name": "list_dids",
+      "description": "List the DIDs controlled by the authenticated Truvera account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many DID results to skip before listing."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "description": "How many DID results to return, up to the Truvera maximum of 64."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cheqd",
+              "dock",
+              "key"
+            ],
+            "description": "The DID method to create or filter, as documented by Truvera."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Truvera DIDs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dids": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DID identifier."
+                },
+                "did": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DID value."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "cheqd",
+                        "dock",
+                        "key"
+                      ],
+                      "description": "The DID method to create or filter, as documented by Truvera."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DID method to create or filter, as documented by Truvera."
+                },
+                "controller": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID controller."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DID controller."
+                },
+                "credentialCount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The number of credentials issued by the DID as returned by Truvera."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of credentials issued by the DID as returned by Truvera."
+                },
+                "updatedLast": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp of the DID metadata update time.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp of the DID metadata update time."
+                },
+                "profile": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The DID profile display name."
+                        },
+                        "logo": {
+                          "type": "string",
+                          "minLength": 0,
+                          "description": "The DID profile logo URL or empty string."
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The DID profile description."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The optional public profile metadata associated with the DID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional public profile metadata associated with the DID."
+                },
+                "keyId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The DID key identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DID key identifier."
+                },
+                "jobId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Truvera background job identifier for this DID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Truvera background job identifier for this DID."
+                },
+                "trustRegistries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The trust registry identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The trust registry display name."
+                      },
+                      "logoUrl": {
+                        "type": "string",
+                        "description": "The trust registry logo URL.",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One trust registry summary associated with the DID."
+                  },
+                  "description": "The trust registries associated with the DID."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One DID summary entry returned by Truvera."
+            },
+            "description": "The DID summaries returned by Truvera."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The list of DIDs returned by Truvera."
+      }
+    }
+  ]
+}

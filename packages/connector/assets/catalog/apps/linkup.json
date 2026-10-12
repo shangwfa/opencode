@@ -1,0 +1,617 @@
+{
+  "service": "linkup",
+  "displayName": "Linkup",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "LINKUP_API_KEY",
+      "description": "Linkup API key used with the Authorization Bearer header. Create a Linkup account to get it: https://docs.linkup.so/pages/documentation/get-started/quickstart"
+    }
+  ],
+  "homepageUrl": "https://www.linkup.so",
+  "actions": [
+    {
+      "id": "linkup.fetch_webpage",
+      "service": "linkup",
+      "name": "fetch_webpage",
+      "description": "Fetch one webpage with Linkup and return markdown plus optional raw HTML and images.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The webpage URL to fetch.",
+            "format": "uri"
+          },
+          "includeRawHtml": {
+            "type": "boolean",
+            "description": "Whether Linkup should include the raw HTML in the response."
+          },
+          "extractImages": {
+            "type": "boolean",
+            "description": "Whether Linkup should include extracted images in the response."
+          },
+          "renderJs": {
+            "type": "boolean",
+            "description": "Whether Linkup should render the webpage JavaScript before extraction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for the Linkup fetch action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "description": "The clean markdown extracted from the webpage."
+          },
+          "rawHtml": {
+            "type": "string",
+            "description": "The raw HTML returned by Linkup."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The image URL.",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string",
+                  "description": "The alt text of the image."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One image returned by the Linkup fetch endpoint."
+            },
+            "description": "The images extracted from the webpage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "markdown"
+        ],
+        "description": "The Linkup fetch payload."
+      }
+    },
+    {
+      "id": "linkup.get_credits_balance",
+      "service": "linkup",
+      "name": "get_credits_balance",
+      "description": "Get the current Linkup credits balance for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the Linkup credits balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "description": "The remaining Linkup credits balance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "balance"
+        ],
+        "description": "The Linkup credits balance payload."
+      }
+    },
+    {
+      "id": "linkup.search_answer",
+      "service": "linkup",
+      "name": "search_answer",
+      "description": "Search the web with Linkup and return a sourced natural-language answer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language query sent to Linkup."
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "deep",
+              "standard",
+              "fast"
+            ],
+            "description": "The Linkup search depth to execute."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of search results to return."
+          },
+          "includeImages": {
+            "type": "boolean",
+            "description": "Whether Linkup should include images in the search results."
+          },
+          "includeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to include in the search."
+            },
+            "description": "Only include results from these domains.",
+            "maxItems": 100
+          },
+          "excludeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to exclude in the search."
+            },
+            "description": "Exclude results from these domains."
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "includeInlineCitations": {
+            "type": "boolean",
+            "description": "Whether Linkup should include inline citations in the answer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q",
+          "depth"
+        ],
+        "description": "The input payload for the Linkup sourced-answer search action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string",
+            "description": "The answer returned by Linkup."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The title or name of the source."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The source URL.",
+                  "format": "uri"
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "The source snippet used in the answer."
+                },
+                "favicon": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The favicon URL.",
+                      "format": "uri"
+                    },
+                    {
+                      "const": "",
+                      "type": "string",
+                      "description": "An empty favicon string."
+                    },
+                    {
+                      "type": "null",
+                      "description": "A null favicon value."
+                    }
+                  ],
+                  "description": "The favicon URL, if available."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "url",
+                "snippet"
+              ],
+              "description": "One source item returned by Linkup."
+            },
+            "description": "The sources cited in the answer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "answer",
+          "sources"
+        ],
+        "description": "The Linkup sourced-answer payload."
+      }
+    },
+    {
+      "id": "linkup.search_results",
+      "service": "linkup",
+      "name": "search_results",
+      "description": "Search the web with Linkup and return raw grounded search results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language query sent to Linkup."
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "deep",
+              "standard",
+              "fast"
+            ],
+            "description": "The Linkup search depth to execute."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of search results to return."
+          },
+          "includeImages": {
+            "type": "boolean",
+            "description": "Whether Linkup should include images in the search results."
+          },
+          "includeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to include in the search."
+            },
+            "description": "Only include results from these domains.",
+            "maxItems": 100
+          },
+          "excludeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to exclude in the search."
+            },
+            "description": "Exclude results from these domains."
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q",
+          "depth"
+        ],
+        "description": "The shared input payload for Linkup search actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The result title."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The canonical result URL.",
+                      "format": "uri"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The extracted text content for the result."
+                    },
+                    "favicon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The favicon URL.",
+                          "format": "uri"
+                        },
+                        {
+                          "const": "",
+                          "type": "string",
+                          "description": "An empty favicon string."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null favicon value."
+                        }
+                      ],
+                      "description": "The favicon URL, if available."
+                    },
+                    "type": {
+                      "const": "text",
+                      "type": "string",
+                      "description": "The result type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url",
+                    "content",
+                    "type"
+                  ],
+                  "description": "One text search result returned by Linkup."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The image result title."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The image result URL.",
+                      "format": "uri"
+                    },
+                    "type": {
+                      "const": "image",
+                      "type": "string",
+                      "description": "The result type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url",
+                    "type"
+                  ],
+                  "description": "One image search result returned by Linkup."
+                }
+              ],
+              "description": "One search result returned by Linkup."
+            },
+            "description": "The ordered search results returned by Linkup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The Linkup search-results payload."
+      }
+    },
+    {
+      "id": "linkup.search_structured_data",
+      "service": "linkup",
+      "name": "search_structured_data",
+      "description": "Search the web with Linkup and return data normalized to the provided JSON schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language query sent to Linkup."
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "deep",
+              "standard",
+              "fast"
+            ],
+            "description": "The Linkup search depth to execute."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of search results to return."
+          },
+          "includeImages": {
+            "type": "boolean",
+            "description": "Whether Linkup should include images in the search results."
+          },
+          "includeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to include in the search."
+            },
+            "description": "Only include results from these domains.",
+            "maxItems": 100
+          },
+          "excludeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One domain to exclude in the search."
+            },
+            "description": "Exclude results from these domains."
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "toDate": {
+            "type": "string",
+            "description": "A calendar date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "structuredOutputSchema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The JSON schema string that defines the structured response shape."
+          },
+          "includeSources": {
+            "type": "boolean",
+            "description": "Whether Linkup should include sources alongside the structured data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q",
+          "depth",
+          "structuredOutputSchema"
+        ],
+        "description": "The input payload for the Linkup structured-data search action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The structured data returned by Linkup."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The result title."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The canonical result URL.",
+                      "format": "uri"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The extracted text content for the result."
+                    },
+                    "favicon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The favicon URL.",
+                          "format": "uri"
+                        },
+                        {
+                          "const": "",
+                          "type": "string",
+                          "description": "An empty favicon string."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null favicon value."
+                        }
+                      ],
+                      "description": "The favicon URL, if available."
+                    },
+                    "type": {
+                      "const": "text",
+                      "type": "string",
+                      "description": "The result type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url",
+                    "content",
+                    "type"
+                  ],
+                  "description": "One text search result returned by Linkup."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The image result title."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "The image result URL.",
+                      "format": "uri"
+                    },
+                    "type": {
+                      "const": "image",
+                      "type": "string",
+                      "description": "The result type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url",
+                    "type"
+                  ],
+                  "description": "One image search result returned by Linkup."
+                }
+              ],
+              "description": "One search result returned by Linkup."
+            },
+            "description": "The sources returned alongside the structured data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The Linkup structured-data payload."
+      }
+    }
+  ]
+}

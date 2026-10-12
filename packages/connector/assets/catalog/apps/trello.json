@@ -1,0 +1,2230 @@
+{
+  "service": "trello",
+  "displayName": "Trello",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Trello API key",
+          "description": "Trello API Key from the API Key tab at https://trello.com/apps/admin. Do not use the API Secret or an Atlassian API token here."
+        },
+        {
+          "key": "apiToken",
+          "label": "API Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Trello API token",
+          "description": "Trello API token generated from the Token link beside your API Key at https://trello.com/apps/admin. This is different from the API Secret."
+        }
+      ],
+      "testAction": {
+        "actionName": "get_member",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://trello.com",
+  "actions": [
+    {
+      "id": "trello.add_card_attachment_url",
+      "service": "trello",
+      "name": "add_card_attachment_url",
+      "description": "Attach an external URL to a Trello card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL to attach to the card.",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attachment display name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId",
+          "url"
+        ],
+        "description": "Input parameters for attaching a URL to a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello attachment ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Attachment name."
+              },
+              "url": {
+                "type": "string",
+                "description": "Attachment URL.",
+                "format": "uri"
+              },
+              "bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Attachment size in bytes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Attachment size in bytes."
+              },
+              "date": {
+                "type": "string",
+                "description": "Attachment creation timestamp in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trello card attachment returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello attachment."
+      }
+    },
+    {
+      "id": "trello.add_card_comment",
+      "service": "trello",
+      "name": "add_card_comment",
+      "description": "Add a comment action to a Trello card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comment text to add to the card."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for adding a Trello card comment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello action ID."
+              },
+              "type": {
+                "type": "string",
+                "description": "Trello action type."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Action data returned by Trello."
+              },
+              "date": {
+                "type": "string",
+                "description": "Action creation timestamp in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trello action returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello comment action."
+      }
+    },
+    {
+      "id": "trello.add_card_label",
+      "service": "trello",
+      "name": "add_card_label",
+      "description": "Add a Trello label to a card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "labelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello label ID to add."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for adding a Trello label to a card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Trello accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Trello mutation response."
+      }
+    },
+    {
+      "id": "trello.add_card_member",
+      "service": "trello",
+      "name": "add_card_member",
+      "description": "Assign a Trello member to a card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello member ID to assign."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for assigning a Trello member to a card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Trello accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Trello mutation response."
+      }
+    },
+    {
+      "id": "trello.add_checkitem",
+      "service": "trello",
+      "name": "add_checkitem",
+      "description": "Add a check item to a Trello checklist.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checklistId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello checklist ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Check item name."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named list position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric list position."
+              }
+            ],
+            "description": "List position. Use top, bottom, or a numeric position."
+          },
+          "checked": {
+            "type": "boolean",
+            "description": "Whether the new check item should be created as complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "checklistId",
+          "name"
+        ],
+        "description": "Input parameters for adding a Trello checklist item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkItem": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello check item ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Check item name."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "complete",
+                  "incomplete"
+                ],
+                "description": "Check item state."
+              },
+              "position": {
+                "type": "number",
+                "description": "Check item position in the checklist."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trello checklist item returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello check item."
+      }
+    },
+    {
+      "id": "trello.archive_card",
+      "service": "trello",
+      "name": "archive_card",
+      "description": "Archive a Trello card.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for archiving a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The archived Trello card."
+      }
+    },
+    {
+      "id": "trello.archive_list",
+      "service": "trello",
+      "name": "archive_list",
+      "description": "Archive a Trello list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello list ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for archiving a Trello list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello list ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the list."
+              },
+              "name": {
+                "type": "string",
+                "description": "List name."
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the list is closed."
+              },
+              "position": {
+                "type": "number",
+                "description": "List position on the board."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello list returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The archived Trello list."
+      }
+    },
+    {
+      "id": "trello.create_board",
+      "service": "trello",
+      "name": "create_board",
+      "description": "Create a Trello board.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Board name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Board description."
+          },
+          "defaultLists": {
+            "type": "boolean",
+            "description": "Whether Trello should create default lists on the board."
+          },
+          "permissionLevel": {
+            "type": "string",
+            "enum": [
+              "org",
+              "private",
+              "public"
+            ],
+            "description": "Board visibility preference."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating a Trello board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello board ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Board name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Board description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello board URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello board URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the board is closed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello board returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello board."
+      }
+    },
+    {
+      "id": "trello.create_card",
+      "service": "trello",
+      "name": "create_card",
+      "description": "Create a Trello card in a list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello list ID that will contain the new card."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Card name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Card description."
+          },
+          "due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Card due date in ISO 8601 format.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Card due date in ISO 8601 format."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named card position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric card position."
+              }
+            ],
+            "description": "Card position. Use top, bottom, or a numeric position."
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello member ID."
+            },
+            "description": "Trello member IDs to assign to the card.",
+            "minItems": 1
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello label ID."
+            },
+            "description": "Trello label IDs to assign to the card.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "name"
+        ],
+        "description": "Input parameters for creating a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello card."
+      }
+    },
+    {
+      "id": "trello.create_checklist",
+      "service": "trello",
+      "name": "create_checklist",
+      "description": "Create a Trello checklist on a card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Checklist name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Trello checklist."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello checklist ID."
+              },
+              "cardId": {
+                "type": "string",
+                "description": "Trello card ID that owns the checklist."
+              },
+              "name": {
+                "type": "string",
+                "description": "Checklist name."
+              },
+              "checkItems": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Trello check item ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Check item name."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "complete",
+                        "incomplete"
+                      ],
+                      "description": "Check item state."
+                    },
+                    "position": {
+                      "type": "number",
+                      "description": "Check item position in the checklist."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Trello checklist item returned by the REST API."
+                },
+                "description": "Checklist items returned by Trello."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trello checklist returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello checklist."
+      }
+    },
+    {
+      "id": "trello.create_list",
+      "service": "trello",
+      "name": "create_list",
+      "description": "Create a Trello list on a board.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID that will own the list."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List name."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named list position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric list position."
+              }
+            ],
+            "description": "List position. Use top, bottom, or a numeric position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId",
+          "name"
+        ],
+        "description": "Input parameters for creating a Trello list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello list ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the list."
+              },
+              "name": {
+                "type": "string",
+                "description": "List name."
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the list is closed."
+              },
+              "position": {
+                "type": "number",
+                "description": "List position on the board."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello list returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Trello list."
+      }
+    },
+    {
+      "id": "trello.get_board",
+      "service": "trello",
+      "name": "get_board",
+      "description": "Get a Trello board by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Input parameters for retrieving a Trello board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello board ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Board name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Board description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello board URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello board URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the board is closed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello board returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved Trello board."
+      }
+    },
+    {
+      "id": "trello.get_card",
+      "service": "trello",
+      "name": "get_card",
+      "description": "Get a Trello card by ID or short link.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId"
+        ],
+        "description": "Input parameters for retrieving a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved Trello card."
+      }
+    },
+    {
+      "id": "trello.get_member",
+      "service": "trello",
+      "name": "get_member",
+      "description": "Get a Trello member, defaulting to the authenticated member.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello member ID or the me shortcut. Defaults to me."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Trello member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello member ID."
+              },
+              "username": {
+                "type": "string",
+                "description": "Trello username."
+              },
+              "fullName": {
+                "type": "string",
+                "description": "Display name for the Trello member."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello member returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved Trello member."
+      }
+    },
+    {
+      "id": "trello.list_board_cards",
+      "service": "trello",
+      "name": "list_board_cards",
+      "description": "List Trello cards on a board.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "closed",
+              "none",
+              "open",
+              "visible"
+            ],
+            "description": "Card filter passed to Trello."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Input parameters for listing Trello cards on a board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello card ID."
+                },
+                "boardId": {
+                  "type": "string",
+                  "description": "Trello board ID that owns the card."
+                },
+                "listId": {
+                  "type": "string",
+                  "description": "Trello list ID that contains the card."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Card name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Card description."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Public Trello card URL.",
+                  "format": "uri"
+                },
+                "shortUrl": {
+                  "type": "string",
+                  "description": "Short Trello card URL.",
+                  "format": "uri"
+                },
+                "closed": {
+                  "type": "boolean",
+                  "description": "Whether the card is closed."
+                },
+                "due": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Card due date in ISO 8601 format.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Card due date in ISO 8601 format."
+                },
+                "dueComplete": {
+                  "type": "boolean",
+                  "description": "Whether the card due date is marked complete."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Trello card returned by the REST API."
+            },
+            "description": "Trello cards."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cards returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_board_labels",
+      "service": "trello",
+      "name": "list_board_labels",
+      "description": "List Trello labels on a board.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Trello board labels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Trello label returned by the API."
+            },
+            "description": "Trello labels."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Board labels returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_board_lists",
+      "service": "trello",
+      "name": "list_board_lists",
+      "description": "List Trello lists on a board.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "closed",
+              "none",
+              "open"
+            ],
+            "description": "List filter passed to Trello."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Input parameters for listing Trello lists on a board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello list ID."
+                },
+                "boardId": {
+                  "type": "string",
+                  "description": "Trello board ID that owns the list."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "List name."
+                },
+                "closed": {
+                  "type": "boolean",
+                  "description": "Whether the list is closed."
+                },
+                "position": {
+                  "type": "number",
+                  "description": "List position on the board."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Trello list returned by the REST API."
+            },
+            "description": "Trello lists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Lists returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_board_members",
+      "service": "trello",
+      "name": "list_board_members",
+      "description": "List Trello members on a board.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello board ID."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Input parameters for listing Trello board members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello member ID."
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Trello username."
+                },
+                "fullName": {
+                  "type": "string",
+                  "description": "Display name for the Trello member."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Trello member returned by the REST API."
+            },
+            "description": "Trello members."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Board members returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_card_checklists",
+      "service": "trello",
+      "name": "list_card_checklists",
+      "description": "List Trello checklists on a card.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Trello card checklists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checklists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello checklist ID."
+                },
+                "cardId": {
+                  "type": "string",
+                  "description": "Trello card ID that owns the checklist."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Checklist name."
+                },
+                "checkItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Trello check item ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Check item name."
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "complete",
+                          "incomplete"
+                        ],
+                        "description": "Check item state."
+                      },
+                      "position": {
+                        "type": "number",
+                        "description": "Check item position in the checklist."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Trello checklist item returned by the REST API."
+                  },
+                  "description": "Checklist items returned by Trello."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Trello checklist returned by the REST API."
+            },
+            "description": "Trello checklists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Checklists returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_card_comments",
+      "service": "trello",
+      "name": "list_card_comments",
+      "description": "List comment actions on a Trello card.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of comment actions to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId"
+        ],
+        "description": "Input parameters for listing Trello card comments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello action ID."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Trello action type."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Action data returned by Trello."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Action creation timestamp in ISO 8601 format.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Trello action returned by the REST API."
+            },
+            "description": "Trello comment actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Comment actions returned by Trello."
+      }
+    },
+    {
+      "id": "trello.list_member_boards",
+      "service": "trello",
+      "name": "list_member_boards",
+      "description": "List Trello boards visible to a member.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello member ID or the me shortcut. Defaults to me."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello field name to include in the response."
+            },
+            "description": "Comma-joined Trello fields to request from the REST API.",
+            "minItems": 1
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "closed",
+              "members",
+              "open",
+              "organization",
+              "public",
+              "starred"
+            ],
+            "description": "Board filter passed to Trello."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing boards for a Trello member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Trello board ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Board name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Board description."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Public Trello board URL.",
+                  "format": "uri"
+                },
+                "shortUrl": {
+                  "type": "string",
+                  "description": "Short Trello board URL.",
+                  "format": "uri"
+                },
+                "closed": {
+                  "type": "boolean",
+                  "description": "Whether the board is closed."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Trello board returned by the REST API."
+            },
+            "description": "Trello boards."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Boards returned by Trello."
+      }
+    },
+    {
+      "id": "trello.move_card",
+      "service": "trello",
+      "name": "move_card",
+      "description": "Move a Trello card to another list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination Trello list ID."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named card position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric card position."
+              }
+            ],
+            "description": "Card position. Use top, bottom, or a numeric position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId",
+          "listId"
+        ],
+        "description": "Input parameters for moving a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The moved Trello card."
+      }
+    },
+    {
+      "id": "trello.remove_card_label",
+      "service": "trello",
+      "name": "remove_card_label",
+      "description": "Remove a Trello label from a card.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "labelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello label ID to remove."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for removing a Trello label from a card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Trello accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Trello mutation response."
+      }
+    },
+    {
+      "id": "trello.remove_card_member",
+      "service": "trello",
+      "name": "remove_card_member",
+      "description": "Remove a Trello member from a card.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello member ID to remove."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for removing a Trello member from a card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Trello accepted the mutation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Trello mutation response."
+      }
+    },
+    {
+      "id": "trello.search",
+      "service": "trello",
+      "name": "search",
+      "description": "Search Trello cards, boards, members, and organizations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query sent to Trello."
+          },
+          "modelTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "actions",
+                "boards",
+                "cards",
+                "members",
+                "organizations"
+              ],
+              "description": "One Trello model type."
+            },
+            "description": "Trello model types to search.",
+            "minItems": 1
+          },
+          "cardsLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of cards to return."
+          },
+          "boardsLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of boards to return."
+          },
+          "membersLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of members to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for Trello search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Trello search result."
+            },
+            "description": "Search results returned by Trello."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search results returned by Trello."
+      }
+    },
+    {
+      "id": "trello.update_card",
+      "service": "trello",
+      "name": "update_card",
+      "description": "Update a Trello card by ID or short link.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Card name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Card description."
+          },
+          "due": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Card due date in ISO 8601 format.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Card due date in ISO 8601 format."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named card position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric card position."
+              }
+            ],
+            "description": "Card position. Use top, bottom, or a numeric position."
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello member ID."
+            },
+            "description": "Trello member IDs to assign to the card.",
+            "minItems": 1
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Trello label ID."
+            },
+            "description": "Trello label IDs to assign to the card.",
+            "minItems": 1
+          },
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello list ID to move the card into."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Whether the card should be closed."
+          },
+          "dueComplete": {
+            "type": "boolean",
+            "description": "Whether the card due date should be marked complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cardId"
+        ],
+        "description": "Input parameters for updating a Trello card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Trello card."
+      }
+    },
+    {
+      "id": "trello.update_checkitem_state",
+      "service": "trello",
+      "name": "update_checkitem_state",
+      "description": "Update a Trello check item state on a card.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello card ID or short link."
+          },
+          "checkItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello check item ID."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "description": "New check item state."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for updating a Trello check item state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello card ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the card."
+              },
+              "listId": {
+                "type": "string",
+                "description": "Trello list ID that contains the card."
+              },
+              "name": {
+                "type": "string",
+                "description": "Card name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Card description."
+              },
+              "url": {
+                "type": "string",
+                "description": "Public Trello card URL.",
+                "format": "uri"
+              },
+              "shortUrl": {
+                "type": "string",
+                "description": "Short Trello card URL.",
+                "format": "uri"
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the card is closed."
+              },
+              "due": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Card due date in ISO 8601 format.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Card due date in ISO 8601 format."
+              },
+              "dueComplete": {
+                "type": "boolean",
+                "description": "Whether the card due date is marked complete."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello card returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Trello card returned after updating the check item."
+      }
+    },
+    {
+      "id": "trello.update_list",
+      "service": "trello",
+      "name": "update_list",
+      "description": "Update a Trello list name or position.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trello list ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List name."
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Named list position."
+              },
+              {
+                "type": "number",
+                "description": "Numeric list position."
+              }
+            ],
+            "description": "List position. Use top, bottom, or a numeric position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "Input parameters for updating a Trello list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Trello list ID."
+              },
+              "boardId": {
+                "type": "string",
+                "description": "Trello board ID that owns the list."
+              },
+              "name": {
+                "type": "string",
+                "description": "List name."
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Whether the list is closed."
+              },
+              "position": {
+                "type": "number",
+                "description": "List position on the board."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Trello list returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Trello list."
+      }
+    }
+  ]
+}

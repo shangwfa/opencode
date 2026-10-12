@@ -1,0 +1,1152 @@
+{
+  "service": "indexed",
+  "displayName": "Indexed",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "idx_...",
+      "description": "Indexed API key sent in the X-API-Key header. Every plan can create a key at https://indexed.vc/developers/keys. The free plan needs no credit card."
+    }
+  ],
+  "homepageUrl": "https://indexed.vc",
+  "actions": [
+    {
+      "id": "indexed.get_company",
+      "service": "indexed",
+      "name": "get_company",
+      "description": "Fetch one company profile by slug. Cost depends on depth: slim is 1 credit (identity fields), standard is 2 credits (all scalar fields, owners and subsidiaries), full is 3 credits (adds funding rounds with investors, valuations, technologies and app stack). Fetching the same company at the same depth again within 12 months is not charged. A 402 means credits are exhausted, which is a billing state and should not be retried.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+            "description": "The company slug from a search or lookup result."
+          },
+          "depth": {
+            "type": "string",
+            "enum": [
+              "slim",
+              "standard",
+              "full"
+            ],
+            "description": "How much of the profile to return and charge for. Defaults to standard."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "slug"
+        ],
+        "description": "The company to fetch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Indexed company id.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The company name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The company slug."
+              },
+              "website": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The company website, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The company website, or null."
+              },
+              "short_description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A one or two sentence description, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A one or two sentence description, or null."
+              },
+              "industries": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One industry label."
+                    },
+                    "description": "Canonical industry labels, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Canonical industry labels, or null."
+              },
+              "hq_country": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Headquarters country, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Headquarters country, or null."
+              },
+              "total_funding_raised": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total disclosed funding in whole USD, grants included, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total disclosed funding in whole USD, grants included, or null."
+              },
+              "operating_status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "One of active, acquired, ipo, closed, or null when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One of active, acquired, ipo, closed, or null when unknown."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "slug"
+            ],
+            "description": "The company profile. slim returns identity fields. standard adds all scalar fields plus owners and subsidiaries. full adds valuationEvents (funding rounds with participating investors), technologies and appStack. Amounts are whole USD and a null amount means undisclosed."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The company profile."
+      }
+    },
+    {
+      "id": "indexed.lookup_companies_by_domains",
+      "service": "indexed",
+      "name": "lookup_companies_by_domains",
+      "description": "Look up up to 100 website domains in one call. Domains are normalized and deduplicated in first-seen order, and results keep that order. Each hit costs 1 credit. Misses are free and are recorded for coverage review. If credits run out part way through, the remaining domains come back as insufficient_credits without a charge. summary gives the counts and total credits charged.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "One domain or URL."
+            },
+            "description": "Website domains or URLs to look up, 1 to 100 items.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "The domains to look up."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "description": "The normalized domain this result belongs to."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "hit",
+                    "miss",
+                    "insufficient_credits"
+                  ],
+                  "description": "hit: a company was found and 1 credit was charged. miss: no company found, nothing charged, the domain is recorded for coverage review. insufficient_credits: the account ran out of credits before this domain, nothing charged."
+                },
+                "credits_charged": {
+                  "type": "integer",
+                  "description": "Credits charged for this domain: 1 for a hit, 0 otherwise."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The Indexed company id.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The company name."
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "The company slug. Pass it to get_company for more detail."
+                    },
+                    "logo_url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The company logo URL, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The company logo URL, or null."
+                    },
+                    "website": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The company website, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The company website, or null."
+                    },
+                    "short_description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A one or two sentence description, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A one or two sentence description, or null."
+                    },
+                    "industries": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One industry label."
+                          },
+                          "description": "Canonical industry labels, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Canonical industry labels, or null."
+                    },
+                    "hq_city": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Headquarters city, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Headquarters city, or null."
+                    },
+                    "hq_country": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Headquarters country, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Headquarters country, or null."
+                    },
+                    "employee_count_range": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Employee count bucket such as 51-200, or null."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Employee count bucket such as 51-200, or null."
+                    },
+                    "total_funding_raised": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                    },
+                    "operating_status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "One of active, acquired, ipo, closed, or null when unknown."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "One of active, acquired, ipo, closed, or null when unknown."
+                    },
+                    "_revealed": {
+                      "type": "boolean",
+                      "description": "True when this account has already unlocked the company's detail within the last 12 months."
+                    },
+                    "domain_match": {
+                      "type": "object",
+                      "properties": {
+                        "queried": {
+                          "type": "string",
+                          "description": "The domain as supplied by the caller, after normalization."
+                        },
+                        "canonical_domain": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The current website host of the matched company."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The current website host of the matched company."
+                        },
+                        "matched_via": {
+                          "type": "string",
+                          "enum": [
+                            "canonical_domain",
+                            "alias_domain",
+                            "former_website"
+                          ],
+                          "description": "Which stored domain matched the query."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Present on domain lookups. When matched_via is not canonical_domain, the company's current website differs from the domain that was queried."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "_revealed"
+                  ],
+                  "description": "The public company card. Fields not listed here may also be present."
+                },
+                "coverage_requested": {
+                  "type": "boolean",
+                  "description": "Present on a miss. Whether the domain was recorded for coverage review."
+                },
+                "coverage_status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "not_queued",
+                    "pending_enrichment",
+                    "scope_review",
+                    "not_in_coverage_scope",
+                    "not_found"
+                  ],
+                  "description": "Present when a domain lookup or name search returns no result. queued: recorded for coverage review. not_queued: recording failed, retry later. pending_enrichment: Indexed holds the company but the profile is not yet complete enough to serve. scope_review: Indexed holds it and its fit with coverage scope is under review. not_in_coverage_scope: Indexed holds it but it is outside coverage scope and will not be served. not_found: no match; name misses are reviewed as search demand."
+                },
+                "coverage_eta_days": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Present on a miss. Currently null because manual review has no guaranteed completion date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Present on a miss. Currently null because manual review has no guaranteed completion date."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "domain",
+                "status",
+                "credits_charged"
+              ],
+              "description": "The lookup outcome for one domain. data is present only when status is hit."
+            },
+            "description": "One result per unique domain, in first-seen order."
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total_requested": {
+                "type": "integer",
+                "description": "Unique domains looked up."
+              },
+              "total_hits": {
+                "type": "integer",
+                "description": "Domains that matched a company."
+              },
+              "total_misses": {
+                "type": "integer",
+                "description": "Domains with no match."
+              },
+              "total_insufficient_credits": {
+                "type": "integer",
+                "description": "Domains skipped because credits ran out."
+              },
+              "total_credits_charged": {
+                "type": "integer",
+                "description": "Credits charged for this call."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Counts across the whole call."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Ordered per-domain results and a summary."
+      },
+      "followUpActions": [
+        "indexed.get_company"
+      ]
+    },
+    {
+      "id": "indexed.lookup_company_by_domain",
+      "service": "indexed",
+      "name": "lookup_company_by_domain",
+      "description": "Find the company that owns one website domain. Accepts a bare domain or a full URL and matches the registrable domain exactly: stripe.com finds a company whose site is stripe.com or a subdomain of it, never a longer name such as bluestripe.com. A sub-host you send, like app.stripe.com, is not rewritten to its parent, so send the company's main domain. Alias and former domains match too, and domain_match says which. This counts as a standard search: free within the daily search quota, after which paid plans spend 1 credit per page that has results and free plans get a rate-limited error. A miss costs nothing and the domain is recorded for coverage review; coverage_status explains why nothing was returned.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The website domain or URL, for example stripe.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The domain to look up."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Indexed company id.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The company name."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The company slug. Pass it to get_company for more detail."
+                },
+                "logo_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company logo URL, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company logo URL, or null."
+                },
+                "website": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company website, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company website, or null."
+                },
+                "short_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A one or two sentence description, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A one or two sentence description, or null."
+                },
+                "industries": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "One industry label."
+                      },
+                      "description": "Canonical industry labels, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Canonical industry labels, or null."
+                },
+                "hq_city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Headquarters city, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Headquarters city, or null."
+                },
+                "hq_country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Headquarters country, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Headquarters country, or null."
+                },
+                "employee_count_range": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Employee count bucket such as 51-200, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Employee count bucket such as 51-200, or null."
+                },
+                "total_funding_raised": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                },
+                "operating_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "One of active, acquired, ipo, closed, or null when unknown."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "One of active, acquired, ipo, closed, or null when unknown."
+                },
+                "_revealed": {
+                  "type": "boolean",
+                  "description": "True when this account has already unlocked the company's detail within the last 12 months."
+                },
+                "domain_match": {
+                  "type": "object",
+                  "properties": {
+                    "queried": {
+                      "type": "string",
+                      "description": "The domain as supplied by the caller, after normalization."
+                    },
+                    "canonical_domain": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The current website host of the matched company."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The current website host of the matched company."
+                    },
+                    "matched_via": {
+                      "type": "string",
+                      "enum": [
+                        "canonical_domain",
+                        "alias_domain",
+                        "former_website"
+                      ],
+                      "description": "Which stored domain matched the query."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Present on domain lookups. When matched_via is not canonical_domain, the company's current website differs from the domain that was queried."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "slug",
+                "_revealed"
+              ],
+              "description": "The public company card. Fields not listed here may also be present."
+            },
+            "description": "Matching company cards. Empty when nothing matched."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of matches."
+              },
+              "page": {
+                "type": "integer",
+                "description": "The page number returned."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The page size used."
+              },
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether another page exists."
+              },
+              "revealed_count": {
+                "type": "integer",
+                "description": "Count of matches this account has already unlocked."
+              },
+              "unrevealed_count": {
+                "type": "integer",
+                "description": "Count of matches this account has not unlocked."
+              },
+              "all_revealed": {
+                "type": "boolean",
+                "description": "Present when reveal_status is unrevealed but every match is already unlocked."
+              },
+              "resolved_filters": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Echo of the resolved filter values, such as ai-ml resolved to AI/ML. Present when filters are applied."
+              },
+              "next_cursor": {
+                "type": "string",
+                "description": "Present on paid plans when more results exist. Pass it back as cursor for the next page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "total",
+              "page",
+              "limit",
+              "hasMore",
+              "revealed_count",
+              "unrevealed_count"
+            ],
+            "description": "Pagination and reveal counts for the result set."
+          },
+          "coverage_requested": {
+            "type": "boolean",
+            "description": "Present on a zero-result domain lookup. True when the domain was recorded for coverage review, false when recording failed or the company is outside coverage scope. This is not a promise of coverage."
+          },
+          "coverage_status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "not_queued",
+              "pending_enrichment",
+              "scope_review",
+              "not_in_coverage_scope",
+              "not_found"
+            ],
+            "description": "Present when a domain lookup or name search returns no result. queued: recorded for coverage review. not_queued: recording failed, retry later. pending_enrichment: Indexed holds the company but the profile is not yet complete enough to serve. scope_review: Indexed holds it and its fit with coverage scope is under review. not_in_coverage_scope: Indexed holds it but it is outside coverage scope and will not be served. not_found: no match; name misses are reviewed as search demand."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "meta"
+        ],
+        "description": "A page of company cards as returned by Indexed."
+      },
+      "followUpActions": [
+        "indexed.get_company"
+      ]
+    },
+    {
+      "id": "indexed.search_companies",
+      "service": "indexed",
+      "name": "search_companies",
+      "description": "Search company cards by name text and filters such as industry, country, size, operating status and funding range. Standard search is free within the daily search quota. After the quota, paid plans spend 1 credit per page that has results and free plans get a rate-limited error. Results are cards, so use get_company for funding history and stacks. Technology-stack filters are not exposed here because they are billed as a separate premium search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Free text query, for example a company name."
+          },
+          "industries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One industry label or slug."
+            },
+            "description": "Industry filters. Accepts display labels such as Fintech or slugs such as ai-ml. Multiple values match any of them.",
+            "minItems": 1
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One country name."
+            },
+            "description": "Headquarters country names such as United States.",
+            "minItems": 1
+          },
+          "employees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "1-10",
+                "11-50",
+                "51-200",
+                "201-500",
+                "501-1000",
+                "1001-5000",
+                "5001-10000",
+                "10001+"
+              ],
+              "description": "One employee bucket."
+            },
+            "description": "Employee count buckets to include.",
+            "minItems": 1
+          },
+          "operatingStatus": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "active",
+                "acquired",
+                "ipo",
+                "closed",
+                "merged"
+              ],
+              "description": "One operating status."
+            },
+            "description": "Operating statuses to include.",
+            "minItems": 1
+          },
+          "minFunding": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum total funding in whole USD, grants included. Funding filters are paid-plan only."
+          },
+          "maxFunding": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum total funding in whole USD, grants included. Funding filters are paid-plan only."
+          },
+          "minCompleteness": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64,
+            "description": "Minimum data_completeness_score, to skip thin records."
+          },
+          "updatedSince": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Incremental sync: only records modified at or after this ISO 8601 date or timestamp, such as 2026-09-01 or 2026-09-01T00:00:00Z. Combine with cursor for delta pulls."
+          },
+          "revealStatus": {
+            "type": "string",
+            "enum": [
+              "all",
+              "revealed",
+              "unrevealed"
+            ],
+            "description": "Filter results by whether this account has unlocked them. Defaults to all."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "total_funding_raised",
+              "name",
+              "last_funding_date",
+              "last_funding_amount",
+              "founded_year",
+              "data_completeness_score"
+            ],
+            "description": "Sort field. Sorting is part of the paid-plan listing surface."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1. Free keys can read pages 1 through 3."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Results per page. Defaults to 25. Free keys get 10 rows per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paid plans only. The meta.next_cursor value from the previous page, for sequential bulk pulls. When set, page and sort are ignored."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search text and filters. Filter-only listing and sorting are part of the paid-plan surface and can be refused on a free key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Indexed company id.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The company name."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The company slug. Pass it to get_company for more detail."
+                },
+                "logo_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company logo URL, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company logo URL, or null."
+                },
+                "website": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company website, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company website, or null."
+                },
+                "short_description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A one or two sentence description, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A one or two sentence description, or null."
+                },
+                "industries": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "One industry label."
+                      },
+                      "description": "Canonical industry labels, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Canonical industry labels, or null."
+                },
+                "hq_city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Headquarters city, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Headquarters city, or null."
+                },
+                "hq_country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Headquarters country, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Headquarters country, or null."
+                },
+                "employee_count_range": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Employee count bucket such as 51-200, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Employee count bucket such as 51-200, or null."
+                },
+                "total_funding_raised": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Total disclosed funding in whole USD, grants included. Null when no round has a disclosed amount."
+                },
+                "operating_status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "One of active, acquired, ipo, closed, or null when unknown."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "One of active, acquired, ipo, closed, or null when unknown."
+                },
+                "_revealed": {
+                  "type": "boolean",
+                  "description": "True when this account has already unlocked the company's detail within the last 12 months."
+                },
+                "domain_match": {
+                  "type": "object",
+                  "properties": {
+                    "queried": {
+                      "type": "string",
+                      "description": "The domain as supplied by the caller, after normalization."
+                    },
+                    "canonical_domain": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The current website host of the matched company."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The current website host of the matched company."
+                    },
+                    "matched_via": {
+                      "type": "string",
+                      "enum": [
+                        "canonical_domain",
+                        "alias_domain",
+                        "former_website"
+                      ],
+                      "description": "Which stored domain matched the query."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Present on domain lookups. When matched_via is not canonical_domain, the company's current website differs from the domain that was queried."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "slug",
+                "_revealed"
+              ],
+              "description": "The public company card. Fields not listed here may also be present."
+            },
+            "description": "Matching company cards. Empty when nothing matched."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of matches."
+              },
+              "page": {
+                "type": "integer",
+                "description": "The page number returned."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The page size used."
+              },
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether another page exists."
+              },
+              "revealed_count": {
+                "type": "integer",
+                "description": "Count of matches this account has already unlocked."
+              },
+              "unrevealed_count": {
+                "type": "integer",
+                "description": "Count of matches this account has not unlocked."
+              },
+              "all_revealed": {
+                "type": "boolean",
+                "description": "Present when reveal_status is unrevealed but every match is already unlocked."
+              },
+              "resolved_filters": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Echo of the resolved filter values, such as ai-ml resolved to AI/ML. Present when filters are applied."
+              },
+              "next_cursor": {
+                "type": "string",
+                "description": "Present on paid plans when more results exist. Pass it back as cursor for the next page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "total",
+              "page",
+              "limit",
+              "hasMore",
+              "revealed_count",
+              "unrevealed_count"
+            ],
+            "description": "Pagination and reveal counts for the result set."
+          },
+          "coverage_requested": {
+            "type": "boolean",
+            "description": "Present on a zero-result domain lookup. True when the domain was recorded for coverage review, false when recording failed or the company is outside coverage scope. This is not a promise of coverage."
+          },
+          "coverage_status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "not_queued",
+              "pending_enrichment",
+              "scope_review",
+              "not_in_coverage_scope",
+              "not_found"
+            ],
+            "description": "Present when a domain lookup or name search returns no result. queued: recorded for coverage review. not_queued: recording failed, retry later. pending_enrichment: Indexed holds the company but the profile is not yet complete enough to serve. scope_review: Indexed holds it and its fit with coverage scope is under review. not_in_coverage_scope: Indexed holds it but it is outside coverage scope and will not be served. not_found: no match; name misses are reviewed as search demand."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "meta"
+        ],
+        "description": "A page of company cards as returned by Indexed."
+      },
+      "followUpActions": [
+        "indexed.get_company"
+      ]
+    }
+  ]
+}

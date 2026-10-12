@@ -1,0 +1,843 @@
+{
+  "service": "next_dns",
+  "displayName": "NextDNS",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NEXTDNS_API_KEY",
+      "description": "NextDNS API key passed with the X-Api-Key header. Create or view API keys in the NextDNS account page: https://my.nextdns.io/account",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://nextdns.io/",
+  "actions": [
+    {
+      "id": "next_dns.get_analytics_devices",
+      "service": "next_dns",
+      "name": "get_analytics_devices",
+      "description": "List per-device DNS query analytics for a NextDNS profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive start date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as -7d.",
+            "pattern": "\\S"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exclusive end date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as now.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque pagination cursor from a previous response."
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS device ID to filter by, or __UNIDENTIFIED__ for unidentified devices."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for retrieving NextDNS device analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The item identifier when returned by NextDNS."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The item display name when returned by NextDNS."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain value when returned by NextDNS."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The status value when returned by NextDNS."
+                },
+                "queries": {
+                  "type": "integer",
+                  "description": "The query count for this item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NextDNS analytics item."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS device analytics."
+      }
+    },
+    {
+      "id": "next_dns.get_analytics_domains",
+      "service": "next_dns",
+      "name": "get_analytics_domains",
+      "description": "List per-domain DNS query analytics for a NextDNS profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive start date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as -7d.",
+            "pattern": "\\S"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exclusive end date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as now.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque pagination cursor from a previous response."
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS device ID to filter by, or __UNIDENTIFIED__ for unidentified devices."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "default",
+              "blocked",
+              "allowed"
+            ],
+            "description": "The analytics status to filter by."
+          },
+          "root": {
+            "type": "boolean",
+            "description": "Whether to aggregate results by root domain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for retrieving NextDNS domain analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The item identifier when returned by NextDNS."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The item display name when returned by NextDNS."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain value when returned by NextDNS."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The status value when returned by NextDNS."
+                },
+                "queries": {
+                  "type": "integer",
+                  "description": "The query count for this item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NextDNS analytics item."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS domain analytics."
+      }
+    },
+    {
+      "id": "next_dns.get_analytics_reasons",
+      "service": "next_dns",
+      "name": "get_analytics_reasons",
+      "description": "List DNS query counts grouped by blocking reason for a NextDNS profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive start date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as -7d.",
+            "pattern": "\\S"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exclusive end date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as now.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque pagination cursor from a previous response."
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS device ID to filter by, or __UNIDENTIFIED__ for unidentified devices."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for retrieving NextDNS blocking-reason analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The item identifier when returned by NextDNS."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The item display name when returned by NextDNS."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain value when returned by NextDNS."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The status value when returned by NextDNS."
+                },
+                "queries": {
+                  "type": "integer",
+                  "description": "The query count for this item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NextDNS analytics item."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS blocking-reason analytics."
+      }
+    },
+    {
+      "id": "next_dns.get_analytics_status",
+      "service": "next_dns",
+      "name": "get_analytics_status",
+      "description": "List DNS query counts grouped by status for a NextDNS profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive start date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as -7d.",
+            "pattern": "\\S"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exclusive end date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as now.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque pagination cursor from a previous response."
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS device ID to filter by, or __UNIDENTIFIED__ for unidentified devices."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for retrieving NextDNS status analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The item identifier when returned by NextDNS."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The item display name when returned by NextDNS."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain value when returned by NextDNS."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The status value when returned by NextDNS."
+                },
+                "queries": {
+                  "type": "integer",
+                  "description": "The query count for this item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NextDNS analytics item."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS status analytics."
+      }
+    },
+    {
+      "id": "next_dns.get_logs",
+      "service": "next_dns",
+      "name": "get_logs",
+      "description": "List DNS query logs for a NextDNS profile with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive start date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as -1d.",
+            "pattern": "\\S"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exclusive end date filter. NextDNS accepts ISO timestamps, Unix timestamps, and relative values such as now.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1000,
+            "description": "The maximum number of log entries to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque pagination cursor from a previous response."
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS device ID to filter by, or __UNIDENTIFIED__ for unidentified devices."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain or substring to search for in logs."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "default",
+              "error",
+              "blocked",
+              "allowed"
+            ],
+            "description": "The DNS query status to filter by."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The log order to request from NextDNS."
+          },
+          "raw": {
+            "type": "boolean",
+            "description": "Whether to return raw DNS queries instead of filtered navigational logs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for listing NextDNS logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "The query timestamp."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The queried domain."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The query status."
+                },
+                "protocol": {
+                  "type": "string",
+                  "description": "The query protocol."
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One log reason."
+                  },
+                  "description": "The reasons attached to this log entry."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NextDNS log entry."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS logs."
+      }
+    },
+    {
+      "id": "next_dns.get_profile",
+      "service": "next_dns",
+      "name": "get_profile",
+      "description": "Get one NextDNS profile with its current settings and setup details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NextDNS profile ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profileId"
+        ],
+        "description": "The input payload for retrieving a NextDNS profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw profile object returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "raw"
+        ],
+        "description": "The response returned when retrieving a NextDNS profile."
+      }
+    },
+    {
+      "id": "next_dns.list_profiles",
+      "service": "next_dns",
+      "name": "list_profiles",
+      "description": "List NextDNS profiles available to the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing NextDNS profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The NextDNS profile ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The profile name."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The current user's role for this profile."
+                },
+                "fingerprint": {
+                  "type": "string",
+                  "description": "The profile fingerprint when returned by NextDNS."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A NextDNS profile summary."
+            },
+            "description": "The items returned by NextDNS."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pagination": {
+                    "type": "object",
+                    "properties": {
+                      "cursor": {
+                        "type": "string",
+                        "description": "The cursor for the next page of results."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The pagination metadata returned by NextDNS."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The response metadata returned by NextDNS."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response metadata returned by NextDNS."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response returned by NextDNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta",
+          "raw"
+        ],
+        "description": "The response returned when listing NextDNS profiles."
+      }
+    }
+  ]
+}

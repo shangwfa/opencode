@@ -1,0 +1,1085 @@
+{
+  "service": "momentum_io",
+  "displayName": "Momentum.io",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MOMENTUM_API_KEY",
+      "description": "Momentum API key sent with the X-API-Key header. Enable API access and create keys from the Momentum dashboard Integrations page: https://docs.momentum.io/api-access."
+    }
+  ],
+  "homepageUrl": "https://www.momentum.io",
+  "actions": [
+    {
+      "id": "momentum_io.list_meetings",
+      "service": "momentum_io",
+      "name": "list_meetings",
+      "description": "List Momentum meetings with optional date, attendee, Salesforce, and source filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve, using 1-based indexing."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return, from 1 to 50."
+          },
+          "salesforceAccountId": {
+            "type": "string",
+            "minLength": 18,
+            "maxLength": 18,
+            "description": "An 18-character Salesforce record ID."
+          },
+          "salesforceOpportunityId": {
+            "type": "string",
+            "minLength": 18,
+            "maxLength": 18,
+            "description": "An 18-character Salesforce record ID."
+          },
+          "attendeeEmailAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An attendee email address.",
+              "format": "email"
+            },
+            "description": "Email addresses that every returned meeting must include.",
+            "minItems": 1
+          },
+          "sourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "AIRCALL",
+                "CHORUS",
+                "CLOUDTALK",
+                "DIALPAD",
+                "GONG",
+                "MINDTICKLE",
+                "MOMENTUM",
+                "MS_TEAMS",
+                "ORUM",
+                "OUTREACH",
+                "RINGCENTRAL",
+                "SALESLOFT",
+                "SALESLOFT_CI",
+                "USER_PROVIDED",
+                "VONAGE",
+                "WEBEX",
+                "WINGMAN",
+                "WISER",
+                "ZOOM",
+                "ZOOM_PHONE"
+              ],
+              "description": "Momentum meeting source type to filter by."
+            },
+            "description": "Meeting source types to include.",
+            "minItems": 1
+          },
+          "includeDownloadUrl": {
+            "type": "boolean",
+            "description": "Whether to include temporary recording download URLs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Momentum meetings.",
+        "not": {
+          "required": [
+            "salesforceAccountId",
+            "salesforceOpportunityId"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Meeting ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Meeting title."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "Meeting start time.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "Meeting end time.",
+                  "format": "date-time"
+                },
+                "host": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "description": "Host email address.",
+                          "format": "email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Host name."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Meeting host."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting host."
+                },
+                "attendees": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Attendee ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Attendee name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Attendee email address.",
+                        "format": "email"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Momentum meeting attendee."
+                  },
+                  "description": "Meeting attendees."
+                },
+                "transcript": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Meeting transcript data."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting transcript data."
+                },
+                "salesforceAccountId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce account ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce account ID."
+                },
+                "salesforceLeadId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce lead ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce lead ID."
+                },
+                "salesforceOpportunityId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce opportunity ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce opportunity ID."
+                },
+                "downloadUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Temporary pre-signed meeting recording download URL.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Temporary pre-signed meeting recording download URL."
+                },
+                "downloadUrlExpiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Expiration timestamp for the temporary download URL.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Expiration timestamp for the temporary download URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum meeting."
+            },
+            "description": "Momentum meetings returned for the requested page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages available for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetings"
+        ],
+        "description": "A paginated Momentum meetings response."
+      }
+    },
+    {
+      "id": "momentum_io.list_signal_definitions",
+      "service": "momentum_io",
+      "name": "list_signal_definitions",
+      "description": "List Momentum signal v2 definitions configured for the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Momentum signal v2 definitions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Unique identifier for the signal."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "Display name of the signal."
+                },
+                "contextSource": {
+                  "type": "string",
+                  "description": "Source context that triggers the signal."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the signal is enabled."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the signal was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum signal prompt or definition."
+            },
+            "description": "Momentum signals returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signals"
+        ],
+        "description": "A Momentum signals response."
+      }
+    },
+    {
+      "id": "momentum_io.list_signal_executions",
+      "service": "momentum_io",
+      "name": "list_signal_executions",
+      "description": "List executions for a Momentum v1 signal prompt within a time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "promptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The signal prompt ID to retrieve executions for."
+          },
+          "executionFrom": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "executionTo": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve, using 1-based indexing."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return, from 1 to 50."
+          },
+          "includeCustomInstructions": {
+            "type": "boolean",
+            "description": "Whether to include custom instruction outputs in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "promptId",
+          "executionFrom"
+        ],
+        "description": "Input parameters for listing Momentum signal executions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signalId": {
+                  "type": "integer",
+                  "description": "Identifier for the signal that was triggered."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "Name of the signal that was triggered."
+                },
+                "triggeredAt": {
+                  "type": "string",
+                  "description": "Timestamp when the signal was triggered.",
+                  "format": "date-time"
+                },
+                "sourceId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "A numeric source item identifier."
+                    },
+                    {
+                      "type": "string",
+                      "description": "A string source item identifier."
+                    }
+                  ],
+                  "description": "Identifier for the source item that triggered the signal."
+                },
+                "sourceType": {
+                  "type": "string",
+                  "description": "Type of source that triggered the signal."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Title of the source item."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Title of the source item."
+                },
+                "prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Prompt text used for the signal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Prompt text used for the signal."
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "AI-generated reason explaining why the signal was triggered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "AI-generated reason explaining why the signal was triggered."
+                },
+                "hostEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Email address of the meeting host.",
+                      "format": "email"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Email address of the meeting host."
+                },
+                "attendeeEmails": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Attendee email address.",
+                        "format": "email"
+                      },
+                      "description": "Meeting attendee email addresses."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting attendee email addresses."
+                },
+                "emailFrom": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Sender email address for email-triggered signals.",
+                      "format": "email"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sender email address for email-triggered signals."
+                },
+                "emailTo": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Recipient email address.",
+                        "format": "email"
+                      },
+                      "description": "Recipient email addresses for email-triggered signals."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recipient email addresses for email-triggered signals."
+                },
+                "followUpPrompts": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A follow-up prompt output."
+                      },
+                      "description": "Follow-up prompt outputs returned by Momentum."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Follow-up prompt outputs returned by Momentum."
+                },
+                "customInstructions": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A custom instruction output."
+                      },
+                      "description": "Custom instruction outputs returned by Momentum."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Custom instruction outputs returned by Momentum."
+                },
+                "salesforceAccountId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce account ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce account ID."
+                },
+                "salesforceOpportunityId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce opportunity ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce opportunity ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum signal execution."
+            },
+            "description": "Momentum signal executions returned for the requested page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages available for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signals",
+          "pageCount"
+        ],
+        "description": "A paginated Momentum signal executions response."
+      }
+    },
+    {
+      "id": "momentum_io.list_signal_prompts",
+      "service": "momentum_io",
+      "name": "list_signal_prompts",
+      "description": "List Momentum AI signal prompts configured for the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Momentum signal prompts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Unique identifier for the signal."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "Display name of the signal."
+                },
+                "contextSource": {
+                  "type": "string",
+                  "description": "Source context that triggers the signal."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the signal is enabled."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the signal was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum signal prompt or definition."
+            },
+            "description": "Momentum signals returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signals"
+        ],
+        "description": "A Momentum signals response."
+      }
+    },
+    {
+      "id": "momentum_io.list_signal_v2_executions",
+      "service": "momentum_io",
+      "name": "list_signal_v2_executions",
+      "description": "List executions for a Momentum signal v2 definition within a time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "definitionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The signal definition ID to retrieve executions for."
+          },
+          "executionFrom": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "executionTo": {
+            "type": "string",
+            "description": "An ISO 8601 date-time value.",
+            "format": "date-time"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve, using 1-based indexing."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return, from 1 to 50."
+          },
+          "includeFollowUpPrompts": {
+            "type": "boolean",
+            "description": "Whether to include follow-up prompt outputs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "definitionId",
+          "executionFrom"
+        ],
+        "description": "Input parameters for listing Momentum signal v2 executions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signalId": {
+                  "type": "integer",
+                  "description": "Identifier for the signal that was triggered."
+                },
+                "signalName": {
+                  "type": "string",
+                  "description": "Name of the signal that was triggered."
+                },
+                "triggeredAt": {
+                  "type": "string",
+                  "description": "Timestamp when the signal was triggered.",
+                  "format": "date-time"
+                },
+                "sourceId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "A numeric source item identifier."
+                    },
+                    {
+                      "type": "string",
+                      "description": "A string source item identifier."
+                    }
+                  ],
+                  "description": "Identifier for the source item that triggered the signal."
+                },
+                "sourceType": {
+                  "type": "string",
+                  "description": "Type of source that triggered the signal."
+                },
+                "sourceTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Title of the source item."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Title of the source item."
+                },
+                "prompt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Prompt text used for the signal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Prompt text used for the signal."
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "AI-generated reason explaining why the signal was triggered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "AI-generated reason explaining why the signal was triggered."
+                },
+                "hostEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Email address of the meeting host.",
+                      "format": "email"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Email address of the meeting host."
+                },
+                "attendeeEmails": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Attendee email address.",
+                        "format": "email"
+                      },
+                      "description": "Meeting attendee email addresses."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Meeting attendee email addresses."
+                },
+                "emailFrom": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Sender email address for email-triggered signals.",
+                      "format": "email"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sender email address for email-triggered signals."
+                },
+                "emailTo": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Recipient email address.",
+                        "format": "email"
+                      },
+                      "description": "Recipient email addresses for email-triggered signals."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recipient email addresses for email-triggered signals."
+                },
+                "followUpPrompts": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A follow-up prompt output."
+                      },
+                      "description": "Follow-up prompt outputs returned by Momentum."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Follow-up prompt outputs returned by Momentum."
+                },
+                "customInstructions": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A custom instruction output."
+                      },
+                      "description": "Custom instruction outputs returned by Momentum."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Custom instruction outputs returned by Momentum."
+                },
+                "salesforceAccountId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce account ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce account ID."
+                },
+                "salesforceOpportunityId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Associated Salesforce opportunity ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Associated Salesforce opportunity ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum signal execution."
+            },
+            "description": "Momentum signal executions returned for the requested page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages available for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signals",
+          "pageCount"
+        ],
+        "description": "A paginated Momentum signal executions response."
+      }
+    },
+    {
+      "id": "momentum_io.list_users",
+      "service": "momentum_io",
+      "name": "list_users",
+      "description": "List Momentum organization users with optional pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve, using 1-based indexing."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return, from 1 to 50."
+          },
+          "licenseAdded": {
+            "type": "boolean",
+            "description": "Filter users by license status."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "VIEWER",
+              "EDITOR",
+              "ORGANIZATION_ADMIN",
+              "USER_ADMIN",
+              "USER"
+            ],
+            "description": "Momentum user role to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Momentum users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "User email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "User full name."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "User role returned by Momentum."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Momentum user type."
+                },
+                "slackUserId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Slack user ID, when connected."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Slack user ID, when connected."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User job title from Slack, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User job title from Slack, when available."
+                },
+                "salesforceDepartment": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User department from Salesforce, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User department from Salesforce, when available."
+                },
+                "salesforceUserRole": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User role from Salesforce, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User role from Salesforce, when available."
+                },
+                "licenseAdded": {
+                  "type": "boolean",
+                  "description": "Whether the user has an active AI license."
+                },
+                "licenseAssignedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Timestamp when the license was assigned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Timestamp when the license was assigned."
+                },
+                "salesforceAuthStatus": {
+                  "type": "string",
+                  "description": "Salesforce authentication status."
+                },
+                "gcalAuthStatus": {
+                  "type": "string",
+                  "description": "Google Calendar authentication status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Momentum organization user."
+            },
+            "description": "Momentum users returned for the requested page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages available for the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "pageCount"
+        ],
+        "description": "A paginated Momentum users response."
+      }
+    }
+  ]
+}

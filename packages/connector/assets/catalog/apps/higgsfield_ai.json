@@ -1,0 +1,579 @@
+{
+  "service": "higgsfield_ai",
+  "displayName": "Higgsfield AI",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HIGGSFIELD_API_KEY",
+      "description": "Higgsfield API key used with the Authorization: Key header. Create API credentials from the Higgsfield Cloud dashboard: https://cloud.higgsfield.ai.",
+      "extraFields": [
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "HIGGSFIELD_API_SECRET",
+          "description": "Higgsfield API secret paired with the API key for Authorization: Key authentication. Create API credentials from the Higgsfield Cloud dashboard: https://cloud.higgsfield.ai."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://higgsfield.ai/",
+  "actions": [
+    {
+      "id": "higgsfield_ai.cancel_request",
+      "service": "higgsfield_ai",
+      "name": "cancel_request",
+      "description": "Cancel a queued Higgsfield generation request.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "description": "The Higgsfield request cancellation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Higgsfield accepted the cancellation request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "accepted"
+        ],
+        "description": "The Higgsfield cancellation result."
+      }
+    },
+    {
+      "id": "higgsfield_ai.get_request_status",
+      "service": "higgsfield_ai",
+      "name": "get_request_status",
+      "description": "Retrieve the current status and outputs for a Higgsfield generation request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "description": "The Higgsfield request status lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "nsfw",
+              "failed",
+              "completed"
+            ],
+            "description": "The current Higgsfield request status."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          },
+          "statusUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield status URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield status URL for this request."
+          },
+          "cancelUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield cancel URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield cancel URL for this request."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The generated image URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One generated image result."
+            },
+            "description": "Generated image outputs when available."
+          },
+          "video": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The generated video URL.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "url"
+                ],
+                "description": "The generated video result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated video result."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield error message when the request failed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield error message when the request failed."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Higgsfield response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "requestId",
+          "statusUrl",
+          "cancelUrl",
+          "images",
+          "video",
+          "error",
+          "raw"
+        ],
+        "description": "A Higgsfield generation request state."
+      }
+    },
+    {
+      "id": "higgsfield_ai.submit_image_generation",
+      "service": "higgsfield_ai",
+      "name": "submit_image_generation",
+      "description": "Submit a Higgsfield text-to-image generation request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text prompt describing the image to generate."
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield model identifier to call."
+          },
+          "aspectRatio": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The image aspect ratio, such as 16:9."
+          },
+          "resolution": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The requested image resolution, such as 720p."
+          },
+          "cameraFixed": {
+            "type": "boolean",
+            "description": "Whether the model camera should remain fixed."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "The public webhook URL that Higgsfield should notify.",
+            "format": "uri"
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional model-specific Higgsfield request arguments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Higgsfield text-to-image generation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "nsfw",
+              "failed",
+              "completed"
+            ],
+            "description": "The current Higgsfield request status."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          },
+          "statusUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield status URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield status URL for this request."
+          },
+          "cancelUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield cancel URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield cancel URL for this request."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The generated image URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One generated image result."
+            },
+            "description": "Generated image outputs when available."
+          },
+          "video": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The generated video URL.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "url"
+                ],
+                "description": "The generated video result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated video result."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield error message when the request failed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield error message when the request failed."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Higgsfield response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "requestId",
+          "statusUrl",
+          "cancelUrl",
+          "images",
+          "video",
+          "error",
+          "raw"
+        ],
+        "description": "A Higgsfield generation request state."
+      },
+      "followUpActions": [
+        "higgsfield_ai.get_request_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "higgsfield_ai.submit_image_generation",
+        "statusActionId": "higgsfield_ai.get_request_status",
+        "cancelActionId": "higgsfield_ai.cancel_request"
+      }
+    },
+    {
+      "id": "higgsfield_ai.submit_video_generation",
+      "service": "higgsfield_ai",
+      "name": "submit_video_generation",
+      "description": "Submit a Higgsfield image-to-video generation request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The motion prompt describing how the image should animate."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "The publicly accessible source image URL.",
+            "format": "uri"
+          },
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield model identifier to call."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested video duration in seconds."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "The public webhook URL that Higgsfield should notify.",
+            "format": "uri"
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional model-specific Higgsfield request arguments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt",
+          "imageUrl"
+        ],
+        "description": "The Higgsfield image-to-video generation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "nsfw",
+              "failed",
+              "completed"
+            ],
+            "description": "The current Higgsfield request status."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Higgsfield request identifier returned by submit."
+          },
+          "statusUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield status URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield status URL for this request."
+          },
+          "cancelUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield cancel URL for this request.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield cancel URL for this request."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The generated image URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One generated image result."
+            },
+            "description": "Generated image outputs when available."
+          },
+          "video": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The generated video URL.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "url"
+                ],
+                "description": "The generated video result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated video result."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Higgsfield error message when the request failed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Higgsfield error message when the request failed."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Higgsfield response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "requestId",
+          "statusUrl",
+          "cancelUrl",
+          "images",
+          "video",
+          "error",
+          "raw"
+        ],
+        "description": "A Higgsfield generation request state."
+      },
+      "followUpActions": [
+        "higgsfield_ai.get_request_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "higgsfield_ai.submit_video_generation",
+        "statusActionId": "higgsfield_ai.get_request_status",
+        "cancelActionId": "higgsfield_ai.cancel_request"
+      }
+    }
+  ]
+}

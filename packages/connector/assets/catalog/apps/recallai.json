@@ -1,0 +1,368 @@
+{
+  "service": "recallai",
+  "displayName": "Recall.ai",
+  "categories": [
+    "Communication",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "recallai_api_key",
+      "description": "Recall.ai API key used with the Authorization Token header. Create it from your regional Recall dashboard API Keys page and use the same region where you created the key.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "us-east-1",
+          "description": "Recall.ai region for this workspace, such as us-east-1, us-west-2, eu-central-1, or ap-northeast-1."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.recall.ai",
+  "actions": [
+    {
+      "id": "recallai.create_bot",
+      "service": "recallai",
+      "name": "create_bot",
+      "description": "Create a Recall.ai bot with the core scheduling, recording, automatic-leave, and metadata fields needed for a first-pass meeting bot workflow.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting_url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The meeting URL that Recall.ai should join, such as a Google Meet or Zoom link."
+          },
+          "bot_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bot display name shown in the meeting when the platform allows custom names."
+          },
+          "join_at": {
+            "type": "string",
+            "description": "Optional ISO 8601 timestamp for scheduling the bot at least 10 minutes in the future.",
+            "format": "date-time"
+          },
+          "recording_config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Recall.ai recording_config object for transcript, media, and recording behavior."
+          },
+          "automatic_leave": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Recall.ai automatic_leave object that controls when the bot should leave the meeting."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One metadata value."
+            },
+            "description": "String metadata entries passed to or returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meeting_url"
+        ],
+        "description": "Input parameters for creating a Recall.ai bot."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bot": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Recall.ai bot payload returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the create_bot action."
+      }
+    },
+    {
+      "id": "recallai.delete_bot_media",
+      "service": "recallai",
+      "name": "delete_bot_media",
+      "description": "Delete the Recall.ai media artifacts stored for a completed bot after downstream processing is finished.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Recall.ai bot identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting one Recall.ai bot's stored media."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Recall.ai bot payload returned by Recall.ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Recall.ai bot payload returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the delete_bot_media action."
+      }
+    },
+    {
+      "id": "recallai.get_bot",
+      "service": "recallai",
+      "name": "get_bot",
+      "description": "Retrieve one Recall.ai bot by bot ID, including its current status changes, recordings, and metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Recall.ai bot identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Recall.ai bot."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bot": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Recall.ai bot payload returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the get_bot action."
+      }
+    },
+    {
+      "id": "recallai.list_bots",
+      "service": "recallai",
+      "name": "list_bots",
+      "description": "List Recall.ai bots with optional filters for scheduled date window, meeting URL, platform, status, metadata, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "join_at_after": {
+            "type": "string",
+            "description": "Only include bots scheduled on or after this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "join_at_before": {
+            "type": "string",
+            "description": "Only include bots scheduled on or before this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "meeting_url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include bots for the given meeting URL."
+          },
+          "platform": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "chime_sdk",
+                "google_meet",
+                "google_meet_media_api",
+                "goto_meeting",
+                "microsoft_teams",
+                "microsoft_teams_live",
+                "slack_authenticator",
+                "slack_huddle_observer",
+                "webex",
+                "zoom",
+                "zoom_rtms"
+              ],
+              "description": "The meeting platform filter accepted by Recall.ai."
+            },
+            "description": "Optional list of Recall.ai platform filters."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "analysis_done",
+                "analysis_failed",
+                "call_ended",
+                "done",
+                "fatal",
+                "in_call_not_recording",
+                "in_call_recording",
+                "in_waiting_room",
+                "joining_call",
+                "media_expired",
+                "ready",
+                "recording_done",
+                "recording_permission_allowed",
+                "recording_permission_denied"
+              ],
+              "description": "The Recall.ai bot status filter value."
+            },
+            "description": "Optional list of Recall.ai bot status filters."
+          },
+          "use_cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "When present, ask Recall.ai to use cursor-based pagination semantics."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One metadata value."
+            },
+            "description": "String metadata entries passed to or returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Recall.ai bots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total bot count returned by Recall.ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total bot count returned by Recall.ai."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL returned by Recall.ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL returned by Recall.ai."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL returned by Recall.ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL returned by Recall.ai."
+          },
+          "bots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Recall.ai bot payload returned by Recall.ai."
+            },
+            "description": "The bot results returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bots"
+        ],
+        "description": "The normalized output payload for the list_bots action."
+      }
+    },
+    {
+      "id": "recallai.remove_bot_from_call",
+      "service": "recallai",
+      "name": "remove_bot_from_call",
+      "description": "Remove a Recall.ai bot from the meeting immediately when it is already active in the call.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Recall.ai bot identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for removing one Recall.ai bot from a call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Recall.ai bot payload returned by Recall.ai."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Recall.ai bot payload returned by Recall.ai."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the remove_bot_from_call action."
+      }
+    }
+  ]
+}

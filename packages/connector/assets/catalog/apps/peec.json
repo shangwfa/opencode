@@ -1,0 +1,747 @@
+{
+  "service": "peec",
+  "displayName": "Peec AI",
+  "description": "Inspect Peec AI projects, prompts, visibility, sources, and analytics.",
+  "categories": [
+    "Marketing",
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "PEEC_API_KEY",
+      "description": "Peec AI Customer API key sent with the X-API-Key header. Create a company- or project-scoped key at https://app.peec.ai/api-keys."
+    }
+  ],
+  "homepageUrl": "https://peec.ai/",
+  "actions": [
+    {
+      "id": "peec.get_brands_report",
+      "service": "peec",
+      "name": "get_brands_report",
+      "description": "Get Peec brand visibility, sentiment, position, and share-of-voice report rows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Peec project ID. Required by upstream when the connection uses a company-scoped API key."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000,
+            "description": "Number of rows to skip before returning results."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "First date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Last date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "prompt_id",
+                "model_channel_id",
+                "tag_id",
+                "topic_id",
+                "date",
+                "week",
+                "month",
+                "country_code",
+                "chat_id"
+              ],
+              "description": "A dimension used to split report rows."
+            },
+            "description": "Dimensions used to split report rows.",
+            "uniqueItems": true
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Peec field to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The comparison operator accepted for the selected field."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "description": "A predicate value."
+                  },
+                  "description": "Values for a set predicate.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "field",
+                "operator",
+                "values"
+              ],
+              "description": "A Peec report predicate that compares a field with a set of values."
+            },
+            "description": "Pre-aggregation filters. These change both numerator and denominator values for ratio metrics."
+          },
+          "having": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected field."
+                    },
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "description": "A predicate value."
+                      },
+                      "description": "Values for a set predicate.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "values"
+                  ],
+                  "description": "A Peec report predicate that compares a field with a set of values."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec metric field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected metric."
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "The scalar metric value to compare."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "value"
+                  ],
+                  "description": "A Peec report predicate that compares a metric with one scalar value."
+                }
+              ],
+              "description": "A documented Peec having predicate."
+            },
+            "description": "Post-aggregation predicates. Use these to select rows without changing ratio-metric denominators."
+          },
+          "orderBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The report field to sort by."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A Peec report sort instruction."
+            },
+            "description": "Sort instructions applied in order."
+          },
+          "previousStartDate": {
+            "type": "string",
+            "description": "First date of an explicit comparison window; provide it with previousEndDate.",
+            "format": "date"
+          },
+          "previousEndDate": {
+            "type": "string",
+            "description": "Last date of an explicit comparison window; provide it with previousStartDate.",
+            "format": "date"
+          },
+          "includePreviousPeriod": {
+            "type": "boolean",
+            "description": "Whether to include metrics for the adjacent equal-length comparison window."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for a Peec brands report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Peec report row."
+            },
+            "description": "The report rows returned by Peec. Row fields depend on the report and requested dimensions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Peec analytics report response."
+      }
+    },
+    {
+      "id": "peec.get_domains_report",
+      "service": "peec",
+      "name": "get_domains_report",
+      "description": "Get Peec source-domain retrieval and citation report rows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Peec project ID. Required by upstream when the connection uses a company-scoped API key."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000,
+            "description": "Number of rows to skip before returning results."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "First date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Last date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "prompt_id",
+                "model_channel_id",
+                "tag_id",
+                "topic_id",
+                "date",
+                "week",
+                "month",
+                "country_code",
+                "chat_id"
+              ],
+              "description": "A dimension used to split report rows."
+            },
+            "description": "Dimensions used to split report rows.",
+            "uniqueItems": true
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Peec field to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The comparison operator accepted for the selected field."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "description": "A predicate value."
+                  },
+                  "description": "Values for a set predicate.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "field",
+                "operator",
+                "values"
+              ],
+              "description": "A Peec report predicate that compares a field with a set of values."
+            },
+            "description": "Pre-aggregation filters. These change both numerator and denominator values for ratio metrics."
+          },
+          "having": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected field."
+                    },
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "description": "A predicate value."
+                      },
+                      "description": "Values for a set predicate.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "values"
+                  ],
+                  "description": "A Peec report predicate that compares a field with a set of values."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec metric field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected metric."
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "The scalar metric value to compare."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "value"
+                  ],
+                  "description": "A Peec report predicate that compares a metric with one scalar value."
+                }
+              ],
+              "description": "A documented Peec having predicate."
+            },
+            "description": "Post-aggregation predicates. Use these to select rows without changing ratio-metric denominators."
+          },
+          "orderBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The report field to sort by."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A Peec report sort instruction."
+            },
+            "description": "Sort instructions applied in order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for a Peec domains report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Peec report row."
+            },
+            "description": "The report rows returned by Peec. Row fields depend on the report and requested dimensions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Peec analytics report response."
+      }
+    },
+    {
+      "id": "peec.get_urls_report",
+      "service": "peec",
+      "name": "get_urls_report",
+      "description": "Get Peec source-URL retrieval and citation report rows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Peec project ID. Required by upstream when the connection uses a company-scoped API key."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000,
+            "description": "Number of rows to skip before returning results."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "First date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Last date included in the report window, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "prompt_id",
+                "model_channel_id",
+                "tag_id",
+                "topic_id",
+                "date",
+                "week",
+                "month",
+                "country_code",
+                "chat_id"
+              ],
+              "description": "A dimension used to split report rows."
+            },
+            "description": "Dimensions used to split report rows.",
+            "uniqueItems": true
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Peec field to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The comparison operator accepted for the selected field."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "description": "A predicate value."
+                  },
+                  "description": "Values for a set predicate.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "field",
+                "operator",
+                "values"
+              ],
+              "description": "A Peec report predicate that compares a field with a set of values."
+            },
+            "description": "Pre-aggregation filters. These change both numerator and denominator values for ratio metrics."
+          },
+          "having": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected field."
+                    },
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "description": "A predicate value."
+                      },
+                      "description": "Values for a set predicate.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "values"
+                  ],
+                  "description": "A Peec report predicate that compares a field with a set of values."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Peec metric field to filter."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The comparison operator accepted for the selected metric."
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "The scalar metric value to compare."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "field",
+                    "operator",
+                    "value"
+                  ],
+                  "description": "A Peec report predicate that compares a metric with one scalar value."
+                }
+              ],
+              "description": "A documented Peec having predicate."
+            },
+            "description": "Post-aggregation predicates. Use these to select rows without changing ratio-metric denominators."
+          },
+          "orderBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The report field to sort by."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "A Peec report sort instruction."
+            },
+            "description": "Sort instructions applied in order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for a Peec URLs report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Peec report row."
+            },
+            "description": "The report rows returned by Peec. Row fields depend on the report and requested dimensions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Peec analytics report response."
+      }
+    },
+    {
+      "id": "peec.list_projects",
+      "service": "peec",
+      "name": "list_projects",
+      "description": "List Peec projects available to a company-scoped API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500000,
+            "description": "Number of rows to skip before returning results."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return the project with this external ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Only return projects created on or after this date.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Only return projects created on or before this date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Peec projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Peec project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The project display name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current project status."
+                },
+                "countryCode": {
+                  "type": "string",
+                  "description": "The project's ISO 3166-1 alpha-2 country code."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The project's ISO 639-1 prompt language code."
+                },
+                "externalId": {
+                  "type": "string",
+                  "description": "The caller-defined external project ID."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The project creation date.",
+                  "format": "date"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Peec project available to the connected API key."
+            },
+            "description": "The returned Peec projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The projects visible to the connected API key."
+      }
+    }
+  ]
+}

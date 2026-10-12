@@ -1,0 +1,376 @@
+{
+  "service": "vatlayer",
+  "displayName": "VATlayer",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Access Key",
+      "placeholder": "VATLAYER_API_KEY",
+      "description": "The vatlayer API access key sent with the access_key query parameter.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://vatlayer.com",
+  "actions": [
+    {
+      "id": "vatlayer.calculate_price",
+      "service": "vatlayer",
+      "name": "calculate_price",
+      "description": "Calculate VAT-compliant inclusive and exclusive prices with vatlayer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Monetary amount to convert."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reduced VAT type to apply, such as medical or books."
+          },
+          "incl": {
+            "type": "boolean",
+            "description": "Whether the amount already includes VAT and should be reverse-calculated."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter ISO country code to select country VAT rates."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom IP address to use to geolocate a country for VAT rate lookup."
+          },
+          "useClientIp": {
+            "type": "boolean",
+            "description": "Whether vatlayer should use the requester's IP address to determine the country."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "amount"
+        ],
+        "description": "Input parameters for calculating VAT-compliant prices with vatlayer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the VAT price calculation succeeded."
+          },
+          "country_code": {
+            "type": "string",
+            "description": "Country code used for the calculation."
+          },
+          "country_name": {
+            "type": "string",
+            "description": "Country name used for the calculation."
+          },
+          "price_excl_vat": {
+            "type": "number",
+            "description": "Price excluding VAT."
+          },
+          "price_incl_vat": {
+            "type": "number",
+            "description": "Price including VAT."
+          },
+          "vat_rate": {
+            "type": "number",
+            "description": "VAT rate in percent applied during the calculation."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Reduced VAT type used for the calculation."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reduced VAT type used for the calculation."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "country_code",
+          "country_name",
+          "price_excl_vat",
+          "price_incl_vat",
+          "vat_rate",
+          "type"
+        ],
+        "description": "VAT-compliant price calculation result returned by vatlayer."
+      }
+    },
+    {
+      "id": "vatlayer.get_rate",
+      "service": "vatlayer",
+      "name": "get_rate",
+      "description": "Retrieve VAT rates for one country selected by country code, IP address, or client IP.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter ISO country code to select country VAT rates."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom IP address to use to geolocate a country for VAT rate lookup."
+          },
+          "useClientIp": {
+            "type": "boolean",
+            "description": "Whether vatlayer should use the requester's IP address to determine the country."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving VAT rates for one country with vatlayer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the VAT rate lookup succeeded."
+          },
+          "country_code": {
+            "type": "string",
+            "description": "Two-letter country code for which rates are returned."
+          },
+          "country_name": {
+            "type": "string",
+            "description": "Full country name."
+          },
+          "standard_rate": {
+            "type": "number",
+            "description": "Standard VAT rate in percent."
+          },
+          "reduced_rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "VAT rate percentage for the reduced rate type."
+            },
+            "description": "Mapping of reduced VAT rate type names to VAT percentages."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "country_code",
+          "country_name",
+          "standard_rate",
+          "reduced_rates"
+        ],
+        "description": "Single-country VAT rate response returned by vatlayer."
+      }
+    },
+    {
+      "id": "vatlayer.list_rates",
+      "service": "vatlayer",
+      "name": "list_rates",
+      "description": "Retrieve VAT rates for all EU member states from vatlayer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving VAT rates for all EU member states with vatlayer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the VAT rate list lookup succeeded."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "country_name": {
+                  "type": "string",
+                  "description": "Full country name."
+                },
+                "standard_rate": {
+                  "type": "number",
+                  "description": "Standard VAT rate in percent."
+                },
+                "reduced_rates": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number",
+                    "description": "VAT rate percentage for the reduced rate type."
+                  },
+                  "description": "Mapping of reduced VAT rate type names to VAT percentages."
+                }
+              },
+              "additionalProperties": true,
+              "description": "VAT rate details for one country."
+            },
+            "description": "Mapping of two-letter country codes to VAT rate details."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "rates"
+        ],
+        "description": "VAT rates for all EU member states returned by vatlayer."
+      }
+    },
+    {
+      "id": "vatlayer.list_types",
+      "service": "vatlayer",
+      "name": "list_types",
+      "description": "List vatlayer reduced VAT rate type identifiers for price calculations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing vatlayer reduced VAT rate types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the reduced VAT type list lookup succeeded."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Reduced VAT rate type identifier."
+            },
+            "description": "Available reduced VAT rate type identifiers."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "types"
+        ],
+        "description": "Reduced VAT rate types returned by vatlayer."
+      }
+    },
+    {
+      "id": "vatlayer.validate_vat_number",
+      "service": "vatlayer",
+      "name": "validate_vat_number",
+      "description": "Validate a VAT number and return company information when vatlayer finds it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vatNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "VAT number to validate, including the country prefix when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vatNumber"
+        ],
+        "description": "Input parameters for validating a VAT number with vatlayer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the VAT number is valid and active according to official member state records."
+          },
+          "database": {
+            "type": "string",
+            "description": "Whether the member state's VAT database was reachable."
+          },
+          "format_valid": {
+            "type": "boolean",
+            "description": "Whether the supplied VAT number has a syntactically valid format."
+          },
+          "query": {
+            "type": "string",
+            "description": "The original VAT number string passed to vatlayer."
+          },
+          "country_code": {
+            "type": "string",
+            "description": "Two-letter country code parsed from the VAT number."
+          },
+          "vat_number": {
+            "type": "string",
+            "description": "VAT number without the two-letter country prefix."
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Company name associated with the VAT number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Company name associated with the VAT number."
+          },
+          "company_address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Company address associated with the VAT number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Company address associated with the VAT number."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "valid",
+          "database",
+          "format_valid",
+          "query",
+          "country_code",
+          "vat_number",
+          "company_name",
+          "company_address"
+        ],
+        "description": "VAT number validation response returned by vatlayer."
+      }
+    }
+  ]
+}

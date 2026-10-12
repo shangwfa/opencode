@@ -1,0 +1,557 @@
+{
+  "service": "klaviyo",
+  "displayName": "Klaviyo",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Private API Key",
+      "placeholder": "KLAVIYO_PRIVATE_API_KEY",
+      "description": "Klaviyo private API key sent in the Authorization: Klaviyo-API-Key header. Create one from Klaviyo Settings > Account > API keys: https://www.klaviyo.com/settings/account/api-keys"
+    }
+  ],
+  "homepageUrl": "https://www.klaviyo.com",
+  "actions": [
+    {
+      "id": "klaviyo.create_event",
+      "service": "klaviyo",
+      "name": "create_event",
+      "description": "Create a Klaviyo event for a profile using a metric name and JSON event properties.",
+      "operationType": "write",
+      "requiredScopes": [
+        "events:write",
+        "profiles:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metricName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The metric name to track, such as Viewed Product."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Klaviyo profile ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The profile email address.",
+                "format": "email"
+              },
+              "phoneNumber": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The profile phone number in E.164 format when available."
+              },
+              "externalId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "An external identifier associated with the profile."
+              },
+              "anonymousId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The anonymous profile identifier."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Profile identifiers for finding or creating the event profile."
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary event or profile properties forwarded to Klaviyo."
+          },
+          "time": {
+            "type": "string",
+            "description": "The event time as an ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "value": {
+            "type": "number",
+            "description": "The monetary value associated with the event."
+          },
+          "uniqueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique event ID used by Klaviyo for de-duplication."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metricName",
+          "profile"
+        ],
+        "description": "Input for creating a Klaviyo event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Klaviyo accepted the event creation request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The event creation status."
+      }
+    },
+    {
+      "id": "klaviyo.get_campaign",
+      "service": "klaviyo",
+      "name": "get_campaign",
+      "description": "Get one Klaviyo campaign by campaign ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "campaigns:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Klaviyo campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving one Klaviyo campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw Klaviyo JSON:API resource object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A raw Klaviyo JSON:API resource object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The requested Klaviyo campaign."
+      }
+    },
+    {
+      "id": "klaviyo.get_profile",
+      "service": "klaviyo",
+      "name": "get_profile",
+      "description": "Get one Klaviyo profile by profile ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "profiles:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Klaviyo profile ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving one Klaviyo profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw Klaviyo JSON:API resource object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A raw Klaviyo JSON:API resource object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ],
+        "description": "The requested Klaviyo profile."
+      }
+    },
+    {
+      "id": "klaviyo.list_campaigns",
+      "service": "klaviyo",
+      "name": "list_campaigns",
+      "description": "List Klaviyo campaigns with the required channel filter plus optional sorting and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "campaigns:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms",
+              "mobile_push"
+            ],
+            "description": "The campaign message channel to list."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Additional Klaviyo campaign filter expression appended to the required channel filter."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Klaviyo sort expression for campaigns."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of campaigns to return."
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Klaviyo page cursor from a previous campaign response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel"
+        ],
+        "description": "Input for listing Klaviyo campaigns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Klaviyo JSON:API resource object."
+            },
+            "description": "Klaviyo campaign resources."
+          },
+          "links": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo pagination or resource links."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo pagination or resource links."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo response metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo response metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Klaviyo campaigns and pagination metadata."
+      }
+    },
+    {
+      "id": "klaviyo.list_events",
+      "service": "klaviyo",
+      "name": "list_events",
+      "description": "List Klaviyo events with optional filtering, sorting, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "events:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Klaviyo filter expression, such as equals(email,\"ada@example.com\")."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Klaviyo sort expression, such as -created or updated."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Klaviyo page cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Klaviyo events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Klaviyo JSON:API resource object."
+            },
+            "description": "Klaviyo event resources."
+          },
+          "links": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo pagination or resource links."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo pagination or resource links."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo response metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo response metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Klaviyo events and pagination metadata."
+      }
+    },
+    {
+      "id": "klaviyo.list_profiles",
+      "service": "klaviyo",
+      "name": "list_profiles",
+      "description": "List Klaviyo profiles with optional filtering, sorting, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "profiles:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Klaviyo filter expression, such as equals(email,\"ada@example.com\")."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Klaviyo sort expression, such as -created or updated."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Klaviyo page cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Klaviyo profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Klaviyo JSON:API resource object."
+            },
+            "description": "Klaviyo profile resources."
+          },
+          "links": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo pagination or resource links."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo pagination or resource links."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Klaviyo response metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Klaviyo response metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Klaviyo profiles and pagination metadata."
+      }
+    },
+    {
+      "id": "klaviyo.validate_account",
+      "service": "klaviyo",
+      "name": "validate_account",
+      "description": "Validate a Klaviyo private API key by reading account metadata.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounts:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to validate a Klaviyo account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw Klaviyo JSON:API resource object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A raw Klaviyo JSON:API resource object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Klaviyo JSON:API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Klaviyo account metadata for the connected private API key."
+      }
+    }
+  ]
+}

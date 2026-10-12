@@ -1,0 +1,468 @@
+{
+  "service": "issue_badge",
+  "displayName": "IssueBadge",
+  "homepageUrl": "https://issuebadge.com",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "IssueBadge API key used for Bearer authentication. Sign in and open Settings → Developer to generate a key: https://issuebadge.com/features/integrations/rest-api"
+    }
+  ],
+  "actions": [
+    {
+      "id": "issue_badge.get_issued_badge",
+      "service": "issue_badge",
+      "name": "get_issued_badge",
+      "description": "Retrieve an issued IssueBadge record by encrypted issue ID, including recipient details, metadata, verification URL, and PDF URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Encrypted issue ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for retrieving an issued badge."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "issue_id": {
+                "type": "string",
+                "description": "Encrypted issue ID."
+              },
+              "recipient_name": {
+                "type": "string",
+                "description": "Recipient's full name."
+              },
+              "recipient_email": {
+                "type": "string",
+                "description": "Recipient's email address."
+              },
+              "recipient_phone": {
+                "type": "string",
+                "description": "Recipient's phone number."
+              },
+              "badge_id": {
+                "type": "string",
+                "description": "Encrypted badge ID."
+              },
+              "badge_name": {
+                "type": "string",
+                "description": "Badge name."
+              },
+              "organization_name": {
+                "type": "string",
+                "description": "Issuing organization name."
+              },
+              "issue_date": {
+                "type": "string",
+                "description": "Badge issue date."
+              },
+              "expire_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Badge expiration date, if set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Badge expiration date, if set."
+              },
+              "serial_number": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Badge serial number, if set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Badge serial number, if set."
+              },
+              "memo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional notes, if set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional notes, if set."
+              },
+              "public_url": {
+                "type": "string",
+                "description": "Public verification URL."
+              },
+              "pdf_url": {
+                "type": "string",
+                "description": "PDF download URL."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom field values and additional metadata."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Custom field values and additional metadata."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "Record creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "Record last update timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An issued badge with recipient details and verification URLs."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Issued badge details response."
+      }
+    },
+    {
+      "id": "issue_badge.issue_badge",
+      "service": "issue_badge",
+      "name": "issue_badge",
+      "description": "Issue an existing IssueBadge template to a recipient and create a public verification URL. Providing an email address triggers a notification email. Reuse an idempotency key to retrieve the existing issuance without issuing it again.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Encrypted badge ID from list_badges."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Recipient's full name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Recipient's email address for notification.",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Recipient's phone number."
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique key to prevent duplicate issuance. Generated by IssueBadge when omitted."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom field values and additional metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_id",
+          "name"
+        ],
+        "description": "Input for issuing a badge."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "IssueId": {
+            "type": "string",
+            "description": "Encrypted issue ID for tracking."
+          },
+          "publicUrl": {
+            "type": "string",
+            "description": "Public verification URL."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge issuance response, including an existing issue on an idempotency replay."
+      }
+    },
+    {
+      "id": "issue_badge.list_badges",
+      "service": "issue_badge",
+      "name": "list_badges",
+      "description": "List up to 100 badge templates in your IssueBadge organization. The API does not expose pagination for this list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing badge templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Response message."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Encrypted badge ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Badge name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A badge template."
+            },
+            "description": "Available badge templates."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge template list response."
+      }
+    },
+    {
+      "id": "issue_badge.list_issued_badges",
+      "service": "issue_badge",
+      "name": "list_issued_badges",
+      "description": "List issued IssueBadge records with pagination and optional badge, recipient name, and recipient email filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by encrypted badge ID."
+          },
+          "recipient_name": {
+            "type": "string",
+            "description": "Search by recipient name using a partial match."
+          },
+          "recipient_email": {
+            "type": "string",
+            "description": "Search by recipient email using a partial match."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1. Defaults to 1."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Items per page, up to 100. Defaults to 10."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing issued badges."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "issue_id": {
+                  "type": "string",
+                  "description": "Encrypted issue ID."
+                },
+                "recipient_name": {
+                  "type": "string",
+                  "description": "Recipient's full name."
+                },
+                "recipient_email": {
+                  "type": "string",
+                  "description": "Recipient's email address."
+                },
+                "recipient_phone": {
+                  "type": "string",
+                  "description": "Recipient's phone number."
+                },
+                "badge_id": {
+                  "type": "string",
+                  "description": "Encrypted badge ID."
+                },
+                "badge_name": {
+                  "type": "string",
+                  "description": "Badge name."
+                },
+                "organization_name": {
+                  "type": "string",
+                  "description": "Issuing organization name."
+                },
+                "issue_date": {
+                  "type": "string",
+                  "description": "Badge issue date."
+                },
+                "expire_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Badge expiration date, if set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Badge expiration date, if set."
+                },
+                "serial_number": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Badge serial number, if set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Badge serial number, if set."
+                },
+                "memo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Additional notes, if set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Additional notes, if set."
+                },
+                "public_url": {
+                  "type": "string",
+                  "description": "Public verification URL."
+                },
+                "pdf_url": {
+                  "type": "string",
+                  "description": "PDF download URL."
+                },
+                "metadata": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Custom field values and additional metadata."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Custom field values and additional metadata."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Record creation timestamp."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Record last update timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An issued badge with recipient details and verification URLs."
+            },
+            "description": "Issued badges matching the filters."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "current_page": {
+                "type": "integer",
+                "description": "Current page number."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "Items per page."
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total number of matching records."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "Total number of pages."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Paginated issued badge response."
+      }
+    }
+  ]
+}

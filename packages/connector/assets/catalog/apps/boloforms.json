@@ -1,0 +1,591 @@
+{
+  "service": "boloforms",
+  "displayName": "BoloForms",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "boloforms_api_key",
+      "description": "BoloForms API key sent with the x-api-key header. Generate or copy it from the BoloForms API Key settings page: https://signature.boloforms.com/settings?copyKey=true&subType=APIKEY&type=DEV_SEC",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.boloforms.com",
+  "actions": [
+    {
+      "id": "boloforms.get_form_responses",
+      "service": "boloforms",
+      "name": "get_form_responses",
+      "description": "List response records for a specific form so they can be used in follow-up automations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting from 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "The input parameters for listing form responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "description": "The form ID associated with this query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number returned in the current response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size used in the current response."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of records that match the current query."
+          },
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "responseId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique form response identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The respondent name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The respondent email address.",
+                  "format": "email"
+                },
+                "submittedAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The form response submission time."
+                },
+                "answers": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The form answer object. Field names and structure depend on the specific form."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw response fields returned by the upstream API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single form response."
+            },
+            "description": "The list of form responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "responses"
+        ],
+        "description": "The result of the form response query."
+      }
+    },
+    {
+      "id": "boloforms.list_documents",
+      "service": "boloforms",
+      "name": "list_documents",
+      "description": "List documents and form statistics from the current BoloForms workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The workspace ID to query. When provided, it is sent through the workspaceid header."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter the document list by document name or keywords."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter results by a specific document ID."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A filter value supported by the official API."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sort direction, such as asc or desc."
+          },
+          "dateFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lower bound of the document start time filter."
+          },
+          "dateTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The upper bound of the document end time filter."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting from 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filter and pagination parameters available when listing BoloForms documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The informational message returned by the upstream API."
+          },
+          "documentsCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of documents in the current workspace."
+          },
+          "formCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of forms in the current workspace."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number returned in the current response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size used in the current response."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique document identifier, which can be reused to start signing or track status."
+                },
+                "documentName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The document name."
+                },
+                "signingType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signing type, such as PDF_TEMPLATE or FORM_TEMPLATE."
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The current document status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The document creation time, usually as an ISO 8601 timestamp."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The most recent document update time, usually as an ISO 8601 timestamp."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "documentId",
+                "documentName",
+                "signingType",
+                "status",
+                "createdAt",
+                "updatedAt"
+              ],
+              "description": "A single document record in the BoloForms workspace."
+            },
+            "description": "The list of documents returned by this query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents"
+        ],
+        "description": "The result of the document list query."
+      }
+    },
+    {
+      "id": "boloforms.list_template_respondents",
+      "service": "boloforms",
+      "name": "list_template_respondents",
+      "description": "List the current signing participants and their statuses for a specific template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting from 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "The input parameters for listing template respondents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "description": "The template ID associated with this query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number returned in the current response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size used in the current response."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of records that match the current query."
+          },
+          "respondents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique signer identifier."
+                },
+                "respondentDocumentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The respondent document identifier associated with this signer."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer email address.",
+                  "format": "email"
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The current signer status."
+                },
+                "roleTitle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role title."
+                },
+                "roleColor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role color."
+                },
+                "hasDeclined": {
+                  "type": "boolean",
+                  "description": "Whether the signer has declined the request."
+                },
+                "signingOrderNo": {
+                  "type": "integer",
+                  "description": "The signer order number."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw signer fields returned by the upstream API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single participant in a template signing request or signing result."
+            },
+            "description": "The current list of signing participants for the template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "respondents"
+        ],
+        "description": "The result of the template respondent query."
+      }
+    },
+    {
+      "id": "boloforms.send_template_for_signing",
+      "service": "boloforms",
+      "name": "send_template_for_signing",
+      "description": "Start a signing request for a group of participants by using an existing template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template or document ID to use for the signing request."
+          },
+          "signingType": {
+            "type": "string",
+            "enum": [
+              "PDF_TEMPLATE",
+              "FORM_TEMPLATE"
+            ],
+            "description": "The signing type, which must match the template type configured in BoloForms."
+          },
+          "mailSubject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The default email subject."
+          },
+          "mailMessage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The default email body."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer email address.",
+                  "format": "email"
+                },
+                "subject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email subject sent to this signer."
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email body sent to this signer."
+                },
+                "roleTitle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role title."
+                },
+                "roleColor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role color."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "email"
+              ],
+              "description": "A single signer used when starting a template signing request."
+            },
+            "description": "The list of participants who will receive the signing request.",
+            "minItems": 1
+          },
+          "customVariables": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The values for custom template variables, which are mapped to variablesData."
+          },
+          "pdfData": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Extra PDF parameters used only for the PDF_TEMPLATE scenario."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "signingType",
+          "signers"
+        ],
+        "description": "The input payload for starting a signing request from an existing template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the connector successfully sent the request to the upstream API."
+          },
+          "message": {
+            "type": "string",
+            "description": "The result message returned by the upstream API."
+          },
+          "documentId": {
+            "type": "string",
+            "description": "The document ID associated with this signing result."
+          },
+          "documentName": {
+            "type": "string",
+            "description": "The document name associated with this signing result."
+          },
+          "signingType": {
+            "type": "string",
+            "description": "The signing type returned by the upstream API."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique signer identifier."
+                },
+                "respondentDocumentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The respondent document identifier associated with this signer."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer email address.",
+                  "format": "email"
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The current signer status."
+                },
+                "roleTitle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role title."
+                },
+                "roleColor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role color."
+                },
+                "hasDeclined": {
+                  "type": "boolean",
+                  "description": "Whether the signer has declined the request."
+                },
+                "signingOrderNo": {
+                  "type": "integer",
+                  "description": "The signer order number."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw signer fields returned by the upstream API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single participant in a template signing request or signing result."
+            },
+            "description": "The signer summary returned by the upstream API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The preserved raw result object returned by the upstream API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The normalized result returned after starting a template signing request."
+      }
+    }
+  ]
+}

@@ -1,0 +1,836 @@
+{
+  "service": "typebot",
+  "displayName": "Typebot",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "Typebot API token",
+      "description": "Typebot API token sent as a Bearer credential. Create one under Settings & Members > My account > API tokens: https://app.typebot.io/typebots."
+    }
+  ],
+  "homepageUrl": "https://typebot.com",
+  "actions": [
+    {
+      "id": "typebot.get_result",
+      "service": "typebot",
+      "name": "get_result",
+      "description": "Retrieve one collected Typebot result by bot and result identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "typebotId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot bot identifier.",
+            "pattern": "\\S"
+          },
+          "resultId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot result identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "typebotId",
+          "resultId"
+        ],
+        "description": "The Typebot result to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Typebot result identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The result creation timestamp."
+              },
+              "typebotId": {
+                "type": "string",
+                "description": "The bot identifier that produced the result."
+              },
+              "variables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The result variable identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The result variable name."
+                    },
+                    "value": {
+                      "description": "The string or string-array value captured for this variable."
+                    },
+                    "isSessionVariable": {
+                      "type": "boolean",
+                      "description": "Whether the variable belongs to the chat session rather than the saved result."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "name",
+                    "value"
+                  ],
+                  "description": "One variable captured in a Typebot result."
+                },
+                "description": "The variables captured in the result."
+              },
+              "answers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "blockId": {
+                      "type": "string",
+                      "description": "The identifier of the input block that captured the answer."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The answer text content."
+                    },
+                    "attachedFileUrls": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One attached file URL."
+                      },
+                      "description": "The uploaded file URLs attached to the answer."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "blockId",
+                    "content"
+                  ],
+                  "description": "One answer captured in a Typebot result."
+                },
+                "description": "The answers captured in the result."
+              },
+              "isCompleted": {
+                "type": "boolean",
+                "description": "Whether the conversation reached completion."
+              },
+              "hasStarted": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the conversation has started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the conversation has started."
+              },
+              "isArchived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the result is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the result is archived."
+              },
+              "lastChatSessionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The most recent chat session identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The most recent chat session identifier when available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "createdAt",
+              "typebotId",
+              "variables",
+              "answers",
+              "isCompleted",
+              "hasStarted",
+              "isArchived",
+              "lastChatSessionId"
+            ],
+            "description": "One Typebot conversation result."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "result"
+        ],
+        "description": "The Typebot result response."
+      }
+    },
+    {
+      "id": "typebot.get_typebot",
+      "service": "typebot",
+      "name": "get_typebot",
+      "description": "Retrieve one Typebot definition and its graph configuration.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "typebotId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot bot identifier.",
+            "pattern": "\\S"
+          },
+          "migrateToLatestVersion": {
+            "type": "boolean",
+            "description": "Whether Typebot should migrate the returned definition to the latest schema."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "typebotId"
+        ],
+        "description": "The Typebot bot to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "typebot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Typebot bot identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The Typebot bot name."
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "The Typebot schema version."
+                  },
+                  "workspaceId": {
+                    "type": "string",
+                    "description": "The workspace identifier that owns the bot."
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "description": "The bot creation timestamp."
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "description": "The bot last update timestamp."
+                  },
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One bot graph group returned by Typebot."
+                    },
+                    "description": "The bot graph groups returned by Typebot."
+                  },
+                  "edges": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One bot graph edge returned by Typebot."
+                    },
+                    "description": "The bot graph edges returned by Typebot."
+                  },
+                  "variables": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One bot variable returned by Typebot."
+                    },
+                    "description": "The bot variables returned by Typebot."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "name",
+                  "version",
+                  "workspaceId",
+                  "createdAt",
+                  "updatedAt",
+                  "groups",
+                  "edges",
+                  "variables"
+                ],
+                "description": "The Typebot definition, including its graph and configuration fields."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Typebot definition, including its graph and configuration fields."
+          },
+          "currentUserMode": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "guest"
+            ],
+            "description": "The access right granted to the current Typebot user."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "typebot",
+          "currentUserMode"
+        ],
+        "description": "The Typebot definition result."
+      }
+    },
+    {
+      "id": "typebot.get_workspace",
+      "service": "typebot",
+      "name": "get_workspace",
+      "description": "Retrieve detailed information for one Typebot workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot workspace identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "description": "The Typebot workspace to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Typebot workspace identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Typebot workspace name."
+              },
+              "icon": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The workspace icon URL when one is configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The workspace icon URL when one is configured."
+              },
+              "plan": {
+                "type": "string",
+                "enum": [
+                  "FREE",
+                  "STARTER",
+                  "PRO",
+                  "LIFETIME",
+                  "OFFERED",
+                  "CUSTOM",
+                  "UNLIMITED",
+                  "ENTERPRISE"
+                ],
+                "description": "The billing plan assigned to the Typebot workspace."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The workspace creation timestamp."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The workspace last update timestamp."
+              },
+              "isSuspended": {
+                "type": "boolean",
+                "description": "Whether the workspace is suspended."
+              },
+              "isPastDue": {
+                "type": "boolean",
+                "description": "Whether the workspace has an overdue subscription payment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "icon",
+              "plan",
+              "createdAt",
+              "updatedAt",
+              "isSuspended",
+              "isPastDue"
+            ],
+            "description": "Detailed Typebot workspace information."
+          },
+          "currentUserMode": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "guest"
+            ],
+            "description": "The access right granted to the current Typebot user."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "workspace",
+          "currentUserMode"
+        ],
+        "description": "The Typebot workspace result."
+      }
+    },
+    {
+      "id": "typebot.list_results",
+      "service": "typebot",
+      "name": "list_results",
+      "description": "List collected results for one Typebot bot with cursor and time filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "typebotId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot bot identifier.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of results to return, from 1 through 500."
+          },
+          "cursor": {
+            "type": "number",
+            "description": "The numeric cursor returned by a previous result page."
+          },
+          "timeFilter": {
+            "type": "string",
+            "enum": [
+              "today",
+              "last7Days",
+              "last30Days",
+              "monthToDate",
+              "lastMonth",
+              "yearToDate",
+              "allTime"
+            ],
+            "description": "The predefined time range used to filter results."
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA time zone used to interpret the selected time range.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "typebotId"
+        ],
+        "description": "Filters for listing Typebot results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Typebot result identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The result creation timestamp."
+                },
+                "typebotId": {
+                  "type": "string",
+                  "description": "The bot identifier that produced the result."
+                },
+                "variables": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The result variable identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The result variable name."
+                      },
+                      "value": {
+                        "description": "The string or string-array value captured for this variable."
+                      },
+                      "isSessionVariable": {
+                        "type": "boolean",
+                        "description": "Whether the variable belongs to the chat session rather than the saved result."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "value"
+                    ],
+                    "description": "One variable captured in a Typebot result."
+                  },
+                  "description": "The variables captured in the result."
+                },
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "blockId": {
+                        "type": "string",
+                        "description": "The identifier of the input block that captured the answer."
+                      },
+                      "content": {
+                        "type": "string",
+                        "description": "The answer text content."
+                      },
+                      "attachedFileUrls": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "One attached file URL."
+                        },
+                        "description": "The uploaded file URLs attached to the answer."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "blockId",
+                      "content"
+                    ],
+                    "description": "One answer captured in a Typebot result."
+                  },
+                  "description": "The answers captured in the result."
+                },
+                "isCompleted": {
+                  "type": "boolean",
+                  "description": "Whether the conversation reached completion."
+                },
+                "hasStarted": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the conversation has started."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the conversation has started."
+                },
+                "isArchived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the result is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the result is archived."
+                },
+                "lastChatSessionId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The most recent chat session identifier when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The most recent chat session identifier when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "createdAt",
+                "typebotId",
+                "variables",
+                "answers",
+                "isCompleted",
+                "hasStarted",
+                "isArchived",
+                "lastChatSessionId"
+              ],
+              "description": "One Typebot conversation result."
+            },
+            "description": "The Typebot results in this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The cursor for the next result page when another page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next result page when another page exists."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "A page of Typebot results."
+      }
+    },
+    {
+      "id": "typebot.list_typebots",
+      "service": "typebot",
+      "name": "list_typebots",
+      "description": "List Typebot bots in a workspace, optionally restricted to one folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Typebot workspace identifier.",
+            "pattern": "\\S"
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return bots in this Typebot folder.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "description": "Filters for listing Typebot bots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "typebots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Typebot bot identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Typebot bot name."
+                },
+                "icon": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The bot icon URL when one is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The bot icon URL when one is configured."
+                },
+                "spaceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The space identifier containing the bot when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The space identifier containing the bot when present."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The bot creation timestamp."
+                },
+                "accessRight": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "guest"
+                  ],
+                  "description": "The access right granted to the current Typebot user."
+                },
+                "publishedTypebotId": {
+                  "type": "string",
+                  "description": "The published bot identifier when the bot has been published."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "icon",
+                "spaceId",
+                "createdAt",
+                "accessRight"
+              ],
+              "description": "A Typebot bot summary."
+            },
+            "description": "The bots accessible in the workspace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "typebots"
+        ],
+        "description": "The Typebot bots in the workspace."
+      }
+    },
+    {
+      "id": "typebot.list_workspaces",
+      "service": "typebot",
+      "name": "list_workspaces",
+      "description": "List the Typebot workspaces accessible to the configured API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "An empty Typebot action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Typebot workspace identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Typebot workspace name."
+                },
+                "icon": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The workspace icon URL when one is configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The workspace icon URL when one is configured."
+                },
+                "plan": {
+                  "type": "string",
+                  "enum": [
+                    "FREE",
+                    "STARTER",
+                    "PRO",
+                    "LIFETIME",
+                    "OFFERED",
+                    "CUSTOM",
+                    "UNLIMITED",
+                    "ENTERPRISE"
+                  ],
+                  "description": "The billing plan assigned to the Typebot workspace."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "icon",
+                "plan"
+              ],
+              "description": "A Typebot workspace summary."
+            },
+            "description": "The workspaces accessible to the token."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "workspaces"
+        ],
+        "description": "The accessible Typebot workspaces."
+      }
+    }
+  ]
+}

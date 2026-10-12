@@ -1,0 +1,327 @@
+{
+  "service": "solcast",
+  "displayName": "Solcast",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SOLCAST_API_KEY",
+      "description": "Solcast API key sent with the Authorization Bearer header. Get it after signing in to the Solcast API Toolkit: https://toolkit.solcast.com.au/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://solcast.com",
+  "actions": [
+    {
+      "id": "solcast.get_radiation_and_weather_forecast",
+      "service": "solcast",
+      "name": "get_radiation_and_weather_forecast",
+      "description": "Get Solcast irradiance and weather forecasts for a latitude and longitude up to 14 days ahead.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees using EPSG:4326."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees using EPSG:4326."
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 336,
+            "description": "Time window of the response in hours from 1 to 336."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "PT5M",
+              "PT10M",
+              "PT15M",
+              "PT20M",
+              "PT30M",
+              "PT60M"
+            ],
+            "description": "Length of the averaging period in ISO 8601 duration format."
+          },
+          "output_parameters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Solcast output parameter names to include in each record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "description": "Input parameters for Solcast irradiance and weather forecasts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period_end": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inclusive end timestamp for the returned averaging period."
+                },
+                "period": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO 8601 averaging duration for this record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Solcast time-series record keyed by the requested output parameters."
+            },
+            "description": "Ordered Solcast time-series records."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Solcast response message returned when the request succeeds without record data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Normalized Solcast time-series response."
+      }
+    },
+    {
+      "id": "solcast.get_radiation_and_weather_historic",
+      "service": "solcast",
+      "name": "get_radiation_and_weather_historic",
+      "description": "Get Solcast irradiance and weather historical estimated actuals for a latitude and longitude from 2007 through 7 days ago.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees using EPSG:4326."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees using EPSG:4326."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 start timestamp for the historical request. If the value omits a timezone, Solcast infers it from time_zone or assumes UTC."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 end timestamp for the historical request. Provide either end or duration."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 duration for the historical request. Provide either duration or end."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "PT5M",
+              "PT10M",
+              "PT15M",
+              "PT20M",
+              "PT30M",
+              "PT60M"
+            ],
+            "description": "Length of the averaging period in ISO 8601 duration format."
+          },
+          "output_parameters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Solcast output parameter names to include in each historical record."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "const": "utc",
+                "type": "string",
+                "description": "Use UTC timestamps."
+              },
+              {
+                "const": "longitudinal",
+                "type": "string",
+                "description": "Use Solcast longitudinal timestamps."
+              },
+              {
+                "type": "number",
+                "minimum": -13,
+                "maximum": 13,
+                "description": "UTC offset from -13 to 13."
+              }
+            ],
+            "description": "Timezone used for returned timestamps. Use utc, longitudinal, or a UTC offset from -13 to 13 in 0.25 hour increments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latitude",
+          "longitude",
+          "start"
+        ],
+        "description": "Input parameters for Solcast irradiance and weather historical estimated actuals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period_end": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inclusive end timestamp for the returned averaging period."
+                },
+                "period": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO 8601 averaging duration for this record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Solcast time-series record keyed by the requested output parameters."
+            },
+            "description": "Ordered Solcast time-series records."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Solcast response message returned when the request succeeds without record data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Normalized Solcast time-series response."
+      }
+    },
+    {
+      "id": "solcast.get_radiation_and_weather_live_estimated_actuals",
+      "service": "solcast",
+      "name": "get_radiation_and_weather_live_estimated_actuals",
+      "description": "Get Solcast irradiance and weather live estimated actuals for a latitude and longitude over the past 7 days.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees using EPSG:4326."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees using EPSG:4326."
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "Time window of the response in hours from 1 to 168."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "PT5M",
+              "PT10M",
+              "PT15M",
+              "PT20M",
+              "PT30M",
+              "PT60M"
+            ],
+            "description": "Length of the averaging period in ISO 8601 duration format."
+          },
+          "output_parameters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Solcast output parameter names to include in each record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "description": "Input parameters for Solcast irradiance and weather live estimated actuals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period_end": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The inclusive end timestamp for the returned averaging period."
+                },
+                "period": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO 8601 averaging duration for this record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Solcast time-series record keyed by the requested output parameters."
+            },
+            "description": "Ordered Solcast time-series records."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Solcast response message returned when the request succeeds without record data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Normalized Solcast time-series response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "service": "skyfire",
+  "displayName": "Skyfire",
+  "categories": [
+    "Finance",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "skyfire_...",
+      "description": "Skyfire Buyer or Seller agent API key sent with the skyfire-api-key header. Create it in the Skyfire Dashboard for your agent account: https://app.skyfire.xyz/."
+    }
+  ],
+  "homepageUrl": "https://skyfire.xyz",
+  "actions": [
+    {
+      "id": "skyfire.create_token",
+      "service": "skyfire",
+      "name": "create_token",
+      "description": "Create a buyer token in Skyfire for one seller service or seller domain, including funded pay and identity-carrying KYA variants.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "kya",
+              "pay",
+              "kya-pay"
+            ],
+            "description": "The Skyfire token type to create."
+          },
+          "buyerTag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The buyer's internal identifier for the transaction or token."
+          },
+          "tokenAmount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The token amount to fund on a pay or kya-pay token."
+          },
+          "sellerServiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller service ID to authorize against."
+          },
+          "sellerDomainOrUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller domain or full URL when creating a domain-scoped token."
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "The Unix timestamp in seconds when the token should expire."
+          },
+          "identityPermissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "email",
+                "phone",
+                "country",
+                "region",
+                "city",
+                "postalCode",
+                "walletAddress",
+                "organizationName",
+                "organizationWebsite"
+              ],
+              "description": "An identity field to include in a KYA or KYA-pay token."
+            },
+            "description": "The additional identity fields to include when creating a KYA or KYA-pay token.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "description": "Input parameters for creating a buyer token in Skyfire."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signed Skyfire JWT token."
+          },
+          "raw": {
+            "description": "The raw Skyfire token creation response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "The normalized token creation result."
+      }
+    },
+    {
+      "id": "skyfire.get_all_services",
+      "service": "skyfire",
+      "name": "get_all_services",
+      "description": "List all approved and active services from the Skyfire marketplace directory.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for listing all Skyfire services."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Skyfire service identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable service name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service description published in the Skyfire marketplace."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service description published in the Skyfire marketplace."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The marketplace tags attached to the service."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Skyfire service type."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service price as returned by Skyfire."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service price as returned by Skyfire."
+                },
+                "priceModel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service pricing model returned by Skyfire."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service pricing model returned by Skyfire."
+                },
+                "minimumTokenAmount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The minimum token amount accepted by this service, when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The minimum token amount accepted by this service, when provided."
+                },
+                "maxTokenTTLSeconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The maximum token lifetime in seconds allowed by this service."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum token lifetime in seconds allowed by this service."
+                },
+                "humanIdentityRequirement": {
+                  "type": "object",
+                  "properties": {
+                    "identityLevels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The identity levels accepted by the service."
+                    },
+                    "organization": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The organization identity fields accepted by the service."
+                    },
+                    "individual": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The individual identity fields accepted by the service."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The human identity requirements declared by the service."
+                },
+                "seller": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The seller agent identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The seller display name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The seller account that owns the service."
+                },
+                "openApiSpecUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OpenAPI specification URL published for the service."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OpenAPI specification URL published for the service."
+                },
+                "acceptedTokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Skyfire token types accepted by the service."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO timestamp when the service was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO timestamp when the service was last updated."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Skyfire marketplace service summary."
+            },
+            "description": "The services returned by the Skyfire directory."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of approved Skyfire marketplace services."
+      }
+    },
+    {
+      "id": "skyfire.get_service",
+      "service": "skyfire",
+      "name": "get_service",
+      "description": "Get one Skyfire marketplace service by its service ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Skyfire service ID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading one Skyfire service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Skyfire service identifier."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The human-readable service name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The service description published in the Skyfire marketplace."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The service description published in the Skyfire marketplace."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The marketplace tags attached to the service."
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Skyfire service type."
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The service price as returned by Skyfire."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The service price as returned by Skyfire."
+              },
+              "priceModel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The service pricing model returned by Skyfire."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The service pricing model returned by Skyfire."
+              },
+              "minimumTokenAmount": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The minimum token amount accepted by this service, when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The minimum token amount accepted by this service, when provided."
+              },
+              "maxTokenTTLSeconds": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum token lifetime in seconds allowed by this service."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum token lifetime in seconds allowed by this service."
+              },
+              "humanIdentityRequirement": {
+                "type": "object",
+                "properties": {
+                  "identityLevels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The identity levels accepted by the service."
+                  },
+                  "organization": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The organization identity fields accepted by the service."
+                  },
+                  "individual": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The individual identity fields accepted by the service."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The human identity requirements declared by the service."
+              },
+              "seller": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The seller agent identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The seller display name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The seller account that owns the service."
+              },
+              "openApiSpecUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The OpenAPI specification URL published for the service."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The OpenAPI specification URL published for the service."
+              },
+              "acceptedTokens": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The Skyfire token types accepted by the service."
+              },
+              "createdAt": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO timestamp when the service was created."
+              },
+              "updatedAt": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO timestamp when the service was last updated."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Skyfire marketplace service summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Skyfire service returned by the directory."
+      }
+    },
+    {
+      "id": "skyfire.get_services_by_agent",
+      "service": "skyfire",
+      "name": "get_services_by_agent",
+      "description": "List all approved and active Skyfire marketplace services owned by one seller agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller agent ID whose services should be listed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing a seller agent's Skyfire services."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Skyfire service identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable service name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service description published in the Skyfire marketplace."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service description published in the Skyfire marketplace."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The marketplace tags attached to the service."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Skyfire service type."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service price as returned by Skyfire."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service price as returned by Skyfire."
+                },
+                "priceModel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The service pricing model returned by Skyfire."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The service pricing model returned by Skyfire."
+                },
+                "minimumTokenAmount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The minimum token amount accepted by this service, when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The minimum token amount accepted by this service, when provided."
+                },
+                "maxTokenTTLSeconds": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The maximum token lifetime in seconds allowed by this service."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum token lifetime in seconds allowed by this service."
+                },
+                "humanIdentityRequirement": {
+                  "type": "object",
+                  "properties": {
+                    "identityLevels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The identity levels accepted by the service."
+                    },
+                    "organization": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The organization identity fields accepted by the service."
+                    },
+                    "individual": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The individual identity fields accepted by the service."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The human identity requirements declared by the service."
+                },
+                "seller": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The seller agent identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The seller display name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The seller account that owns the service."
+                },
+                "openApiSpecUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The OpenAPI specification URL published for the service."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The OpenAPI specification URL published for the service."
+                },
+                "acceptedTokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The Skyfire token types accepted by the service."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO timestamp when the service was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO timestamp when the service was last updated."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Skyfire marketplace service summary."
+            },
+            "description": "The services returned for the seller agent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Skyfire services owned by one seller agent."
+      }
+    }
+  ]
+}

@@ -1,0 +1,935 @@
+{
+  "service": "baremetrics",
+  "displayName": "Baremetrics",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BAREMETRICS_API_KEY",
+      "description": "Baremetrics API key used as a Bearer token. Create or view it in Baremetrics API settings: https://app.baremetrics.com/settings/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://baremetrics.com",
+  "actions": [
+    {
+      "id": "baremetrics.cancel_subscription",
+      "service": "baremetrics",
+      "name": "cancel_subscription",
+      "description": "Cancel a Baremetrics subscription at a documented cancellation timestamp.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "subscriptionOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics subscription ID."
+          },
+          "canceledAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when the subscription was canceled."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for canceling a Baremetrics subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics subscription object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics subscription object."
+          },
+          "event": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics event object returned by a mutation endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics event object returned by a mutation endpoint."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics subscription response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics subscription response."
+      }
+    },
+    {
+      "id": "baremetrics.create_customer",
+      "service": "baremetrics",
+      "name": "create_customer",
+      "description": "Create a customer record in a Baremetrics API source.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "oid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics customer ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The customer's email address.",
+            "format": "email"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Your own notes for this customer."
+          },
+          "created": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when the customer was created."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "oid"
+        ],
+        "description": "Input for creating a Baremetrics customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics customer object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics customer object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics customer response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics customer response."
+      }
+    },
+    {
+      "id": "baremetrics.create_plan",
+      "service": "baremetrics",
+      "name": "create_plan",
+      "description": "Create a plan for use in Baremetrics subscription records.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "oid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics plan ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The internal name for this plan."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO currency code for this plan, such as usd."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "The plan amount in cents."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "day",
+              "month",
+              "year"
+            ],
+            "description": "The recurring interval for the plan."
+          },
+          "intervalCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many intervals are included in each billing period."
+          },
+          "trialDuration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The trial duration to use with trialDurationUnit."
+          },
+          "trialDurationUnit": {
+            "type": "string",
+            "enum": [
+              "day",
+              "month"
+            ],
+            "description": "The unit for the trial duration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "oid",
+          "name",
+          "currency",
+          "amount",
+          "interval",
+          "intervalCount"
+        ],
+        "description": "Input for creating a Baremetrics plan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics plan object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics plan object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics plan response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics plan response."
+      }
+    },
+    {
+      "id": "baremetrics.create_subscription",
+      "service": "baremetrics",
+      "name": "create_subscription",
+      "description": "Create a subscription in a Baremetrics API source.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "oid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics subscription ID."
+          },
+          "startedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when the subscription started."
+          },
+          "canceledAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when the subscription was or should be canceled."
+          },
+          "planOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics plan ID."
+          },
+          "customerOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics customer ID."
+          },
+          "addons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Your unique ID for the addon."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "The addon amount in cents."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "description": "The addon quantity."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Baremetrics subscription addon."
+            },
+            "description": "Addons attached to this subscription."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The subscription quantity."
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount amount in the same currency as the plan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "oid",
+          "startedAt",
+          "planOid",
+          "customerOid"
+        ],
+        "description": "Input for creating a Baremetrics subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics subscription object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics subscription object."
+          },
+          "event": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics event object returned by a mutation endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics event object returned by a mutation endpoint."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics subscription response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics subscription response."
+      }
+    },
+    {
+      "id": "baremetrics.list_charges",
+      "service": "baremetrics",
+      "name": "list_charges",
+      "description": "List charges for a Baremetrics source with optional time and entity filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for the start of the charge window."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for the end of the charge window."
+          },
+          "subscriptionOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics subscription ID."
+          },
+          "customerOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics customer ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ],
+        "description": "Input for listing Baremetrics charges."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "charges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Baremetrics charge object."
+            },
+            "description": "Baremetrics charges matching the request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics list charges response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baremetrics charges returned by the API."
+      }
+    },
+    {
+      "id": "baremetrics.list_customers",
+      "service": "baremetrics",
+      "name": "list_customers",
+      "description": "List customers for a Baremetrics source with optional search and ordering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search customers by Baremetrics oid, email, notes, or name."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "ltv",
+              "created"
+            ],
+            "description": "The customer field Baremetrics should sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order to return Baremetrics results in."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ],
+        "description": "Input for listing Baremetrics customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Baremetrics customer object."
+            },
+            "description": "Baremetrics customers matching the request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics list customers response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baremetrics customers returned by the API."
+      }
+    },
+    {
+      "id": "baremetrics.list_plans",
+      "service": "baremetrics",
+      "name": "list_plans",
+      "description": "List plans for a Baremetrics source with optional search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search plans by Baremetrics name or oid."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ],
+        "description": "Input for listing Baremetrics plans."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Baremetrics plan object."
+            },
+            "description": "Baremetrics plans matching the request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics list plans response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baremetrics plans returned by the API."
+      }
+    },
+    {
+      "id": "baremetrics.list_sources",
+      "service": "baremetrics",
+      "name": "list_sources",
+      "description": "List Baremetrics sources available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Baremetrics sources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Baremetrics source object."
+            },
+            "description": "Baremetrics sources available to this API key."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics list sources response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baremetrics sources returned by the API."
+      }
+    },
+    {
+      "id": "baremetrics.list_subscriptions",
+      "service": "baremetrics",
+      "name": "list_subscriptions",
+      "description": "List subscriptions for a Baremetrics source with optional customer and ordering filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "customerOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics customer ID."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order to return Baremetrics results in."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ],
+        "description": "Input for listing Baremetrics subscriptions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Baremetrics subscription object."
+            },
+            "description": "Baremetrics subscriptions matching the request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics list subscriptions response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baremetrics subscriptions returned by the API."
+      }
+    },
+    {
+      "id": "baremetrics.update_customer",
+      "service": "baremetrics",
+      "name": "update_customer",
+      "description": "Update basic information for a Baremetrics customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "customerOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics customer ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated customer name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The updated customer email address.",
+            "format": "email"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Updated notes for this customer."
+          },
+          "created": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when the customer was created."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "customerOid"
+        ],
+        "description": "Input for updating a Baremetrics customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics customer object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics customer object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics customer response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics customer response."
+      }
+    },
+    {
+      "id": "baremetrics.update_plan",
+      "service": "baremetrics",
+      "name": "update_plan",
+      "description": "Update the name of a Baremetrics plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "planOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics plan ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new name for this plan."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for updating a Baremetrics plan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics plan object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics plan object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics plan response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics plan response."
+      }
+    },
+    {
+      "id": "baremetrics.update_subscription",
+      "service": "baremetrics",
+      "name": "update_subscription",
+      "description": "Update plan, addon, quantity, or discount data for a Baremetrics subscription.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baremetrics source ID from the List Sources endpoint."
+          },
+          "subscriptionOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics subscription ID."
+          },
+          "planOid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your unique Baremetrics plan ID."
+          },
+          "occurredAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unix timestamp for when this subscription change occurred."
+          },
+          "addons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "oid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Your unique ID for the addon."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "The addon amount in cents."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "description": "The addon quantity."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Baremetrics subscription addon."
+            },
+            "description": "Addons attached to this subscription."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The subscription quantity."
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount amount in the same currency as the plan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "subscriptionOid",
+          "planOid"
+        ],
+        "description": "Input for updating a Baremetrics subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics subscription object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics subscription object."
+          },
+          "event": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Baremetrics event object returned by a mutation endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Baremetrics event object returned by a mutation endpoint."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Baremetrics subscription response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baremetrics subscription response."
+      }
+    }
+  ]
+}

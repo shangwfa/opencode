@@ -1,0 +1,335 @@
+{
+  "service": "fraudlabspro",
+  "displayName": "FraudLabs Pro",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API License Key",
+      "placeholder": "FRAUDLABSPRO_API_KEY",
+      "description": "FraudLabs Pro API license key passed as the key parameter. Get it from your FraudLabs Pro merchant area: https://www.fraudlabspro.com/merchant/sign-in."
+    }
+  ],
+  "homepageUrl": "https://www.fraudlabspro.com/",
+  "actions": [
+    {
+      "id": "fraudlabspro.feedback_order",
+      "service": "fraudlabspro",
+      "name": "feedback_order",
+      "description": "Send approve or reject feedback for a FraudLabs Pro order transaction.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The FraudLabs Pro transaction id returned by the Screen Order API."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT",
+              "REJECT_BLACKLIST"
+            ],
+            "description": "The feedback action to apply to the transaction."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional merchant note explaining the feedback decision."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "action"
+        ],
+        "description": "Input parameters for sending merchant feedback to FraudLabs Pro."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The feedback status returned by FraudLabs Pro."
+          },
+          "message": {
+            "type": "string",
+            "description": "The feedback message returned by FraudLabs Pro."
+          },
+          "error": {
+            "type": "string",
+            "description": "The error message returned by FraudLabs Pro when present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "FraudLabs Pro feedback response."
+      }
+    },
+    {
+      "id": "fraudlabspro.get_order_result",
+      "service": "fraudlabspro",
+      "name": "get_order_result",
+      "description": "Retrieve a FraudLabs Pro order screening result by transaction id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The FraudLabs Pro transaction id returned by the Screen Order API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving a FraudLabs Pro order result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fraudlabspro_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FraudLabs Pro transaction id."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FraudLabs Pro transaction id."
+          },
+          "fraudlabspro_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The fraud score returned by FraudLabs Pro."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fraud score returned by FraudLabs Pro."
+          },
+          "fraudlabspro_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPROVE",
+                  "REJECT",
+                  "REVIEW"
+                ],
+                "description": "The final action returned by FraudLabs Pro."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final action returned by FraudLabs Pro."
+          },
+          "fraudlabspro_rules": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A triggered FraudLabs Pro rule."
+                },
+                "description": "The FraudLabs Pro rules triggered by the system."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FraudLabs Pro rules triggered by the system."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "fraudlabspro_id",
+          "fraudlabspro_score",
+          "fraudlabspro_status",
+          "fraudlabspro_rules"
+        ],
+        "description": "FraudLabs Pro order result response."
+      }
+    },
+    {
+      "id": "fraudlabspro.screen_order",
+      "service": "fraudlabspro",
+      "name": "screen_order",
+      "description": "Screen an order transaction for fraud risk with FraudLabs Pro.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer IP address for the transaction."
+          },
+          "userOrderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant order id for the transaction."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer email address."
+          },
+          "amount": {
+            "type": "number",
+            "description": "The transaction amount."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 4217 currency code for the transaction."
+          },
+          "paymentMode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The payment method or mode used by the customer."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer last name."
+          },
+          "userPhone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer phone number."
+          },
+          "emailHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The hashed customer email value accepted by FraudLabs Pro."
+          },
+          "emailDomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer email domain."
+          },
+          "binNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The payment card BIN or IIN value."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items in the order."
+          },
+          "couponCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coupon code used for the order."
+          },
+          "flpChecksum": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The FraudLabs Pro checksum value for the transaction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ip"
+        ],
+        "description": "Input parameters for screening an order transaction with FraudLabs Pro."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fraudlabspro_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FraudLabs Pro transaction id generated for the screened order."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FraudLabs Pro transaction id generated for the screened order."
+          },
+          "fraudlabspro_score": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The fraud score returned by FraudLabs Pro."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fraud score returned by FraudLabs Pro."
+          },
+          "fraudlabspro_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "APPROVE",
+                  "REJECT",
+                  "REVIEW"
+                ],
+                "description": "The final action returned by FraudLabs Pro."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final action returned by FraudLabs Pro."
+          },
+          "user_order_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The merchant order id returned by FraudLabs Pro."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The merchant order id returned by FraudLabs Pro."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "fraudlabspro_id",
+          "fraudlabspro_score",
+          "fraudlabspro_status",
+          "user_order_id"
+        ],
+        "description": "FraudLabs Pro order screening response."
+      }
+    }
+  ]
+}

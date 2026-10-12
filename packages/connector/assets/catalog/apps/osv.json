@@ -1,0 +1,663 @@
+{
+  "service": "osv",
+  "displayName": "OSV",
+  "description": "Query known vulnerabilities in open source packages and retrieve OSV advisory records.",
+  "categories": [
+    "Security",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "no_auth"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    }
+  ],
+  "homepageUrl": "https://osv.dev",
+  "actions": [
+    {
+      "id": "osv.get_vulnerability",
+      "service": "osv",
+      "name": "get_vulnerability",
+      "description": "Get the complete OSV record for a vulnerability identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The case-sensitive OSV vulnerability identifier, such as GHSA-vp9c-fpxx-744v."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Vulnerability lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "description": "The OSV schema version used by this record."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vulnerability identifier."
+          },
+          "modified": {
+            "type": "string",
+            "description": "When the record was last modified.",
+            "format": "date-time"
+          },
+          "published": {
+            "type": "string",
+            "description": "When the vulnerability was published.",
+            "format": "date-time"
+          },
+          "withdrawn": {
+            "type": "string",
+            "description": "When the record was withdrawn.",
+            "format": "date-time"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An alternative identifier."
+            },
+            "description": "Alternative vulnerability identifiers."
+          },
+          "related": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A related identifier."
+            },
+            "description": "Related vulnerability identifiers."
+          },
+          "upstream": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An upstream identifier."
+            },
+            "description": "Upstream vulnerability identifiers."
+          },
+          "summary": {
+            "type": "string",
+            "description": "A short vulnerability summary."
+          },
+          "details": {
+            "type": "string",
+            "description": "The detailed vulnerability description."
+          },
+          "severity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The scoring system, such as CVSS_V3 or CVSS_V4."
+                },
+                "score": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The severity score or vector encoded for the scoring system."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "score"
+              ],
+              "description": "A severity score encoded with a named scoring system."
+            },
+            "description": "Severity scores for the vulnerability."
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The package name as used by its ecosystem."
+                    },
+                    "ecosystem": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The case-sensitive OSV ecosystem name, such as npm, PyPI, Go, or Maven."
+                    },
+                    "purl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The package URL assigned by OSV, when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "name",
+                    "ecosystem"
+                  ],
+                  "description": "A package identified by its ecosystem and name."
+                },
+                "severity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The scoring system, such as CVSS_V3 or CVSS_V4."
+                      },
+                      "score": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The severity score or vector encoded for the scoring system."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "type",
+                      "score"
+                    ],
+                    "description": "A severity score encoded with a named scoring system."
+                  },
+                  "description": "Package-specific severity scores."
+                },
+                "ranges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The range type, such as SEMVER, ECOSYSTEM, or GIT."
+                      },
+                      "repo": {
+                        "type": "string",
+                        "description": "The source repository for a GIT range.",
+                        "format": "uri"
+                      },
+                      "events": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "introduced": {
+                              "type": "string",
+                              "description": "The version or commit where the affected range begins."
+                            },
+                            "fixed": {
+                              "type": "string",
+                              "description": "The version or commit where the affected range ends."
+                            },
+                            "last_affected": {
+                              "type": "string",
+                              "description": "The last known affected version or commit."
+                            },
+                            "limit": {
+                              "type": "string",
+                              "description": "The first version or commit outside the affected range."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A version or commit event delimiting an affected range."
+                        },
+                        "description": "Ordered events delimiting the affected range."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "type",
+                      "events"
+                    ],
+                    "description": "A version or commit range affected by the vulnerability."
+                  },
+                  "description": "Affected version or commit ranges."
+                },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An affected package version."
+                  },
+                  "description": "Known affected versions."
+                },
+                "ecosystem_specific": {
+                  "description": "Additional data defined by the package ecosystem."
+                },
+                "database_specific": {
+                  "description": "Additional data defined by the source vulnerability database."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "package"
+              ],
+              "description": "One package affected by the vulnerability."
+            },
+            "description": "Packages affected by the vulnerability."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OSV reference type, such as ADVISORY, REPORT, or WEB."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The referenced resource URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "url"
+              ],
+              "description": "A reference associated with the vulnerability."
+            },
+            "description": "References associated with the vulnerability."
+          },
+          "credits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The credited person or organization."
+                },
+                "contact": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A contact identifier."
+                  },
+                  "description": "Contact identifiers for the credited party."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The credit role defined by the OSV schema."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "Credit for discovering, reporting, or remediating the vulnerability."
+            },
+            "description": "Credits associated with the vulnerability."
+          },
+          "database_specific": {
+            "description": "Additional data defined by the source vulnerability database."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "modified"
+        ],
+        "description": "An OSV vulnerability record."
+      }
+    },
+    {
+      "id": "osv.query_vulnerabilities",
+      "service": "osv",
+      "name": "query_vulnerabilities",
+      "description": "Find known vulnerabilities associated with a package or affecting a specific package version.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ecosystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The case-sensitive OSV ecosystem name, such as npm, PyPI, Go, or Maven."
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package name as used by its ecosystem."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package version to check. Omit it to return vulnerabilities across all versions."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ecosystem",
+          "package"
+        ],
+        "description": "Package vulnerability query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "vulnerabilities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schema_version": {
+                  "type": "string",
+                  "description": "The OSV schema version used by this record."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The vulnerability identifier."
+                },
+                "modified": {
+                  "type": "string",
+                  "description": "When the record was last modified.",
+                  "format": "date-time"
+                },
+                "published": {
+                  "type": "string",
+                  "description": "When the vulnerability was published.",
+                  "format": "date-time"
+                },
+                "withdrawn": {
+                  "type": "string",
+                  "description": "When the record was withdrawn.",
+                  "format": "date-time"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An alternative identifier."
+                  },
+                  "description": "Alternative vulnerability identifiers."
+                },
+                "related": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A related identifier."
+                  },
+                  "description": "Related vulnerability identifiers."
+                },
+                "upstream": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An upstream identifier."
+                  },
+                  "description": "Upstream vulnerability identifiers."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "A short vulnerability summary."
+                },
+                "details": {
+                  "type": "string",
+                  "description": "The detailed vulnerability description."
+                },
+                "severity": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The scoring system, such as CVSS_V3 or CVSS_V4."
+                      },
+                      "score": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The severity score or vector encoded for the scoring system."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "type",
+                      "score"
+                    ],
+                    "description": "A severity score encoded with a named scoring system."
+                  },
+                  "description": "Severity scores for the vulnerability."
+                },
+                "affected": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "package": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The package name as used by its ecosystem."
+                          },
+                          "ecosystem": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The case-sensitive OSV ecosystem name, such as npm, PyPI, Go, or Maven."
+                          },
+                          "purl": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The package URL assigned by OSV, when available."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "required": [
+                          "name",
+                          "ecosystem"
+                        ],
+                        "description": "A package identified by its ecosystem and name."
+                      },
+                      "severity": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The scoring system, such as CVSS_V3 or CVSS_V4."
+                            },
+                            "score": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The severity score or vector encoded for the scoring system."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "type",
+                            "score"
+                          ],
+                          "description": "A severity score encoded with a named scoring system."
+                        },
+                        "description": "Package-specific severity scores."
+                      },
+                      "ranges": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The range type, such as SEMVER, ECOSYSTEM, or GIT."
+                            },
+                            "repo": {
+                              "type": "string",
+                              "description": "The source repository for a GIT range.",
+                              "format": "uri"
+                            },
+                            "events": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "introduced": {
+                                    "type": "string",
+                                    "description": "The version or commit where the affected range begins."
+                                  },
+                                  "fixed": {
+                                    "type": "string",
+                                    "description": "The version or commit where the affected range ends."
+                                  },
+                                  "last_affected": {
+                                    "type": "string",
+                                    "description": "The last known affected version or commit."
+                                  },
+                                  "limit": {
+                                    "type": "string",
+                                    "description": "The first version or commit outside the affected range."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "description": "A version or commit event delimiting an affected range."
+                              },
+                              "description": "Ordered events delimiting the affected range."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "type",
+                            "events"
+                          ],
+                          "description": "A version or commit range affected by the vulnerability."
+                        },
+                        "description": "Affected version or commit ranges."
+                      },
+                      "versions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "An affected package version."
+                        },
+                        "description": "Known affected versions."
+                      },
+                      "ecosystem_specific": {
+                        "description": "Additional data defined by the package ecosystem."
+                      },
+                      "database_specific": {
+                        "description": "Additional data defined by the source vulnerability database."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "package"
+                    ],
+                    "description": "One package affected by the vulnerability."
+                  },
+                  "description": "Packages affected by the vulnerability."
+                },
+                "references": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The OSV reference type, such as ADVISORY, REPORT, or WEB."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "The referenced resource URL.",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "type",
+                      "url"
+                    ],
+                    "description": "A reference associated with the vulnerability."
+                  },
+                  "description": "References associated with the vulnerability."
+                },
+                "credits": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The credited person or organization."
+                      },
+                      "contact": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A contact identifier."
+                        },
+                        "description": "Contact identifiers for the credited party."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The credit role defined by the OSV schema."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "name"
+                    ],
+                    "description": "Credit for discovering, reporting, or remediating the vulnerability."
+                  },
+                  "description": "Credits associated with the vulnerability."
+                },
+                "database_specific": {
+                  "description": "Additional data defined by the source vulnerability database."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "modified"
+              ],
+              "description": "An OSV vulnerability record."
+            },
+            "description": "Vulnerabilities affecting the package version."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "description": "The continuation token when more results are available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vulnerabilities"
+        ],
+        "description": "Known vulnerabilities returned by OSV."
+      }
+    }
+  ]
+}

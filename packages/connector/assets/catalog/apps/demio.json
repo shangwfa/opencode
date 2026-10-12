@@ -1,0 +1,550 @@
+{
+  "service": "demio",
+  "displayName": "Demio",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DEMIO_API_KEY",
+      "description": "Demio API Key sent with the Api-Key header. Account owners can copy it from Settings > API: https://help.demio.com/en/articles/3527489-zapier-setup.",
+      "extraFields": [
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "DEMIO_API_SECRET",
+          "description": "Demio API Secret sent with the Api-Secret header. Account owners can copy or regenerate it from Settings > API: https://help.demio.com/en/articles/3527489-zapier-setup."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.demio.com",
+  "actions": [
+    {
+      "id": "demio.get_event",
+      "service": "demio",
+      "name": "get_event",
+      "description": "Get one Demio event with its public registration URL and complete scheduled session list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique event identifier."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether to return only active sessions in the event series."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input identifying a Demio event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique event identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The event name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The event description."
+          },
+          "registrants_stay_registered": {
+            "type": "boolean",
+            "description": "Whether registrants stay registered throughout an event series."
+          },
+          "registration_url": {
+            "type": "string",
+            "description": "The public registration page URL for the event."
+          },
+          "next_date_id": {
+            "type": "integer",
+            "description": "The next available running or scheduled event session identifier."
+          },
+          "automated": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "duration": {
+                    "type": "number",
+                    "description": "The automated event video duration in seconds."
+                  },
+                  "ready": {
+                    "type": "boolean",
+                    "description": "Whether the automated event video is ready to play."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "duration",
+                  "ready"
+                ],
+                "description": "Demio automated-event playback details."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Demio automated-event playback details."
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date_id": {
+                  "type": "integer",
+                  "description": "The unique event session identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current event session status."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "The scheduled event session time as a Unix timestamp."
+                },
+                "datetime": {
+                  "type": "string",
+                  "description": "The human-readable scheduled event session time."
+                },
+                "zone": {
+                  "type": "string",
+                  "description": "The timezone used for the event session."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "date_id",
+                "status",
+                "timestamp",
+                "datetime",
+                "zone"
+              ],
+              "description": "A scheduled Demio event session."
+            },
+            "description": "All scheduled, running, and finished sessions for the event."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "description",
+          "registrants_stay_registered",
+          "registration_url",
+          "next_date_id",
+          "automated",
+          "dates"
+        ],
+        "description": "Detailed Demio event information."
+      }
+    },
+    {
+      "id": "demio.get_event_session",
+      "service": "demio",
+      "name": "get_event_session",
+      "description": "Get scheduling and status information for one Demio event session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique event identifier."
+          },
+          "date_id": {
+            "type": "integer",
+            "description": "The unique event session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "date_id"
+        ],
+        "description": "Input identifying a Demio event session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date_id": {
+            "type": "integer",
+            "description": "The unique event session identifier."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current event session status."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The scheduled event session time as a Unix timestamp."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "The human-readable scheduled event session time."
+          },
+          "zone": {
+            "type": "string",
+            "description": "The timezone used for the event session."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date_id",
+          "status",
+          "timestamp",
+          "datetime",
+          "zone"
+        ],
+        "description": "A scheduled Demio event session."
+      }
+    },
+    {
+      "id": "demio.list_event_participants",
+      "service": "demio",
+      "name": "list_event_participants",
+      "description": "List participants for one Demio event session, optionally filtered by participation status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date_id": {
+            "type": "integer",
+            "description": "The unique event session identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "attended",
+              "did not attend",
+              "completed",
+              "left early",
+              "banned"
+            ],
+            "description": "The participation status to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date_id"
+        ],
+        "description": "Input identifying a Demio event session participation report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The participant's email address."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The participant's name."
+                },
+                "custom_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The custom registration field identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The custom registration field name."
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The participant's value for the custom registration field."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "value"
+                    ],
+                    "description": "A Demio participant custom field value."
+                  },
+                  "description": "The participant's custom registration field values."
+                },
+                "attended": {
+                  "type": "boolean",
+                  "description": "Whether the participant attended the event session."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The participant's event session status."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "email",
+                "name",
+                "custom_fields",
+                "attended",
+                "status"
+              ],
+              "description": "A participant in a Demio event session."
+            },
+            "description": "The participants in the event session."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "participants"
+        ],
+        "description": "The Demio event session participation report."
+      }
+    },
+    {
+      "id": "demio.list_events",
+      "service": "demio",
+      "name": "list_events",
+      "description": "List active Demio events, optionally filtered to upcoming, past, or automated events.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past",
+              "automated"
+            ],
+            "description": "The event type to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filtering for the Demio event list."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "The unique event identifier."
+            },
+            "name": {
+              "type": "string",
+              "description": "The event name."
+            },
+            "description": {
+              "type": "string",
+              "description": "The event description."
+            },
+            "date_id": {
+              "type": "integer",
+              "description": "The next scheduled event session identifier."
+            },
+            "status": {
+              "type": "string",
+              "description": "The next scheduled event session status."
+            },
+            "timestamp": {
+              "type": "integer",
+              "description": "The next scheduled event session time as a Unix timestamp."
+            },
+            "zone": {
+              "type": "string",
+              "description": "The timezone used for the next scheduled event session."
+            },
+            "registration_url": {
+              "type": "string",
+              "description": "The public registration page URL for the event."
+            },
+            "automated": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "duration": {
+                      "type": "number",
+                      "description": "The automated event video duration in seconds."
+                    },
+                    "ready": {
+                      "type": "boolean",
+                      "description": "Whether the automated event video is ready to play."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "duration",
+                    "ready"
+                  ],
+                  "description": "Demio automated-event playback details."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Demio automated-event playback details."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "id",
+            "name",
+            "date_id",
+            "status",
+            "timestamp",
+            "zone",
+            "registration_url",
+            "automated"
+          ],
+          "description": "An active Demio event."
+        },
+        "description": "The active Demio events."
+      }
+    },
+    {
+      "id": "demio.register_attendee",
+      "service": "demio",
+      "name": "register_attendee",
+      "description": "Register one attendee for a Demio event and return the attendee hash and unique join link.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The event ID, or null when ref_url identifies the event."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event ID, or null when ref_url identifies the event."
+          },
+          "ref_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The event registration page URL, or null when id identifies the event.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event registration page URL, or null when id identifies the event."
+          },
+          "date_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The event session ID, or null to let Demio choose the nearest active session."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event session ID, or null to let Demio choose the nearest active session."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "description": "The attendee's first name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The attendee's email address.",
+            "format": "email"
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The attendee's last name."
+          },
+          "company": {
+            "type": "string",
+            "description": "The attendee's company."
+          },
+          "website": {
+            "type": "string",
+            "description": "The attendee's company website."
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "The attendee's phone number."
+          },
+          "gdpr": {
+            "type": "string",
+            "description": "The attendee's value for the predefined GDPR field."
+          }
+        },
+        "additionalProperties": {
+          "type": "string",
+          "description": "A custom registration field value keyed by its Demio field identifier."
+        },
+        "required": [
+          "name",
+          "email"
+        ],
+        "description": "Registration data for one Demio attendee. Extra string properties are sent as custom registration fields keyed by their Demio field identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attendee hash used to identify the registration."
+          },
+          "join_link": {
+            "type": "string",
+            "description": "The attendee's unique event join link.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "hash",
+          "join_link"
+        ],
+        "description": "The newly created Demio attendee registration."
+      }
+    }
+  ]
+}

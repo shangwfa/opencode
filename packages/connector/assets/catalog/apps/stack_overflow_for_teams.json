@@ -1,0 +1,583 @@
+{
+  "service": "stack_overflow_for_teams",
+  "displayName": "Stack Internal",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "STACK_INTERNAL_PAT",
+      "description": "Stack Internal personal access token sent with the Authorization Bearer header. Create one from Account Settings > Personal access tokens: https://api.stackoverflowteams.com/docs/authentication",
+      "extraFields": [
+        {
+          "key": "team",
+          "label": "Team Slug",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "my-team",
+          "description": "The team slug from your Stack Internal URL, such as my-team in stackoverflowteams.com/c/my-team."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://stackoverflow.co/internal/",
+  "actions": [
+    {
+      "id": "stack_overflow_for_teams.get_current_user",
+      "service": "stack_overflow_for_teams",
+      "name": "get_current_user",
+      "description": "Retrieve the user represented by the connected Stack Internal personal access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve the current Stack Internal user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "One resource returned by the Stack Internal API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Stack Internal user."
+      }
+    },
+    {
+      "id": "stack_overflow_for_teams.get_question",
+      "service": "stack_overflow_for_teams",
+      "name": "get_question",
+      "description": "Retrieve one question from the connected Stack Internal team by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The question ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Stack Internal question."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "One resource returned by the Stack Internal API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Stack Internal question."
+      }
+    },
+    {
+      "id": "stack_overflow_for_teams.list_answers",
+      "service": "stack_overflow_for_teams",
+      "name": "list_answers",
+      "description": "List answers for one question in the connected Stack Internal team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The question ID whose answers should be listed."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "const": 15,
+                "type": "number",
+                "description": "Return 15 records per page."
+              },
+              {
+                "const": 30,
+                "type": "number",
+                "description": "Return 30 records per page."
+              },
+              {
+                "const": 50,
+                "type": "number",
+                "description": "Return 50 records per page."
+              },
+              {
+                "const": 100,
+                "type": "number",
+                "description": "Return 100 records per page."
+              }
+            ],
+            "description": "The number of records to return per page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "score",
+              "modified",
+              "creation"
+            ],
+            "description": "The answer sort mode."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "questionId"
+        ],
+        "description": "Input for listing answers to a Stack Internal question."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of records returned per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of available pages."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The sort mode applied by Stack Internal."
+          },
+          "order": {
+            "type": "string",
+            "description": "The sort order applied by Stack Internal."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One resource returned by the Stack Internal API."
+            },
+            "description": "The resources on the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalCount",
+          "pageSize",
+          "page",
+          "totalPages",
+          "sort",
+          "items"
+        ],
+        "description": "The paginated answers returned by Stack Internal."
+      }
+    },
+    {
+      "id": "stack_overflow_for_teams.list_questions",
+      "service": "stack_overflow_for_teams",
+      "name": "list_questions",
+      "description": "List questions from the connected Stack Internal team with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "const": 15,
+                "type": "number",
+                "description": "Return 15 records per page."
+              },
+              {
+                "const": 30,
+                "type": "number",
+                "description": "Return 30 records per page."
+              },
+              {
+                "const": 50,
+                "type": "number",
+                "description": "Return 50 records per page."
+              },
+              {
+                "const": 100,
+                "type": "number",
+                "description": "Return 100 records per page."
+              }
+            ],
+            "description": "The number of records to return per page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "activity",
+              "creation",
+              "score"
+            ],
+            "description": "The question sort mode."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort order."
+          },
+          "isAnswered": {
+            "type": "boolean",
+            "description": "Whether to return only answered or unanswered questions."
+          },
+          "hasAcceptedAnswer": {
+            "type": "boolean",
+            "description": "Whether to filter by the presence of an accepted answer."
+          },
+          "authorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The author user ID to filter by."
+          },
+          "from": {
+            "type": "string",
+            "description": "The earliest question creation timestamp to include.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "The latest question creation timestamp to include.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Stack Internal questions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of records returned per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of available pages."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The sort mode applied by Stack Internal."
+          },
+          "order": {
+            "type": "string",
+            "description": "The sort order applied by Stack Internal."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One resource returned by the Stack Internal API."
+            },
+            "description": "The resources on the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalCount",
+          "pageSize",
+          "page",
+          "totalPages",
+          "sort",
+          "items"
+        ],
+        "description": "The paginated questions returned by Stack Internal."
+      }
+    },
+    {
+      "id": "stack_overflow_for_teams.list_tags",
+      "service": "stack_overflow_for_teams",
+      "name": "list_tags",
+      "description": "List tags from the connected Stack Internal team with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "const": 15,
+                "type": "number",
+                "description": "Return 15 records per page."
+              },
+              {
+                "const": 30,
+                "type": "number",
+                "description": "Return 30 records per page."
+              },
+              {
+                "const": 50,
+                "type": "number",
+                "description": "Return 50 records per page."
+              },
+              {
+                "const": 100,
+                "type": "number",
+                "description": "Return 100 records per page."
+              }
+            ],
+            "description": "The number of records to return per page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "postCount",
+              "creationDate"
+            ],
+            "description": "The tag sort mode."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort order."
+          },
+          "partialName": {
+            "type": "string",
+            "description": "A partial tag name to match."
+          },
+          "hasSmes": {
+            "type": "boolean",
+            "description": "Whether returned tags must have subject matter experts."
+          },
+          "hasSynonyms": {
+            "type": "boolean",
+            "description": "Whether returned tags must have synonyms."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Stack Internal tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of records returned per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of available pages."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The sort mode applied by Stack Internal."
+          },
+          "order": {
+            "type": "string",
+            "description": "The sort order applied by Stack Internal."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One resource returned by the Stack Internal API."
+            },
+            "description": "The resources on the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalCount",
+          "pageSize",
+          "page",
+          "totalPages",
+          "sort",
+          "items"
+        ],
+        "description": "The paginated tags returned by Stack Internal."
+      }
+    },
+    {
+      "id": "stack_overflow_for_teams.search",
+      "service": "stack_overflow_for_teams",
+      "name": "search",
+      "description": "Search questions, answers, and articles in the connected Stack Internal team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The text query to search for."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "const": 15,
+                "type": "number",
+                "description": "Return 15 records per page."
+              },
+              {
+                "const": 30,
+                "type": "number",
+                "description": "Return 30 records per page."
+              },
+              {
+                "const": 50,
+                "type": "number",
+                "description": "Return 50 records per page."
+              },
+              {
+                "const": 100,
+                "type": "number",
+                "description": "Return 100 records per page."
+              }
+            ],
+            "description": "The number of records to return per page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "newest",
+              "active",
+              "score"
+            ],
+            "description": "The search result sort mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching Stack Internal knowledge."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of records returned per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of available pages."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The sort mode applied by Stack Internal."
+          },
+          "order": {
+            "type": "string",
+            "description": "The sort order applied by Stack Internal."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One resource returned by the Stack Internal API."
+            },
+            "description": "The resources on the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalCount",
+          "pageSize",
+          "page",
+          "totalPages",
+          "sort",
+          "items"
+        ],
+        "description": "The paginated Stack Internal search results."
+      }
+    }
+  ]
+}

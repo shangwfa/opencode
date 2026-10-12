@@ -1,0 +1,623 @@
+{
+  "service": "serpdog",
+  "displayName": "Serpdog",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SERPDOG_API_KEY",
+      "description": "Serpdog API key passed as the api_key query parameter. The official Account API docs show it in the account_info response: https://docs.serpdog.io/account-api."
+    }
+  ],
+  "homepageUrl": "https://serpdog.io",
+  "actions": [
+    {
+      "id": "serpdog.get_account_info",
+      "service": "serpdog",
+      "name": "get_account_info",
+      "description": "Retrieve account details and quota usage for the connected Serpdog API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Serpdog account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user name returned by Serpdog."
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The API key echoed by Serpdog."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The account email address returned by Serpdog."
+          },
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Serpdog plan name."
+          },
+          "quota": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The monthly quota returned by Serpdog."
+          },
+          "requests": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of requests already used in the current period."
+          },
+          "requests_left": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of requests remaining in the current period."
+          },
+          "billing_history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The billing event timestamp."
+                },
+                "plan": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The billed plan name."
+                },
+                "amount": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The billed amount string."
+                },
+                "invoice": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The invoice URL or label returned by Serpdog."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Serpdog billing history entry."
+            },
+            "description": "The billing history entries returned by Serpdog when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_name",
+          "api_key",
+          "email",
+          "plan",
+          "quota",
+          "requests",
+          "requests_left"
+        ],
+        "description": "Account information payload returned by Serpdog."
+      }
+    },
+    {
+      "id": "serpdog.google_autocomplete",
+      "service": "serpdog",
+      "name": "google_autocomplete",
+      "description": "Retrieve Google Autocomplete suggestions through Serpdog.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google Autocomplete query."
+          },
+          "gl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter country code used for localized suggestions."
+          },
+          "hl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used for localized suggestions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for running a Google Autocomplete request through Serpdog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Request metadata returned by Serpdog."
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Suggestion text returned by Serpdog."
+                },
+                "relevance": {
+                  "type": "integer",
+                  "description": "Suggestion relevance score returned by Serpdog."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Suggestion type returned by Serpdog."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One autocomplete suggestion item."
+            },
+            "description": "Autocomplete suggestions returned by Serpdog."
+          },
+          "verbatim_relevance": {
+            "type": "integer",
+            "description": "Verbatim relevance score returned by Serpdog."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "suggestions",
+          "verbatim_relevance"
+        ],
+        "description": "Normalized output payload for google_autocomplete."
+      }
+    },
+    {
+      "id": "serpdog.google_news_search",
+      "service": "serpdog",
+      "name": "google_news_search",
+      "description": "Run a Google News request through Serpdog.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google News query."
+          },
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results to request per page."
+          },
+          "gl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter country code used for localized results."
+          },
+          "hl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used for localized results."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Result offset used by Serpdog pagination, such as 0, 10, or 20."
+          },
+          "lr": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document language restriction passed to Google News."
+          },
+          "uule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Encoded location parameter passed to Google News."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative time filter passed to Google News."
+          },
+          "nfpr": {
+            "type": "boolean",
+            "description": "Whether to exclude results for an auto-corrected query."
+          },
+          "tbs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Advanced search filter string passed to Google News."
+          },
+          "safe": {
+            "type": "string",
+            "enum": [
+              "active",
+              "off"
+            ],
+            "description": "Safe search mode passed to Google News."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for running a Google News request through Serpdog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Request metadata returned by Serpdog."
+          },
+          "news_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Google News result item."
+            },
+            "description": "News results returned by Serpdog."
+          },
+          "subArticles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One grouped sub-article payload."
+            },
+            "description": "Grouped sub-articles returned by Serpdog when available."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Google pagination payload returned by Serpdog."
+          },
+          "serpdog_pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Serpdog pagination helper payload returned by Serpdog."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "news_results"
+        ],
+        "description": "Normalized output payload for google_news_search."
+      }
+    },
+    {
+      "id": "serpdog.google_search",
+      "service": "serpdog",
+      "name": "google_search",
+      "description": "Run a Google Search request through Serpdog using either the advanced or lite endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google Search query."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "advanced",
+              "lite"
+            ],
+            "description": "Search mode used for Google Search requests."
+          },
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results to request per page."
+          },
+          "gl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter country code used for localized results."
+          },
+          "hl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used for localized results."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Result offset used by Serpdog pagination, such as 0, 10, or 20."
+          },
+          "lr": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document language restriction passed to Google Search."
+          },
+          "uule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Encoded location parameter passed to Google Search."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative time filter passed to Google Search."
+          },
+          "nfpr": {
+            "type": "boolean",
+            "description": "Whether to exclude results for an auto-corrected query."
+          },
+          "tbs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Advanced search filter string passed to Google Search."
+          },
+          "safe": {
+            "type": "string",
+            "enum": [
+              "active",
+              "off"
+            ],
+            "description": "Safe search mode passed to Google Search."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google domain override such as google.co.uk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for running a Google Search request through Serpdog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Request metadata returned by Serpdog."
+          },
+          "organic_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Google Search organic result item."
+            },
+            "description": "Organic search results returned by Serpdog."
+          },
+          "knowledge_graph": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Knowledge graph payload returned by Serpdog when available."
+          },
+          "inline_videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One inline video result item."
+            },
+            "description": "Inline video results returned by Serpdog when available."
+          },
+          "local_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One local result item."
+            },
+            "description": "Local results returned by Serpdog when available."
+          },
+          "recipes_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One recipe result item."
+            },
+            "description": "Recipe results returned by Serpdog when available."
+          },
+          "peopleAlsoAskedFor": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One related entity item."
+            },
+            "description": "Related entity results returned by Serpdog when available."
+          },
+          "relatedSearches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One related search item."
+            },
+            "description": "Related searches returned by Serpdog when available."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Google pagination payload returned by Serpdog."
+          },
+          "serpdog_pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Serpdog pagination helper payload returned by Serpdog."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "organic_results"
+        ],
+        "description": "Normalized output payload for google_search."
+      }
+    },
+    {
+      "id": "serpdog.google_videos_search",
+      "service": "serpdog",
+      "name": "google_videos_search",
+      "description": "Run a Google Videos request through Serpdog.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Google Videos query."
+          },
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results to request per page."
+          },
+          "gl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Two-letter country code used for localized results."
+          },
+          "hl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code used for localized results."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Result offset used by Serpdog pagination, such as 0, 10, or 20."
+          },
+          "lr": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document language restriction passed to Google Videos."
+          },
+          "uule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Encoded location parameter passed to Google Videos."
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative time filter passed to Google Videos."
+          },
+          "nfpr": {
+            "type": "boolean",
+            "description": "Whether to exclude results for an auto-corrected query."
+          },
+          "tbs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Advanced search filter string passed to Google Videos."
+          },
+          "safe": {
+            "type": "string",
+            "enum": [
+              "active",
+              "off"
+            ],
+            "description": "Safe search mode passed to Google Videos."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for running a Google Videos request through Serpdog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Request metadata returned by Serpdog."
+          },
+          "video_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Google Videos result item."
+            },
+            "description": "Video results returned by Serpdog."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Google pagination payload returned by Serpdog."
+          },
+          "serpdog_pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Serpdog pagination helper payload returned by Serpdog."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "video_results"
+        ],
+        "description": "Normalized output payload for google_videos_search."
+      }
+    }
+  ]
+}

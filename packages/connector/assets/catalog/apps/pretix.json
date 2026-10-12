@@ -1,0 +1,721 @@
+{
+  "service": "pretix",
+  "displayName": "pretix",
+  "categories": [
+    "Productivity",
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "pretix team API token",
+      "description": "Team-level pretix API token sent in the Authorization header. Create one below the team member list in your organizer settings: https://docs.pretix.eu/dev/api/tokenauth.html.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "pretix Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://pretix.eu",
+          "description": "The public HTTPS root URL of pretix Hosted or your self-hosted pretix instance, such as https://pretix.eu or https://tickets.example.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://pretix.eu",
+  "actions": [
+    {
+      "id": "pretix.get_event",
+      "service": "pretix",
+      "name": "get_event",
+      "description": "Get one pretix event by organizer and event slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event slug."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a pretix event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The translated event name keyed by locale."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The event slug."
+              },
+              "live": {
+                "type": "boolean",
+                "description": "Whether the ticket shop is live."
+              },
+              "testmode": {
+                "type": "boolean",
+                "description": "Whether the event is in test mode."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The event currency code."
+              },
+              "date_from": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The event start date and time, or null for an event series without a single start date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The event start date and time, or null for an event series without a single start date."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A pretix event."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pretix event response."
+      }
+    },
+    {
+      "id": "pretix.get_item",
+      "service": "pretix",
+      "name": "get_item",
+      "description": "Get one product or ticket item from a pretix event.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event slug."
+          },
+          "itemId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The item ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a pretix item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The item ID."
+              },
+              "name": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The translated item name keyed by locale."
+              },
+              "default_price": {
+                "type": "string",
+                "description": "The default item price as a decimal string."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the item is active."
+              },
+              "admission": {
+                "type": "boolean",
+                "description": "Whether the item grants event admission."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A pretix item or product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pretix item response."
+      }
+    },
+    {
+      "id": "pretix.get_order",
+      "service": "pretix",
+      "name": "get_order",
+      "description": "Get one pretix order by organizer, event, and order code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event slug."
+          },
+          "orderCode": {
+            "type": "string",
+            "description": "The order code."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a pretix order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "The order code."
+              },
+              "event": {
+                "type": "string",
+                "description": "The parent event slug."
+              },
+              "status": {
+                "type": "string",
+                "description": "The order status code."
+              },
+              "testmode": {
+                "type": "boolean",
+                "description": "Whether the order was created in test mode."
+              },
+              "email": {
+                "type": "string",
+                "description": "The customer email address."
+              },
+              "datetime": {
+                "type": "string",
+                "description": "The order creation date and time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A pretix order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pretix order response."
+      }
+    },
+    {
+      "id": "pretix.get_organizer",
+      "service": "pretix",
+      "name": "get_organizer",
+      "description": "Get one pretix organizer by slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a pretix organizer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The organizer name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The organizer slug."
+              },
+              "public_url": {
+                "type": "string",
+                "description": "The public organizer URL."
+              },
+              "plugins": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A plugin package name."
+                },
+                "description": "Enabled organizer plugin package names."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A pretix organizer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pretix organizer response."
+      }
+    },
+    {
+      "id": "pretix.list_events",
+      "service": "pretix",
+      "name": "list_events",
+      "description": "List events belonging to a pretix organizer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "ordering": {
+            "type": "string",
+            "description": "The official pretix ordering expression for this resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizer"
+        ],
+        "description": "The input for listing pretix events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL, or null when there is no next page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL, or null when there is no previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL, or null when there is no previous page."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The translated event name keyed by locale."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The event slug."
+                },
+                "live": {
+                  "type": "boolean",
+                  "description": "Whether the ticket shop is live."
+                },
+                "testmode": {
+                  "type": "boolean",
+                  "description": "Whether the event is in test mode."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "The event currency code."
+                },
+                "date_from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The event start date and time, or null for an event series without a single start date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The event start date and time, or null for an event series without a single start date."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A pretix event."
+            },
+            "description": "Events returned by pretix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated pretix event list."
+      }
+    },
+    {
+      "id": "pretix.list_items",
+      "service": "pretix",
+      "name": "list_items",
+      "description": "List products or ticket items configured for a pretix event.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "ordering": {
+            "type": "string",
+            "description": "The official pretix ordering expression for this resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizer",
+          "event"
+        ],
+        "description": "The input for listing pretix items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL, or null when there is no next page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL, or null when there is no previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL, or null when there is no previous page."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The item ID."
+                },
+                "name": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The translated item name keyed by locale."
+                },
+                "default_price": {
+                  "type": "string",
+                  "description": "The default item price as a decimal string."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the item is active."
+                },
+                "admission": {
+                  "type": "boolean",
+                  "description": "Whether the item grants event admission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A pretix item or product."
+            },
+            "description": "Items returned by pretix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated pretix item list."
+      }
+    },
+    {
+      "id": "pretix.list_orders",
+      "service": "pretix",
+      "name": "list_orders",
+      "description": "List and filter orders for a pretix event.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizer": {
+            "type": "string",
+            "description": "The organizer slug."
+          },
+          "event": {
+            "type": "string",
+            "description": "The event slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "ordering": {
+            "type": "string",
+            "description": "The official pretix ordering expression for this resource."
+          },
+          "status": {
+            "type": "string",
+            "description": "The pretix order status code to filter by."
+          },
+          "search": {
+            "type": "string",
+            "description": "A search query matched against order and attendee fields."
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Only return orders modified at or after this ISO 8601 date and time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizer",
+          "event"
+        ],
+        "description": "The input for listing pretix orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL, or null when there is no next page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL, or null when there is no previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL, or null when there is no previous page."
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The order code."
+                },
+                "event": {
+                  "type": "string",
+                  "description": "The parent event slug."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The order status code."
+                },
+                "testmode": {
+                  "type": "boolean",
+                  "description": "Whether the order was created in test mode."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The customer email address."
+                },
+                "datetime": {
+                  "type": "string",
+                  "description": "The order creation date and time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A pretix order."
+            },
+            "description": "Orders returned by pretix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated pretix order list."
+      }
+    },
+    {
+      "id": "pretix.list_organizers",
+      "service": "pretix",
+      "name": "list_organizers",
+      "description": "List pretix organizers accessible to the connected API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "ordering": {
+            "type": "string",
+            "description": "The official pretix ordering expression for this resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing pretix organizers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL, or null when there is no next page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL, or null when there is no previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL, or null when there is no previous page."
+          },
+          "organizers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The organizer name."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The organizer slug."
+                },
+                "public_url": {
+                  "type": "string",
+                  "description": "The public organizer URL."
+                },
+                "plugins": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A plugin package name."
+                  },
+                  "description": "Enabled organizer plugin package names."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A pretix organizer."
+            },
+            "description": "Organizers returned by pretix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated pretix organizer list."
+      }
+    }
+  ]
+}

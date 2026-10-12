@@ -1,0 +1,742 @@
+{
+  "service": "databar_ai",
+  "displayName": "Databar.ai",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DATABAR_API_KEY",
+      "description": "Databar API key sent in the x-apikey header."
+    }
+  ],
+  "homepageUrl": "https://databar.ai/",
+  "actions": [
+    {
+      "id": "databar_ai.create_table",
+      "service": "databar_ai",
+      "name": "create_table",
+      "description": "Create a Databar table with optional columns and empty rows.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The table name."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The initial human-readable column names.",
+            "minItems": 1
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of empty rows Databar should create."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Databar table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "object",
+            "properties": {
+              "identifier": {
+                "type": "string",
+                "description": "The table identifier returned by Databar."
+              },
+              "name": {
+                "type": "string",
+                "description": "The table name."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The table creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The table update timestamp."
+              },
+              "workspace_identifier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The workspace identifier associated with the table when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The workspace identifier associated with the table when present."
+              },
+              "table_url": {
+                "type": "string",
+                "description": "The Databar web URL for the table."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The object returned by Databar."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "identifier",
+              "name",
+              "created_at",
+              "updated_at",
+              "workspace_identifier",
+              "table_url",
+              "raw"
+            ],
+            "description": "A Databar table."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.get_enrichment",
+      "service": "databar_ai",
+      "name": "get_enrichment",
+      "description": "Get detailed Databar enrichment metadata by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enrichment_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Databar enrichment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enrichment_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enrichment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by Databar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enrichment"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.get_table_columns",
+      "service": "databar_ai",
+      "name": "get_table_columns",
+      "description": "List columns for a Databar table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table_uuid": {
+            "type": "string",
+            "description": "The UUID of the Databar table.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table_uuid"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by Databar."
+            },
+            "description": "The Databar table columns."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "columns"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.get_table_rows",
+      "service": "databar_ai",
+      "name": "get_table_rows",
+      "description": "Get Databar table rows with pagination and optional column filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table_uuid": {
+            "type": "string",
+            "description": "The UUID of the Databar table.",
+            "format": "uuid"
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of rows per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "filter": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by Databar."
+            },
+            "description": "Column filters keyed by human-readable column name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table_uuid"
+        ],
+        "description": "The input payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by Databar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.get_task_status",
+      "service": "databar_ai",
+      "name": "get_task_status",
+      "description": "Get the status and result data for a Databar enrichment or waterfall task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Databar task identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The Databar task identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Databar task status."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "task_id",
+              "status"
+            ],
+            "description": "A Databar task status response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.get_user_info",
+      "service": "databar_ai",
+      "name": "get_user_info",
+      "description": "Get the current Databar account information for the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The user's email address.",
+                "format": "email"
+              },
+              "balance": {
+                "type": "number",
+                "description": "The user's credit balance."
+              },
+              "plan": {
+                "type": "string",
+                "description": "The user's Databar plan."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "email",
+              "balance",
+              "plan"
+            ],
+            "description": "The current Databar user account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.insert_rows",
+      "service": "databar_ai",
+      "name": "insert_rows",
+      "description": "Insert up to 50 rows into a Databar table using human-readable column names.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "table_uuid": {
+            "type": "string",
+            "description": "The UUID of the Databar table.",
+            "format": "uuid"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "One row value."
+                  },
+                  "description": "Row fields."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "fields"
+              ]
+            },
+            "description": "The rows to insert into Databar.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "options": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by Databar."
+          },
+          "return_rows": {
+            "type": "boolean",
+            "description": "Whether Databar should return full row_data for each inserted row."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table_uuid",
+          "rows"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by Databar."
+            },
+            "description": "The Databar batch insert results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.list_enrichments",
+      "service": "databar_ai",
+      "name": "list_enrichments",
+      "description": "List Databar enrichments with optional search and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 3,
+            "description": "The search query for Databar enrichments."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of items to return."
+          },
+          "authorized_only": {
+            "type": "boolean",
+            "description": "Whether to hide BYOK enrichments that are not connected."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The enrichment category name to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One returned item."
+                },
+                "description": "The array returned by Databar."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The object returned by Databar."
+              }
+            ],
+            "description": "The data returned by Databar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.list_tables",
+      "service": "databar_ai",
+      "name": "list_tables",
+      "description": "List Databar tables in the current workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "string",
+                  "description": "The table identifier returned by Databar."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The table name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The table creation timestamp."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The table update timestamp."
+                },
+                "workspace_identifier": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The workspace identifier associated with the table when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The workspace identifier associated with the table when present."
+                },
+                "table_url": {
+                  "type": "string",
+                  "description": "The Databar web URL for the table."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The object returned by Databar."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "identifier",
+                "name",
+                "created_at",
+                "updated_at",
+                "workspace_identifier",
+                "table_url",
+                "raw"
+              ],
+              "description": "A Databar table."
+            },
+            "description": "The Databar tables."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tables"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.run_enrichment",
+      "service": "databar_ai",
+      "name": "run_enrichment",
+      "description": "Submit a Databar enrichment task and return the task ID for later status polling.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enrichment_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Databar enrichment ID."
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One parameter value."
+            },
+            "description": "The enrichment parameters keyed by Databar parameter name."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by Databar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enrichment_id",
+          "params"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The Databar task identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Databar task status."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "task_id",
+              "status"
+            ],
+            "description": "A Databar task status response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "databar_ai.run_waterfall",
+      "service": "databar_ai",
+      "name": "run_waterfall",
+      "description": "Submit a Databar waterfall task and return the task ID for later status polling.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "waterfall_identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Databar waterfall identifier."
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One parameter value."
+            },
+            "description": "The waterfall parameters keyed by Databar parameter name."
+          },
+          "enrichments": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One enrichment ID."
+            },
+            "description": "The enrichment IDs.",
+            "minItems": 1
+          },
+          "email_verifier": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The email verifier enrichment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "waterfall_identifier",
+          "params",
+          "enrichments"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The Databar task identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Databar task status."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "task_id",
+              "status"
+            ],
+            "description": "A Databar task status response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

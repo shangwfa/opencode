@@ -1,0 +1,667 @@
+{
+  "service": "freshstatus",
+  "displayName": "Freshstatus",
+  "description": "Build and organize a Freshstatus status page through its public API.",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "freshstatus_api_key",
+      "description": "Freshstatus organization API key used as the HTTP Basic username. Copy it from Settings > Account: https://support.freshstatus.io/support/solutions/articles/50000003646-freshstatus-api-documentation",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Freshstatus Subdomain",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "your-status-page",
+          "description": "Freshstatus account subdomain used as the HTTP Basic password. For https://example.freshstatus.io, enter example."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.freshworks.com/statuspage",
+  "actions": [
+    {
+      "id": "freshstatus.create_group",
+      "service": "freshstatus",
+      "name": "create_group",
+      "description": "Create a service group on a Freshstatus status page.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Service group name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Service group description."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Display order of the service group."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Parent service group identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent service group identifier."
+          },
+          "displayOptions": {
+            "type": "object",
+            "properties": {
+              "expandOnLoad": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether the group is expanded on page load, encoded as required by Freshstatus."
+              },
+              "uptimeHistoryEnabled": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether uptime history is enabled, encoded as required by Freshstatus."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Freshstatus service group display options.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input for creating a Freshstatus service group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service group object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Created Freshstatus service group response."
+      }
+    },
+    {
+      "id": "freshstatus.create_service",
+      "service": "freshstatus",
+      "name": "create_service",
+      "description": "Create a service on a Freshstatus status page.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Service name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Service description."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Display order of the service."
+          },
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Parent service group identifier."
+          },
+          "displayOptions": {
+            "type": "object",
+            "properties": {
+              "serviceStartDate": {
+                "type": "string",
+                "description": "Service history start date in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "uptimeHistoryEnabled": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether uptime history is enabled, encoded as required by Freshstatus."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Freshstatus service display options.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "order"
+        ],
+        "description": "Input for creating a Freshstatus service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Created Freshstatus service response."
+      }
+    },
+    {
+      "id": "freshstatus.delete_group",
+      "service": "freshstatus",
+      "name": "delete_group",
+      "description": "Delete a Freshstatus service group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for deleting a Freshstatus service group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the service group was deleted."
+          },
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Freshstatus service group deletion acknowledgement."
+      }
+    },
+    {
+      "id": "freshstatus.delete_service",
+      "service": "freshstatus",
+      "name": "delete_service",
+      "description": "Delete a Freshstatus service.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for deleting a Freshstatus service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the service was deleted."
+          },
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Freshstatus service deletion acknowledgement."
+      }
+    },
+    {
+      "id": "freshstatus.get_group",
+      "service": "freshstatus",
+      "name": "get_group",
+      "description": "Get one Freshstatus service group by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading a Freshstatus service group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service group object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Freshstatus service group response."
+      }
+    },
+    {
+      "id": "freshstatus.get_service",
+      "service": "freshstatus",
+      "name": "get_service",
+      "description": "Get one Freshstatus service by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading a Freshstatus service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Freshstatus service response."
+      }
+    },
+    {
+      "id": "freshstatus.list_groups",
+      "service": "freshstatus",
+      "name": "list_groups",
+      "description": "List service groups configured on a Freshstatus status page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Freshstatus service groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Total number of matching Freshstatus objects."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the next page when another page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the next page when another page exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the previous page when one exists."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A service group object returned by Freshstatus."
+            },
+            "description": "Service groups returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Freshstatus service group list."
+      }
+    },
+    {
+      "id": "freshstatus.list_services",
+      "service": "freshstatus",
+      "name": "list_services",
+      "description": "List the services configured on a Freshstatus status page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Freshstatus services."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Total number of matching Freshstatus objects."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the next page when another page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the next page when another page exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the previous page when one exists."
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A service object returned by Freshstatus."
+            },
+            "description": "Services returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Freshstatus service list."
+      }
+    },
+    {
+      "id": "freshstatus.update_group",
+      "service": "freshstatus",
+      "name": "update_group",
+      "description": "Update a Freshstatus service group.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Replacement service group name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Replacement service group description."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Replacement display order."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Replacement parent group identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replacement parent group identifier."
+          },
+          "displayOptions": {
+            "type": "object",
+            "properties": {
+              "expandOnLoad": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether the group is expanded on page load, encoded as required by Freshstatus."
+              },
+              "uptimeHistoryEnabled": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether uptime history is enabled, encoded as required by Freshstatus."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Freshstatus service group display options.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groupId"
+        ],
+        "description": "Input for updating a Freshstatus service group.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "description"
+            ]
+          },
+          {
+            "required": [
+              "order"
+            ]
+          },
+          {
+            "required": [
+              "parentId"
+            ]
+          },
+          {
+            "required": [
+              "displayOptions"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service group object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Updated Freshstatus service group response."
+      }
+    },
+    {
+      "id": "freshstatus.update_service",
+      "service": "freshstatus",
+      "name": "update_service",
+      "description": "Update a Freshstatus service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshstatus object identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Replacement service name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Replacement service description."
+          },
+          "order": {
+            "type": "integer",
+            "description": "Replacement display order."
+          },
+          "groupId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Replacement parent group identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Replacement parent group identifier."
+          },
+          "displayOptions": {
+            "type": "object",
+            "properties": {
+              "serviceStartDate": {
+                "type": "string",
+                "description": "Service history start date in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "uptimeHistoryEnabled": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ],
+                "description": "Whether uptime history is enabled, encoded as required by Freshstatus."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Freshstatus service display options.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceId"
+        ],
+        "description": "Input for updating a Freshstatus service.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "description"
+            ]
+          },
+          {
+            "required": [
+              "order"
+            ]
+          },
+          {
+            "required": [
+              "groupId"
+            ]
+          },
+          {
+            "required": [
+              "displayOptions"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A service object returned by Freshstatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Updated Freshstatus service response."
+      }
+    }
+  ]
+}

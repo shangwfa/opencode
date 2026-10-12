@@ -1,0 +1,809 @@
+{
+  "service": "news_api",
+  "displayName": "News API",
+  "categories": [
+    "Data",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NEWS_API_KEY",
+      "description": "News API key used with the X-Api-Key request header. Register for one at https://newsapi.org/register."
+    }
+  ],
+  "homepageUrl": "https://newsapi.org",
+  "actions": [
+    {
+      "id": "news_api.get_everything",
+      "service": "news_api",
+      "name": "get_everything",
+      "description": "Search every article published by News API using the official everything endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keywords or phrases to search for in the article title and body."
+          },
+          "from": {
+            "type": "string",
+            "description": "The oldest date or date-time allowed for articles in the result set."
+          },
+          "to": {
+            "type": "string",
+            "description": "The newest date or date-time allowed for articles in the result set."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "relevancy",
+              "popularity",
+              "publishedAt"
+            ],
+            "description": "The order used to sort article results."
+          },
+          "sources": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of source identifiers to include."
+          },
+          "domains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of domains to include."
+          },
+          "excludeDomains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of domains to exclude."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ar",
+              "de",
+              "en",
+              "es",
+              "fr",
+              "he",
+              "it",
+              "nl",
+              "no",
+              "pt",
+              "ru",
+              "sv",
+              "ud",
+              "zh"
+            ],
+            "description": "The ISO 639-1 language code used by the request."
+          },
+          "qInTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keywords or phrases to search for only in article titles."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the News API everything endpoint.",
+        "anyOf": [
+          {
+            "required": [
+              "q"
+            ]
+          },
+          {
+            "required": [
+              "qInTitle"
+            ]
+          },
+          {
+            "required": [
+              "sources"
+            ]
+          },
+          {
+            "required": [
+              "domains"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Top-level News API status."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of matching articles."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The source identifier for the article."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The source identifier for the article."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the article source."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The source metadata for the article."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author of the article."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author of the article."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The short description or snippet."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The short description or snippet."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical URL of the article.",
+                  "format": "uri"
+                },
+                "urlToImage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The associated image URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The associated image URL."
+                },
+                "publishedAt": {
+                  "type": "string",
+                  "description": "The article publication timestamp.",
+                  "format": "date-time"
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The content excerpt returned by News API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The content excerpt returned by News API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One article returned by News API."
+            },
+            "description": "Articles returned by News API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "totalResults",
+          "articles"
+        ],
+        "description": "News API article search response."
+      }
+    },
+    {
+      "id": "news_api.get_sources",
+      "service": "news_api",
+      "name": "get_sources",
+      "description": "List available news sources using the official sources endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "business",
+              "entertainment",
+              "general",
+              "health",
+              "science",
+              "sports",
+              "technology"
+            ],
+            "description": "The source category filter."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ar",
+              "de",
+              "en",
+              "es",
+              "fr",
+              "he",
+              "it",
+              "nl",
+              "no",
+              "pt",
+              "ru",
+              "sv",
+              "ud",
+              "zh"
+            ],
+            "description": "The ISO 639-1 language code used by the source listing request."
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "ae",
+              "ar",
+              "at",
+              "au",
+              "be",
+              "bg",
+              "br",
+              "ca",
+              "ch",
+              "cn",
+              "co",
+              "cu",
+              "cz",
+              "de",
+              "eg",
+              "fr",
+              "gb",
+              "gr",
+              "hk",
+              "hu",
+              "id",
+              "ie",
+              "il",
+              "in",
+              "is",
+              "it",
+              "jp",
+              "kr",
+              "lt",
+              "lv",
+              "ma",
+              "mx",
+              "my",
+              "ng",
+              "nl",
+              "no",
+              "nz",
+              "ph",
+              "pl",
+              "pt",
+              "ro",
+              "rs",
+              "ru",
+              "sa",
+              "se",
+              "sg",
+              "si",
+              "sk",
+              "th",
+              "tr",
+              "tw",
+              "ua",
+              "us",
+              "ve",
+              "za"
+            ],
+            "description": "The country code to retrieve sources for."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the News API sources endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Top-level News API status."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique source identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the source."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The short description of the source."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The source homepage URL.",
+                  "format": "uri"
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The source category."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The source language."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The source country."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One source returned by News API."
+            },
+            "description": "Sources returned by News API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "sources"
+        ],
+        "description": "News API source listing response."
+      }
+    },
+    {
+      "id": "news_api.get_top_headlines",
+      "service": "news_api",
+      "name": "get_top_headlines",
+      "description": "Retrieve current top and breaking headlines using the official top headlines endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keywords or phrases to search for in the article title and body."
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "ae",
+              "ar",
+              "at",
+              "au",
+              "be",
+              "bg",
+              "br",
+              "ca",
+              "ch",
+              "cn",
+              "co",
+              "cu",
+              "cz",
+              "de",
+              "eg",
+              "fr",
+              "gb",
+              "gr",
+              "hk",
+              "hu",
+              "id",
+              "ie",
+              "il",
+              "in",
+              "it",
+              "jp",
+              "kr",
+              "lt",
+              "lv",
+              "ma",
+              "mx",
+              "my",
+              "ng",
+              "nl",
+              "no",
+              "nz",
+              "ph",
+              "pl",
+              "pt",
+              "ro",
+              "rs",
+              "ru",
+              "sa",
+              "se",
+              "sg",
+              "si",
+              "sk",
+              "th",
+              "tr",
+              "tw",
+              "ua",
+              "us",
+              "ve",
+              "za"
+            ],
+            "description": "The country code to retrieve headlines for."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "business",
+              "entertainment",
+              "general",
+              "health",
+              "science",
+              "sports",
+              "technology"
+            ],
+            "description": "The news category filter."
+          },
+          "sources": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of source identifiers to include."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the News API top headlines endpoint.",
+        "anyOf": [
+          {
+            "required": [
+              "q"
+            ]
+          },
+          {
+            "required": [
+              "country"
+            ]
+          },
+          {
+            "required": [
+              "category"
+            ]
+          },
+          {
+            "required": [
+              "sources"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Top-level News API status."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of matching articles."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The source identifier for the article."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The source identifier for the article."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the article source."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The source metadata for the article."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author of the article."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author of the article."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The short description or snippet."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The short description or snippet."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical URL of the article.",
+                  "format": "uri"
+                },
+                "urlToImage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The associated image URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The associated image URL."
+                },
+                "publishedAt": {
+                  "type": "string",
+                  "description": "The article publication timestamp.",
+                  "format": "date-time"
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The content excerpt returned by News API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The content excerpt returned by News API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One article returned by News API."
+            },
+            "description": "Articles returned by News API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "totalResults",
+          "articles"
+        ],
+        "description": "News API article search response."
+      }
+    },
+    {
+      "id": "news_api.get_v1_articles",
+      "service": "news_api",
+      "name": "get_v1_articles",
+      "description": "Provide a compatibility wrapper for the legacy v1 articles action using top headlines with one source.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The legacy single-source identifier."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "top"
+            ],
+            "description": "The legacy v1 sort order requested by the caller."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source"
+        ],
+        "description": "Input parameters for the legacy News API v1 articles compatibility action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Top-level News API status."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of matching articles."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The source identifier for the article."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The source identifier for the article."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the article source."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The source metadata for the article."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author of the article."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author of the article."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The short description or snippet."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The short description or snippet."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical URL of the article.",
+                  "format": "uri"
+                },
+                "urlToImage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The associated image URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The associated image URL."
+                },
+                "publishedAt": {
+                  "type": "string",
+                  "description": "The article publication timestamp.",
+                  "format": "date-time"
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The content excerpt returned by News API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The content excerpt returned by News API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One article returned by News API."
+            },
+            "description": "Articles returned by News API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "totalResults",
+          "articles"
+        ],
+        "description": "News API article search response."
+      }
+    }
+  ]
+}

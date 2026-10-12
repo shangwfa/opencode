@@ -1,0 +1,1408 @@
+{
+  "service": "cloudflare_dns",
+  "displayName": "Cloudflare DNS",
+  "categories": [
+    "Developer Tools",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key",
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "cloudflare_api_token",
+      "description": "Cloudflare API token sent as a Bearer token. Create one from the Cloudflare API Tokens page: https://dash.cloudflare.com/profile/api-tokens",
+      "extraFields": []
+    },
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://dash.cloudflare.com/oauth2/auth",
+      "tokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "refreshTokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "scopes": [
+        "offline_access",
+        "zone.read",
+        "dns.read",
+        "dns.write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://www.cloudflare.com",
+  "actions": [
+    {
+      "id": "cloudflare_dns.create_dns_record",
+      "service": "cloudflare_dns",
+      "name": "create_dns_record",
+      "description": "Create a DNS record inside a Cloudflare zone.",
+      "operationType": "write",
+      "requiredScopes": [
+        "zone.read",
+        "dns.read",
+        "dns.write"
+      ],
+      "providerPermissions": [
+        "DNS Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CAA",
+              "CERT",
+              "CNAME",
+              "DNSKEY",
+              "DS",
+              "HTTPS",
+              "LOC",
+              "MX",
+              "NAPTR",
+              "NS",
+              "OPENPGPKEY",
+              "PTR",
+              "SMIMEA",
+              "SRV",
+              "SSHFP",
+              "SVCB",
+              "TLSA",
+              "TXT",
+              "URI"
+            ],
+            "description": "The DNS record type."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DNS record name."
+          },
+          "content": {
+            "type": "string",
+            "description": "The DNS record content."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "ttl": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DNS TTL in seconds. Use 1 for automatic TTL."
+          },
+          "proxied": {
+            "type": "boolean",
+            "description": "Whether Cloudflare proxying should be enabled."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "The DNS record priority."
+          },
+          "comment": {
+            "type": "string",
+            "description": "The DNS record comment."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The DNS record tags."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "type",
+          "name"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "required": [
+              "data"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The DNS record ID."
+              },
+              "zoneId": {
+                "type": "string",
+                "description": "The parent zone ID."
+              },
+              "zoneName": {
+                "type": "string",
+                "description": "The parent zone name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The DNS record type."
+              },
+              "name": {
+                "type": "string",
+                "description": "The record name."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record content."
+              },
+              "ttl": {
+                "type": "integer",
+                "description": "The DNS TTL in seconds."
+              },
+              "proxied": {
+                "type": "boolean",
+                "description": "Whether Cloudflare proxying is enabled."
+              },
+              "proxiable": {
+                "type": "boolean",
+                "description": "Whether the record can be proxied."
+              },
+              "priority": {
+                "type": "integer",
+                "description": "The record priority."
+              },
+              "comment": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record comment."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record comment."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The record tags."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The record creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last record update timestamp."
+              },
+              "commentModifiedOn": {
+                "type": "string",
+                "description": "The comment update timestamp."
+              },
+              "tagsModifiedOn": {
+                "type": "string",
+                "description": "The tag update timestamp."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "settings": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "name"
+            ],
+            "description": "A Cloudflare DNS record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.delete_dns_record",
+      "service": "cloudflare_dns",
+      "name": "delete_dns_record",
+      "description": "Delete one DNS record from a Cloudflare zone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "zone.read",
+        "dns.read",
+        "dns.write"
+      ],
+      "providerPermissions": [
+        "DNS Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "dnsRecordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare DNS record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "dnsRecordId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The deleted DNS record ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.get_dns_record",
+      "service": "cloudflare_dns",
+      "name": "get_dns_record",
+      "description": "Get one DNS record from a Cloudflare zone.",
+      "operationType": "read",
+      "requiredScopes": [
+        "zone.read",
+        "dns.read"
+      ],
+      "providerPermissions": [
+        "DNS Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "dnsRecordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare DNS record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "dnsRecordId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The DNS record ID."
+              },
+              "zoneId": {
+                "type": "string",
+                "description": "The parent zone ID."
+              },
+              "zoneName": {
+                "type": "string",
+                "description": "The parent zone name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The DNS record type."
+              },
+              "name": {
+                "type": "string",
+                "description": "The record name."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record content."
+              },
+              "ttl": {
+                "type": "integer",
+                "description": "The DNS TTL in seconds."
+              },
+              "proxied": {
+                "type": "boolean",
+                "description": "Whether Cloudflare proxying is enabled."
+              },
+              "proxiable": {
+                "type": "boolean",
+                "description": "Whether the record can be proxied."
+              },
+              "priority": {
+                "type": "integer",
+                "description": "The record priority."
+              },
+              "comment": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record comment."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record comment."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The record tags."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The record creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last record update timestamp."
+              },
+              "commentModifiedOn": {
+                "type": "string",
+                "description": "The comment update timestamp."
+              },
+              "tagsModifiedOn": {
+                "type": "string",
+                "description": "The tag update timestamp."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "settings": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "name"
+            ],
+            "description": "A Cloudflare DNS record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.get_zone",
+      "service": "cloudflare_dns",
+      "name": "get_zone",
+      "description": "Get one Cloudflare zone by zone ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "zone.read"
+      ],
+      "providerPermissions": [
+        "Zone Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The zone ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The zone name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The zone status."
+              },
+              "type": {
+                "type": "string",
+                "description": "The zone type."
+              },
+              "paused": {
+                "type": "boolean",
+                "description": "Whether the zone is paused."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The zone creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last zone update timestamp."
+              },
+              "nameServers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The assigned name servers."
+              },
+              "originalNameServers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The original name servers reported by Cloudflare."
+              },
+              "account": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Cloudflare account ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The Cloudflare account name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "The Cloudflare account type."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Cloudflare account linked to a zone."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Cloudflare zone summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.list_accounts",
+      "service": "cloudflare_dns",
+      "name": "list_accounts",
+      "description": "List Cloudflare accounts visible to the current credential.",
+      "operationType": "read",
+      "requiredScopes": [
+        "zone.read"
+      ],
+      "providerPermissions": [
+        "Zone Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Cloudflare account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Cloudflare account name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Cloudflare account type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "The Cloudflare account summary."
+            },
+            "description": "The visible Cloudflare accounts."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.list_dns_records",
+      "service": "cloudflare_dns",
+      "name": "list_dns_records",
+      "description": "List DNS records inside one Cloudflare zone.",
+      "operationType": "read",
+      "requiredScopes": [
+        "zone.read",
+        "dns.read"
+      ],
+      "providerPermissions": [
+        "DNS Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CAA",
+              "CERT",
+              "CNAME",
+              "DNSKEY",
+              "DS",
+              "HTTPS",
+              "LOC",
+              "MX",
+              "NAPTR",
+              "NS",
+              "OPENPGPKEY",
+              "PTR",
+              "SMIMEA",
+              "SRV",
+              "SSHFP",
+              "SVCB",
+              "TLSA",
+              "TXT",
+              "URI"
+            ],
+            "description": "The DNS record type."
+          },
+          "name": {
+            "type": "string",
+            "description": "Filter by record name."
+          },
+          "content": {
+            "type": "string",
+            "description": "Filter by record content."
+          },
+          "proxied": {
+            "type": "boolean",
+            "description": "Filter by proxy status."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ],
+            "description": "Whether all or any query filters must match."
+          },
+          "order": {
+            "type": "string",
+            "description": "The field to order by."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The DNS record ID."
+                },
+                "zoneId": {
+                  "type": "string",
+                  "description": "The parent zone ID."
+                },
+                "zoneName": {
+                  "type": "string",
+                  "description": "The parent zone name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The DNS record type."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The record name."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The record content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The record content."
+                },
+                "ttl": {
+                  "type": "integer",
+                  "description": "The DNS TTL in seconds."
+                },
+                "proxied": {
+                  "type": "boolean",
+                  "description": "Whether Cloudflare proxying is enabled."
+                },
+                "proxiable": {
+                  "type": "boolean",
+                  "description": "Whether the record can be proxied."
+                },
+                "priority": {
+                  "type": "integer",
+                  "description": "The record priority."
+                },
+                "comment": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The record comment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The record comment."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The record tags."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The record creation timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last record update timestamp."
+                },
+                "commentModifiedOn": {
+                  "type": "string",
+                  "description": "The comment update timestamp."
+                },
+                "tagsModifiedOn": {
+                  "type": "string",
+                  "description": "The tag update timestamp."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                },
+                "settings": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type",
+                "name"
+              ],
+              "description": "A Cloudflare DNS record."
+            },
+            "description": "The list of DNS records."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.list_zones",
+      "service": "cloudflare_dns",
+      "name": "list_zones",
+      "description": "List the Cloudflare zones visible to the current API token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "zone.read"
+      ],
+      "providerPermissions": [
+        "Zone Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          },
+          "name": {
+            "type": "string",
+            "description": "Filter zones by exact zone name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter zones by zone status."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "Filter zones by Cloudflare account ID."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ],
+            "description": "Whether all or any query filters must match."
+          },
+          "order": {
+            "type": "string",
+            "description": "The field to order by."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The zone ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The zone name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The zone status."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The zone type."
+                },
+                "paused": {
+                  "type": "boolean",
+                  "description": "Whether the zone is paused."
+                },
+                "createdOn": {
+                  "type": "string",
+                  "description": "The zone creation timestamp."
+                },
+                "modifiedOn": {
+                  "type": "string",
+                  "description": "The last zone update timestamp."
+                },
+                "nameServers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The assigned name servers."
+                },
+                "originalNameServers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The original name servers reported by Cloudflare."
+                },
+                "account": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The Cloudflare account ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The Cloudflare account name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The Cloudflare account type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The Cloudflare account linked to a zone."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A free-form object accepted by the Cloudflare API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Cloudflare zone summary."
+            },
+            "description": "The list of matching zones."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zones"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_dns.update_dns_record",
+      "service": "cloudflare_dns",
+      "name": "update_dns_record",
+      "description": "Patch one DNS record inside a Cloudflare zone.",
+      "operationType": "write",
+      "requiredScopes": [
+        "zone.read",
+        "dns.read",
+        "dns.write"
+      ],
+      "providerPermissions": [
+        "DNS Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "dnsRecordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare DNS record ID."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CAA",
+              "CERT",
+              "CNAME",
+              "DNSKEY",
+              "DS",
+              "HTTPS",
+              "LOC",
+              "MX",
+              "NAPTR",
+              "NS",
+              "OPENPGPKEY",
+              "PTR",
+              "SMIMEA",
+              "SRV",
+              "SSHFP",
+              "SVCB",
+              "TLSA",
+              "TXT",
+              "URI"
+            ],
+            "description": "The DNS record type."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DNS record name."
+          },
+          "content": {
+            "type": "string",
+            "description": "The DNS record content."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          },
+          "ttl": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DNS TTL in seconds. Use 1 for automatic TTL."
+          },
+          "proxied": {
+            "type": "boolean",
+            "description": "Whether Cloudflare proxying should be enabled."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "The DNS record priority."
+          },
+          "comment": {
+            "type": "string",
+            "description": "The DNS record comment."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The DNS record tags."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A free-form object accepted by the Cloudflare API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "dnsRecordId"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "required": [
+              "ttl"
+            ]
+          },
+          {
+            "required": [
+              "proxied"
+            ]
+          },
+          {
+            "required": [
+              "priority"
+            ]
+          },
+          {
+            "required": [
+              "comment"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "settings"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The DNS record ID."
+              },
+              "zoneId": {
+                "type": "string",
+                "description": "The parent zone ID."
+              },
+              "zoneName": {
+                "type": "string",
+                "description": "The parent zone name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The DNS record type."
+              },
+              "name": {
+                "type": "string",
+                "description": "The record name."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record content."
+              },
+              "ttl": {
+                "type": "integer",
+                "description": "The DNS TTL in seconds."
+              },
+              "proxied": {
+                "type": "boolean",
+                "description": "Whether Cloudflare proxying is enabled."
+              },
+              "proxiable": {
+                "type": "boolean",
+                "description": "Whether the record can be proxied."
+              },
+              "priority": {
+                "type": "integer",
+                "description": "The record priority."
+              },
+              "comment": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The record comment."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The record comment."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The record tags."
+              },
+              "createdOn": {
+                "type": "string",
+                "description": "The record creation timestamp."
+              },
+              "modifiedOn": {
+                "type": "string",
+                "description": "The last record update timestamp."
+              },
+              "commentModifiedOn": {
+                "type": "string",
+                "description": "The comment update timestamp."
+              },
+              "tagsModifiedOn": {
+                "type": "string",
+                "description": "The tag update timestamp."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              },
+              "settings": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A free-form object accepted by the Cloudflare API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "name"
+            ],
+            "description": "A Cloudflare DNS record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

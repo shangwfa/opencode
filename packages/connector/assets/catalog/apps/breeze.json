@@ -1,0 +1,372 @@
+{
+  "service": "breeze",
+  "displayName": "Breeze",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "breeze_api_key",
+      "description": "Breeze API key sent with the Api-key header. Generate or copy it from your Breeze account's API page: https://app.breezechms.com/api.",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Church Subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "yourchurch",
+          "description": "Breeze church subdomain used to build https://<subdomain>.breezechms.com API requests. Use the same church web address shown on the Breeze Login screen."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.breezechms.com",
+  "actions": [
+    {
+      "id": "breeze.get_person",
+      "service": "breeze",
+      "name": "get_person",
+      "description": "Get one Breeze person by Breeze person ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Breeze church subdomain without the .breezechms.com suffix."
+          },
+          "person_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Breeze person identifier to read."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether to request the full Breeze person details payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "person_id"
+        ],
+        "description": "Input parameters for reading one Breeze person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Breeze person identifier."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The Breeze person record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "person"
+        ],
+        "description": "One Breeze person returned by the request."
+      }
+    },
+    {
+      "id": "breeze.list_people",
+      "service": "breeze",
+      "name": "list_people",
+      "description": "List people from Breeze with optional details, pagination, and filter_json criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Breeze church subdomain without the .breezechms.com suffix."
+          },
+          "details": {
+            "type": "boolean",
+            "description": "Whether to request the full Breeze person details payload."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of Breeze people to return. Use 0 to request all records."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of Breeze people to skip before returning results."
+          },
+          "filter_json": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Single Breeze filter value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One Breeze filter value."
+                  },
+                  "description": "Multiple Breeze filter values.",
+                  "minItems": 1
+                }
+              ],
+              "description": "One Breeze filter_json value."
+            },
+            "description": "Breeze filter_json object keyed by official Breeze profile field or filter names."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Breeze people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze person identifier."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "One Breeze person record."
+            },
+            "description": "Breeze people returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "people"
+        ],
+        "description": "People list returned by Breeze."
+      }
+    },
+    {
+      "id": "breeze.list_profile_fields",
+      "service": "breeze",
+      "name": "list_profile_fields",
+      "description": "List Breeze profile sections and fields used to construct Breeze people filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Breeze church subdomain without the .breezechms.com suffix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Breeze profile fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze profile section identifier."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Breeze profile field identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Breeze profile field display name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "field_id",
+                      "name"
+                    ],
+                    "description": "One Breeze profile field record."
+                  },
+                  "description": "Profile fields within the section."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "One Breeze profile section record."
+            },
+            "description": "Breeze profile sections."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sections"
+        ],
+        "description": "Breeze profile sections returned by the request."
+      }
+    },
+    {
+      "id": "breeze.list_tag_folders",
+      "service": "breeze",
+      "name": "list_tag_folders",
+      "description": "List Breeze tag folders.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Breeze church subdomain without the .breezechms.com suffix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Breeze tag folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze tag folder identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze tag folder name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "One Breeze tag folder record."
+            },
+            "description": "Breeze tag folders."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folders"
+        ],
+        "description": "Breeze tag folders returned by the request."
+      }
+    },
+    {
+      "id": "breeze.list_tags",
+      "service": "breeze",
+      "name": "list_tags",
+      "description": "List Breeze tags, optionally narrowed to one Breeze tag folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subdomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Breeze church subdomain without the .breezechms.com suffix."
+          },
+          "folder_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Breeze tag folder identifier used to filter tags."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Breeze tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Breeze tag name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "One Breeze tag record."
+            },
+            "description": "Breeze tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tags"
+        ],
+        "description": "Breeze tags returned by the request."
+      }
+    }
+  ]
+}

@@ -1,0 +1,2890 @@
+{
+  "service": "mailtrap",
+  "displayName": "Mailtrap",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "MAILTRAP_API_TOKEN",
+      "description": "Mailtrap API token used with the Authorization Bearer header. Create or manage tokens in Mailtrap Settings > API Tokens: https://docs.mailtrap.io/email-api-smtp/setup/api-tokens/.",
+      "extraFields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "26730",
+          "description": "Optional default Mailtrap account ID for account-scoped actions. You can find it in Account Settings or through the Accounts API."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://mailtrap.io/",
+  "actions": [
+    {
+      "id": "mailtrap.clean_inbox",
+      "service": "mailtrap",
+      "name": "clean_inbox",
+      "description": "Clean all messages from a Mailtrap inbox.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Mailtrap inbox clean input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inbox": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Cleaned Mailtrap inbox."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap inbox clean response."
+      }
+    },
+    {
+      "id": "mailtrap.create_contact",
+      "service": "mailtrap",
+      "name": "create_contact",
+      "description": "Create a Mailtrap contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contact": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Contact email address.",
+                "format": "email"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Mailtrap contact custom fields keyed by merge tag."
+              },
+              "listIds": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One Mailtrap contact list ID."
+                },
+                "description": "Mailtrap contact list IDs.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "email"
+            ],
+            "description": "Mailtrap contact fields for creation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "Mailtrap contact create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contact": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_contact_event",
+      "service": "mailtrap",
+      "name": "create_contact_event",
+      "description": "Create a custom event for a Mailtrap contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Mailtrap custom event name."
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Scalar custom event parameters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIdentifier",
+          "name"
+        ],
+        "description": "Mailtrap contact event create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          },
+          "contactEvent": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap contact event."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact event create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_contact_export",
+      "service": "mailtrap",
+      "name": "create_contact_export",
+      "description": "Create a Mailtrap contact export job.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap contact export filter object."
+            },
+            "description": "Mailtrap export filters.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact export create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactExport": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact export job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact export create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_contact_field",
+      "service": "mailtrap",
+      "name": "create_contact_field",
+      "description": "Create a Mailtrap contact field.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Contact field name."
+          },
+          "dataType": {
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "float",
+              "boolean",
+              "date"
+            ],
+            "description": "Mailtrap contact field data type."
+          },
+          "mergeTag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Contact field merge tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "dataType",
+          "mergeTag"
+        ],
+        "description": "Mailtrap contact-field create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactField": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap contact field."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-field create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_contact_list",
+      "service": "mailtrap",
+      "name": "create_contact_list",
+      "description": "Create a Mailtrap contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Mailtrap contact-list name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Mailtrap contact-list create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactList": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap contact list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-list create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_email_template",
+      "service": "mailtrap",
+      "name": "create_email_template",
+      "description": "Create a Mailtrap email template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "emailTemplate": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "Template name."
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template subject line."
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template category."
+              },
+              "bodyHtml": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTML body content."
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain-text body content."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap email template fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailTemplate"
+        ],
+        "description": "Mailtrap email-template create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "emailTemplate": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap email template."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap email-template create response."
+      }
+    },
+    {
+      "id": "mailtrap.create_sending_domain",
+      "service": "mailtrap",
+      "name": "create_sending_domain",
+      "description": "Create a Mailtrap sending domain.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "sendingDomain": {
+            "type": "object",
+            "properties": {
+              "domainName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Domain name to register in Mailtrap."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap sending domain fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sendingDomain"
+        ],
+        "description": "Mailtrap sending-domain create input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "sendingDomain": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Created Mailtrap sending domain."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending-domain create response."
+      }
+    },
+    {
+      "id": "mailtrap.delete_contact",
+      "service": "mailtrap",
+      "name": "delete_contact",
+      "description": "Delete a Mailtrap contact.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIdentifier"
+        ],
+        "description": "Mailtrap contact delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact delete response."
+      }
+    },
+    {
+      "id": "mailtrap.delete_contact_field",
+      "service": "mailtrap",
+      "name": "delete_contact_field",
+      "description": "Delete one Mailtrap contact field.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "fieldId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact field ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fieldId"
+        ],
+        "description": "Mailtrap contact-field delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "fieldId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact field ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap delete result."
+      }
+    },
+    {
+      "id": "mailtrap.delete_contact_list",
+      "service": "mailtrap",
+      "name": "delete_contact_list",
+      "description": "Delete one Mailtrap contact list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "Mailtrap contact-list delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact list ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap delete result."
+      }
+    },
+    {
+      "id": "mailtrap.delete_email_template",
+      "service": "mailtrap",
+      "name": "delete_email_template",
+      "description": "Delete one Mailtrap email template.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "emailTemplateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap email template ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailTemplateId"
+        ],
+        "description": "Mailtrap email-template delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "emailTemplateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap email template ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap delete result."
+      }
+    },
+    {
+      "id": "mailtrap.delete_project",
+      "service": "mailtrap",
+      "name": "delete_project",
+      "description": "Delete one Mailtrap project.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap project ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Mailtrap project delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap project ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap delete result."
+      }
+    },
+    {
+      "id": "mailtrap.delete_sending_domain",
+      "service": "mailtrap",
+      "name": "delete_sending_domain",
+      "description": "Delete one Mailtrap sending domain.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "sendingDomainId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap sending domain ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sendingDomainId"
+        ],
+        "description": "Mailtrap sending-domain delete input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "sendingDomainId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap sending domain ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Mailtrap accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap delete result."
+      }
+    },
+    {
+      "id": "mailtrap.get_billing_usage",
+      "service": "mailtrap",
+      "name": "get_billing_usage",
+      "description": "Retrieve Mailtrap billing usage for an account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap billing usage input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "billingUsage": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap billing usage payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap billing usage response."
+      }
+    },
+    {
+      "id": "mailtrap.get_contact",
+      "service": "mailtrap",
+      "name": "get_contact",
+      "description": "Retrieve a Mailtrap contact by UUID or email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIdentifier"
+        ],
+        "description": "Mailtrap contact lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contact": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact response."
+      }
+    },
+    {
+      "id": "mailtrap.get_contact_export",
+      "service": "mailtrap",
+      "name": "get_contact_export",
+      "description": "Retrieve one Mailtrap contact export job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "exportId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact export ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "exportId"
+        ],
+        "description": "Mailtrap contact export lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactExport": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact export job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact export response."
+      }
+    },
+    {
+      "id": "mailtrap.get_contact_field",
+      "service": "mailtrap",
+      "name": "get_contact_field",
+      "description": "Retrieve one Mailtrap contact field.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "fieldId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact field ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fieldId"
+        ],
+        "description": "Mailtrap contact-field lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactField": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact field returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-field response."
+      }
+    },
+    {
+      "id": "mailtrap.get_contact_import",
+      "service": "mailtrap",
+      "name": "get_contact_import",
+      "description": "Retrieve one Mailtrap contact import job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "importId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact import ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "importId"
+        ],
+        "description": "Mailtrap contact import lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactImport": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact import job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact import response."
+      }
+    },
+    {
+      "id": "mailtrap.get_contact_list",
+      "service": "mailtrap",
+      "name": "get_contact_list",
+      "description": "Retrieve one Mailtrap contact list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "Mailtrap contact-list lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactList": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact list returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-list response."
+      }
+    },
+    {
+      "id": "mailtrap.get_email_template",
+      "service": "mailtrap",
+      "name": "get_email_template",
+      "description": "Retrieve one Mailtrap email template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "emailTemplateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap email template ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailTemplateId"
+        ],
+        "description": "Mailtrap email-template lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "emailTemplate": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap email template returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap email-template response."
+      }
+    },
+    {
+      "id": "mailtrap.get_inbox",
+      "service": "mailtrap",
+      "name": "get_inbox",
+      "description": "Retrieve one Mailtrap inbox.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Mailtrap inbox lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inbox": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap inbox returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap inbox response."
+      }
+    },
+    {
+      "id": "mailtrap.get_message",
+      "service": "mailtrap",
+      "name": "get_message",
+      "description": "Retrieve one message from a Mailtrap inbox.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "messageId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap message ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId",
+          "messageId"
+        ],
+        "description": "Mailtrap message lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "message": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap message returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap message response."
+      }
+    },
+    {
+      "id": "mailtrap.get_message_html_source",
+      "service": "mailtrap",
+      "name": "get_message_html_source",
+      "description": "Retrieve the HTML source body for one Mailtrap message.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "messageId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap message ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId",
+          "messageId"
+        ],
+        "description": "Mailtrap message HTML-source input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "messageId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap message ID."
+          },
+          "htmlSource": {
+            "type": "string",
+            "description": "Raw HTML source returned by Mailtrap."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap message HTML-source response."
+      }
+    },
+    {
+      "id": "mailtrap.get_permission_resources",
+      "service": "mailtrap",
+      "name": "get_permission_resources",
+      "description": "List Mailtrap permission resources for an account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap permission resources input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap permission resource."
+            },
+            "description": "Mailtrap permission resources."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap permission resources response."
+      }
+    },
+    {
+      "id": "mailtrap.get_project",
+      "service": "mailtrap",
+      "name": "get_project",
+      "description": "Retrieve one Mailtrap project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap project ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Mailtrap project lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "project": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap project returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap project response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_domain",
+      "service": "mailtrap",
+      "name": "get_sending_domain",
+      "description": "Retrieve one Mailtrap sending domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "sendingDomainId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap sending domain ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sendingDomainId"
+        ],
+        "description": "Mailtrap sending-domain lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "sendingDomain": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap sending domain returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending-domain response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_stats",
+      "service": "mailtrap",
+      "name": "get_sending_stats",
+      "description": "Get aggregate Mailtrap sending statistics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Stats start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Stats end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sendingDomainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Mailtrap sending domain ID."
+            },
+            "description": "Sending domain IDs to include.",
+            "minItems": 1
+          },
+          "sendingStreams": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactional",
+                "bulk"
+              ],
+              "description": "One Mailtrap sending stream."
+            },
+            "description": "Mailtrap sending streams to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Mailtrap sending categories to include.",
+            "minItems": 1
+          },
+          "emailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Email service provider names to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Mailtrap sending stats input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "stats": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap aggregate sending stats."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending stats response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_stats_by_categories",
+      "service": "mailtrap",
+      "name": "get_sending_stats_by_categories",
+      "description": "Get Mailtrap sending statistics grouped by category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Stats start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Stats end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sendingDomainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Mailtrap sending domain ID."
+            },
+            "description": "Sending domain IDs to include.",
+            "minItems": 1
+          },
+          "sendingStreams": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactional",
+                "bulk"
+              ],
+              "description": "One Mailtrap sending stream."
+            },
+            "description": "Mailtrap sending streams to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Mailtrap sending categories to include.",
+            "minItems": 1
+          },
+          "emailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Email service provider names to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Mailtrap sending stats-by-category input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "statsByCategories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One stats-by-category entry."
+            },
+            "description": "Mailtrap stats grouped by category."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending stats-by-category response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_stats_by_date",
+      "service": "mailtrap",
+      "name": "get_sending_stats_by_date",
+      "description": "Get Mailtrap sending statistics grouped by date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Stats start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Stats end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sendingDomainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Mailtrap sending domain ID."
+            },
+            "description": "Sending domain IDs to include.",
+            "minItems": 1
+          },
+          "sendingStreams": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactional",
+                "bulk"
+              ],
+              "description": "One Mailtrap sending stream."
+            },
+            "description": "Mailtrap sending streams to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Mailtrap sending categories to include.",
+            "minItems": 1
+          },
+          "emailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Email service provider names to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Mailtrap sending stats-by-date input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "statsByDate": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One stats-by-date entry."
+            },
+            "description": "Mailtrap stats grouped by date."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending stats-by-date response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_stats_by_domains",
+      "service": "mailtrap",
+      "name": "get_sending_stats_by_domains",
+      "description": "Get Mailtrap sending statistics grouped by sending domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Stats start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Stats end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sendingDomainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Mailtrap sending domain ID."
+            },
+            "description": "Sending domain IDs to include.",
+            "minItems": 1
+          },
+          "sendingStreams": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactional",
+                "bulk"
+              ],
+              "description": "One Mailtrap sending stream."
+            },
+            "description": "Mailtrap sending streams to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Mailtrap sending categories to include.",
+            "minItems": 1
+          },
+          "emailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Email service provider names to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Mailtrap sending stats-by-domain input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "statsByDomains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One stats-by-domain entry."
+            },
+            "description": "Mailtrap stats grouped by sending domain."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending stats-by-domain response."
+      }
+    },
+    {
+      "id": "mailtrap.get_sending_stats_by_esp",
+      "service": "mailtrap",
+      "name": "get_sending_stats_by_esp",
+      "description": "Get Mailtrap sending statistics grouped by email service provider.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Stats start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Stats end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "sendingDomainIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Mailtrap sending domain ID."
+            },
+            "description": "Sending domain IDs to include.",
+            "minItems": 1
+          },
+          "sendingStreams": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transactional",
+                "bulk"
+              ],
+              "description": "One Mailtrap sending stream."
+            },
+            "description": "Mailtrap sending streams to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Mailtrap sending categories to include.",
+            "minItems": 1
+          },
+          "emailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Email service provider names to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Mailtrap sending stats-by-email-service-provider input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "statsByEmailServiceProviders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One stats-by-email-service-provider entry."
+            },
+            "description": "Mailtrap stats grouped by email service provider."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending stats-by-email-service-provider response."
+      }
+    },
+    {
+      "id": "mailtrap.import_contacts",
+      "service": "mailtrap",
+      "name": "import_contacts",
+      "description": "Import contacts into Mailtrap.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Contact email address.",
+                  "format": "email"
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Mailtrap contact custom fields keyed by merge tag."
+                },
+                "listIdsIncluded": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "One Mailtrap contact list ID."
+                  },
+                  "description": "Mailtrap contact list IDs.",
+                  "minItems": 1
+                },
+                "listIdsExcluded": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "One Mailtrap contact list ID."
+                  },
+                  "description": "Mailtrap contact list IDs.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "One contact record to import into Mailtrap."
+            },
+            "description": "Contacts to import.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts"
+        ],
+        "description": "Mailtrap contact import input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactImport": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Mailtrap contact import job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact import response."
+      }
+    },
+    {
+      "id": "mailtrap.list_accounts",
+      "service": "mailtrap",
+      "name": "list_accounts",
+      "description": "List Mailtrap accounts accessible to the API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Mailtrap accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap account."
+            },
+            "description": "Accessible Mailtrap accounts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap accounts response."
+      }
+    },
+    {
+      "id": "mailtrap.list_contact_fields",
+      "service": "mailtrap",
+      "name": "list_contact_fields",
+      "description": "List Mailtrap contact fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-field list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap contact field."
+            },
+            "description": "Mailtrap contact fields returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact fields response."
+      }
+    },
+    {
+      "id": "mailtrap.list_contact_lists",
+      "service": "mailtrap",
+      "name": "list_contact_lists",
+      "description": "List Mailtrap contact lists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-list list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactLists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap contact list."
+            },
+            "description": "Mailtrap contact lists returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact lists response."
+      }
+    },
+    {
+      "id": "mailtrap.list_email_templates",
+      "service": "mailtrap",
+      "name": "list_email_templates",
+      "description": "List Mailtrap email templates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap email-template list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "emailTemplates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap email template."
+            },
+            "description": "Mailtrap email templates returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap email templates response."
+      }
+    },
+    {
+      "id": "mailtrap.list_inboxes",
+      "service": "mailtrap",
+      "name": "list_inboxes",
+      "description": "List Mailtrap sandboxes or inboxes in an account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap account scope for listing inboxes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inboxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap inbox."
+            },
+            "description": "Mailtrap inboxes returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap inboxes response."
+      }
+    },
+    {
+      "id": "mailtrap.list_messages",
+      "service": "mailtrap",
+      "name": "list_messages",
+      "description": "List messages in a Mailtrap inbox.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query for filtering messages."
+          },
+          "lastId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Last message ID cursor."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number when lastId is not used."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Mailtrap message list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap message."
+            },
+            "description": "Mailtrap messages returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap messages response."
+      }
+    },
+    {
+      "id": "mailtrap.list_projects",
+      "service": "mailtrap",
+      "name": "list_projects",
+      "description": "List Mailtrap projects in an account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap account scope for listing projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap project."
+            },
+            "description": "Mailtrap projects returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap projects response."
+      }
+    },
+    {
+      "id": "mailtrap.list_sending_domains",
+      "service": "mailtrap",
+      "name": "list_sending_domains",
+      "description": "List Mailtrap sending domains.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending-domain list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "sendingDomains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap sending domain."
+            },
+            "description": "Mailtrap sending domains returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap sending domains response."
+      }
+    },
+    {
+      "id": "mailtrap.list_suppressions",
+      "service": "mailtrap",
+      "name": "list_suppressions",
+      "description": "List Mailtrap suppressions with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "email": {
+            "type": "string",
+            "description": "Suppressed email address to filter by.",
+            "format": "email"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Filter suppressions created after this timestamp.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "Filter suppressions created before this timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap suppressions list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "suppressions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mailtrap suppression."
+            },
+            "description": "Mailtrap suppressions returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap suppressions response."
+      }
+    },
+    {
+      "id": "mailtrap.mark_inbox_as_read",
+      "service": "mailtrap",
+      "name": "mark_inbox_as_read",
+      "description": "Mark all messages in a Mailtrap inbox as read.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Mailtrap mark-inbox-as-read input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inbox": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap inbox."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap mark-inbox-as-read response."
+      }
+    },
+    {
+      "id": "mailtrap.reset_inbox_credentials",
+      "service": "mailtrap",
+      "name": "reset_inbox_credentials",
+      "description": "Reset SMTP credentials for a Mailtrap inbox.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Mailtrap inbox credential reset input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inbox": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap inbox."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap inbox credential reset response."
+      }
+    },
+    {
+      "id": "mailtrap.update_contact",
+      "service": "mailtrap",
+      "name": "update_contact",
+      "description": "Update a Mailtrap contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "contactIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact UUID or email address. Email values are URL-encoded by the runtime."
+          },
+          "contact": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "New contact email address.",
+                "format": "email"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Mailtrap contact custom fields keyed by merge tag."
+              },
+              "listIdsIncluded": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One Mailtrap contact list ID."
+                },
+                "description": "Mailtrap contact list IDs.",
+                "minItems": 1
+              },
+              "listIdsExcluded": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One Mailtrap contact list ID."
+                },
+                "description": "Mailtrap contact list IDs.",
+                "minItems": 1
+              },
+              "unsubscribed": {
+                "type": "boolean",
+                "description": "Whether to unsubscribe the contact."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap contact fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactIdentifier",
+          "contact"
+        ],
+        "description": "Mailtrap contact update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailtrap contact update action."
+          },
+          "contact": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact update response."
+      }
+    },
+    {
+      "id": "mailtrap.update_contact_field",
+      "service": "mailtrap",
+      "name": "update_contact_field",
+      "description": "Update a Mailtrap contact field.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "fieldId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact field ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "New contact field name."
+          },
+          "mergeTag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "New contact field merge tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fieldId"
+        ],
+        "description": "Mailtrap contact-field update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactField": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap contact field."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-field update response."
+      }
+    },
+    {
+      "id": "mailtrap.update_contact_list",
+      "service": "mailtrap",
+      "name": "update_contact_list",
+      "description": "Update a Mailtrap contact list name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap contact list ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Mailtrap contact-list name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "name"
+        ],
+        "description": "Mailtrap contact-list update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "contactList": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap contact list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap contact-list update response."
+      }
+    },
+    {
+      "id": "mailtrap.update_email_template",
+      "service": "mailtrap",
+      "name": "update_email_template",
+      "description": "Update a Mailtrap email template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "emailTemplateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap email template ID."
+          },
+          "emailTemplate": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "Template name."
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template subject line."
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template category."
+              },
+              "bodyHtml": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTML body content."
+              },
+              "bodyText": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain-text body content."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap email template fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailTemplateId",
+          "emailTemplate"
+        ],
+        "description": "Mailtrap email-template update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "emailTemplate": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap email template."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap email-template update response."
+      }
+    },
+    {
+      "id": "mailtrap.update_inbox",
+      "service": "mailtrap",
+      "name": "update_inbox",
+      "description": "Update a Mailtrap inbox name or email username.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap inbox ID."
+          },
+          "inbox": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "New Mailtrap inbox name."
+              },
+              "emailUsername": {
+                "type": "string",
+                "minLength": 1,
+                "description": "New Mailtrap inbox email username."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap inbox fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId",
+          "inbox"
+        ],
+        "description": "Mailtrap inbox update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "inbox": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap inbox."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap inbox update response."
+      }
+    },
+    {
+      "id": "mailtrap.update_project",
+      "service": "mailtrap",
+      "name": "update_project",
+      "description": "Update one Mailtrap project name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID. Omit when the connection has a default account scope."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap project ID."
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 100,
+                "description": "New Mailtrap project name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailtrap project fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "project"
+        ],
+        "description": "Mailtrap project update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Mailtrap account ID used for the request."
+          },
+          "project": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Updated Mailtrap project."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailtrap project update response."
+      }
+    }
+  ]
+}

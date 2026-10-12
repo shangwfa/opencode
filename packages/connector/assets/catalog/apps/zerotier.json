@@ -1,0 +1,3319 @@
+{
+  "service": "zerotier",
+  "displayName": "ZeroTier",
+  "description": "Manage ZeroTier virtual networks, members, organizations, service accounts, webhooks, and IAM through the ZeroTier Central v1 (Legacy) and v2 (New Central) APIs.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "label": "ZeroTier API Token",
+      "description": "Choose the API generation matching your token: v1 tokens come from Legacy Central (my.zerotier.com > Account > API Access Tokens), v2 service account API keys come from New Central (central.zerotier.com).",
+      "fields": [
+        {
+          "key": "apiVersion",
+          "label": "API Version",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "v2",
+          "description": "Which Central API to call: \"v1\" for Legacy Central (api.zerotier.com, Authorization: token) or \"v2\" for New Central (central.zerotier.com, Authorization: Bearer service account key)."
+        },
+        {
+          "key": "apiKey",
+          "label": "API Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "your_zerotier_token",
+          "description": "For v1: a personal API token created in Legacy Central under Account > API Access Tokens. For v2: a service account API key created in New Central under your organization > Service Accounts (the secret is shown only once)."
+        },
+        {
+          "key": "orgId",
+          "label": "Organization ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "c0341f5c-...",
+          "description": "New Central (v2) only: default organization for list_networks and list_network_groups (org-id filter) and for get_org. Other org-scoped actions take orgId explicitly. Leave empty for v1."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.zerotier.com",
+  "actions": [
+    {
+      "id": "zerotier.accept_invitation",
+      "service": "zerotier",
+      "name": "accept_invitation",
+      "description": "v1 only: accept an organization invitation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The invitation ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invitationId"
+        ],
+        "description": "Input for accepting an invitation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The accepted invitation."
+      }
+    },
+    {
+      "id": "zerotier.add_iam",
+      "service": "zerotier",
+      "name": "add_iam",
+      "description": "v2 only: add roles for a principal on an org, network group, or network.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "org",
+              "network-group",
+              "network"
+            ],
+            "description": "The ZeroTier v2 resource kind the IAM assignment applies to."
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource ID."
+          },
+          "principal": {
+            "type": "string",
+            "description": "Email address of the user or service account.",
+            "format": "email"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Owner",
+                "Admin",
+                "Editor",
+                "Viewer",
+                "NetworkGroupAdmin",
+                "NetworkGroupEditor",
+                "NetworkGroupViewer",
+                "NetworkAdmin",
+                "NetworkEditor",
+                "NetworkViewer"
+              ],
+              "description": "A ZeroTier v2 IAM role. Org roles (Owner, Admin, Editor, Viewer) apply to every child resource; NetworkGroup* and Network* roles apply at that level and below."
+            },
+            "description": "IAM roles to add.",
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "resourceId",
+          "principal",
+          "roles"
+        ],
+        "description": "Input for adding IAM roles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "IAM update result."
+      }
+    },
+    {
+      "id": "zerotier.add_members",
+      "service": "zerotier",
+      "name": "add_members",
+      "description": "v2 only: add multiple members to a network in one call.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deviceId": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 10,
+                  "description": "The member device ID (10-character hex string).",
+                  "pattern": "^[0-9a-fA-F]{10}$"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name to set."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The description to set (may be an empty string)."
+                },
+                "activeBridge": {
+                  "type": "boolean",
+                  "description": "Whether this device acts as an active bridge."
+                },
+                "noAutoAssignIps": {
+                  "type": "boolean",
+                  "description": "Disable automatic IP assignment."
+                },
+                "ipv4Assignments": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Static IPv4 assignments."
+                },
+                "ipv6Assignments": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Static IPv6 assignments."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "deviceId"
+              ],
+              "description": "One member to add."
+            },
+            "description": "Members to add."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "members"
+        ],
+        "description": "Input for adding members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The added members."
+      }
+    },
+    {
+      "id": "zerotier.add_user_token",
+      "service": "zerotier",
+      "name": "add_user_token",
+      "description": "v1 only: register an API token for a user. The caller supplies the token value (get_random_token generates one); it cannot be retrieved after it is set.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID."
+          },
+          "tokenName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A name for the new token."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 32,
+            "description": "The API token value to register, at least 32 characters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "tokenName",
+          "token"
+        ],
+        "description": "Input for creating a user API token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created API token record."
+      }
+    },
+    {
+      "id": "zerotier.authorize_member",
+      "service": "zerotier",
+      "name": "authorize_member",
+      "description": "Authorize one member on a ZeroTier network.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for authorizing a network member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The authorized network member."
+      }
+    },
+    {
+      "id": "zerotier.authorize_members",
+      "service": "zerotier",
+      "name": "authorize_members",
+      "description": "v2 only: authorize multiple members on a network in one call.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "deviceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "The member device ID (10-character hex string).",
+              "pattern": "^[0-9a-fA-F]{10}$"
+            },
+            "description": "Member device IDs (10-character hex strings)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "deviceIds"
+        ],
+        "description": "Input for authorizing members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Authorization result."
+      }
+    },
+    {
+      "id": "zerotier.check_permissions",
+      "service": "zerotier",
+      "name": "check_permissions",
+      "description": "v2 only: check whether the authenticated principal holds permissions on resources.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "permission": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission name to check."
+                },
+                "resourceType": {
+                  "type": "string",
+                  "enum": [
+                    "org",
+                    "network_group",
+                    "network"
+                  ],
+                  "description": "The type of resource to check permissions for."
+                },
+                "resourceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The resource ID."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "permission",
+                "resourceType",
+                "resourceId"
+              ],
+              "description": "One permission check."
+            },
+            "description": "Permission checks to perform."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "checks"
+        ],
+        "description": "Input for checking permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The permission check results."
+      }
+    },
+    {
+      "id": "zerotier.create_api_key",
+      "service": "zerotier",
+      "name": "create_api_key",
+      "description": "v2 only: create an API key for a service account. The secret is returned only once.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account ID."
+          },
+          "expires": {
+            "type": "string",
+            "description": "The key expiration time (RFC 3339).",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceAccountId",
+          "expires"
+        ],
+        "description": "Input for creating a service account API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created API key (secret shown once)."
+      }
+    },
+    {
+      "id": "zerotier.create_invitation",
+      "service": "zerotier",
+      "name": "create_invitation",
+      "description": "v1 only: send an organization invitation to an email address.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to invite.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input for creating an organization invitation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created invitation."
+      }
+    },
+    {
+      "id": "zerotier.create_network",
+      "service": "zerotier",
+      "name": "create_network",
+      "description": "Create a ZeroTier network. For v1 sends {config, description} and rejects networkGroupId; for v2 sends {name, description, config} and requires networkGroupId (the group the network is created under) and name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkGroupId": {
+            "type": "string",
+            "description": "v2 only, required on v2 and rejected on v1: the network group ID to create the network under."
+          },
+          "name": {
+            "type": "string",
+            "description": "The network name (required for v2)."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Network configuration. v1 accepts name/private/enableBroadcast/mtu/multicastLimit/routes/ipAssignmentPools/v4AssignMode/v6AssignMode/dns; v2 accepts private/enableBroadcast/mtu/multicastLimit/routes/v4Subnet/v4IpAssignmentPools/v4AssignmentMode/v6Subnet/v6IpAssignmentPools/v6AssignmentMode/dns."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for creating a ZeroTier network."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created ZeroTier network."
+      }
+    },
+    {
+      "id": "zerotier.create_network_group",
+      "service": "zerotier",
+      "name": "create_network_group",
+      "description": "v2 only: create a network group inside an organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The group name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId",
+          "name"
+        ],
+        "description": "Input for creating a network group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created network group."
+      }
+    },
+    {
+      "id": "zerotier.create_service_account",
+      "service": "zerotier",
+      "name": "create_service_account",
+      "description": "v2 only: create a service account in an organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId",
+          "id",
+          "name"
+        ],
+        "description": "Input for creating a service account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created service account."
+      }
+    },
+    {
+      "id": "zerotier.create_webhook",
+      "service": "zerotier",
+      "name": "create_webhook",
+      "description": "v2 only: create a webhook for an organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The HTTPS endpoint URL that receives webhook events (FQDN only, no raw IPs or private ranges).",
+            "format": "uri"
+          },
+          "eventList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An event type."
+            },
+            "description": "ZeroTier event types to subscribe to.",
+            "minItems": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "The webhook description (at most 255 characters)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId",
+          "url",
+          "eventList"
+        ],
+        "description": "Input for creating a webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The created webhook."
+      }
+    },
+    {
+      "id": "zerotier.deauthorize_member",
+      "service": "zerotier",
+      "name": "deauthorize_member",
+      "description": "Revoke authorization for one member on a ZeroTier network.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for de-authorizing a network member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The de-authorized network member."
+      }
+    },
+    {
+      "id": "zerotier.deauthorize_members",
+      "service": "zerotier",
+      "name": "deauthorize_members",
+      "description": "v2 only: de-authorize multiple members on a network in one call.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "deviceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "The member device ID (10-character hex string).",
+              "pattern": "^[0-9a-fA-F]{10}$"
+            },
+            "description": "Member device IDs (10-character hex strings)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "deviceIds"
+        ],
+        "description": "Input for de-authorizing members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "De-authorization result."
+      }
+    },
+    {
+      "id": "zerotier.decline_invitation",
+      "service": "zerotier",
+      "name": "decline_invitation",
+      "description": "v1 only: decline or cancel an organization invitation.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The invitation ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invitationId"
+        ],
+        "description": "Input for declining an invitation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Decline result."
+      }
+    },
+    {
+      "id": "zerotier.delete_api_key",
+      "service": "zerotier",
+      "name": "delete_api_key",
+      "description": "v2 only: delete an API key.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The API key ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiKeyId"
+        ],
+        "description": "Input for deleting an API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_current_user",
+      "service": "zerotier",
+      "name": "delete_current_user",
+      "description": "v2 only: permanently delete the authenticated user account.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_member",
+      "service": "zerotier",
+      "name": "delete_member",
+      "description": "Remove a member from a ZeroTier network.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for deleting a network member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_network",
+      "service": "zerotier",
+      "name": "delete_network",
+      "description": "Permanently delete a ZeroTier network and all its members.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId"
+        ],
+        "description": "Input for deleting a ZeroTier network."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_network_group",
+      "service": "zerotier",
+      "name": "delete_network_group",
+      "description": "v2 only: permanently delete a network group. Upstream also deletes all networks in the group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network group ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkGroupId"
+        ],
+        "description": "Input for deleting a network group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_service_account",
+      "service": "zerotier",
+      "name": "delete_service_account",
+      "description": "v2 only: permanently delete a service account and all of its API keys.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceAccountId"
+        ],
+        "description": "Input for deleting a service account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_user",
+      "service": "zerotier",
+      "name": "delete_user",
+      "description": "v1 only: permanently delete a ZeroTier user account by ID. Upstream also deletes every network the user owns; this cannot be undone.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Input for deleting a user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_user_token",
+      "service": "zerotier",
+      "name": "delete_user_token",
+      "description": "v1 only: delete one of a user's API tokens by name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID."
+          },
+          "tokenName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The token name to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "tokenName"
+        ],
+        "description": "Input for deleting a user API token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_webhook",
+      "service": "zerotier",
+      "name": "delete_webhook",
+      "description": "v2 only: delete a webhook.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Input for deleting a webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.delete_webhook_secret",
+      "service": "zerotier",
+      "name": "delete_webhook_secret",
+      "description": "v2 only: revoke an overlap (previous) webhook secret by ID before its grace window ends. The active primary secret cannot be deleted (upstream returns 400); rotate first.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookSecretId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook secret ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookSecretId"
+        ],
+        "description": "Input for deleting a webhook secret."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "zerotier.get_api_key",
+      "service": "zerotier",
+      "name": "get_api_key",
+      "description": "v2 only: get one API key's metadata by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The API key ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiKeyId"
+        ],
+        "description": "Input for fetching an API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The API key object."
+      }
+    },
+    {
+      "id": "zerotier.get_flow_rules",
+      "service": "zerotier",
+      "name": "get_flow_rules",
+      "description": "v2 only (beta): get a network's flow rules.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId"
+        ],
+        "description": "Input for fetching flow rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The flow rules."
+      }
+    },
+    {
+      "id": "zerotier.get_iam",
+      "service": "zerotier",
+      "name": "get_iam",
+      "description": "v2 only: list IAM role assignments on an org, network group, or network.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "org",
+              "network-group",
+              "network"
+            ],
+            "description": "The ZeroTier v2 resource kind the IAM assignment applies to."
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "resourceId"
+        ],
+        "description": "Input for reading IAM assignments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The IAM assignments."
+      }
+    },
+    {
+      "id": "zerotier.get_invitation",
+      "service": "zerotier",
+      "name": "get_invitation",
+      "description": "v1 only: get one organization invitation by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The invitation ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invitationId"
+        ],
+        "description": "Input for fetching an invitation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The invitation object."
+      }
+    },
+    {
+      "id": "zerotier.get_member",
+      "service": "zerotier",
+      "name": "get_member",
+      "description": "Get one member of a ZeroTier network, including authorization and IP assignment state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for fetching one network member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The network member object."
+      }
+    },
+    {
+      "id": "zerotier.get_network",
+      "service": "zerotier",
+      "name": "get_network",
+      "description": "Get one ZeroTier network by ID, including its config (v1 responses also include member counts).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId"
+        ],
+        "description": "Input for fetching one ZeroTier network."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The ZeroTier network object."
+      }
+    },
+    {
+      "id": "zerotier.get_network_group",
+      "service": "zerotier",
+      "name": "get_network_group",
+      "description": "v2 only: get one network group by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network group ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkGroupId"
+        ],
+        "description": "Input for fetching a network group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The network group object."
+      }
+    },
+    {
+      "id": "zerotier.get_org",
+      "service": "zerotier",
+      "name": "get_org",
+      "description": "Get a ZeroTier organization. For v1, returns the current user's org when orgId is omitted, or /org/{orgId}. For v2, uses orgId or falls back to the connection's orgId; one of them is required.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "The organization ID. v2 falls back to the connection's orgId when omitted; v1 does not."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for fetching an organization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The ZeroTier organization object."
+      }
+    },
+    {
+      "id": "zerotier.get_org_iam_tree",
+      "service": "zerotier",
+      "name": "get_org_iam_tree",
+      "description": "v2 only: get the IAM tree of an organization (groups, networks, principals, roles).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId"
+        ],
+        "description": "Input for the org IAM tree."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The org IAM tree."
+      }
+    },
+    {
+      "id": "zerotier.get_org_subscription",
+      "service": "zerotier",
+      "name": "get_org_subscription",
+      "description": "v2 only: get an organization's subscription plan and entitlements.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId"
+        ],
+        "description": "Input for fetching an org subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The subscription object."
+      }
+    },
+    {
+      "id": "zerotier.get_random_token",
+      "service": "zerotier",
+      "name": "get_random_token",
+      "description": "v1 only: get a server-generated random token value.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The random token object."
+      }
+    },
+    {
+      "id": "zerotier.get_service_account",
+      "service": "zerotier",
+      "name": "get_service_account",
+      "description": "v2 only: get one service account by ID, including its API keys.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceAccountId"
+        ],
+        "description": "Input for fetching a service account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The service account object."
+      }
+    },
+    {
+      "id": "zerotier.get_status",
+      "service": "zerotier",
+      "name": "get_status",
+      "description": "v1 only: get ZeroTier Legacy Central status, including the authenticated user, version, and uptime.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The Central status object."
+      }
+    },
+    {
+      "id": "zerotier.get_user",
+      "service": "zerotier",
+      "name": "get_user",
+      "description": "v1 only: get a ZeroTier user by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Input for fetching a user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The user object."
+      }
+    },
+    {
+      "id": "zerotier.get_webhook",
+      "service": "zerotier",
+      "name": "get_webhook",
+      "description": "v2 only: get one webhook by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Input for fetching a webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The webhook object."
+      }
+    },
+    {
+      "id": "zerotier.invite_users",
+      "service": "zerotier",
+      "name": "invite_users",
+      "description": "v2 only: invite email addresses to an organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An email address.",
+              "format": "email"
+            },
+            "description": "Email addresses to invite."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId",
+          "emails"
+        ],
+        "description": "Input for inviting users to an org."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The invitation result."
+      }
+    },
+    {
+      "id": "zerotier.list_invitations",
+      "service": "zerotier",
+      "name": "list_invitations",
+      "description": "v1 only: list organization invitations for the current user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The organization invitations."
+      }
+    },
+    {
+      "id": "zerotier.list_members",
+      "service": "zerotier",
+      "name": "list_members",
+      "description": "List all members (devices) joined to a ZeroTier network.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId"
+        ],
+        "description": "Input for listing network members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The list of network members."
+      }
+    },
+    {
+      "id": "zerotier.list_network_group_networks",
+      "service": "zerotier",
+      "name": "list_network_group_networks",
+      "description": "v2 only: list networks inside one network group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network group ID."
+          },
+          "stats": {
+            "type": "boolean",
+            "description": "Include device statistics."
+          },
+          "permissionCheck": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Permission names to check on each network."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkGroupId"
+        ],
+        "description": "Input for listing a network group's networks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The networks in the group."
+      }
+    },
+    {
+      "id": "zerotier.list_network_groups",
+      "service": "zerotier",
+      "name": "list_network_groups",
+      "description": "v2 only: list network groups, optionally filtered by organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "Organization ID to filter by. Falls back to the connection's orgId when omitted."
+          },
+          "stats": {
+            "type": "boolean",
+            "description": "Include device and network statistics."
+          },
+          "permissionCheck": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Permission names to check on each group."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing network groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The network groups."
+      }
+    },
+    {
+      "id": "zerotier.list_networks",
+      "service": "zerotier",
+      "name": "list_networks",
+      "description": "List ZeroTier networks visible to the configured token. Works on both API versions; orgId, stats, and permissionCheck are v2 only and rejected on v1, which always lists every network the token can access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "v2 only, rejected on v1: organization ID to filter by. Falls back to the connection's orgId field when omitted."
+          },
+          "stats": {
+            "type": "boolean",
+            "description": "v2 only, rejected on v1: include device statistics for each network."
+          },
+          "permissionCheck": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "v2 only, rejected on v1: permission names to check for each network; results include a permissions map."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing ZeroTier networks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The list of ZeroTier networks."
+      }
+    },
+    {
+      "id": "zerotier.list_org_members",
+      "service": "zerotier",
+      "name": "list_org_members",
+      "description": "v1 only: list user members of an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId"
+        ],
+        "description": "Input for listing org members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The organization members."
+      }
+    },
+    {
+      "id": "zerotier.list_orgs",
+      "service": "zerotier",
+      "name": "list_orgs",
+      "description": "v2 only: list organizations the service account can access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "permissionCheck": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Permission names to check on each organization."
+          },
+          "latest": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Limit to recently active orgs plus the listed org IDs."
+          },
+          "stats": {
+            "type": "boolean",
+            "description": "Include aggregate statistics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing organizations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The organizations."
+      }
+    },
+    {
+      "id": "zerotier.list_service_accounts",
+      "service": "zerotier",
+      "name": "list_service_accounts",
+      "description": "v2 only: list service accounts in an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId"
+        ],
+        "description": "Input for listing service accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The service accounts."
+      }
+    },
+    {
+      "id": "zerotier.list_webhooks",
+      "service": "zerotier",
+      "name": "list_webhooks",
+      "description": "v2 only: list webhooks in an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId"
+        ],
+        "description": "Input for listing webhooks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The webhooks."
+      }
+    },
+    {
+      "id": "zerotier.reject_member",
+      "service": "zerotier",
+      "name": "reject_member",
+      "description": "v2 only: reject one member on a network.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for rejecting a member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The rejected member."
+      }
+    },
+    {
+      "id": "zerotier.reject_members",
+      "service": "zerotier",
+      "name": "reject_members",
+      "description": "v2 only: reject multiple members on a network in one call.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "deviceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "The member device ID (10-character hex string).",
+              "pattern": "^[0-9a-fA-F]{10}$"
+            },
+            "description": "Member device IDs (10-character hex strings)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "deviceIds"
+        ],
+        "description": "Input for rejecting members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Rejection result."
+      }
+    },
+    {
+      "id": "zerotier.remove_iam",
+      "service": "zerotier",
+      "name": "remove_iam",
+      "description": "v2 only: remove roles from a principal on an org, network group, or network.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "org",
+              "network-group",
+              "network"
+            ],
+            "description": "The ZeroTier v2 resource kind the IAM assignment applies to."
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource ID."
+          },
+          "principal": {
+            "type": "string",
+            "description": "Email address of the user or service account.",
+            "format": "email"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Owner",
+                "Admin",
+                "Editor",
+                "Viewer",
+                "NetworkGroupAdmin",
+                "NetworkGroupEditor",
+                "NetworkGroupViewer",
+                "NetworkAdmin",
+                "NetworkEditor",
+                "NetworkViewer"
+              ],
+              "description": "A ZeroTier v2 IAM role. Org roles (Owner, Admin, Editor, Viewer) apply to every child resource; NetworkGroup* and Network* roles apply at that level and below."
+            },
+            "description": "IAM roles to remove.",
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "resourceId",
+          "principal",
+          "roles"
+        ],
+        "description": "Input for removing IAM roles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "IAM update result."
+      }
+    },
+    {
+      "id": "zerotier.remove_members",
+      "service": "zerotier",
+      "name": "remove_members",
+      "description": "v2 only: remove multiple members from a network in one call.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "deviceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 10,
+              "description": "The member device ID (10-character hex string).",
+              "pattern": "^[0-9a-fA-F]{10}$"
+            },
+            "description": "Member device IDs (10-character hex strings)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "deviceIds"
+        ],
+        "description": "Input for removing members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "Removal result."
+      }
+    },
+    {
+      "id": "zerotier.replace_iam",
+      "service": "zerotier",
+      "name": "replace_iam",
+      "description": "v2 only: replace all IAM assignments on an org, network group, or network. Existing assignments missing from the list are removed, so an empty list strips every role.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "org",
+              "network-group",
+              "network"
+            ],
+            "description": "The ZeroTier v2 resource kind the IAM assignment applies to."
+          },
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource ID."
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "principal": {
+                  "type": "string",
+                  "description": "Email address of the user or service account.",
+                  "format": "email"
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "Owner",
+                      "Admin",
+                      "Editor",
+                      "Viewer",
+                      "NetworkGroupAdmin",
+                      "NetworkGroupEditor",
+                      "NetworkGroupViewer",
+                      "NetworkAdmin",
+                      "NetworkEditor",
+                      "NetworkViewer"
+                    ],
+                    "description": "A ZeroTier v2 IAM role. Org roles (Owner, Admin, Editor, Viewer) apply to every child resource; NetworkGroup* and Network* roles apply at that level and below."
+                  },
+                  "description": "One or more ZeroTier IAM roles.",
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "principal",
+                "roles"
+              ],
+              "description": "A principal-to-roles assignment."
+            },
+            "description": "The complete principal–roles assignment list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "resourceId",
+          "assignments"
+        ],
+        "description": "Input for replacing IAM assignments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the ZeroTier API operation completed successfully."
+          },
+          "result": {
+            "description": "The ZeroTier API response payload when one was returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "result"
+        ],
+        "description": "IAM update result."
+      }
+    },
+    {
+      "id": "zerotier.rotate_webhook_secret",
+      "service": "zerotier",
+      "name": "rotate_webhook_secret",
+      "description": "v2 only: rotate a webhook's signing secret.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook ID."
+          },
+          "overlapHours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 720,
+            "description": "Hours the previous secret stays valid after rotation (0 = immediate cutover, at most 720, default 24)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Input for rotating a webhook secret."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The rotation result."
+      }
+    },
+    {
+      "id": "zerotier.search_principals",
+      "service": "zerotier",
+      "name": "search_principals",
+      "description": "v2 only: search org users by email term.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier organization ID."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search term matched against principal email addresses."
+          },
+          "principalType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "user"
+              ],
+              "description": "A principal type."
+            },
+            "description": "Optional principal-type filters (upstream accepts only \"user\")."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orgId",
+          "search"
+        ],
+        "description": "Input for searching principals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "description": "One ZeroTier API resource."
+            },
+            "description": "The ZeroTier API resources returned for this request."
+          },
+          "stats": {
+            "description": "v2 only: aggregate statistics returned when stats was requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The matching principals."
+      }
+    },
+    {
+      "id": "zerotier.set_network_user_permissions",
+      "service": "zerotier",
+      "name": "set_network_user_permissions",
+      "description": "v1 only: replace a user's permission set on a network. The call sets all four flags, so omitted flags are sent as false.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID to set permissions for."
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Read permission (r): view network settings. Omitted means false."
+          },
+          "authorize": {
+            "type": "boolean",
+            "description": "Authorize permission (a): authorize new members. Omitted means false."
+          },
+          "modify": {
+            "type": "boolean",
+            "description": "Modify permission (m): change network settings. Omitted means false."
+          },
+          "delete": {
+            "type": "boolean",
+            "description": "Delete permission (d): remove members. Omitted means false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "userId"
+        ],
+        "description": "Input for setting network user permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The applied permission set (NetworkUserPermissions)."
+      }
+    },
+    {
+      "id": "zerotier.update_api_key",
+      "service": "zerotier",
+      "name": "update_api_key",
+      "description": "v2 only: update an API key's description.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The API key ID."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiKeyId"
+        ],
+        "description": "Input for updating an API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated API key."
+      }
+    },
+    {
+      "id": "zerotier.update_current_user",
+      "service": "zerotier",
+      "name": "update_current_user",
+      "description": "v2 only: update the authenticated user's profile.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "The first name to set."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The last name to set."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for updating the current user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated user."
+      }
+    },
+    {
+      "id": "zerotier.update_flow_rules",
+      "service": "zerotier",
+      "name": "update_flow_rules",
+      "description": "v2 only (beta): update a network's flow rules (custom rule source or isolation config).",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "custom",
+              "isolation"
+            ],
+            "description": "The flow rule kind."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The flow rule config. For custom rules: {source: '<rules source>'}. For isolation: {allowedServices, blockNonIP, enableServiceFilter, excludedDeviceIds}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "kind"
+        ],
+        "description": "Input for updating flow rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated flow rules."
+      }
+    },
+    {
+      "id": "zerotier.update_member",
+      "service": "zerotier",
+      "name": "update_member",
+      "description": "Update a network member. v1 fields: name, description, authorized, activeBridge, noAutoAssignIps, ipAssignments. v2 fields: name, description, activeBridge, noAutoAssignIps, ipv4Assignments, ipv6Assignments. Fields from the other API version are rejected; on v2 change authorization with authorize_member or deauthorize_member.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member device/node ID (10-character hex string)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name to set."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          },
+          "authorized": {
+            "type": "boolean",
+            "description": "v1 only: whether the member is authorized on the network."
+          },
+          "activeBridge": {
+            "type": "boolean",
+            "description": "Whether this device acts as an active bridge."
+          },
+          "noAutoAssignIps": {
+            "type": "boolean",
+            "description": "Disable automatic IP assignment for this member."
+          },
+          "ipAssignments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "v1 only: static IP assignments replacing the current list."
+          },
+          "ipv4Assignments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "v2 only: static IPv4 assignments."
+          },
+          "ipv6Assignments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "v2 only: static IPv6 assignments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId",
+          "memberId"
+        ],
+        "description": "Input for updating a network member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated network member."
+      }
+    },
+    {
+      "id": "zerotier.update_network",
+      "service": "zerotier",
+      "name": "update_network",
+      "description": "Update a ZeroTier network's name, description, and/or configuration fields.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZeroTier network ID (16-character hex string)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name to set."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Partial network configuration. v1 fields: name/private/enableBroadcast/mtu/multicastLimit/routes/ipAssignmentPools/v4AssignMode/v6AssignMode/dns; v2 fields: private/enableBroadcast/mtu/multicastLimit/routes/v4Subnet/v4IpAssignmentPools/v4AssignmentMode/v6Subnet/v6IpAssignmentPools/v6AssignmentMode/dns."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkId"
+        ],
+        "description": "Input for updating a ZeroTier network."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated ZeroTier network."
+      }
+    },
+    {
+      "id": "zerotier.update_network_group",
+      "service": "zerotier",
+      "name": "update_network_group",
+      "description": "v2 only: rename or re-describe a network group.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "networkGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network group ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name to set."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "networkGroupId"
+        ],
+        "description": "Input for updating a network group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated network group."
+      }
+    },
+    {
+      "id": "zerotier.update_service_account",
+      "service": "zerotier",
+      "name": "update_service_account",
+      "description": "v2 only: update a service account's name or description.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The service account ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name to set."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description to set (may be an empty string)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceAccountId"
+        ],
+        "description": "Input for updating a service account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated service account."
+      }
+    },
+    {
+      "id": "zerotier.update_user",
+      "service": "zerotier",
+      "name": "update_user",
+      "description": "v1 only: update a user's profile fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The display name to set."
+          },
+          "smsNumber": {
+            "type": "string",
+            "description": "The SMS number to set (deprecated by ZeroTier)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Input for updating a user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated user."
+      }
+    },
+    {
+      "id": "zerotier.update_webhook",
+      "service": "zerotier",
+      "name": "update_webhook",
+      "description": "v2 only: update a webhook's URL, event list, or description.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The HTTPS endpoint URL that receives webhook events.",
+            "format": "uri"
+          },
+          "eventList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An event type."
+            },
+            "description": "ZeroTier event types to subscribe to.",
+            "minItems": 1
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "The webhook description (at most 255 characters)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookId"
+        ],
+        "description": "Input for updating a webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The ZeroTier API response payload for the requested resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The updated webhook."
+      }
+    }
+  ]
+}

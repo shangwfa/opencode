@@ -1,0 +1,640 @@
+{
+  "service": "emaillistverify",
+  "displayName": "EmailListVerify",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "EMAILLISTVERIFY_API_KEY",
+      "description": "EmailListVerify API key passed as the secret query parameter. Get or activate your API key from the API page: https://emaillistverify.com/api."
+    }
+  ],
+  "homepageUrl": "https://emaillistverify.com",
+  "actions": [
+    {
+      "id": "emaillistverify.check_disposable",
+      "service": "emaillistverify",
+      "name": "check_disposable",
+      "description": "Check whether one email domain is disposable with EmailListVerify.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The email domain to check for disposable-email status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Input payload for checking whether one email domain is disposable."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The email domain that was checked."
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "disposable",
+              "dead_server",
+              "invalid_mx",
+              "unknown"
+            ],
+            "description": "The disposability status returned for the email domain."
+          },
+          "internalResult": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The provider value, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider value, or null when unavailable."
+          },
+          "mxServer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The provider value, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider value, or null when unavailable."
+          },
+          "mxServerIp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The provider value, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider value, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "result",
+          "internalResult",
+          "mxServer",
+          "mxServerIp"
+        ],
+        "description": "The disposable-domain verification result returned by EmailListVerify."
+      }
+    },
+    {
+      "id": "emaillistverify.delete_email_list",
+      "service": "emaillistverify",
+      "name": "delete_email_list",
+      "description": "Delete one finished EmailListVerify email list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the uploaded EmailListVerify email list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListId"
+        ],
+        "description": "Input payload for referencing one uploaded EmailListVerify email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the email list was deleted successfully."
+          },
+          "emailListId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the uploaded EmailListVerify email list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "emailListId"
+        ],
+        "description": "The confirmation payload returned after deleting an EmailListVerify email list."
+      }
+    },
+    {
+      "id": "emaillistverify.download_email_list",
+      "service": "emaillistverify",
+      "name": "download_email_list",
+      "description": "Download one finished EmailListVerify email list as base64 content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the uploaded EmailListVerify email list."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "description": "The output file format to request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "unknown",
+                "dead_server",
+                "invalid_mx",
+                "email_disabled",
+                "antispam_system",
+                "ok_for_all",
+                "smtp_protocol",
+                "invalid_syntax",
+                "disposable",
+                "spamtrap"
+              ],
+              "description": "The EmailListVerify deliverability status for the email address."
+            },
+            "description": "Only include rows whose verification result matches one of these statuses.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListId"
+        ],
+        "description": "Input payload for downloading one finished EmailListVerify email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "The downloaded file name."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The response content type returned by EmailListVerify."
+          },
+          "contentBase64": {
+            "type": "string",
+            "description": "The downloaded file content encoded as base64."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName",
+          "contentType",
+          "contentBase64"
+        ],
+        "description": "The downloaded EmailListVerify email list encoded as base64 content."
+      }
+    },
+    {
+      "id": "emaillistverify.get_credits",
+      "service": "emaillistverify",
+      "name": "get_credits",
+      "description": "Retrieve the available EmailListVerify on-demand and subscription credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "onDemand": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Remaining balance of on-demand credits."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "available"
+            ],
+            "description": "On-demand credits that never expire."
+          },
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "available": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Remaining subscription credits for the current period."
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "description": "The ISO 8601 expiration timestamp of the current subscription period.",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "available",
+                  "expiresAt"
+                ],
+                "description": "Subscription credits for the current billing period."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Subscription credits for the current billing period."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "onDemand",
+          "subscription"
+        ],
+        "description": "The available EmailListVerify credit balances."
+      }
+    },
+    {
+      "id": "emaillistverify.get_email_list_progress",
+      "service": "emaillistverify",
+      "name": "get_email_list_progress",
+      "description": "Get the current progress of one uploaded EmailListVerify email list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the uploaded EmailListVerify email list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListId"
+        ],
+        "description": "Input payload for referencing one uploaded EmailListVerify email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "uploaded",
+              "processing",
+              "finished",
+              "inQueue",
+              "starting",
+              "error"
+            ],
+            "description": "The current status of the uploaded email list."
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The percentage completion of the uploaded email list."
+          },
+          "credits": {
+            "type": "object",
+            "properties": {
+              "charged": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The provider integer value, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider integer value, or null when unavailable."
+              },
+              "returned": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The provider integer value, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider integer value, or null when unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "charged",
+              "returned"
+            ],
+            "description": "Credit usage information for the uploaded email list."
+          },
+          "name": {
+            "type": "string",
+            "description": "The uploaded file name."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the email list was uploaded.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the email list was last updated.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "progress",
+          "credits",
+          "name",
+          "createdAt",
+          "updatedAt"
+        ],
+        "description": "The progress information for one uploaded EmailListVerify email list."
+      }
+    },
+    {
+      "id": "emaillistverify.upload_email_list",
+      "service": "emaillistverify",
+      "name": "upload_email_list",
+      "description": "Upload one email list file to EmailListVerify for batch verification.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name sent to EmailListVerify."
+          },
+          "contentText": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain text file content for csv or txt email lists."
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base64-encoded file content for csv, txt, or xlsx email lists."
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "high"
+            ],
+            "description": "The verification quality requested for the uploaded email list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName"
+        ],
+        "description": "Input payload for uploading one email list to EmailListVerify. Exactly one of contentText or contentBase64 must be provided."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The identifier of the uploaded EmailListVerify email list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListId"
+        ],
+        "description": "The identifier returned after EmailListVerify accepts the uploaded email list."
+      }
+    },
+    {
+      "id": "emaillistverify.verify_email",
+      "service": "emaillistverify",
+      "name": "verify_email",
+      "description": "Verify a single email address with EmailListVerify's real-time API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to verify with EmailListVerify.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input payload for verifying a single email address with EmailListVerify."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address that was verified.",
+            "format": "email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unknown",
+              "dead_server",
+              "invalid_mx",
+              "email_disabled",
+              "antispam_system",
+              "ok_for_all",
+              "smtp_protocol",
+              "invalid_syntax",
+              "disposable",
+              "spamtrap"
+            ],
+            "description": "The EmailListVerify deliverability status for the email address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "status"
+        ],
+        "description": "The plain text verification result normalized into a stable object."
+      }
+    },
+    {
+      "id": "emaillistverify.verify_email_detailed",
+      "service": "emaillistverify",
+      "name": "verify_email_detailed",
+      "description": "Verify and enrich a single email address with EmailListVerify's detailed API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to verify with EmailListVerify.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input payload for verifying a single email address with EmailListVerify."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address that was verified.",
+            "format": "email"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unknown",
+              "dead_server",
+              "invalid_mx",
+              "email_disabled",
+              "antispam_system",
+              "ok_for_all",
+              "smtp_protocol",
+              "invalid_syntax",
+              "disposable",
+              "spamtrap"
+            ],
+            "description": "The EmailListVerify deliverability status for the email address."
+          },
+          "account": {
+            "type": "string",
+            "description": "The local part of the email address before the at sign."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain part of the email address."
+          },
+          "isRole": {
+            "type": "boolean",
+            "description": "Whether the email address belongs to a role account."
+          },
+          "isFree": {
+            "type": "boolean",
+            "description": "Whether the email address uses a free email provider."
+          },
+          "isNoReply": {
+            "type": "boolean",
+            "description": "Whether the email address is a no-reply inbox."
+          },
+          "mxServer": {
+            "type": "string",
+            "description": "The MX server associated with the email domain."
+          },
+          "mxServerIp": {
+            "type": "string",
+            "description": "The IP address of the MX server."
+          },
+          "esp": {
+            "type": "string",
+            "description": "The detected email service provider."
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The first name inferred from the email address, when available."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The last name inferred from the email address, when available."
+          },
+          "gender": {
+            "type": "string",
+            "description": "The gender inferred from the email address, when available."
+          },
+          "tag": {
+            "type": "string",
+            "description": "The plus-addressing tag, when present."
+          },
+          "internalResult": {
+            "type": "string",
+            "description": "The provider's internal processing result, when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "result",
+          "account",
+          "domain",
+          "isRole",
+          "isFree",
+          "isNoReply"
+        ],
+        "description": "The detailed EmailListVerify enrichment result for a single email address."
+      }
+    }
+  ]
+}

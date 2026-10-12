@@ -1,0 +1,331 @@
+{
+  "service": "markettime",
+  "displayName": "MarketTime",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MARKETTIME_API_KEY",
+      "description": "MarketTime Public API key sent as x-api-key. Generate it from Billing & Payment > API Key: https://support.markettime.com/hc/en-us/articles/43441619857947-Generating-an-API-Key-for-your-MarketTime-Account",
+      "extraFields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "R123 or M123",
+          "description": "Your MarketTime RepGroup ID (R...) or Manufacturer ID (M...) used as whoAmI in API paths."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.markettime.com/",
+  "actions": [
+    {
+      "id": "markettime.list_items",
+      "service": "markettime",
+      "name": "list_items",
+      "description": "List MarketTime catalog items with offset pagination and modification filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based starting index."
+          },
+          "recordSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of items to return."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The documented item field used for sorting."
+          },
+          "sortType": {
+            "type": "integer",
+            "description": "The sort direction, where 1 means ascending."
+          },
+          "modifiedStartDate": {
+            "type": "integer",
+            "description": "The earliest modification timestamp to include."
+          },
+          "modifiedEndDate": {
+            "type": "integer",
+            "description": "The latest modification timestamp to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for listing MarketTime items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A MarketTime record."
+            },
+            "description": "The records returned by MarketTime."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of records reported in the response."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "The server timestamp returned by MarketTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "total",
+          "timestamp"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "markettime.list_manufacturers",
+      "service": "markettime",
+      "name": "list_manufacturers",
+      "description": "List manufacturers available to the connected MarketTime account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based starting index."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of manufacturers to return."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The documented manufacturer field used for sorting."
+          },
+          "sortType": {
+            "type": "integer",
+            "description": "The sort direction, where 1 means ascending."
+          },
+          "active": {
+            "type": "integer",
+            "description": "The upstream active-status filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for listing MarketTime manufacturers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A MarketTime record."
+            },
+            "description": "The records returned by MarketTime."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of records reported in the response."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "The server timestamp returned by MarketTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "total",
+          "timestamp"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "markettime.search_orders",
+      "service": "markettime",
+      "name": "search_orders",
+      "description": "Search MarketTime orders with documented filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeTotalCount": {
+            "type": "boolean",
+            "description": "Whether to include total record and page counts."
+          },
+          "excludeOrderDetails": {
+            "type": "boolean",
+            "description": "Whether to omit order details from returned orders."
+          },
+          "filterRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filterField": {
+                  "type": "string",
+                  "description": "The documented order field to filter."
+                },
+                "filterValue": {
+                  "type": "string",
+                  "description": "The comparison value, omitted for null checks."
+                },
+                "filterOperation": {
+                  "type": "string",
+                  "enum": [
+                    "EQ",
+                    "NE",
+                    "LT",
+                    "LTE",
+                    "GT",
+                    "GTE",
+                    "IN",
+                    "NOT_IN",
+                    "STARTS_WITH",
+                    "ENDS_WITH",
+                    "CONTAINS",
+                    "IS_NULL",
+                    "IS_NOT_NULL"
+                  ],
+                  "description": "The comparison operation for this filter."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filterField",
+                "filterOperation"
+              ],
+              "description": "A MarketTime order filter condition."
+            },
+            "description": "The filter conditions combined with AND."
+          },
+          "sortRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sortField": {
+                  "type": "string",
+                  "description": "The documented order field to sort."
+                },
+                "sortOrder": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The precedence of this rule when multiple sorts are supplied."
+                },
+                "sortType": {
+                  "type": "string",
+                  "enum": [
+                    "ASC",
+                    "DESC"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "sortField",
+                "sortType"
+              ],
+              "description": "A MarketTime order sorting rule."
+            },
+            "description": "The ordered sorting rules."
+          },
+          "paginationRequest": {
+            "type": "object",
+            "properties": {
+              "pageNumber": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The page number to fetch."
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 250,
+                "description": "The maximum number of orders to return per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The page-number pagination settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters, sorting, and pagination options for searching MarketTime orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A MarketTime order."
+            },
+            "description": "The orders returned for the current page."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "totalNumberOfPages": {
+            "type": "integer",
+            "description": "The total number of matching pages when total counts were requested."
+          },
+          "totalNumberOfRecords": {
+            "type": "integer",
+            "description": "The total number of matching orders when total counts were requested."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "The server timestamp returned by MarketTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "currentPage",
+          "pageSize",
+          "timestamp"
+        ],
+        "description": "A paginated MarketTime order search response."
+      }
+    }
+  ]
+}

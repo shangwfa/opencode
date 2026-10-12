@@ -1,0 +1,365 @@
+{
+  "service": "openfda",
+  "displayName": "openFDA",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "openFDA API Key",
+      "placeholder": "OPENFDA_API_KEY",
+      "description": "Optional API key from https://open.fda.gov/apis/authentication/"
+    }
+  ],
+  "homepageUrl": "https://open.fda.gov/",
+  "actions": [
+    {
+      "id": "openfda.count_drug_values",
+      "service": "openfda",
+      "name": "count_drug_values",
+      "description": "Count the most frequent values of a field in a supported openFDA drug dataset, optionally filtered by a search expression.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "event",
+              "label",
+              "ndc",
+              "enforcement",
+              "orangebook",
+              "drugsfda",
+              "shortages"
+            ],
+            "description": "The openFDA drug dataset to query."
+          },
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The searchable openFDA field to count, such as patient.reaction.reactionmeddrapt.exact."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An openFDA search expression, such as openfda.brand_name:Advil or receivedate:[20240101 TO 20241231]."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "The maximum number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "field"
+        ],
+        "description": "Input parameters for counting field values in an openFDA drug dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "disclaimer": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The openFDA data-use disclaimer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The openFDA data-use disclaimer."
+              },
+              "terms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the openFDA terms of service."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the openFDA terms of service."
+              },
+              "license": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the openFDA data license."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the openFDA data license."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The dataset update date reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The dataset update date reported by openFDA."
+              },
+              "skip": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The result offset reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The result offset reported by openFDA."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The result page size reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The result page size reported by openFDA."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of records matching the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of records matching the query."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw object returned by openFDA."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata returned by openFDA."
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "term": {
+                  "type": "string",
+                  "description": "The field value returned by openFDA."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "The number of matching records containing the field value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One openFDA field value count."
+            },
+            "description": "The field values ordered by frequency by openFDA."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The field value counts and response metadata returned by openFDA."
+      }
+    },
+    {
+      "id": "openfda.search_drug_records",
+      "service": "openfda",
+      "name": "search_drug_records",
+      "description": "Search and page through records from a supported openFDA drug dataset. Results are informational and must not be used as medical advice.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "event",
+              "label",
+              "ndc",
+              "enforcement",
+              "orangebook",
+              "drugsfda",
+              "shortages"
+            ],
+            "description": "The openFDA drug dataset to query."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An openFDA search expression, such as openfda.brand_name:Advil or receivedate:[20240101 TO 20241231]."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An openFDA sort expression containing a field and optional :asc or :desc modifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "The maximum number of records to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 25999,
+            "description": "The number of matching records to skip before returning results. The sum of skip and limit cannot exceed 26,000."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "Input parameters for searching an openFDA drug dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "disclaimer": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The openFDA data-use disclaimer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The openFDA data-use disclaimer."
+              },
+              "terms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the openFDA terms of service."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the openFDA terms of service."
+              },
+              "license": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the openFDA data license."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the openFDA data license."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The dataset update date reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The dataset update date reported by openFDA."
+              },
+              "skip": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The result offset reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The result offset reported by openFDA."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The result page size reported by openFDA."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The result page size reported by openFDA."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of records matching the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of records matching the query."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A raw object returned by openFDA."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata returned by openFDA."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw object returned by openFDA."
+            },
+            "description": "The raw records returned by the selected openFDA dataset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching openFDA drug records and response metadata."
+      }
+    }
+  ]
+}

@@ -1,0 +1,561 @@
+{
+  "service": "amplitude",
+  "displayName": "Amplitude",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "AMPLITUDE_SECRET_KEY",
+      "description": "Amplitude project Secret Key used as the Basic Auth password for Dashboard REST API requests. Find it in Amplitude Settings > Projects > General > Secret Key: https://amplitude.com/docs/apis/authentication.",
+      "extraFields": [
+        {
+          "key": "apiKeyId",
+          "label": "API Key",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "AMPLITUDE_API_KEY",
+          "description": "Amplitude project API Key used as the Basic Auth username. Find it in Amplitude Settings > Projects > General > API Key: https://amplitude.com/docs/apis/authentication."
+        },
+        {
+          "key": "dataResidency",
+          "label": "Data Residency",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "default",
+          "description": "Optional Amplitude data residency region. Use default for amplitude.com or eu for analytics.eu.amplitude.com, as documented in the Dashboard REST API regions table: https://amplitude.com/docs/apis/analytics/dashboard-rest."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://amplitude.com",
+  "actions": [
+    {
+      "id": "amplitude.get_event_segmentation",
+      "service": "amplitude",
+      "name": "get_event_segmentation",
+      "description": "Get Amplitude event segmentation metrics for one or two event queries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Amplitude event type to query."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined JSON object fields."
+                },
+                "description": "Optional event or user property filters."
+              },
+              "group_by": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined JSON object fields."
+                },
+                "description": "Optional event or user properties to group by."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "event_type"
+            ],
+            "description": "An Amplitude event query object."
+          },
+          "secondEvent": {
+            "type": "object",
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Amplitude event type to query."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined JSON object fields."
+                },
+                "description": "Optional event or user property filters."
+              },
+              "group_by": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined JSON object fields."
+                },
+                "description": "Optional event or user properties to group by."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "event_type"
+            ],
+            "description": "An Amplitude event query object."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "A date formatted as YYYYMMDD."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "A date formatted as YYYYMMDD."
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "uniques",
+              "totals",
+              "pct_dau",
+              "average",
+              "histogram",
+              "sums",
+              "value_avg",
+              "formula"
+            ],
+            "description": "The Amplitude segmentation metric."
+          },
+          "userType": {
+            "type": "string",
+            "enum": [
+              "any",
+              "active"
+            ],
+            "description": "The Amplitude user type filter."
+          },
+          "interval": {
+            "type": "integer",
+            "description": "The Amplitude interval value, such as 1, 7, or 30."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "prop": {
+                  "type": "string",
+                  "description": "The Amplitude user property or cohort property name."
+                },
+                "op": {
+                  "type": "string",
+                  "description": "The segment comparison operator."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A segment value."
+                  },
+                  "description": "The segment values to match."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The optional segment type, such as event."
+                },
+                "event_type": {
+                  "type": "string",
+                  "description": "The event type used by a who-performed segment."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Amplitude segment definition."
+            },
+            "description": "Amplitude segment definitions."
+          },
+          "groupBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amplitude property name to group by."
+          },
+          "secondGroupBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The second Amplitude property name to group by."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of group-by values to return."
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amplitude custom formula expression."
+          },
+          "rollingWindow": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The rolling window size."
+          },
+          "rollingAverage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The rolling average size."
+          },
+          "dataResidency": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu"
+            ],
+            "description": "The Amplitude data residency region."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "start",
+          "end"
+        ],
+        "description": "Input for querying Amplitude event segmentation metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "series": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "A metric value."
+                  },
+                  "description": "Metric values."
+                },
+                "description": "Metric series returned by Amplitude."
+              },
+              "seriesLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A series label."
+                },
+                "description": "Labels for each metric series."
+              },
+              "seriesCollapsed": {
+                "type": "array",
+                "items": {
+                  "description": "A collapsed metric value."
+                },
+                "description": "Collapsed metric values returned by Amplitude."
+              },
+              "xValues": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A result date."
+                },
+                "description": "Dates included in the result."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Amplitude event segmentation result data."
+          },
+          "raw": {
+            "description": "The raw Amplitude API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Amplitude event segmentation response."
+      }
+    },
+    {
+      "id": "amplitude.get_user_activity",
+      "service": "amplitude",
+      "name": "get_user_activity",
+      "description": "Get an Amplitude user summary and recent or earliest activity events.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amplitude ID of the user."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-indexed offset from the most recent event."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of events to return."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "earliest",
+              "latest"
+            ],
+            "description": "The event direction to return."
+          },
+          "dataResidency": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu"
+            ],
+            "description": "The Amplitude data residency region."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Input for retrieving Amplitude user activity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userData": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "description": "The Amplitude user ID."
+              },
+              "canonical_amplitude_id": {
+                "type": "integer",
+                "description": "The canonical Amplitude ID."
+              },
+              "num_events": {
+                "type": "integer",
+                "description": "The total number of events for the user."
+              },
+              "num_sessions": {
+                "type": "integer",
+                "description": "The total number of sessions for the user."
+              },
+              "first_used": {
+                "type": "string",
+                "description": "The first date the user was seen."
+              },
+              "last_used": {
+                "type": "string",
+                "description": "The latest date the user was seen."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Amplitude user summary fields."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event_type": {
+                  "type": "string",
+                  "description": "The Amplitude event type."
+                },
+                "event_time": {
+                  "type": "string",
+                  "description": "The event timestamp."
+                },
+                "event_id": {
+                  "type": "integer",
+                  "description": "The Amplitude event ID."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "The Amplitude user ID."
+                },
+                "amplitude_id": {
+                  "type": "integer",
+                  "description": "The Amplitude ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Amplitude user activity event."
+            },
+            "description": "Amplitude user activity events."
+          },
+          "raw": {
+            "description": "The raw Amplitude API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Amplitude user activity response."
+      }
+    },
+    {
+      "id": "amplitude.list_events",
+      "service": "amplitude",
+      "name": "list_events",
+      "description": "List visible Amplitude events with current-week totals and display metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataResidency": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu"
+            ],
+            "description": "The Amplitude data residency region."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Amplitude events in a project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "The raw Amplitude event name."
+                },
+                "display": {
+                  "type": "string",
+                  "description": "The Amplitude display name for the event."
+                },
+                "totals": {
+                  "type": "number",
+                  "description": "The total event count for the current week."
+                },
+                "hidden": {
+                  "type": "boolean",
+                  "description": "Whether the event is hidden."
+                },
+                "deleted": {
+                  "type": "boolean",
+                  "description": "Whether the event is deleted."
+                },
+                "non_active": {
+                  "type": "boolean",
+                  "description": "Whether the event is marked inactive."
+                },
+                "flow_hidden": {
+                  "type": "boolean",
+                  "description": "Whether the event is hidden from Pathfinder surfaces."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Amplitude event summary."
+            },
+            "description": "Amplitude events returned by the Dashboard REST API."
+          },
+          "raw": {
+            "description": "The raw Amplitude API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Amplitude events list response."
+      }
+    },
+    {
+      "id": "amplitude.search_user",
+      "service": "amplitude",
+      "name": "search_user",
+      "description": "Search for an Amplitude user by Amplitude ID, device ID, user ID, or prefix.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amplitude ID, device ID, user ID, or user ID prefix to search."
+          },
+          "dataResidency": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu"
+            ],
+            "description": "The Amplitude data residency region."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Input for searching an Amplitude user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amplitude_id": {
+                  "type": "integer",
+                  "description": "The Amplitude ID for the matched user."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "The user ID for the matched user."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A matching Amplitude user."
+            },
+            "description": "Amplitude user matches."
+          },
+          "type": {
+            "type": "string",
+            "description": "The match type returned by Amplitude."
+          },
+          "raw": {
+            "description": "The raw Amplitude API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "matches",
+          "raw"
+        ],
+        "description": "The normalized Amplitude user search response."
+      }
+    }
+  ]
+}

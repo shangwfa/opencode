@@ -1,0 +1,976 @@
+{
+  "service": "postmark",
+  "displayName": "Postmark",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Server Token",
+      "placeholder": "server_token",
+      "description": "Postmark server token used with the X-Postmark-Server-Token header. Find it under Server > API Tokens: https://postmarkapp.com/support/article/1008-what-are-the-account-and-server-api-tokens."
+    }
+  ],
+  "homepageUrl": "https://postmarkapp.com",
+  "actions": [
+    {
+      "id": "postmark.create_template",
+      "service": "postmark",
+      "name": "create_template",
+      "description": "Create a Postmark template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Template name."
+          },
+          "Subject": {
+            "type": "string",
+            "description": "Subject content for the template. Required for standard templates."
+          },
+          "HtmlBody": {
+            "type": "string",
+            "description": "HTML body content of the template."
+          },
+          "TextBody": {
+            "type": "string",
+            "description": "Plain-text body content of the template."
+          },
+          "TemplateType": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "Layout"
+            ],
+            "description": "Template type recognized by the official Postmark API."
+          },
+          "Alias": {
+            "type": "string",
+            "description": "Optional alias that identifies the template within the server."
+          },
+          "LayoutTemplate": {
+            "type": "string",
+            "description": "Optional layout template alias used by a standard template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "Name"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    },
+    {
+      "id": "postmark.edit_template",
+      "service": "postmark",
+      "name": "edit_template",
+      "description": "Edit an existing Postmark template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateIdOrAlias": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Template ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template alias."
+              }
+            ],
+            "description": "Template ID or template alias accepted by the Postmark path parameter."
+          },
+          "Name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated template name."
+          },
+          "Subject": {
+            "type": "string",
+            "description": "Updated template subject content when the template is standard."
+          },
+          "HtmlBody": {
+            "type": "string",
+            "description": "Updated HTML body content."
+          },
+          "TextBody": {
+            "type": "string",
+            "description": "Updated plain-text body content."
+          },
+          "Alias": {
+            "type": "string",
+            "description": "Updated alias that identifies the template within the server."
+          },
+          "LayoutTemplate": {
+            "type": "string",
+            "description": "Updated layout template alias for a standard template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateIdOrAlias",
+          "Name"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    },
+    {
+      "id": "postmark.get_bounces",
+      "service": "postmark",
+      "name": "get_bounces",
+      "description": "Get Postmark bounces for the current server with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Number of results to return per request."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip before returning the current page."
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by bounce type."
+          },
+          "inactive": {
+            "type": "boolean",
+            "description": "Whether to return only inactive bounces."
+          },
+          "emailFilter": {
+            "type": "string",
+            "description": "Filter by bounced email address."
+          },
+          "messageID": {
+            "type": "string",
+            "description": "Filter by outbound message ID."
+          },
+          "mailboxHash": {
+            "type": "string",
+            "description": "Filter by the mailbox hash portion of the address."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Filter by tag."
+          },
+          "todate": {
+            "type": "string",
+            "description": "Only include bounces before this datetime."
+          },
+          "fromdate": {
+            "type": "string",
+            "description": "Only include bounces after this datetime."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "TotalCount": {
+            "type": "integer",
+            "description": "Total number of bounces that matched the filter."
+          },
+          "Bounces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Additional upstream fields returned by Postmark."
+            },
+            "description": "Bounces returned by Postmark."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "postmark.get_outbound_message_details",
+      "service": "postmark",
+      "name": "get_outbound_message_details",
+      "description": "Get detailed content and events for one outbound Postmark message.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outbound message ID returned by Postmark."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    },
+    {
+      "id": "postmark.get_server",
+      "service": "postmark",
+      "name": "get_server",
+      "description": "Get the current Postmark server configuration for the connected server token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    },
+    {
+      "id": "postmark.get_template",
+      "service": "postmark",
+      "name": "get_template",
+      "description": "Get one Postmark template by template ID or alias.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateIdOrAlias": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Template ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Template alias."
+              }
+            ],
+            "description": "Template ID or template alias accepted by the Postmark path parameter."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    },
+    {
+      "id": "postmark.list_templates",
+      "service": "postmark",
+      "name": "list_templates",
+      "description": "List Postmark templates for the current server.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Number of results to return per request."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip before returning the current page."
+          },
+          "TemplateType": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "Layout"
+            ],
+            "description": "Template type recognized by the official Postmark API."
+          },
+          "LayoutTemplate": {
+            "type": "string",
+            "description": "Filter by layout template alias."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "TotalCount": {
+            "type": "integer",
+            "description": "Total number of templates."
+          },
+          "Templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Additional upstream fields returned by Postmark."
+            },
+            "description": "Templates returned by Postmark."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "postmark.search_outbound_messages",
+      "service": "postmark",
+      "name": "search_outbound_messages",
+      "description": "Search outbound Postmark messages with filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Number of results to return per request."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip before returning the current page."
+          },
+          "recipient": {
+            "type": "string",
+            "description": "Filter by the user who was receiving the email."
+          },
+          "fromemail": {
+            "type": "string",
+            "description": "Filter by the sender email address."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Filter by message tag."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "sent",
+              "processed"
+            ],
+            "description": "Outbound message status filter accepted by Postmark search."
+          },
+          "todate": {
+            "type": "string",
+            "description": "Filter messages up to this datetime, inclusive."
+          },
+          "fromdate": {
+            "type": "string",
+            "description": "Filter messages starting from this datetime, inclusive."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Filter by email subject."
+          },
+          "messagestream": {
+            "type": "string",
+            "description": "Filter by message stream ID."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Metadata value."
+            },
+            "description": "Metadata filters mapped to Postmark metadata_<key> query parameters for outbound search."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "TotalCount": {
+            "type": "integer",
+            "description": "Total number of messages that matched the search."
+          },
+          "Messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Additional upstream fields returned by Postmark."
+            },
+            "description": "Outbound messages returned by the search."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "postmark.send_batch_with_templates",
+      "service": "postmark",
+      "name": "send_batch_with_templates",
+      "description": "Send up to 500 templated emails in a single Postmark batch request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "TemplateId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Template ID to use when rendering this message."
+                },
+                "TemplateAlias": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Template alias to use when rendering this message."
+                },
+                "TemplateModel": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional upstream fields returned by Postmark."
+                },
+                "InlineCss": {
+                  "type": "boolean",
+                  "description": "Whether CSS blocks should be inlined into rendered HTML content."
+                },
+                "From": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Sender email address or full formatted sender string accepted by Postmark."
+                },
+                "To": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Recipient email address string. Multiple recipients are comma separated."
+                },
+                "Cc": {
+                  "type": "string",
+                  "description": "Cc recipient email address string."
+                },
+                "Bcc": {
+                  "type": "string",
+                  "description": "Bcc recipient email address string."
+                },
+                "Tag": {
+                  "type": "string",
+                  "description": "Email tag used for categorization and analytics."
+                },
+                "ReplyTo": {
+                  "type": "string",
+                  "description": "Reply-To email address override."
+                },
+                "Headers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "Name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Custom header name."
+                      },
+                      "Value": {
+                        "type": "string",
+                        "description": "Custom header value."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "description": "Custom headers to include on the email."
+                },
+                "TrackOpens": {
+                  "type": "boolean",
+                  "description": "Whether open tracking is enabled."
+                },
+                "TrackLinks": {
+                  "type": "string",
+                  "enum": [
+                    "None",
+                    "HtmlAndText",
+                    "HtmlOnly",
+                    "TextOnly"
+                  ],
+                  "description": "Link tracking mode recognized by the official Postmark API."
+                },
+                "Attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "Name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Attachment file name."
+                      },
+                      "Content": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Base64-encoded attachment content."
+                      },
+                      "ContentType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Attachment MIME type."
+                      },
+                      "ContentID": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Optional content ID for inline attachments."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "Name",
+                      "Content",
+                      "ContentType"
+                    ]
+                  },
+                  "description": "Attachments to include on the email."
+                },
+                "Metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "Metadata value."
+                  },
+                  "description": "Custom metadata key-value pairs attached to the message."
+                },
+                "MessageStream": {
+                  "type": "string",
+                  "description": "Message stream ID to use when sending the email."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "TemplateModel",
+                "From",
+                "To"
+              ]
+            },
+            "description": "Templated messages to send in this batch request.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true,
+          "description": "Postmark message submission result."
+        },
+        "description": "Per-message results returned by Postmark batch template sending."
+      }
+    },
+    {
+      "id": "postmark.send_email",
+      "service": "postmark",
+      "name": "send_email",
+      "description": "Send a transactional email through the current Postmark server.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "From": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sender email address or full formatted sender string accepted by Postmark."
+          },
+          "To": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient email address string. Multiple recipients are comma separated."
+          },
+          "Cc": {
+            "type": "string",
+            "description": "Cc recipient email address string."
+          },
+          "Bcc": {
+            "type": "string",
+            "description": "Bcc recipient email address string."
+          },
+          "Tag": {
+            "type": "string",
+            "description": "Email tag used for categorization and analytics."
+          },
+          "ReplyTo": {
+            "type": "string",
+            "description": "Reply-To email address override."
+          },
+          "Headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom header name."
+                },
+                "Value": {
+                  "type": "string",
+                  "description": "Custom header value."
+                }
+              },
+              "additionalProperties": false
+            },
+            "description": "Custom headers to include on the email."
+          },
+          "TrackOpens": {
+            "type": "boolean",
+            "description": "Whether open tracking is enabled."
+          },
+          "TrackLinks": {
+            "type": "string",
+            "enum": [
+              "None",
+              "HtmlAndText",
+              "HtmlOnly",
+              "TextOnly"
+            ],
+            "description": "Link tracking mode recognized by the official Postmark API."
+          },
+          "Attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment file name."
+                },
+                "Content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Base64-encoded attachment content."
+                },
+                "ContentType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment MIME type."
+                },
+                "ContentID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional content ID for inline attachments."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "Name",
+                "Content",
+                "ContentType"
+              ]
+            },
+            "description": "Attachments to include on the email."
+          },
+          "Metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Metadata value."
+            },
+            "description": "Custom metadata key-value pairs attached to the message."
+          },
+          "MessageStream": {
+            "type": "string",
+            "description": "Message stream ID to use when sending the email."
+          },
+          "Subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email subject line."
+          },
+          "HtmlBody": {
+            "type": "string",
+            "description": "HTML body content of the email."
+          },
+          "TextBody": {
+            "type": "string",
+            "description": "Plain-text body content of the email."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "From",
+          "To",
+          "Subject"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Postmark message submission result."
+      }
+    },
+    {
+      "id": "postmark.send_email_with_template",
+      "service": "postmark",
+      "name": "send_email_with_template",
+      "description": "Send a single templated email through the current Postmark server.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "TemplateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Template ID to use when rendering this message."
+          },
+          "TemplateAlias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Template alias to use when rendering this message."
+          },
+          "TemplateModel": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Postmark."
+          },
+          "InlineCss": {
+            "type": "boolean",
+            "description": "Whether CSS blocks should be inlined into rendered HTML content."
+          },
+          "From": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sender email address or full formatted sender string accepted by Postmark."
+          },
+          "To": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient email address string. Multiple recipients are comma separated."
+          },
+          "Cc": {
+            "type": "string",
+            "description": "Cc recipient email address string."
+          },
+          "Bcc": {
+            "type": "string",
+            "description": "Bcc recipient email address string."
+          },
+          "Tag": {
+            "type": "string",
+            "description": "Email tag used for categorization and analytics."
+          },
+          "ReplyTo": {
+            "type": "string",
+            "description": "Reply-To email address override."
+          },
+          "Headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom header name."
+                },
+                "Value": {
+                  "type": "string",
+                  "description": "Custom header value."
+                }
+              },
+              "additionalProperties": false
+            },
+            "description": "Custom headers to include on the email."
+          },
+          "TrackOpens": {
+            "type": "boolean",
+            "description": "Whether open tracking is enabled."
+          },
+          "TrackLinks": {
+            "type": "string",
+            "enum": [
+              "None",
+              "HtmlAndText",
+              "HtmlOnly",
+              "TextOnly"
+            ],
+            "description": "Link tracking mode recognized by the official Postmark API."
+          },
+          "Attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment file name."
+                },
+                "Content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Base64-encoded attachment content."
+                },
+                "ContentType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment MIME type."
+                },
+                "ContentID": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional content ID for inline attachments."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "Name",
+                "Content",
+                "ContentType"
+              ]
+            },
+            "description": "Attachments to include on the email."
+          },
+          "Metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Metadata value."
+            },
+            "description": "Custom metadata key-value pairs attached to the message."
+          },
+          "MessageStream": {
+            "type": "string",
+            "description": "Message stream ID to use when sending the email."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "TemplateModel",
+          "From",
+          "To"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Postmark message submission result."
+      }
+    },
+    {
+      "id": "postmark.validate_template",
+      "service": "postmark",
+      "name": "validate_template",
+      "description": "Validate Postmark template content and render test output.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Subject": {
+            "type": "string",
+            "description": "Subject content to validate against Postmark template syntax."
+          },
+          "HtmlBody": {
+            "type": "string",
+            "description": "HTML body content to validate."
+          },
+          "TextBody": {
+            "type": "string",
+            "description": "Plain-text body content to validate."
+          },
+          "TestRenderModel": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Postmark."
+          },
+          "InlineCssForHtmlTestRender": {
+            "type": "boolean",
+            "description": "Whether CSS blocks should be inlined when rendering HTML test output."
+          },
+          "TemplateType": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "Layout"
+            ],
+            "description": "Template type recognized by the official Postmark API."
+          },
+          "LayoutTemplate": {
+            "type": "string",
+            "description": "Optional layout template alias used while validating a standard template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "TestRenderModel"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Additional upstream fields returned by Postmark."
+      }
+    }
+  ]
+}

@@ -1,0 +1,855 @@
+{
+  "service": "avochato",
+  "displayName": "Avochato",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "authId",
+          "label": "Auth ID",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "AVOCHATO_AUTH_ID",
+          "description": "Account-bound Auth ID generated under Settings > API Access."
+        },
+        {
+          "key": "authSecret",
+          "label": "Auth Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "AVOCHATO_AUTH_SECRET",
+          "description": "Secret paired with the Avochato Auth ID."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.avochato.com/",
+  "actions": [
+    {
+      "id": "avochato.get_contacts",
+      "service": "avochato",
+      "name": "get_contacts",
+      "description": "Retrieve one or more Avochato contacts by their identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Contact ID."
+            },
+            "description": "One or more Avochato contact identifiers.",
+            "minItems": 1
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ids"
+        ],
+        "description": "Contact identifiers and optional page number."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Avochato contact identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact name."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "Contact phone number."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact email address."
+                },
+                "company": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact company name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact company name."
+                },
+                "created_at": {
+                  "type": "number",
+                  "description": "Unix timestamp when the contact was created."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Contact tag."
+                  },
+                  "description": "Tags assigned to the contact."
+                },
+                "opted_out": {
+                  "type": "boolean",
+                  "description": "Whether the contact opted out of messaging."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Avochato contact."
+            },
+            "description": "Matching contacts."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Current page number when returned by Avochato."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current page number when returned by Avochato."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Avochato contacts matching the identifiers."
+      }
+    },
+    {
+      "id": "avochato.get_current_identity",
+      "service": "avochato",
+      "name": "get_current_identity",
+      "description": "Retrieve the account and user associated with the configured Avochato API tokens.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The inbox account associated with the credentials."
+          },
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The user associated with the credentials."
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Credential origin reported by Avochato."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Credential origin reported by Avochato."
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Credential creation time reported by Avochato."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Credential creation time reported by Avochato."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Avochato credential identity."
+      }
+    },
+    {
+      "id": "avochato.get_message",
+      "service": "avochato",
+      "name": "get_message",
+      "description": "Retrieve one Avochato message by its Event ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message Event ID returned as event_id by Avochato."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Event identifier of the message to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Message UUID."
+              },
+              "event_id": {
+                "type": "string",
+                "description": "Event identifier used by the get-message endpoint."
+              },
+              "contact_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Related contact identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Related contact identifier."
+              },
+              "to": {
+                "type": "string",
+                "description": "Message recipient."
+              },
+              "from": {
+                "type": "string",
+                "description": "Message sender."
+              },
+              "direction": {
+                "type": "string",
+                "description": "Message direction."
+              },
+              "message": {
+                "type": "string",
+                "description": "Message text."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current delivery status."
+              },
+              "created_at": {
+                "type": "number",
+                "description": "Unix timestamp when the message was created."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Avochato message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Avochato message."
+      }
+    },
+    {
+      "id": "avochato.list_contacts",
+      "service": "avochato",
+      "name": "list_contacts",
+      "description": "List contacts in the Avochato inbox with cursor-style pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "afterPage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque nextPage value returned by a previous list_contacts call."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of contacts to return, from 1 through 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for listing Avochato contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Avochato contact identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact name."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "Contact phone number."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact email address."
+                },
+                "company": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact company name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact company name."
+                },
+                "created_at": {
+                  "type": "number",
+                  "description": "Unix timestamp when the contact was created."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Contact tag."
+                  },
+                  "description": "Tags assigned to the contact."
+                },
+                "opted_out": {
+                  "type": "boolean",
+                  "description": "Whether the contact opted out of messaging."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Avochato contact."
+            },
+            "description": "Contacts returned for this page."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page when available."
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Number of contacts returned by Avochato."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Number of contacts returned by Avochato."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Avochato contacts."
+      },
+      "followUpActions": [
+        "avochato.get_contacts"
+      ]
+    },
+    {
+      "id": "avochato.list_messages",
+      "service": "avochato",
+      "name": "list_messages",
+      "description": "List or search messages in the Avochato inbox.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Free-text message search query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "description": "Message direction to return."
+          },
+          "status": {
+            "type": "string",
+            "description": "Delivery status to return."
+          },
+          "from": {
+            "type": "string",
+            "description": "Sender phone number filter."
+          },
+          "to": {
+            "type": "string",
+            "description": "Recipient phone number filter."
+          },
+          "createdFrom": {
+            "type": "number",
+            "description": "Minimum message creation Unix timestamp."
+          },
+          "createdTo": {
+            "type": "number",
+            "description": "Maximum message creation Unix timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for Avochato messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "Message UUID."
+                },
+                "event_id": {
+                  "type": "string",
+                  "description": "Event identifier used by the get-message endpoint."
+                },
+                "contact_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Related contact identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Related contact identifier."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "Message recipient."
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Message sender."
+                },
+                "direction": {
+                  "type": "string",
+                  "description": "Message direction."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Message text."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current delivery status."
+                },
+                "created_at": {
+                  "type": "number",
+                  "description": "Unix timestamp when the message was created."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Avochato message."
+            },
+            "description": "Messages returned for this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Current page number when returned by Avochato."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current page number when returned by Avochato."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Avochato messages."
+      },
+      "followUpActions": [
+        "avochato.get_message"
+      ]
+    },
+    {
+      "id": "avochato.send_message",
+      "service": "avochato",
+      "name": "send_message",
+      "description": "Send a text message to an Avochato contact phone number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text to send to the recipient."
+          },
+          "from": {
+            "type": "string",
+            "description": "Avochato E.164 number to send from."
+          },
+          "markAddressed": {
+            "type": "boolean",
+            "description": "Whether to mark the conversation as addressed."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tags to apply to the contact."
+          },
+          "statusCallback": {
+            "type": "string",
+            "description": "URL that receives delivery status updates.",
+            "format": "uri"
+          },
+          "sendAsUserId": {
+            "type": "string",
+            "description": "Avochato user ID to send on behalf of."
+          },
+          "sendAsUserEmail": {
+            "type": "string",
+            "description": "Avochato user email to send on behalf of."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone",
+          "message"
+        ],
+        "description": "Message content and optional routing fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Message UUID."
+              },
+              "event_id": {
+                "type": "string",
+                "description": "Event identifier used by the get-message endpoint."
+              },
+              "contact_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Related contact identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Related contact identifier."
+              },
+              "to": {
+                "type": "string",
+                "description": "Message recipient."
+              },
+              "from": {
+                "type": "string",
+                "description": "Message sender."
+              },
+              "direction": {
+                "type": "string",
+                "description": "Message direction."
+              },
+              "message": {
+                "type": "string",
+                "description": "Message text."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current delivery status."
+              },
+              "created_at": {
+                "type": "number",
+                "description": "Unix timestamp when the message was created."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Avochato message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The queued Avochato message."
+      }
+    },
+    {
+      "id": "avochato.upsert_contact",
+      "service": "avochato",
+      "name": "upsert_contact",
+      "description": "Create or update an Avochato contact, matched by phone number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact phone number, preferably in E.164 format."
+          },
+          "name": {
+            "type": "string",
+            "description": "Contact name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Contact email address."
+          },
+          "otherPhone": {
+            "type": "string",
+            "description": "Additional contact phone number."
+          },
+          "company": {
+            "type": "string",
+            "description": "Contact company name."
+          },
+          "street": {
+            "type": "string",
+            "description": "Contact street address."
+          },
+          "city": {
+            "type": "string",
+            "description": "Contact city."
+          },
+          "state": {
+            "type": "string",
+            "description": "Contact state or region."
+          },
+          "zip": {
+            "type": "string",
+            "description": "Contact postal code."
+          },
+          "country": {
+            "type": "string",
+            "description": "Contact country."
+          },
+          "optedOut": {
+            "type": "boolean",
+            "description": "Whether the contact has opted out of messaging."
+          },
+          "doubleOptedIn": {
+            "type": "boolean",
+            "description": "Whether the contact has double opted in."
+          },
+          "muted": {
+            "type": "boolean",
+            "description": "Whether calls and notifications from the contact are muted."
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "Whether calls and texts to and from the contact are blocked."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "Contact priority from 0 through 5."
+          },
+          "visible": {
+            "type": "boolean",
+            "description": "Whether the contact remains visible."
+          },
+          "landline": {
+            "type": "boolean",
+            "description": "Whether the contact number is a landline."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tags to apply to the contact."
+          },
+          "userId": {
+            "type": "string",
+            "description": "Responsible Avochato user ID or email address."
+          },
+          "stuckNumber": {
+            "type": "string",
+            "description": "Avochato E.164 number to use for future outbound messages."
+          },
+          "allowEmptyFields": {
+            "type": "boolean",
+            "description": "Whether empty or null custom fields may overwrite values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone"
+        ],
+        "description": "Contact fields to create or update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique Avochato contact identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact name."
+              },
+              "phone": {
+                "type": "string",
+                "description": "Contact phone number."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "company": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact company name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact company name."
+              },
+              "created_at": {
+                "type": "number",
+                "description": "Unix timestamp when the contact was created."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Contact tag."
+                },
+                "description": "Tags assigned to the contact."
+              },
+              "opted_out": {
+                "type": "boolean",
+                "description": "Whether the contact opted out of messaging."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Avochato contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created or updated Avochato contact."
+      }
+    }
+  ]
+}

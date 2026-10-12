@@ -1,0 +1,481 @@
+{
+  "service": "wufoo",
+  "displayName": "Wufoo",
+  "description": "Read forms and entries or submit entries to Wufoo.",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WUFOO_API_KEY",
+      "description": "Wufoo API key used as the HTTP Basic authentication username. In Form Manager, open More > API Information beside a form: https://app.wufoo.com/#/form-manager",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-account",
+          "description": "Your Wufoo account subdomain from https://<subdomain>.wufoo.com. Admins can find it in Account Manager: https://help.surveymonkey.com/en/wufoo/account/account-manager/"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.wufoo.com/",
+  "actions": [
+    {
+      "id": "wufoo.count_entries",
+      "service": "wufoo",
+      "name": "count_entries",
+      "description": "Count entries for a Wufoo form, optionally using entry filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The permanent form hash or the form title slug used by Wufoo."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "AND",
+              "OR"
+            ],
+            "description": "How multiple entry filters are grouped."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Wufoo field ID to filter, such as EntryId or Field105."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "Contains",
+                    "Does_not_contain",
+                    "Begins_with",
+                    "Ends_with",
+                    "Is_less_than",
+                    "Is_greater_than",
+                    "Is_on",
+                    "Is_before",
+                    "Is_after",
+                    "Is_not_equal_to",
+                    "Is_equal_to",
+                    "Is_not_NULL"
+                  ],
+                  "description": "The documented Wufoo comparison operator."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value compared with the selected field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Wufoo entry filter."
+            },
+            "description": "Entry filters applied in their listed order.",
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formIdentifier"
+        ],
+        "description": "The form identifier and optional Wufoo entry filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of entries matching the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Wufoo entry count."
+      }
+    },
+    {
+      "id": "wufoo.get_form",
+      "service": "wufoo",
+      "name": "get_form",
+      "description": "Retrieve one Wufoo form by its permanent hash or title slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The permanent form hash or the form title slug used by Wufoo."
+          },
+          "includeTodayCount": {
+            "type": "boolean",
+            "description": "Whether the form should include its number of entries received today."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formIdentifier"
+        ],
+        "description": "The form identifier and optional daily-count control."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Wufoo resource whose fields depend on the account and form definition."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wufoo form response."
+      }
+    },
+    {
+      "id": "wufoo.list_entries",
+      "service": "wufoo",
+      "name": "list_entries",
+      "description": "List, filter, sort, and page entries for a Wufoo form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The permanent form hash or the form title slug used by Wufoo."
+          },
+          "includeSystemFields": {
+            "type": "boolean",
+            "description": "Whether Wufoo should include system metadata such as IP and payment status."
+          },
+          "pageStart": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based entry offset."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of entries to return."
+          },
+          "sortFieldId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wufoo field ID used to sort entries."
+          },
+          "sortDirection": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The direction used to sort entries."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "AND",
+              "OR"
+            ],
+            "description": "How multiple entry filters are grouped."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Wufoo field ID to filter, such as EntryId or Field105."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "Contains",
+                    "Does_not_contain",
+                    "Begins_with",
+                    "Ends_with",
+                    "Is_less_than",
+                    "Is_greater_than",
+                    "Is_on",
+                    "Is_before",
+                    "Is_after",
+                    "Is_not_equal_to",
+                    "Is_equal_to",
+                    "Is_not_NULL"
+                  ],
+                  "description": "The documented Wufoo comparison operator."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value compared with the selected field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Wufoo entry filter."
+            },
+            "description": "Entry filters applied in their listed order.",
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formIdentifier"
+        ],
+        "description": "The form identifier and documented Wufoo entry query controls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Wufoo resource whose fields depend on the account and form definition."
+            },
+            "description": "Entries returned by Wufoo."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wufoo entry list response."
+      }
+    },
+    {
+      "id": "wufoo.list_form_fields",
+      "service": "wufoo",
+      "name": "list_form_fields",
+      "description": "List the field definitions for a Wufoo form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The permanent form hash or the form title slug used by Wufoo."
+          },
+          "includeSystemFields": {
+            "type": "boolean",
+            "description": "Whether Wufoo should include additional system metadata fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formIdentifier"
+        ],
+        "description": "The form identifier and field metadata controls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Wufoo resource whose fields depend on the account and form definition."
+            },
+            "description": "Field definitions returned by Wufoo."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wufoo field definition response."
+      }
+    },
+    {
+      "id": "wufoo.list_forms",
+      "service": "wufoo",
+      "name": "list_forms",
+      "description": "List Wufoo forms available to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based Wufoo result page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of forms to return."
+          },
+          "includeTodayCount": {
+            "type": "boolean",
+            "description": "Whether each form should include its number of entries received today."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and optional daily-count controls for listing forms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Wufoo resource whose fields depend on the account and form definition."
+            },
+            "description": "Forms returned by Wufoo."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wufoo form list response."
+      }
+    },
+    {
+      "id": "wufoo.submit_entry",
+      "service": "wufoo",
+      "name": "submit_entry",
+      "description": "Submit JSON field values as a new entry for a Wufoo form.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The permanent form hash or the form title slug used by Wufoo."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The string value submitted for a Wufoo field."
+            },
+            "description": "Values keyed by Wufoo field IDs such as Field1 or Field105."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The target form and its dynamic Wufoo field values."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Wufoo accepted the entry."
+          },
+          "entryId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The new entry ID when submission succeeds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new entry ID when submission succeeds."
+          },
+          "entryLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Wufoo API link for the new entry when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Wufoo API link for the new entry when available."
+          },
+          "redirectUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The form redirect URL when configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The form redirect URL when configured."
+          },
+          "errorText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The general submission error when validation fails."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The general submission error when validation fails."
+          },
+          "fieldErrors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string",
+                  "description": "The Wufoo field ID that failed validation."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The validation message returned by Wufoo."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A field validation error returned by Wufoo."
+            },
+            "description": "Field-specific validation errors returned by Wufoo."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wufoo entry submission result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,439 @@
+{
+  "service": "postgrid_verify",
+  "displayName": "PostGrid Verify",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "POSTGRID_API_KEY",
+      "description": "PostGrid Verify API key sent with the x-api-key request header. Create or copy it from your PostGrid dashboard: https://dashboard.postgrid.com/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.postgrid.com/address-verification/",
+  "actions": [
+    {
+      "id": "postgrid_verify.autocomplete_address",
+      "service": "postgrid_verify",
+      "name": "autocomplete_address",
+      "description": "Autocomplete a partially specified US or Canadian address with optional location filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "partialStreet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partially written street address to autocomplete.",
+            "pattern": "\\S"
+          },
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional completion result index to retrieve.",
+            "pattern": "\\S"
+          },
+          "pcFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return addresses within this postal or ZIP code.",
+            "pattern": "\\S"
+          },
+          "cityFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return addresses from this city.",
+            "pattern": "\\S"
+          },
+          "stateFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return addresses within this state or province.",
+            "pattern": "\\S"
+          },
+          "countryFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return addresses within this country.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "partialStreet"
+        ],
+        "description": "The input payload for autocompleting a partially specified US or Canadian address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by PostGrid Verify."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by PostGrid Verify."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "description": "The completed street address line."
+                    },
+                    "city": {
+                      "type": "string",
+                      "description": "The city name."
+                    },
+                    "prov": {
+                      "type": "string",
+                      "description": "The province or state abbreviation."
+                    },
+                    "pc": {
+                      "type": "string",
+                      "description": "The postal or ZIP code."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The country code."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The completed address details returned by PostGrid."
+                },
+                "errors": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A validation message returned by PostGrid Verify."
+                    },
+                    "description": "The validation messages for one field."
+                  },
+                  "description": "Field-level validation errors returned by PostGrid Verify."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One PostGrid autocomplete result."
+            },
+            "description": "The address completion results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The address autocomplete response from PostGrid."
+      }
+    },
+    {
+      "id": "postgrid_verify.lookup_city_state_from_postal",
+      "service": "postgrid_verify",
+      "name": "lookup_city_state_from_postal",
+      "description": "Look up city and state or province matches for a postal or ZIP code with PostGrid Verify.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postalOrZip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal or ZIP code used for the lookup.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for looking up city and state or province values from a postal code."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by PostGrid Verify."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by PostGrid Verify."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string",
+                  "description": "The city name corresponding to the postal or ZIP code."
+                },
+                "provinceOrState": {
+                  "type": "string",
+                  "description": "The state or province corresponding to the postal or ZIP code."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One city and state or province match."
+            },
+            "description": "The matching city and state or province records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The postal lookup response from PostGrid."
+      }
+    },
+    {
+      "id": "postgrid_verify.parse_address",
+      "service": "postgrid_verify",
+      "name": "parse_address",
+      "description": "Parse a single-line address into component fields with PostGrid Verify.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to parse on a single line.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for parsing a single-line address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by PostGrid Verify."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by PostGrid Verify."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "houseNumber": {
+                "type": "string",
+                "description": "The house or street number."
+              },
+              "road": {
+                "type": "string",
+                "description": "The street name."
+              },
+              "unit": {
+                "type": "string",
+                "description": "The apartment, suite, or secondary unit designator."
+              },
+              "level": {
+                "type": "string",
+                "description": "The floor number."
+              },
+              "house": {
+                "type": "string",
+                "description": "The building or location name."
+              },
+              "poBox": {
+                "type": "string",
+                "description": "The postal office box."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city name."
+              },
+              "cityDistrict": {
+                "type": "string",
+                "description": "The borough or city district."
+              },
+              "state": {
+                "type": "string",
+                "description": "The state or province."
+              },
+              "stateDistrict": {
+                "type": "string",
+                "description": "The county or state district."
+              },
+              "postcode": {
+                "type": "string",
+                "description": "The postal or ZIP code."
+              },
+              "country": {
+                "type": "string",
+                "description": "The country name."
+              },
+              "suburb": {
+                "type": "string",
+                "description": "The neighborhood or suburb."
+              },
+              "island": {
+                "type": "string",
+                "description": "The island name."
+              },
+              "category": {
+                "type": "string",
+                "description": "The location category."
+              },
+              "near": {
+                "type": "string",
+                "description": "The nearby location reference from the input query."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The parsed address components returned by PostGrid."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The parsed address response from PostGrid."
+      }
+    },
+    {
+      "id": "postgrid_verify.verify_address",
+      "service": "postgrid_verify",
+      "name": "verify_address",
+      "description": "Verify and standardize a US or Canadian address with PostGrid Verify using either freeform or structured address input.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The freeform address written on a single line.",
+            "pattern": "\\S"
+          },
+          "line1": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first line of a structured address.",
+            "pattern": "\\S"
+          },
+          "line2": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional second line of a structured address.",
+            "pattern": "\\S"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name for a structured address.",
+            "pattern": "\\S"
+          },
+          "provinceOrState": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state or province code for a structured address.",
+            "pattern": "\\S"
+          },
+          "postalOrZip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ZIP or postal code for a structured address.",
+            "pattern": "\\S"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 2-letter country code for a structured address.",
+            "pattern": "\\S"
+          },
+          "includeDetails": {
+            "type": "boolean",
+            "description": "Whether to include additional address details in the response."
+          },
+          "geocode": {
+            "type": "boolean",
+            "description": "Whether to include latitude and longitude data in the response."
+          },
+          "properCase": {
+            "type": "boolean",
+            "description": "Whether to return address fields in proper case."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for verifying and standardizing a US or Canadian address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by PostGrid Verify."
+          },
+          "message": {
+            "type": "string",
+            "description": "The message returned by PostGrid Verify."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "line1": {
+                "type": "string",
+                "description": "The first address line."
+              },
+              "line2": {
+                "type": "string",
+                "description": "The second address line when present."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city of the verified address."
+              },
+              "provinceOrState": {
+                "type": "string",
+                "description": "The state or province of the verified address."
+              },
+              "postalOrZip": {
+                "type": "string",
+                "description": "The postal or ZIP code of the verified address."
+              },
+              "country": {
+                "type": "string",
+                "description": "The country code of the verified address."
+              },
+              "status": {
+                "type": "string",
+                "description": "The address verification status."
+              },
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A validation message returned by PostGrid Verify."
+                  },
+                  "description": "The validation messages for one field."
+                },
+                "description": "Field-level validation errors returned by PostGrid Verify."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The verified address details returned by PostGrid."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The address verification response from PostGrid."
+      }
+    }
+  ]
+}

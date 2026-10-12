@@ -1,0 +1,328 @@
+{
+  "service": "textrazor",
+  "displayName": "TextRazor",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TEXTRAZOR_API_KEY",
+      "description": "TextRazor API key used with the X-TextRazor-Key request header. Sign up for an API key at https://www.textrazor.com/signup."
+    }
+  ],
+  "homepageUrl": "https://www.textrazor.com",
+  "actions": [
+    {
+      "id": "textrazor.account_info",
+      "service": "textrazor",
+      "name": "account_info",
+      "description": "Read TextRazor account quota and plan information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "description": "The current subscription plan identifier."
+          },
+          "requestsUsedToday": {
+            "type": "integer",
+            "description": "The number of requests already used today."
+          },
+          "concurrentRequestLimit": {
+            "type": "integer",
+            "description": "The maximum number of concurrent requests allowed."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The TextRazor account summary."
+      }
+    },
+    {
+      "id": "textrazor.analyze_content",
+      "service": "textrazor",
+      "name": "analyze_content",
+      "description": "Analyze text with one or more TextRazor extractors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to analyze."
+          },
+          "extractors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The TextRazor extractors to run."
+          },
+          "cleanup_mode": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "stripTags",
+              "cleanHTML"
+            ],
+            "description": "The cleanup mode TextRazor should apply before analysis."
+          },
+          "language_override": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "An ISO-639-2 language code used to force analysis language."
+          },
+          "cleanup_use_metadata": {
+            "type": "boolean",
+            "description": "Whether TextRazor may use document metadata during cleanup."
+          },
+          "cleanup_return_cleaned": {
+            "type": "boolean",
+            "description": "Whether TextRazor should return cleaned text."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input for a TextRazor analysis request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the analysis request succeeded."
+          },
+          "time": {
+            "type": "number",
+            "description": "The processing time in seconds reported by TextRazor."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw object returned by TextRazor."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The top-level TextRazor analysis response."
+      }
+    },
+    {
+      "id": "textrazor.classify_text",
+      "service": "textrazor",
+      "name": "classify_text",
+      "description": "Classify text with TextRazor classifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to classify."
+          },
+          "classifiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The TextRazor classifiers to run.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input for TextRazor classification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the analysis request succeeded."
+          },
+          "time": {
+            "type": "number",
+            "description": "The processing time in seconds reported by TextRazor."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw object returned by TextRazor."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The top-level TextRazor analysis response."
+      }
+    },
+    {
+      "id": "textrazor.custom_classifier_manager",
+      "service": "textrazor",
+      "name": "custom_classifier_manager",
+      "description": "Create, update, inspect, or delete a TextRazor custom classifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "create_update",
+              "delete",
+              "get_categories",
+              "get_category",
+              "delete_category"
+            ],
+            "description": "The classifier manager operation."
+          },
+          "classifier_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The classifier identifier."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input payload for the custom classifier manager action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw object returned by TextRazor."
+      }
+    },
+    {
+      "id": "textrazor.dictionary_manager",
+      "service": "textrazor",
+      "name": "dictionary_manager",
+      "description": "Create, inspect, update, or delete TextRazor custom entity dictionaries.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "create",
+              "list",
+              "get",
+              "delete",
+              "add_entries",
+              "get_entries",
+              "delete_entries"
+            ],
+            "description": "The dictionary manager operation."
+          },
+          "dictionary_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dictionary identifier."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input payload for the dictionary manager action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A raw object returned by TextRazor."
+      }
+    },
+    {
+      "id": "textrazor.extract_entities",
+      "service": "textrazor",
+      "name": "extract_entities",
+      "description": "Extract entities from text with TextRazor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to analyze."
+          },
+          "entities_allow_overlap": {
+            "type": "boolean",
+            "description": "Whether entity matches may overlap."
+          },
+          "entities_filter_dbpedia_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "DBpedia types to include."
+          },
+          "entities_filter_freebase_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Freebase types to include."
+          },
+          "entity_dictionaries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Custom entity dictionary ids to use."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input for TextRazor entity extraction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the analysis request succeeded."
+          },
+          "time": {
+            "type": "number",
+            "description": "The processing time in seconds reported by TextRazor."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw object returned by TextRazor."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The top-level TextRazor analysis response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,402 @@
+{
+  "service": "ntfy",
+  "displayName": "ntfy",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "NTFY_ACCESS_TOKEN",
+      "description": "ntfy access token sent with the Authorization Bearer header. Create tokens with the ntfy token command or in the ntfy web app Account section: https://docs.ntfy.sh/publish/#access-tokens."
+    }
+  ],
+  "homepageUrl": "https://ntfy.sh",
+  "actions": [
+    {
+      "id": "ntfy.get_account",
+      "service": "ntfy",
+      "name": "get_account",
+      "description": "Retrieve ntfy account profile, limits, and usage for the access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the ntfy account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The authenticated ntfy username."
+          },
+          "role": {
+            "type": "string",
+            "description": "The ntfy account role."
+          },
+          "sync_topic": {
+            "type": "string",
+            "description": "The account sync topic."
+          },
+          "provisioned": {
+            "type": "boolean",
+            "description": "Whether the account is provisioned by server configuration."
+          },
+          "language": {
+            "type": "string",
+            "description": "The preferred account language."
+          },
+          "date_format": {
+            "type": "string",
+            "description": "The preferred date format."
+          },
+          "time_format": {
+            "type": "string",
+            "description": "The preferred time format."
+          },
+          "tier": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "The ntfy tier code."
+              },
+              "name": {
+                "type": "string",
+                "description": "The ntfy tier name."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The ntfy account tier."
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "basis": {
+                "type": "string",
+                "description": "The limit basis, such as ip or tier."
+              },
+              "messages": {
+                "type": "integer",
+                "description": "The message limit."
+              },
+              "messages_expiry_duration": {
+                "type": "integer",
+                "description": "The message expiry duration in seconds."
+              },
+              "emails": {
+                "type": "integer",
+                "description": "The email publishing limit."
+              },
+              "calls": {
+                "type": "integer",
+                "description": "The phone call publishing limit."
+              },
+              "reservations": {
+                "type": "integer",
+                "description": "The topic reservation limit."
+              },
+              "attachment_total_size": {
+                "type": "integer",
+                "description": "The total attachment size limit."
+              },
+              "attachment_file_size": {
+                "type": "integer",
+                "description": "The per-file attachment size limit."
+              },
+              "attachment_expiry_duration": {
+                "type": "integer",
+                "description": "The attachment expiry duration in seconds."
+              },
+              "attachment_bandwidth": {
+                "type": "integer",
+                "description": "The attachment bandwidth limit."
+              }
+            },
+            "additionalProperties": true,
+            "description": "ntfy account limits."
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "integer",
+                "description": "The number of messages used."
+              },
+              "messages_remaining": {
+                "type": "integer",
+                "description": "The number of remaining messages."
+              },
+              "emails": {
+                "type": "integer",
+                "description": "The number of emails used."
+              },
+              "emails_remaining": {
+                "type": "integer",
+                "description": "The number of remaining emails."
+              },
+              "calls": {
+                "type": "integer",
+                "description": "The number of calls used."
+              },
+              "calls_remaining": {
+                "type": "integer",
+                "description": "The number of remaining calls."
+              },
+              "reservations": {
+                "type": "integer",
+                "description": "The number of topic reservations used."
+              },
+              "reservations_remaining": {
+                "type": "integer",
+                "description": "The number of remaining topic reservations."
+              },
+              "attachment_total_size": {
+                "type": "integer",
+                "description": "The attachment storage used."
+              },
+              "attachment_total_size_remaining": {
+                "type": "integer",
+                "description": "The remaining attachment storage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "ntfy account usage statistics."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ntfy account response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "ntfy account profile, limits, and usage returned by GET /v1/account."
+      }
+    },
+    {
+      "id": "ntfy.publish_message",
+      "service": "ntfy",
+      "name": "publish_message",
+      "description": "Publish a notification message to a ntfy topic.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The ntfy topic name. Use 1 to 64 ASCII letters, numbers, underscores, or dashes.",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "message": {
+            "type": "string",
+            "description": "The notification body text. If omitted or empty, ntfy publishes an empty body."
+          },
+          "title": {
+            "type": "string",
+            "description": "The notification title."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The notification priority from 1 to 5."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A ntfy tag."
+            },
+            "description": "Comma-separated ntfy tags represented as an array."
+          },
+          "click": {
+            "type": "string",
+            "description": "The URL opened when the notification is clicked.",
+            "format": "uri"
+          },
+          "attach": {
+            "type": "string",
+            "description": "A file URL that ntfy should attach to the notification.",
+            "format": "uri"
+          },
+          "icon": {
+            "type": "string",
+            "description": "A JPEG or PNG icon URL that ntfy clients should show.",
+            "format": "uri"
+          },
+          "filename": {
+            "type": "string",
+            "description": "The attachment filename shown by ntfy clients."
+          },
+          "markdown": {
+            "type": "boolean",
+            "description": "Whether ntfy should render the notification body as Markdown."
+          },
+          "email": {
+            "type": "string",
+            "description": "An email address or yes to forward the notification by email."
+          },
+          "call": {
+            "type": "string",
+            "description": "A phone number or yes to trigger a phone call notification."
+          },
+          "delay": {
+            "type": "string",
+            "description": "A ntfy scheduled delivery timestamp or duration."
+          },
+          "cache": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "description": "Whether ntfy should enable this publish option."
+          },
+          "firebase": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "description": "Whether ntfy should enable this publish option."
+          },
+          "sequence_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The ntfy sequence ID. Use 1 to 64 ASCII letters, numbers, underscores, or dashes.",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "topic"
+        ],
+        "description": "Input parameters for publishing a notification with ntfy."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ntfy message ID."
+          },
+          "sequence_id": {
+            "type": "string",
+            "description": "The ntfy sequence ID when it differs from the message ID."
+          },
+          "time": {
+            "type": "integer",
+            "description": "The Unix timestamp when ntfy accepted the message."
+          },
+          "expires": {
+            "type": "integer",
+            "description": "The Unix timestamp when the message expires."
+          },
+          "event": {
+            "type": "string",
+            "description": "The ntfy event type."
+          },
+          "topic": {
+            "type": "string",
+            "description": "The ntfy topic."
+          },
+          "title": {
+            "type": "string",
+            "description": "The notification title."
+          },
+          "message": {
+            "type": "string",
+            "description": "The notification body text."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "The notification priority."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A ntfy tag."
+            },
+            "description": "The ntfy tags returned for the message."
+          },
+          "click": {
+            "type": "string",
+            "description": "The click URL returned by ntfy.",
+            "format": "uri"
+          },
+          "icon": {
+            "type": "string",
+            "description": "The icon URL returned by ntfy.",
+            "format": "uri"
+          },
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The attachment file name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The attachment size in bytes."
+              },
+              "expires": {
+                "type": "integer",
+                "description": "The Unix timestamp when the attachment expires."
+              },
+              "url": {
+                "type": "string",
+                "description": "The attachment URL.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": true,
+            "description": "Attachment metadata returned by ntfy."
+          },
+          "content_type": {
+            "type": "string",
+            "description": "The message content type returned by ntfy."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ntfy message response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "time",
+          "event",
+          "topic",
+          "raw"
+        ],
+        "description": "The message object returned by ntfy after publishing."
+      }
+    }
+  ]
+}

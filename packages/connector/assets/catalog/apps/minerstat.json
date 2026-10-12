@@ -1,0 +1,473 @@
+{
+  "service": "minerstat",
+  "displayName": "Minerstat",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MINERSTAT_API_KEY",
+      "description": "Minerstat developer API key sent in the X-API-Key header. Create or view keys in the official Developer Portal: https://api.minerstat.com/dev/login"
+    }
+  ],
+  "homepageUrl": "https://minerstat.com/",
+  "actions": [
+    {
+      "id": "minerstat.list_coins",
+      "service": "minerstat",
+      "name": "list_coins",
+      "description": "List Minerstat coin profitability and market data, optionally filtered by ticker or mining algorithm.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated coin tickers to return, for example BTC,BCH,BSV."
+          },
+          "algo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated mining algorithms to return, for example SHA-256,Scrypt."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Minerstat coin data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Minerstat coin identifier."
+                },
+                "coin": {
+                  "type": "string",
+                  "description": "The coin ticker symbol."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The coin name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Minerstat record type, such as coin or pool."
+                },
+                "algorithm": {
+                  "type": "string",
+                  "description": "The mining algorithm used by the coin."
+                },
+                "network_hashrate": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The network hashrate in hashes per second, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The network hashrate in hashes per second, or null when unavailable."
+                },
+                "difficulty": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The current mining difficulty, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current mining difficulty, or null when unavailable."
+                },
+                "reward": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The estimated reward for one hash per second over one hour, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated reward for one hash per second over one hour, or null when unavailable."
+                },
+                "reward_unit": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reward currency unit, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reward currency unit, or null when unavailable."
+                },
+                "reward_block": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The block reward amount, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The block reward amount, or null when unavailable."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The current price in US dollars, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current price in US dollars, or null when unavailable."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The last 24-hour trading volume in US dollars, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last 24-hour trading volume in US dollars, or null when unavailable."
+                },
+                "updated": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Unix timestamp when Minerstat last updated the coin record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Unix timestamp when Minerstat last updated the coin record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One coin or multi-pool record returned by Minerstat."
+            },
+            "description": "Coin records returned by Minerstat."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "coins"
+        ],
+        "description": "The normalized Minerstat coin response."
+      }
+    },
+    {
+      "id": "minerstat.list_hardware",
+      "service": "minerstat",
+      "name": "list_hardware",
+      "description": "List Minerstat GPU and ASIC benchmark data, optionally filtered by hardware type or brand.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "gpu",
+              "asic"
+            ],
+            "description": "The hardware category to return."
+          },
+          "brand": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The hardware brand or manufacturer to return, for example nvidia or antminer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Minerstat hardware data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hardware": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Minerstat hardware identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The mining hardware model name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Minerstat URL slug for the hardware model."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The hardware category, such as gpu or asic."
+                },
+                "brand": {
+                  "type": "string",
+                  "description": "The hardware brand or manufacturer."
+                },
+                "algorithms": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "hashrate": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The estimated algorithm hashrate in hashes per second, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The estimated algorithm hashrate in hashes per second, or null when unavailable."
+                      },
+                      "power": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The estimated algorithm power consumption in watts, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The estimated algorithm power consumption in watts, or null when unavailable."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One Minerstat benchmark for a mining algorithm."
+                  },
+                  "description": "Benchmark data keyed by mining algorithm name."
+                },
+                "specs": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-defined hardware specifications such as clocks, memory, release date, or power."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One mining hardware record returned by Minerstat."
+            },
+            "description": "Mining hardware records returned by Minerstat."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hardware"
+        ],
+        "description": "The normalized Minerstat hardware response."
+      }
+    },
+    {
+      "id": "minerstat.list_pools",
+      "service": "minerstat",
+      "name": "list_pools",
+      "description": "List Minerstat mining pools and supported-coin terms, optionally filtered by coin or pool type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "coin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported coin symbol to return, for example BTC or ETH."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pool category to return, for example multipool."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Minerstat pool data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Minerstat pool identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The mining pool name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Minerstat URL slug for the pool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The pool description."
+                },
+                "website": {
+                  "type": "string",
+                  "description": "The pool website URL."
+                },
+                "founded": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The founding year represented as an integer."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The founding year represented as a string."
+                    }
+                  ],
+                  "description": "The year the pool was founded."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The pool category, such as pool or multipool."
+                },
+                "coins": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "algorithm": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The mining algorithm used for the coin, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The mining algorithm used for the coin, or null when unavailable."
+                      },
+                      "payoutThreshold": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The payout threshold including any upstream unit."
+                          },
+                          {
+                            "type": "number",
+                            "description": "The numeric payout threshold."
+                          },
+                          {
+                            "type": "null",
+                            "description": "No payout threshold value."
+                          }
+                        ],
+                        "description": "The minimum payout threshold, or null when unavailable."
+                      },
+                      "rewardMethod": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The pool reward distribution method, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The pool reward distribution method, or null when unavailable."
+                      },
+                      "fee": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The pool fee including any upstream percent sign or unit."
+                          },
+                          {
+                            "type": "number",
+                            "description": "The numeric pool fee."
+                          },
+                          {
+                            "type": "null",
+                            "description": "No pool fee value."
+                          }
+                        ],
+                        "description": "The pool fee, or null when unavailable."
+                      },
+                      "anonymous": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the pool supports anonymous mining for the coin."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the pool supports anonymous mining for the coin."
+                      },
+                      "registration": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the pool requires registration for the coin."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the pool requires registration for the coin."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Mining terms for one coin supported by a Minerstat pool."
+                  },
+                  "description": "Pool terms keyed by supported coin symbol."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One mining pool record returned by Minerstat."
+            },
+            "description": "Mining pool records returned by Minerstat."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pools"
+        ],
+        "description": "The normalized Minerstat pool response."
+      }
+    }
+  ]
+}

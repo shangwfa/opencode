@@ -1,0 +1,801 @@
+{
+  "service": "mailchimp",
+  "displayName": "Mailchimp",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://login.mailchimp.com/oauth2/authorize",
+      "tokenUrl": "https://login.mailchimp.com/oauth2/token",
+      "scopes": [],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationRequestFields": {
+        "scope": false
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "0123456789abcdef-us1",
+      "description": "Mailchimp Marketing API key used with HTTP Basic auth. Generate it under Profile > Extras > API keys: https://mailchimp.com/help/about-api-keys/."
+    }
+  ],
+  "homepageUrl": "https://mailchimp.com",
+  "actions": [
+    {
+      "id": "mailchimp.archive_member",
+      "service": "mailchimp",
+      "name": "archive_member",
+      "description": "Archive a Mailchimp member from the specified audience/list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Mailchimp member locator for archiving a member.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Mailchimp accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after a Mailchimp no-content response."
+      }
+    },
+    {
+      "id": "mailchimp.delete_member_permanently",
+      "service": "mailchimp",
+      "name": "delete_member_permanently",
+      "description": "Permanently delete a Mailchimp member from the specified audience/list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Mailchimp member locator for permanently deleting a member.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Mailchimp accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after a Mailchimp no-content response."
+      }
+    },
+    {
+      "id": "mailchimp.get_list",
+      "service": "mailchimp",
+      "name": "get_list",
+      "description": "Fetch a single Mailchimp audience/list by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Path parameters for fetching a single Mailchimp audience/list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Audience/list object returned by Mailchimp."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "list"
+        ],
+        "description": "Single Mailchimp audience/list response normalized by the connector."
+      }
+    },
+    {
+      "id": "mailchimp.get_member",
+      "service": "mailchimp",
+      "name": "get_member",
+      "description": "Fetch a single Mailchimp member by subscriber hash or email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Mailchimp list identifier plus either a subscriber hash or an email address.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Member object returned by Mailchimp."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "member"
+        ],
+        "description": "Single Mailchimp member response normalized by the connector."
+      }
+    },
+    {
+      "id": "mailchimp.list_lists",
+      "service": "mailchimp",
+      "name": "list_lists",
+      "description": "List Mailchimp audiences/lists visible to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before collecting the response page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Mailchimp audiences/lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Audience/list object returned by Mailchimp."
+            },
+            "description": "Array of lists returned by the official Mailchimp API."
+          },
+          "total_items": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of items reported by the official Mailchimp API."
+          },
+          "_links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hypermedia link object returned by Mailchimp."
+            },
+            "description": "Hypermedia links returned by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "lists"
+        ],
+        "description": "Mailchimp audience/list collection response."
+      }
+    },
+    {
+      "id": "mailchimp.list_member_tags",
+      "service": "mailchimp",
+      "name": "list_member_tags",
+      "description": "List tags currently attached to a Mailchimp member.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Mailchimp member locator for listing tags.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tag object returned by Mailchimp."
+            },
+            "description": "Array of tags returned by the official Mailchimp API."
+          },
+          "total_items": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of items reported by the official Mailchimp API."
+          },
+          "_links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hypermedia link object returned by Mailchimp."
+            },
+            "description": "Hypermedia links returned by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "tags"
+        ],
+        "description": "Mailchimp member-tags response."
+      }
+    },
+    {
+      "id": "mailchimp.list_members",
+      "service": "mailchimp",
+      "name": "list_members",
+      "description": "List members in a Mailchimp audience/list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before collecting the response page."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp member status value accepted by the official API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Query parameters for listing members in a Mailchimp audience/list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Member object returned by Mailchimp."
+            },
+            "description": "Array of members returned by the official Mailchimp API."
+          },
+          "total_items": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of items reported by the official Mailchimp API."
+          },
+          "_links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hypermedia link object returned by Mailchimp."
+            },
+            "description": "Hypermedia links returned by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "members"
+        ],
+        "description": "Mailchimp member collection response."
+      }
+    },
+    {
+      "id": "mailchimp.list_merge_fields",
+      "service": "mailchimp",
+      "name": "list_merge_fields",
+      "description": "List merge fields defined for a Mailchimp audience/list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before collecting the response page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Query parameters for listing Mailchimp merge fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "merge_fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Merge field object returned by Mailchimp."
+            },
+            "description": "Array of merge_fields returned by the official Mailchimp API."
+          },
+          "total_items": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of items reported by the official Mailchimp API."
+          },
+          "_links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hypermedia link object returned by Mailchimp."
+            },
+            "description": "Hypermedia links returned by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "merge_fields"
+        ],
+        "description": "Mailchimp merge-field collection response."
+      }
+    },
+    {
+      "id": "mailchimp.update_member",
+      "service": "mailchimp",
+      "name": "update_member",
+      "description": "Patch an existing Mailchimp member by subscriber hash or email address.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          },
+          "skip_merge_validation": {
+            "type": "boolean",
+            "description": "Whether Mailchimp should skip merge-field validation during the write request."
+          },
+          "merge_fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Merge fields object accepted by the official Mailchimp API."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp member status value accepted by the official API."
+          },
+          "vip": {
+            "type": "boolean",
+            "description": "Whether Mailchimp should mark the member as VIP."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred language code accepted by the official Mailchimp API."
+          },
+          "email_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email content type accepted by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Request payload for patching an existing Mailchimp member.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Member object returned by Mailchimp after the update request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "member"
+        ],
+        "description": "Single Mailchimp member response normalized after an update request."
+      }
+    },
+    {
+      "id": "mailchimp.update_member_tags",
+      "service": "mailchimp",
+      "name": "update_member_tags",
+      "description": "Add or remove Mailchimp member tags using the official tag-update endpoint.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "subscriber_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lowercase MD5 hash of the subscriber email address accepted by Mailchimp."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Tag name accepted by the official Mailchimp API."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "inactive"
+                  ],
+                  "description": "Tag state accepted by the official Mailchimp member-tags endpoint."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "status"
+              ],
+              "description": "Single Mailchimp tag update instruction."
+            },
+            "description": "Tag updates to submit to Mailchimp.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "tags"
+        ],
+        "description": "Request payload for updating Mailchimp member tags.",
+        "anyOf": [
+          {
+            "required": [
+              "subscriber_hash"
+            ]
+          },
+          {
+            "required": [
+              "email_address"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Mailchimp accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after a Mailchimp no-content response."
+      }
+    },
+    {
+      "id": "mailchimp.upsert_member",
+      "service": "mailchimp",
+      "name": "upsert_member",
+      "description": "Add or update a Mailchimp member using the official upsert endpoint.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp audience/list identifier."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "Subscriber email address used by Mailchimp to derive the subscriber hash.",
+            "format": "email"
+          },
+          "status_if_new": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp member status value accepted by the official API."
+          },
+          "skip_merge_validation": {
+            "type": "boolean",
+            "description": "Whether Mailchimp should skip merge-field validation during the write request."
+          },
+          "merge_fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Merge fields object accepted by the official Mailchimp API."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailchimp member status value accepted by the official API."
+          },
+          "vip": {
+            "type": "boolean",
+            "description": "Whether Mailchimp should mark the member as VIP."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred language code accepted by the official Mailchimp API."
+          },
+          "email_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email content type accepted by the official Mailchimp API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "email_address"
+        ],
+        "description": "Request payload for Mailchimp add-or-update member requests."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Member object returned by Mailchimp after the upsert request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "member"
+        ],
+        "description": "Single Mailchimp member response normalized after an upsert request."
+      }
+    }
+  ]
+}

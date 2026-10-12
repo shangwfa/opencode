@@ -1,0 +1,1433 @@
+{
+  "service": "updown_io",
+  "displayName": "updown.io",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "updown_api_key",
+      "description": "updown.io API key used with the X-API-KEY header. Sign in to view your API key at https://updown.io/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://updown.io",
+  "actions": [
+    {
+      "id": "updown_io.create_check",
+      "service": "updown_io",
+      "name": "create_check",
+      "description": "Create a new monitoring check in the updown.io account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to monitor. It is required for all checks except pulse checks.",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "https",
+              "http",
+              "icmp",
+              "pulse",
+              "tcp",
+              "tcps"
+            ],
+            "description": "The type of check to create or update."
+          },
+          "period": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 2592000,
+            "description": "The check interval in seconds accepted by updown.io."
+          },
+          "apdex_t": {
+            "anyOf": [
+              {
+                "const": 0.125,
+                "type": "number"
+              },
+              {
+                "const": 0.25,
+                "type": "number"
+              },
+              {
+                "const": 0.5,
+                "type": "number"
+              },
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              },
+              {
+                "const": 4,
+                "type": "number"
+              },
+              {
+                "const": 8,
+                "type": "number"
+              }
+            ],
+            "description": "The APDEX threshold in seconds accepted by updown.io."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the check is enabled."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether the public status page is enabled."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A human-readable alias for the check."
+          },
+          "string_match": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string that must be present in the response body."
+          },
+          "mute_until": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time, 'recovery', or 'forever' value supported by updown.io."
+          },
+          "http_verb": {
+            "type": "string",
+            "enum": [
+              "GET/HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ],
+            "description": "The HTTP verb used by the check."
+          },
+          "http_body": {
+            "type": "string",
+            "description": "The HTTP request body sent with the check."
+          },
+          "disabled_locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "lan",
+                "mia",
+                "bhs",
+                "rbx",
+                "fra",
+                "cap",
+                "hel",
+                "sin",
+                "tok",
+                "syd"
+              ],
+              "description": "A monitoring location code supported by updown.io."
+            },
+            "description": "Monitoring locations disabled for this check.",
+            "minItems": 1
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A recipient identifier returned by the updown.io recipients API."
+            },
+            "description": "Recipients selected for this check.",
+            "minItems": 1
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value sent by the check."
+            },
+            "description": "Custom HTTP headers sent by updown.io when performing the check."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating an updown.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The unique token of the check."
+          },
+          "url": {
+            "type": "string",
+            "description": "The monitored URL."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of check."
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The human-readable alias of the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The human-readable alias of the check."
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The last HTTP status code returned by the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last HTTP status code returned by the monitored endpoint."
+          },
+          "uptime": {
+            "type": "number",
+            "description": "The uptime percentage reported by updown.io."
+          },
+          "down": {
+            "type": "boolean",
+            "description": "Whether the check is currently down."
+          },
+          "down_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check went down, if it is currently down."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check went down, if it is currently down."
+          },
+          "up_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check most recently recovered."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check most recently recovered."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last error message returned by updown.io, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last error message returned by updown.io, if any."
+          },
+          "period": {
+            "type": "integer",
+            "description": "The check interval in seconds."
+          },
+          "apdex_t": {
+            "type": "number",
+            "description": "The APDEX threshold in seconds."
+          },
+          "string_match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The response body string required by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response body string required by the check."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the check is enabled."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether the public status page is enabled."
+          },
+          "disabled_locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Monitoring locations disabled for this check."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Recipients selected for this check."
+          },
+          "last_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io last executed the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io last executed the check."
+          },
+          "next_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io will next execute the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io will next execute the check."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the check was created."
+          },
+          "mute_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The mute-until setting returned by updown.io."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The mute-until setting returned by updown.io."
+          },
+          "favicon_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The favicon URL discovered for the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The favicon URL discovered for the monitored endpoint."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers configured for the check."
+          },
+          "http_verb": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP verb used by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP verb used by the check."
+          },
+          "http_body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP request body sent by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP request body sent by the check."
+          },
+          "ssl": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "SSL information returned by updown.io, if present."
+          },
+          "domain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Domain metadata returned by updown.io, if present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A monitoring check returned by the updown.io API."
+      }
+    },
+    {
+      "id": "updown_io.delete_check",
+      "service": "updown_io",
+      "name": "delete_check",
+      "description": "Delete a monitoring check from the updown.io account.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique token of the updown.io check."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting an updown.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the check was deleted successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion acknowledgement returned by updown.io."
+      }
+    },
+    {
+      "id": "updown_io.get_check",
+      "service": "updown_io",
+      "name": "get_check",
+      "description": "Get a single monitoring check from updown.io by token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique token of the updown.io check."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting an updown.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The unique token of the check."
+          },
+          "url": {
+            "type": "string",
+            "description": "The monitored URL."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of check."
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The human-readable alias of the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The human-readable alias of the check."
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The last HTTP status code returned by the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last HTTP status code returned by the monitored endpoint."
+          },
+          "uptime": {
+            "type": "number",
+            "description": "The uptime percentage reported by updown.io."
+          },
+          "down": {
+            "type": "boolean",
+            "description": "Whether the check is currently down."
+          },
+          "down_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check went down, if it is currently down."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check went down, if it is currently down."
+          },
+          "up_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check most recently recovered."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check most recently recovered."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last error message returned by updown.io, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last error message returned by updown.io, if any."
+          },
+          "period": {
+            "type": "integer",
+            "description": "The check interval in seconds."
+          },
+          "apdex_t": {
+            "type": "number",
+            "description": "The APDEX threshold in seconds."
+          },
+          "string_match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The response body string required by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response body string required by the check."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the check is enabled."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether the public status page is enabled."
+          },
+          "disabled_locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Monitoring locations disabled for this check."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Recipients selected for this check."
+          },
+          "last_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io last executed the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io last executed the check."
+          },
+          "next_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io will next execute the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io will next execute the check."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the check was created."
+          },
+          "mute_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The mute-until setting returned by updown.io."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The mute-until setting returned by updown.io."
+          },
+          "favicon_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The favicon URL discovered for the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The favicon URL discovered for the monitored endpoint."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers configured for the check."
+          },
+          "http_verb": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP verb used by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP verb used by the check."
+          },
+          "http_body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP request body sent by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP request body sent by the check."
+          },
+          "ssl": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "SSL information returned by updown.io, if present."
+          },
+          "domain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Domain metadata returned by updown.io, if present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A monitoring check returned by the updown.io API."
+      }
+    },
+    {
+      "id": "updown_io.list_checks",
+      "service": "updown_io",
+      "name": "list_checks",
+      "description": "List all monitoring checks available in the updown.io account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing updown.io checks."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "The unique token of the check."
+            },
+            "url": {
+              "type": "string",
+              "description": "The monitored URL."
+            },
+            "type": {
+              "type": "string",
+              "description": "The type of check."
+            },
+            "alias": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The human-readable alias of the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The human-readable alias of the check."
+            },
+            "last_status": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "description": "The last HTTP status code returned by the monitored endpoint."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The last HTTP status code returned by the monitored endpoint."
+            },
+            "uptime": {
+              "type": "number",
+              "description": "The uptime percentage reported by updown.io."
+            },
+            "down": {
+              "type": "boolean",
+              "description": "Whether the check is currently down."
+            },
+            "down_since": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "When the check went down, if it is currently down."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When the check went down, if it is currently down."
+            },
+            "up_since": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "When the check most recently recovered."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When the check most recently recovered."
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The last error message returned by updown.io, if any."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The last error message returned by updown.io, if any."
+            },
+            "period": {
+              "type": "integer",
+              "description": "The check interval in seconds."
+            },
+            "apdex_t": {
+              "type": "number",
+              "description": "The APDEX threshold in seconds."
+            },
+            "string_match": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The response body string required by the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The response body string required by the check."
+            },
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether the check is enabled."
+            },
+            "published": {
+              "type": "boolean",
+              "description": "Whether the public status page is enabled."
+            },
+            "disabled_locations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Monitoring locations disabled for this check."
+            },
+            "recipients": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Recipients selected for this check."
+            },
+            "last_check_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "When updown.io last executed the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When updown.io last executed the check."
+            },
+            "next_check_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "When updown.io will next execute the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "When updown.io will next execute the check."
+            },
+            "created_at": {
+              "type": "string",
+              "description": "When the check was created."
+            },
+            "mute_until": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The mute-until setting returned by updown.io."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The mute-until setting returned by updown.io."
+            },
+            "favicon_url": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The favicon URL discovered for the monitored endpoint."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The favicon URL discovered for the monitored endpoint."
+            },
+            "custom_headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "description": "A custom HTTP header value."
+              },
+              "description": "Custom HTTP headers configured for the check."
+            },
+            "http_verb": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The HTTP verb used by the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The HTTP verb used by the check."
+            },
+            "http_body": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The HTTP request body sent by the check."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The HTTP request body sent by the check."
+            },
+            "ssl": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "SSL information returned by updown.io, if present."
+            },
+            "domain": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Domain metadata returned by updown.io, if present."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A monitoring check returned by the updown.io API."
+        },
+        "description": "All checks returned by the updown.io API."
+      }
+    },
+    {
+      "id": "updown_io.list_node_ips",
+      "service": "updown_io",
+      "name": "list_node_ips",
+      "description": "List all updown.io monitoring node IP addresses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing updown.io node IP addresses."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "All monitoring node IP addresses returned by updown.io."
+      }
+    },
+    {
+      "id": "updown_io.list_node_ipv4",
+      "service": "updown_io",
+      "name": "list_node_ipv4",
+      "description": "List all updown.io monitoring node IPv4 addresses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing updown.io node IPv4 addresses."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "All monitoring node IPv4 addresses returned by updown.io."
+      }
+    },
+    {
+      "id": "updown_io.list_node_ipv6",
+      "service": "updown_io",
+      "name": "list_node_ipv6",
+      "description": "List all updown.io monitoring node IPv6 addresses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing updown.io node IPv6 addresses."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "All monitoring node IPv6 addresses returned by updown.io."
+      }
+    },
+    {
+      "id": "updown_io.list_nodes",
+      "service": "updown_io",
+      "name": "list_nodes",
+      "description": "List all updown.io monitoring nodes and their network metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing updown.io nodes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "ip": {
+              "type": "string",
+              "description": "The IPv4 address of the updown.io node."
+            },
+            "ip6": {
+              "type": "string",
+              "description": "The IPv6 address of the updown.io node."
+            },
+            "city": {
+              "type": "string",
+              "description": "The city where the node is located."
+            },
+            "country": {
+              "type": "string",
+              "description": "The country where the node is located."
+            },
+            "country_code": {
+              "type": "string",
+              "description": "The lowercase country code of the node."
+            },
+            "lat": {
+              "type": "number",
+              "description": "The latitude of the node."
+            },
+            "lng": {
+              "type": "number",
+              "description": "The longitude of the node."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A single updown.io monitoring node."
+        },
+        "description": "All monitoring nodes keyed by their node identifier."
+      }
+    },
+    {
+      "id": "updown_io.update_check",
+      "service": "updown_io",
+      "name": "update_check",
+      "description": "Update an existing monitoring check in the updown.io account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique token of the updown.io check."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL to monitor. It is required for all checks except pulse checks.",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "https",
+              "http",
+              "icmp",
+              "pulse",
+              "tcp",
+              "tcps"
+            ],
+            "description": "The type of check to create or update."
+          },
+          "period": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 2592000,
+            "description": "The check interval in seconds accepted by updown.io."
+          },
+          "apdex_t": {
+            "anyOf": [
+              {
+                "const": 0.125,
+                "type": "number"
+              },
+              {
+                "const": 0.25,
+                "type": "number"
+              },
+              {
+                "const": 0.5,
+                "type": "number"
+              },
+              {
+                "const": 1,
+                "type": "number"
+              },
+              {
+                "const": 2,
+                "type": "number"
+              },
+              {
+                "const": 4,
+                "type": "number"
+              },
+              {
+                "const": 8,
+                "type": "number"
+              }
+            ],
+            "description": "The APDEX threshold in seconds accepted by updown.io."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the check is enabled."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether the public status page is enabled."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A human-readable alias for the check."
+          },
+          "string_match": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string that must be present in the response body."
+          },
+          "mute_until": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time, 'recovery', or 'forever' value supported by updown.io."
+          },
+          "http_verb": {
+            "type": "string",
+            "enum": [
+              "GET/HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ],
+            "description": "The HTTP verb used by the check."
+          },
+          "http_body": {
+            "type": "string",
+            "description": "The HTTP request body sent with the check."
+          },
+          "disabled_locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "lan",
+                "mia",
+                "bhs",
+                "rbx",
+                "fra",
+                "cap",
+                "hel",
+                "sin",
+                "tok",
+                "syd"
+              ],
+              "description": "A monitoring location code supported by updown.io."
+            },
+            "description": "Monitoring locations disabled for this check.",
+            "minItems": 1
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A recipient identifier returned by the updown.io recipients API."
+            },
+            "description": "Recipients selected for this check.",
+            "minItems": 1
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value sent by the check."
+            },
+            "description": "Custom HTTP headers sent by updown.io when performing the check."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "The input payload for updating an updown.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The unique token of the check."
+          },
+          "url": {
+            "type": "string",
+            "description": "The monitored URL."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of check."
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The human-readable alias of the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The human-readable alias of the check."
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The last HTTP status code returned by the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last HTTP status code returned by the monitored endpoint."
+          },
+          "uptime": {
+            "type": "number",
+            "description": "The uptime percentage reported by updown.io."
+          },
+          "down": {
+            "type": "boolean",
+            "description": "Whether the check is currently down."
+          },
+          "down_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check went down, if it is currently down."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check went down, if it is currently down."
+          },
+          "up_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the check most recently recovered."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the check most recently recovered."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last error message returned by updown.io, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last error message returned by updown.io, if any."
+          },
+          "period": {
+            "type": "integer",
+            "description": "The check interval in seconds."
+          },
+          "apdex_t": {
+            "type": "number",
+            "description": "The APDEX threshold in seconds."
+          },
+          "string_match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The response body string required by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The response body string required by the check."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the check is enabled."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Whether the public status page is enabled."
+          },
+          "disabled_locations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Monitoring locations disabled for this check."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Recipients selected for this check."
+          },
+          "last_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io last executed the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io last executed the check."
+          },
+          "next_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When updown.io will next execute the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When updown.io will next execute the check."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the check was created."
+          },
+          "mute_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The mute-until setting returned by updown.io."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The mute-until setting returned by updown.io."
+          },
+          "favicon_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The favicon URL discovered for the monitored endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The favicon URL discovered for the monitored endpoint."
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers configured for the check."
+          },
+          "http_verb": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP verb used by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP verb used by the check."
+          },
+          "http_body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HTTP request body sent by the check."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP request body sent by the check."
+          },
+          "ssl": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "SSL information returned by updown.io, if present."
+          },
+          "domain": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Domain metadata returned by updown.io, if present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A monitoring check returned by the updown.io API."
+      }
+    }
+  ]
+}

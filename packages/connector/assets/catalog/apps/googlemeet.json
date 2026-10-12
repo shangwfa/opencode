@@ -1,0 +1,2447 @@
+{
+  "service": "googlemeet",
+  "displayName": "Google Meet",
+  "description": "Create and manage Google Meet spaces, then read conference records, participants, recordings, transcripts, and smart notes.",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2",
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/meetings.space.created",
+        "https://www.googleapis.com/auth/meetings.space.readonly",
+        "https://www.googleapis.com/auth/meetings.space.settings",
+        "openid",
+        "email",
+        "profile"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    },
+    {
+      "type": "custom_credential",
+      "label": "Service Account",
+      "description": "Connect with a Google Cloud service account key instead of a user account, optionally impersonating a Workspace user through domain-wide delegation.",
+      "fields": [
+        {
+          "key": "serviceAccountJson",
+          "label": "Service Account JSON",
+          "inputType": "textarea",
+          "required": true,
+          "secret": true,
+          "placeholder": "{\"type\": \"service_account\", \"project_id\": \"...\", ...}",
+          "description": "The complete service account key JSON from Google Cloud Console (IAM & Admin > Service Accounts > Keys). Enable the Meet API for its project. Meet spaces belong to Workspace users, so use domain-wide delegation below to act as the user who owns the meetings."
+        },
+        {
+          "key": "subject",
+          "label": "Subject Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@your-domain.com",
+          "description": "Workspace user to impersonate through domain-wide delegation. In the Workspace Admin console (Security > Access and data control > API Controls > Domain-wide Delegation), grant the service account client ID the Meet scopes this provider requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://workspace.google.com/products/meet/",
+  "actions": [
+    {
+      "id": "googlemeet.create_space",
+      "service": "googlemeet",
+      "name": "create_space",
+      "description": "Create a Google Meet space and return its join URL.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.created"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.created"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "object",
+            "properties": {
+              "config": {
+                "type": "object",
+                "properties": {
+                  "accessType": {
+                    "type": "string",
+                    "enum": [
+                      "ACCESS_TYPE_UNSPECIFIED",
+                      "OPEN",
+                      "TRUSTED",
+                      "RESTRICTED"
+                    ],
+                    "description": "Who can join the meeting without knocking."
+                  },
+                  "entryPointAccess": {
+                    "type": "string",
+                    "enum": [
+                      "ENTRY_POINT_ACCESS_UNSPECIFIED",
+                      "ALL",
+                      "CREATOR_APP_ONLY"
+                    ],
+                    "description": "Which entry points can join the meeting."
+                  },
+                  "moderation": {
+                    "type": "string",
+                    "enum": [
+                      "MODERATION_UNSPECIFIED",
+                      "OFF",
+                      "ON"
+                    ],
+                    "description": "Whether meeting moderation is enabled."
+                  },
+                  "moderationRestrictions": {
+                    "type": "object",
+                    "properties": {
+                      "chatRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "presentRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "reactionRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "defaultJoinAsViewerType": {
+                        "type": "string",
+                        "enum": [
+                          "DEFAULT_JOIN_AS_VIEWER_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether participants join as viewers by default."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Feature restrictions applied while moderation is enabled."
+                  },
+                  "attendanceReportGenerationType": {
+                    "type": "string",
+                    "enum": [
+                      "ATTENDANCE_REPORT_GENERATION_TYPE_UNSPECIFIED",
+                      "GENERATE_REPORT",
+                      "DO_NOT_GENERATE"
+                    ],
+                    "description": "Whether the meeting generates an attendance report."
+                  },
+                  "artifactConfig": {
+                    "type": "object",
+                    "properties": {
+                      "recordingConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoRecordingGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic recording settings for the meeting space."
+                      },
+                      "transcriptionConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoTranscriptionGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic transcription settings for the meeting space."
+                      },
+                      "smartNotesConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoSmartNotesGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic smart-note settings for the meeting space."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic artifact generation settings for the meeting space."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for a Google Meet space."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Writable Google Meet space fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource name, in the form spaces/{space}."
+          },
+          "meetingUri": {
+            "type": "string",
+            "description": "The URL participants use to join the meeting.",
+            "format": "uri"
+          },
+          "meetingCode": {
+            "type": "string",
+            "description": "The human-readable meeting code."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "accessType": {
+                "type": "string",
+                "enum": [
+                  "ACCESS_TYPE_UNSPECIFIED",
+                  "OPEN",
+                  "TRUSTED",
+                  "RESTRICTED"
+                ],
+                "description": "Who can join the meeting without knocking."
+              },
+              "entryPointAccess": {
+                "type": "string",
+                "enum": [
+                  "ENTRY_POINT_ACCESS_UNSPECIFIED",
+                  "ALL",
+                  "CREATOR_APP_ONLY"
+                ],
+                "description": "Which entry points can join the meeting."
+              },
+              "moderation": {
+                "type": "string",
+                "enum": [
+                  "MODERATION_UNSPECIFIED",
+                  "OFF",
+                  "ON"
+                ],
+                "description": "Whether meeting moderation is enabled."
+              },
+              "moderationRestrictions": {
+                "type": "object",
+                "properties": {
+                  "chatRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "presentRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "reactionRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "defaultJoinAsViewerType": {
+                    "type": "string",
+                    "enum": [
+                      "DEFAULT_JOIN_AS_VIEWER_TYPE_UNSPECIFIED",
+                      "ON",
+                      "OFF"
+                    ],
+                    "description": "Whether participants join as viewers by default."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Feature restrictions applied while moderation is enabled."
+              },
+              "attendanceReportGenerationType": {
+                "type": "string",
+                "enum": [
+                  "ATTENDANCE_REPORT_GENERATION_TYPE_UNSPECIFIED",
+                  "GENERATE_REPORT",
+                  "DO_NOT_GENERATE"
+                ],
+                "description": "Whether the meeting generates an attendance report."
+              },
+              "artifactConfig": {
+                "type": "object",
+                "properties": {
+                  "recordingConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoRecordingGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic recording settings for the meeting space."
+                  },
+                  "transcriptionConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoTranscriptionGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic transcription settings for the meeting space."
+                  },
+                  "smartNotesConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoSmartNotesGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic smart-note settings for the meeting space."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Automatic artifact generation settings for the meeting space."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Configuration for a Google Meet space."
+          },
+          "activeConference": {
+            "type": "object",
+            "properties": {
+              "conferenceRecord": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The active conference record resource name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The conference currently active in the meeting space."
+          },
+          "phoneAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "regionCode": {
+                  "type": "string",
+                  "description": "The regional country code."
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "description": "The E.164 phone number used to dial in."
+                },
+                "pin": {
+                  "type": "string",
+                  "description": "The numeric PIN entered after dialing."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The language code associated with the dial-in option."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A regional dial-in option for the meeting space."
+            },
+            "description": "Regional phone dial-in options."
+          },
+          "gatewaySipAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "The SIP or SIPS URI used to join."
+                },
+                "sipAccessCode": {
+                  "type": "string",
+                  "description": "The numeric SIP access code."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SIP gateway option for joining the meeting space."
+            },
+            "description": "SIP gateway access options."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "A Google Meet meeting space."
+      }
+    },
+    {
+      "id": "googlemeet.end_active_conference",
+      "service": "googlemeet",
+      "name": "end_active_conference",
+      "description": "End the active conference currently running in a Google Meet space.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.created"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.created"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The canonical space resource name, in the form spaces/{space}; bare IDs and meeting-code aliases are not accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of ending the active conference."
+      }
+    },
+    {
+      "id": "googlemeet.get_conference_record",
+      "service": "googlemeet",
+      "name": "get_conference_record",
+      "description": "Retrieve one Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The conference record resource name, such as conferenceRecords/{conference_record}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The conference record resource name."
+          },
+          "space": {
+            "type": "string",
+            "description": "The meeting space resource name."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When the conference started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When the conference ended, when finished.",
+            "format": "date-time"
+          },
+          "expireTime": {
+            "type": "string",
+            "description": "When Google deletes the conference record resource.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "One instance of a conference held in a Google Meet space."
+      }
+    },
+    {
+      "id": "googlemeet.get_participant",
+      "service": "googlemeet",
+      "name": "get_participant",
+      "description": "Retrieve one participant from a Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant resource name, such as conferenceRecords/{conference_record}/participants/{participant}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant resource name."
+          },
+          "earliestStartTime": {
+            "type": "string",
+            "description": "When the participant first joined.",
+            "format": "date-time"
+          },
+          "latestEndTime": {
+            "type": "string",
+            "description": "When the participant most recently left.",
+            "format": "date-time"
+          },
+          "signedinUser": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "type": "string",
+                "description": "The Google user resource name."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The participant display name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A participant signed in with a Google account."
+          },
+          "anonymousUser": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "description": "The name supplied when joining."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A participant who joined without signing in."
+          },
+          "phoneUser": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "description": "The partially redacted phone number shown by Google Meet."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A participant who joined by phone."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "A user who attended a Google Meet conference."
+      }
+    },
+    {
+      "id": "googlemeet.get_participant_session",
+      "service": "googlemeet",
+      "name": "get_participant_session",
+      "description": "Retrieve one Google Meet participant session.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant session resource name ending in participantSessions/{participant_session}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant session resource name."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When the participant session started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When the participant session ended.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "One join-to-leave session for a conference participant."
+      }
+    },
+    {
+      "id": "googlemeet.get_recording",
+      "service": "googlemeet",
+      "name": "get_recording",
+      "description": "Retrieve one Google Meet recording.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recording resource name ending in recordings/{recording}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recording resource name."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "STATE_UNSPECIFIED",
+              "STARTED",
+              "ENDED",
+              "FILE_GENERATED"
+            ],
+            "description": "The current artifact generation state."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When recording started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When recording ended.",
+            "format": "date-time"
+          },
+          "driveDestination": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "The Google Drive file ID of the MP4 recording."
+              },
+              "exportUri": {
+                "type": "string",
+                "description": "The browser URL for the recording.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Google Drive destination of a recording."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "Metadata for a recording generated during a Google Meet conference."
+      }
+    },
+    {
+      "id": "googlemeet.get_smart_note",
+      "service": "googlemeet",
+      "name": "get_smart_note",
+      "description": "Retrieve one Google Meet smart-note artifact.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The smart-note resource name ending in smartNotes/{smart_note}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The smart-note resource name."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "STATE_UNSPECIFIED",
+              "STARTED",
+              "ENDED",
+              "FILE_GENERATED"
+            ],
+            "description": "The current artifact generation state."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When smart-note generation started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When smart-note generation ended.",
+            "format": "date-time"
+          },
+          "docsDestination": {
+            "type": "object",
+            "properties": {
+              "document": {
+                "type": "string",
+                "description": "The Google Docs document ID."
+              },
+              "exportUri": {
+                "type": "string",
+                "description": "The browser URL for the document.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Google Docs destination of a generated artifact."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "Metadata for smart notes generated during a Google Meet conference."
+      }
+    },
+    {
+      "id": "googlemeet.get_space",
+      "service": "googlemeet",
+      "name": "get_space",
+      "description": "Retrieve a Google Meet space by resource name or meeting code.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The space name, such as spaces/{space}, or a bare space ID or meeting code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource name, in the form spaces/{space}."
+          },
+          "meetingUri": {
+            "type": "string",
+            "description": "The URL participants use to join the meeting.",
+            "format": "uri"
+          },
+          "meetingCode": {
+            "type": "string",
+            "description": "The human-readable meeting code."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "accessType": {
+                "type": "string",
+                "enum": [
+                  "ACCESS_TYPE_UNSPECIFIED",
+                  "OPEN",
+                  "TRUSTED",
+                  "RESTRICTED"
+                ],
+                "description": "Who can join the meeting without knocking."
+              },
+              "entryPointAccess": {
+                "type": "string",
+                "enum": [
+                  "ENTRY_POINT_ACCESS_UNSPECIFIED",
+                  "ALL",
+                  "CREATOR_APP_ONLY"
+                ],
+                "description": "Which entry points can join the meeting."
+              },
+              "moderation": {
+                "type": "string",
+                "enum": [
+                  "MODERATION_UNSPECIFIED",
+                  "OFF",
+                  "ON"
+                ],
+                "description": "Whether meeting moderation is enabled."
+              },
+              "moderationRestrictions": {
+                "type": "object",
+                "properties": {
+                  "chatRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "presentRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "reactionRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "defaultJoinAsViewerType": {
+                    "type": "string",
+                    "enum": [
+                      "DEFAULT_JOIN_AS_VIEWER_TYPE_UNSPECIFIED",
+                      "ON",
+                      "OFF"
+                    ],
+                    "description": "Whether participants join as viewers by default."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Feature restrictions applied while moderation is enabled."
+              },
+              "attendanceReportGenerationType": {
+                "type": "string",
+                "enum": [
+                  "ATTENDANCE_REPORT_GENERATION_TYPE_UNSPECIFIED",
+                  "GENERATE_REPORT",
+                  "DO_NOT_GENERATE"
+                ],
+                "description": "Whether the meeting generates an attendance report."
+              },
+              "artifactConfig": {
+                "type": "object",
+                "properties": {
+                  "recordingConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoRecordingGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic recording settings for the meeting space."
+                  },
+                  "transcriptionConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoTranscriptionGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic transcription settings for the meeting space."
+                  },
+                  "smartNotesConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoSmartNotesGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic smart-note settings for the meeting space."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Automatic artifact generation settings for the meeting space."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Configuration for a Google Meet space."
+          },
+          "activeConference": {
+            "type": "object",
+            "properties": {
+              "conferenceRecord": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The active conference record resource name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The conference currently active in the meeting space."
+          },
+          "phoneAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "regionCode": {
+                  "type": "string",
+                  "description": "The regional country code."
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "description": "The E.164 phone number used to dial in."
+                },
+                "pin": {
+                  "type": "string",
+                  "description": "The numeric PIN entered after dialing."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The language code associated with the dial-in option."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A regional dial-in option for the meeting space."
+            },
+            "description": "Regional phone dial-in options."
+          },
+          "gatewaySipAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "The SIP or SIPS URI used to join."
+                },
+                "sipAccessCode": {
+                  "type": "string",
+                  "description": "The numeric SIP access code."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SIP gateway option for joining the meeting space."
+            },
+            "description": "SIP gateway access options."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "A Google Meet meeting space."
+      }
+    },
+    {
+      "id": "googlemeet.get_transcript",
+      "service": "googlemeet",
+      "name": "get_transcript",
+      "description": "Retrieve one Google Meet transcript.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The transcript resource name ending in transcripts/{transcript}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The transcript resource name."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "STATE_UNSPECIFIED",
+              "STARTED",
+              "ENDED",
+              "FILE_GENERATED"
+            ],
+            "description": "The current artifact generation state."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When transcription started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When transcription ended.",
+            "format": "date-time"
+          },
+          "docsDestination": {
+            "type": "object",
+            "properties": {
+              "document": {
+                "type": "string",
+                "description": "The Google Docs document ID."
+              },
+              "exportUri": {
+                "type": "string",
+                "description": "The browser URL for the document.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Google Docs destination of a generated artifact."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "Metadata for a transcript generated during a Google Meet conference."
+      }
+    },
+    {
+      "id": "googlemeet.get_transcript_entry",
+      "service": "googlemeet",
+      "name": "get_transcript_entry",
+      "description": "Retrieve one speaker segment from a Google Meet transcript.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The transcript entry resource name ending in entries/{entry}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The transcript entry resource name."
+          },
+          "participant": {
+            "type": "string",
+            "description": "The participant resource name for the speaker."
+          },
+          "text": {
+            "type": "string",
+            "description": "The transcribed speech."
+          },
+          "languageCode": {
+            "type": "string",
+            "description": "The BCP 47 language code of the speech."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When the spoken segment started.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When the spoken segment ended.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "One speaker segment from a Google Meet transcript."
+      }
+    },
+    {
+      "id": "googlemeet.list_conference_records",
+      "service": "googlemeet",
+      "name": "list_conference_records",
+      "description": "List accessible Google Meet conference records with optional filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Google Meet API filter expression for this resource collection."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of conference records to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conferenceRecords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The conference record resource name."
+                },
+                "space": {
+                  "type": "string",
+                  "description": "The meeting space resource name."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When the conference started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When the conference ended, when finished.",
+                  "format": "date-time"
+                },
+                "expireTime": {
+                  "type": "string",
+                  "description": "When Google deletes the conference record resource.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "One instance of a conference held in a Google Meet space."
+            },
+            "description": "Conference records in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conferenceRecords",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet conferenceRecords response."
+      }
+    },
+    {
+      "id": "googlemeet.list_participant_sessions",
+      "service": "googlemeet",
+      "name": "list_participant_sessions",
+      "description": "List join-to-leave sessions for a Google Meet participant.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent participant, such as conferenceRecords/{conference_record}/participants/{participant}."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Google Meet API filter expression for this resource collection."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "participantSessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The participant session resource name."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When the participant session started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When the participant session ended.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "One join-to-leave session for a conference participant."
+            },
+            "description": "Participant sessions in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participantSessions",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet participantSessions response."
+      }
+    },
+    {
+      "id": "googlemeet.list_participants",
+      "service": "googlemeet",
+      "name": "list_participants",
+      "description": "List participants in a Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent conference record, such as conferenceRecords/{conference_record}."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Google Meet API filter expression for this resource collection."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The participant resource name."
+                },
+                "earliestStartTime": {
+                  "type": "string",
+                  "description": "When the participant first joined.",
+                  "format": "date-time"
+                },
+                "latestEndTime": {
+                  "type": "string",
+                  "description": "When the participant most recently left.",
+                  "format": "date-time"
+                },
+                "signedinUser": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "type": "string",
+                      "description": "The Google user resource name."
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "The participant display name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A participant signed in with a Google account."
+                },
+                "anonymousUser": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "The name supplied when joining."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A participant who joined without signing in."
+                },
+                "phoneUser": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "The partially redacted phone number shown by Google Meet."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A participant who joined by phone."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "A user who attended a Google Meet conference."
+            },
+            "description": "Participants in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          },
+          "totalSize": {
+            "type": "integer",
+            "description": "The total participant count when requested through a field mask."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "nextPageToken"
+        ],
+        "description": "A page of Google Meet participants."
+      }
+    },
+    {
+      "id": "googlemeet.list_recordings",
+      "service": "googlemeet",
+      "name": "list_recordings",
+      "description": "List recordings generated for a Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent conference record, such as conferenceRecords/{conference_record}."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recording resource name."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "STATE_UNSPECIFIED",
+                    "STARTED",
+                    "ENDED",
+                    "FILE_GENERATED"
+                  ],
+                  "description": "The current artifact generation state."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When recording started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When recording ended.",
+                  "format": "date-time"
+                },
+                "driveDestination": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "description": "The Google Drive file ID of the MP4 recording."
+                    },
+                    "exportUri": {
+                      "type": "string",
+                      "description": "The browser URL for the recording.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The Google Drive destination of a recording."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "Metadata for a recording generated during a Google Meet conference."
+            },
+            "description": "Recordings in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordings",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet recordings response."
+      }
+    },
+    {
+      "id": "googlemeet.list_smart_notes",
+      "service": "googlemeet",
+      "name": "list_smart_notes",
+      "description": "List smart notes generated for a Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent conference record, such as conferenceRecords/{conference_record}."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "smartNotes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The smart-note resource name."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "STATE_UNSPECIFIED",
+                    "STARTED",
+                    "ENDED",
+                    "FILE_GENERATED"
+                  ],
+                  "description": "The current artifact generation state."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When smart-note generation started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When smart-note generation ended.",
+                  "format": "date-time"
+                },
+                "docsDestination": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "string",
+                      "description": "The Google Docs document ID."
+                    },
+                    "exportUri": {
+                      "type": "string",
+                      "description": "The browser URL for the document.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The Google Docs destination of a generated artifact."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "Metadata for smart notes generated during a Google Meet conference."
+            },
+            "description": "Smart notes in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "smartNotes",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet smartNotes response."
+      }
+    },
+    {
+      "id": "googlemeet.list_transcript_entries",
+      "service": "googlemeet",
+      "name": "list_transcript_entries",
+      "description": "List speaker segments in a Google Meet transcript.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent transcript, such as conferenceRecords/{conference_record}/transcripts/{transcript}."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transcriptEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The transcript entry resource name."
+                },
+                "participant": {
+                  "type": "string",
+                  "description": "The participant resource name for the speaker."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The transcribed speech."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The BCP 47 language code of the speech."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When the spoken segment started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When the spoken segment ended.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "One speaker segment from a Google Meet transcript."
+            },
+            "description": "Transcript entries in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transcriptEntries",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet transcriptEntries response."
+      }
+    },
+    {
+      "id": "googlemeet.list_transcripts",
+      "service": "googlemeet",
+      "name": "list_transcripts",
+      "description": "List transcripts generated for a Google Meet conference record.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent conference record, such as conferenceRecords/{conference_record}."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parent"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transcripts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The transcript resource name."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "STATE_UNSPECIFIED",
+                    "STARTED",
+                    "ENDED",
+                    "FILE_GENERATED"
+                  ],
+                  "description": "The current artifact generation state."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When transcription started.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When transcription ended.",
+                  "format": "date-time"
+                },
+                "docsDestination": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "string",
+                      "description": "The Google Docs document ID."
+                    },
+                    "exportUri": {
+                      "type": "string",
+                      "description": "The browser URL for the document.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The Google Docs destination of a generated artifact."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "Metadata for a transcript generated during a Google Meet conference."
+            },
+            "description": "Transcripts in the requested page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for the next page, or null when the page is final."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for the next page, or null when the page is final."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transcripts",
+          "nextPageToken"
+        ],
+        "description": "A paginated Google Meet transcripts response."
+      }
+    },
+    {
+      "id": "googlemeet.update_space",
+      "service": "googlemeet",
+      "name": "update_space",
+      "description": "Update the configuration of a Google Meet space.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/meetings.space.settings"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/meetings.space.settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The space resource name, in the form spaces/{space}."
+          },
+          "space": {
+            "type": "object",
+            "properties": {
+              "config": {
+                "type": "object",
+                "properties": {
+                  "accessType": {
+                    "type": "string",
+                    "enum": [
+                      "ACCESS_TYPE_UNSPECIFIED",
+                      "OPEN",
+                      "TRUSTED",
+                      "RESTRICTED"
+                    ],
+                    "description": "Who can join the meeting without knocking."
+                  },
+                  "entryPointAccess": {
+                    "type": "string",
+                    "enum": [
+                      "ENTRY_POINT_ACCESS_UNSPECIFIED",
+                      "ALL",
+                      "CREATOR_APP_ONLY"
+                    ],
+                    "description": "Which entry points can join the meeting."
+                  },
+                  "moderation": {
+                    "type": "string",
+                    "enum": [
+                      "MODERATION_UNSPECIFIED",
+                      "OFF",
+                      "ON"
+                    ],
+                    "description": "Whether meeting moderation is enabled."
+                  },
+                  "moderationRestrictions": {
+                    "type": "object",
+                    "properties": {
+                      "chatRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "presentRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "reactionRestriction": {
+                        "type": "string",
+                        "enum": [
+                          "RESTRICTION_TYPE_UNSPECIFIED",
+                          "HOSTS_ONLY",
+                          "NO_RESTRICTION"
+                        ],
+                        "description": "Who can use the moderated meeting feature."
+                      },
+                      "defaultJoinAsViewerType": {
+                        "type": "string",
+                        "enum": [
+                          "DEFAULT_JOIN_AS_VIEWER_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether participants join as viewers by default."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Feature restrictions applied while moderation is enabled."
+                  },
+                  "attendanceReportGenerationType": {
+                    "type": "string",
+                    "enum": [
+                      "ATTENDANCE_REPORT_GENERATION_TYPE_UNSPECIFIED",
+                      "GENERATE_REPORT",
+                      "DO_NOT_GENERATE"
+                    ],
+                    "description": "Whether the meeting generates an attendance report."
+                  },
+                  "artifactConfig": {
+                    "type": "object",
+                    "properties": {
+                      "recordingConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoRecordingGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic recording settings for the meeting space."
+                      },
+                      "transcriptionConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoTranscriptionGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic transcription settings for the meeting space."
+                      },
+                      "smartNotesConfig": {
+                        "type": "object",
+                        "properties": {
+                          "autoSmartNotesGeneration": {
+                            "type": "string",
+                            "enum": [
+                              "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                              "ON",
+                              "OFF"
+                            ],
+                            "description": "Whether Google Meet should automatically generate the artifact."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Automatic smart-note settings for the meeting space."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic artifact generation settings for the meeting space."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for a Google Meet space."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Writable Google Meet space fields."
+          },
+          "updateMask": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated Google field mask, such as config.accessType."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "space"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource name, in the form spaces/{space}."
+          },
+          "meetingUri": {
+            "type": "string",
+            "description": "The URL participants use to join the meeting.",
+            "format": "uri"
+          },
+          "meetingCode": {
+            "type": "string",
+            "description": "The human-readable meeting code."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "accessType": {
+                "type": "string",
+                "enum": [
+                  "ACCESS_TYPE_UNSPECIFIED",
+                  "OPEN",
+                  "TRUSTED",
+                  "RESTRICTED"
+                ],
+                "description": "Who can join the meeting without knocking."
+              },
+              "entryPointAccess": {
+                "type": "string",
+                "enum": [
+                  "ENTRY_POINT_ACCESS_UNSPECIFIED",
+                  "ALL",
+                  "CREATOR_APP_ONLY"
+                ],
+                "description": "Which entry points can join the meeting."
+              },
+              "moderation": {
+                "type": "string",
+                "enum": [
+                  "MODERATION_UNSPECIFIED",
+                  "OFF",
+                  "ON"
+                ],
+                "description": "Whether meeting moderation is enabled."
+              },
+              "moderationRestrictions": {
+                "type": "object",
+                "properties": {
+                  "chatRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "presentRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "reactionRestriction": {
+                    "type": "string",
+                    "enum": [
+                      "RESTRICTION_TYPE_UNSPECIFIED",
+                      "HOSTS_ONLY",
+                      "NO_RESTRICTION"
+                    ],
+                    "description": "Who can use the moderated meeting feature."
+                  },
+                  "defaultJoinAsViewerType": {
+                    "type": "string",
+                    "enum": [
+                      "DEFAULT_JOIN_AS_VIEWER_TYPE_UNSPECIFIED",
+                      "ON",
+                      "OFF"
+                    ],
+                    "description": "Whether participants join as viewers by default."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Feature restrictions applied while moderation is enabled."
+              },
+              "attendanceReportGenerationType": {
+                "type": "string",
+                "enum": [
+                  "ATTENDANCE_REPORT_GENERATION_TYPE_UNSPECIFIED",
+                  "GENERATE_REPORT",
+                  "DO_NOT_GENERATE"
+                ],
+                "description": "Whether the meeting generates an attendance report."
+              },
+              "artifactConfig": {
+                "type": "object",
+                "properties": {
+                  "recordingConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoRecordingGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic recording settings for the meeting space."
+                  },
+                  "transcriptionConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoTranscriptionGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic transcription settings for the meeting space."
+                  },
+                  "smartNotesConfig": {
+                    "type": "object",
+                    "properties": {
+                      "autoSmartNotesGeneration": {
+                        "type": "string",
+                        "enum": [
+                          "AUTO_GENERATION_TYPE_UNSPECIFIED",
+                          "ON",
+                          "OFF"
+                        ],
+                        "description": "Whether Google Meet should automatically generate the artifact."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Automatic smart-note settings for the meeting space."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Automatic artifact generation settings for the meeting space."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Configuration for a Google Meet space."
+          },
+          "activeConference": {
+            "type": "object",
+            "properties": {
+              "conferenceRecord": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The active conference record resource name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The conference currently active in the meeting space."
+          },
+          "phoneAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "regionCode": {
+                  "type": "string",
+                  "description": "The regional country code."
+                },
+                "phoneNumber": {
+                  "type": "string",
+                  "description": "The E.164 phone number used to dial in."
+                },
+                "pin": {
+                  "type": "string",
+                  "description": "The numeric PIN entered after dialing."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The language code associated with the dial-in option."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A regional dial-in option for the meeting space."
+            },
+            "description": "Regional phone dial-in options."
+          },
+          "gatewaySipAccess": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "The SIP or SIPS URI used to join."
+                },
+                "sipAccessCode": {
+                  "type": "string",
+                  "description": "The numeric SIP access code."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SIP gateway option for joining the meeting space."
+            },
+            "description": "SIP gateway access options."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "A Google Meet meeting space."
+      }
+    }
+  ]
+}

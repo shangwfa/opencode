@@ -1,0 +1,906 @@
+{
+  "service": "aliyun_oss",
+  "displayName": "Alibaba Cloud OSS",
+  "categories": [
+    "Storage",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "accessKeyId",
+          "label": "Access Key ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "LTAI...",
+          "description": "Alibaba Cloud AccessKey ID. Create or manage an AccessKey pair in RAM: https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair"
+        },
+        {
+          "key": "accessKeySecret",
+          "label": "Access Key Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your AccessKey secret",
+          "description": "Alibaba Cloud AccessKey secret from the same RAM AccessKey pair. Alibaba Cloud shows it only when you create the key pair: https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair"
+        },
+        {
+          "key": "endpoint",
+          "label": "OSS Endpoint",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "oss-cn-hangzhou.aliyuncs.com",
+          "description": "The default OSS endpoint used for validation and action execution. Find the endpoint for your region here: https://www.alibabacloud.com/help/en/oss/user-guide/regions-and-endpoints"
+        },
+        {
+          "key": "bucket",
+          "label": "Default Bucket",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "my-bucket",
+          "description": "Optional default bucket reused by object-level actions. Use a bucket from your own OSS resources in the OSS console: https://oss.console.aliyun.com/overview"
+        },
+        {
+          "key": "securityToken",
+          "label": "Security Token",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "Optional STS token",
+          "description": "Optional STS security token when using temporary AK/SK credentials from your own Alibaba Cloud STS flow."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.alibabacloud.com",
+  "actions": [
+    {
+      "id": "aliyun_oss.delete_object",
+      "service": "aliyun_oss",
+      "name": "delete_object",
+      "description": "Delete one OSS object.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS object key."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "versionId": {
+            "type": "string",
+            "description": "The optional object version ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "The bucket that contained the deleted object."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The deleted object key."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "aliyun_oss.download_object",
+      "service": "aliyun_oss",
+      "name": "download_object",
+      "description": "Download one OSS object into local transit file storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete OSS object key. Slashes are preserved as key delimiters."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "versionId": {
+            "type": "string",
+            "description": "The optional object version ID."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional filename override for the local transit file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "The input payload for downloading one OSS object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS object key."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The filename used for the local transit file."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The downloaded object MIME type."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The downloaded object size in bytes."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the stored object.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The stored transit file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored transit file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored transit file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "The downloaded object in local transit file storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey",
+          "name",
+          "mimeType",
+          "sizeBytes",
+          "file"
+        ],
+        "description": "A downloaded OSS object stored in local transit storage."
+      }
+    },
+    {
+      "id": "aliyun_oss.generate_presigned_url",
+      "service": "aliyun_oss",
+      "name": "generate_presigned_url",
+      "description": "Generate a pre-signed OSS URL for reading, uploading, or deleting one object.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS object key."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "PUT",
+              "DELETE"
+            ],
+            "description": "The HTTP method that the signed URL should allow."
+          },
+          "expiresSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 604800,
+            "description": "How long the signed URL remains valid, in seconds."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The Content-Type that must be used with the signed request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "The bucket used to build the signed URL."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The object key used to build the signed URL."
+          },
+          "method": {
+            "type": "string",
+            "description": "The signed HTTP method."
+          },
+          "expiresSeconds": {
+            "type": "integer",
+            "description": "The URL validity duration in seconds."
+          },
+          "url": {
+            "type": "string",
+            "description": "The generated pre-signed URL."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "aliyun_oss.head_object",
+      "service": "aliyun_oss",
+      "name": "head_object",
+      "description": "Fetch structured metadata for one OSS object.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS object key."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "versionId": {
+            "type": "string",
+            "description": "The optional object version ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+              "bucket": {
+                "type": "string",
+                "description": "The bucket that stores the object."
+              },
+              "objectKey": {
+                "type": "string",
+                "description": "The object key."
+              },
+              "etag": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The object ETag, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object ETag, or null when OSS did not return it."
+              },
+              "contentLength": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The object size in bytes, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object size in bytes, or null when OSS did not return it."
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The object Content-Type, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object Content-Type, or null when OSS did not return it."
+              },
+              "lastModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The object last modified timestamp, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object last modified timestamp, or null when OSS did not return it."
+              },
+              "cacheControl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Cache-Control header, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Cache-Control header, or null when OSS did not return it."
+              },
+              "contentDisposition": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Content-Disposition header, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Content-Disposition header, or null when OSS did not return it."
+              },
+              "contentEncoding": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Content-Encoding header, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Content-Encoding header, or null when OSS did not return it."
+              },
+              "storageClass": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The object storage class, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object storage class, or null when OSS did not return it."
+              },
+              "versionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The object version ID, or null when OSS did not return it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The object version ID, or null when OSS did not return it."
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One user-defined metadata value."
+                },
+                "description": "The user-defined `x-oss-meta-*` metadata attached to the object."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One raw response header value."
+                },
+                "description": "The raw response headers returned by OSS for this object metadata request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized OSS object metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "aliyun_oss.list_buckets",
+      "service": "aliyun_oss",
+      "name": "list_buckets",
+      "description": "List OSS buckets visible to the connected Alibaba Cloud credential.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Filter buckets by name prefix."
+          },
+          "marker": {
+            "type": "string",
+            "description": "Continue listing buckets from this marker."
+          },
+          "maxKeys": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The bucket name."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "The bucket region."
+                },
+                "creationDate": {
+                  "type": "string",
+                  "description": "The bucket creation timestamp."
+                },
+                "storageClass": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The bucket storage class."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The bucket storage class."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An OSS bucket summary."
+            },
+            "description": "The returned bucket summaries."
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The owner identifier."
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "description": "The owner display name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The bucket or object owner."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The bucket or object owner."
+          },
+          "isTruncated": {
+            "type": "boolean",
+            "description": "Whether more buckets are available."
+          },
+          "nextMarker": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next pagination marker, or null when the list is complete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next pagination marker, or null when the list is complete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "aliyun_oss.list_objects",
+      "service": "aliyun_oss",
+      "name": "list_objects",
+      "description": "List objects in an OSS bucket with the ListObjectsV2 API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Filter objects by key prefix."
+          },
+          "delimiter": {
+            "type": "string",
+            "description": "Group keys by this delimiter, for example `/` to emulate folders."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Continue listing from the continuation token returned by OSS."
+          },
+          "startAfter": {
+            "type": "string",
+            "description": "Start listing after this object key."
+          },
+          "fetchOwner": {
+            "type": "boolean",
+            "description": "Whether to include owner information for each object."
+          },
+          "maxKeys": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucket"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The object key."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical OSS URL for the object."
+                },
+                "lastModified": {
+                  "type": "string",
+                  "description": "The object's last modified timestamp."
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "The object's ETag."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The OSS object type."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The object size in bytes."
+                },
+                "storageClass": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The object storage class."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The object storage class."
+                },
+                "owner": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The owner identifier."
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "description": "The owner display name."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The bucket or object owner."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The bucket or object owner."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An OSS object summary."
+            },
+            "description": "The listed objects."
+          },
+          "prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One common prefix."
+            },
+            "description": "The common prefixes returned by OSS."
+          },
+          "isTruncated": {
+            "type": "boolean",
+            "description": "Whether more objects are available."
+          },
+          "keyCount": {
+            "type": "integer",
+            "description": "The number of keys returned in this page."
+          },
+          "continuationToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token echoed by OSS, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token echoed by OSS, or null when absent."
+          },
+          "nextContinuationToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when the list is complete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when the list is complete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "aliyun_oss.put_object",
+      "service": "aliyun_oss",
+      "name": "put_object",
+      "description": "Upload one object to OSS from a public URL, plain text, or base64-encoded content.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS object key."
+          },
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OSS endpoint, for example `oss-cn-hangzhou.aliyuncs.com`. Actions can omit it to reuse the connected default endpoint."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "description": "A public URL that the connector can fetch and upload to OSS.",
+            "format": "uri"
+          },
+          "contentText": {
+            "type": "string",
+            "description": "The plain-text content to upload."
+          },
+          "contentBase64": {
+            "type": "string",
+            "description": "Base64-encoded binary content to upload."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The Content-Type header to store on the object."
+          },
+          "cacheControl": {
+            "type": "string",
+            "description": "The Cache-Control header to store on the object."
+          },
+          "contentDisposition": {
+            "type": "string",
+            "description": "The Content-Disposition header to store on the object."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One user-defined metadata value."
+            },
+            "description": "The user-defined metadata to store under `x-oss-meta-*`."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "The input payload for this action.",
+        "oneOf": [
+          {
+            "required": [
+              "sourceUrl"
+            ]
+          },
+          {
+            "required": [
+              "contentText"
+            ]
+          },
+          {
+            "required": [
+              "contentBase64"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "The bucket that received the object."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The uploaded object key."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical OSS URL for the uploaded object."
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The uploaded object ETag, or null when OSS did not return it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The uploaded object ETag, or null when OSS did not return it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

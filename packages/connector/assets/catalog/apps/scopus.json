@@ -1,0 +1,1326 @@
+{
+  "service": "scopus",
+  "displayName": "Scopus",
+  "description": "Search Scopus documents, authors, affiliations, and serial sources through the Elsevier APIs.",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Elsevier API Key",
+      "placeholder": "ELSEVIER_API_KEY",
+      "description": "Elsevier API key sent in the X-ELS-APIKey header. Create or manage a key at https://dev.elsevier.com/apikey/manage and review the official API policies at https://dev.elsevier.com/policy.html",
+      "extraFields": [
+        {
+          "key": "institutionToken",
+          "label": "Institutional Token",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "ELSEVIER_INSTITUTION_TOKEN",
+          "description": "Optional Elsevier Institutional Token sent in X-ELS-Insttoken to establish subscription entitlements when institutional IP authentication is unavailable. Request access through Elsevier API Support: https://dev.elsevier.com/support.html"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.scopus.com/",
+  "actions": [
+    {
+      "id": "scopus.get_abstract",
+      "service": "scopus",
+      "name": "get_abstract",
+      "description": "Get one Scopus abstract record by a documented document identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "scopus_id",
+              "doi",
+              "eid",
+              "pii",
+              "pubmed_id",
+              "pui"
+            ],
+            "description": "The identifier namespace used by the supplied value."
+          },
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document identifier in the selected namespace.",
+            "pattern": "\\S"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "META",
+              "META_ABS",
+              "FULL",
+              "REF",
+              "ENTITLED"
+            ],
+            "description": "The Abstract Retrieval response view."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "referenceStart": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "referenceCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of reference records to return, subject to the selected endpoint and view limits."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifierType",
+          "identifier"
+        ],
+        "description": "Input parameters for retrieving one Scopus abstract record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "One raw Scopus record returned by Elsevier."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record",
+          "quota",
+          "raw"
+        ],
+        "description": "The result of retrieving one Scopus abstract record."
+      }
+    },
+    {
+      "id": "scopus.get_affiliation",
+      "service": "scopus",
+      "name": "get_affiliation",
+      "description": "Get Scopus affiliation profile data by affiliation ID or EID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "affiliation_id",
+              "eid"
+            ],
+            "description": "The identifier namespace used by the supplied value."
+          },
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The affiliation identifier in the selected namespace.",
+            "pattern": "\\S"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "STANDARD",
+              "DOCUMENTS",
+              "AUTHORS",
+              "ENTITLED"
+            ],
+            "description": "The Affiliation Retrieval response view."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "referenceStart": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "referenceCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of reference records to return, subject to the selected endpoint and view limits."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifierType",
+          "identifier"
+        ],
+        "description": "Input parameters for retrieving Scopus affiliation profile data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The affiliation profiles returned by Scopus."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profiles",
+          "quota",
+          "raw"
+        ],
+        "description": "The result of retrieving Scopus affiliation profile data."
+      }
+    },
+    {
+      "id": "scopus.get_author",
+      "service": "scopus",
+      "name": "get_author",
+      "description": "Get Scopus author profile data by author ID, EID, or ORCID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifierType": {
+            "type": "string",
+            "enum": [
+              "author_id",
+              "eid",
+              "orcid"
+            ],
+            "description": "The identifier namespace used by the supplied value."
+          },
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The author identifier in the selected namespace.",
+            "pattern": "\\S"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "LIGHT",
+              "STANDARD",
+              "ENHANCED",
+              "METRICS",
+              "DOCUMENTS",
+              "ENTITLED",
+              "ORCID",
+              "ORCID_BIO",
+              "ORCID_WORKS"
+            ],
+            "description": "The Author Retrieval response view."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "resolveAliases": {
+            "type": "boolean",
+            "description": "Whether Elsevier should substitute a superseded author profile with its current alias."
+          },
+          "referenceStart": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "referenceCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of reference records to return, subject to the selected endpoint and view limits."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifierType",
+          "identifier"
+        ],
+        "description": "Input parameters for retrieving Scopus author profile data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The author profiles returned by Scopus."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profiles",
+          "quota",
+          "raw"
+        ],
+        "description": "The result of retrieving Scopus author profile data."
+      }
+    },
+    {
+      "id": "scopus.search_affiliations",
+      "service": "scopus",
+      "name": "search_affiliations",
+      "description": "Search Scopus affiliation profiles with the official Boolean query syntax and return one normalized result page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Scopus Affiliation Search query, such as AFFIL(University of Oxford).",
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of results to return."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier sort expression. Prefix a field with + or - and separate up to three fields with commas.",
+            "pattern": "\\S"
+          },
+          "facets": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier facet expression, including optional bucket dimensions in parentheses.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Scopus affiliation profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records."
+          },
+          "startIndex": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based offset of this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The zero-based offset of this result page."
+          },
+          "itemsPerPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records in this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of records in this result page."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw Scopus result records in this page."
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw facet buckets returned for this search."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The navigation links returned for this search."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "entries",
+          "facets",
+          "links",
+          "quota",
+          "raw"
+        ],
+        "description": "A normalized page of Scopus search results."
+      }
+    },
+    {
+      "id": "scopus.search_authors",
+      "service": "scopus",
+      "name": "search_authors",
+      "description": "Search Scopus author profiles with the official Boolean query syntax and return one normalized result page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Scopus Author Search query, such as AUTHLASTNAME(Smith) AND AFFIL(University).",
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of results to return."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier sort expression. Prefix a field with + or - and separate up to three fields with commas.",
+            "pattern": "\\S"
+          },
+          "facets": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier facet expression, including optional bucket dimensions in parentheses.",
+            "pattern": "\\S"
+          },
+          "resolveAliases": {
+            "type": "boolean",
+            "description": "Whether Elsevier should substitute superseded author identifiers with their current aliases."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Scopus author profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records."
+          },
+          "startIndex": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based offset of this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The zero-based offset of this result page."
+          },
+          "itemsPerPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records in this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of records in this result page."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw Scopus result records in this page."
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw facet buckets returned for this search."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The navigation links returned for this search."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "entries",
+          "facets",
+          "links",
+          "quota",
+          "raw"
+        ],
+        "description": "A normalized page of Scopus search results."
+      }
+    },
+    {
+      "id": "scopus.search_documents",
+      "service": "scopus",
+      "name": "search_documents",
+      "description": "Search Scopus documents with the official Boolean query syntax and return one normalized result page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Scopus Boolean query, such as TITLE-ABS-KEY(machine learning) AND PUBYEAR > 2020.",
+            "pattern": "\\S"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "COMPLETE"
+            ],
+            "description": "The Scopus Search response view."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of results. STANDARD supports up to 200; COMPLETE supports up to 25."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier sort expression. Prefix a field with + or - and separate up to three fields with commas.",
+            "pattern": "\\S"
+          },
+          "dateRange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication year or inclusive year range, such as 2024 or 2020-2024.",
+            "pattern": "\\S"
+          },
+          "subjectArea": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Scopus subject-area abbreviation such as COMP, MEDI, or SOCI.",
+            "pattern": "\\S"
+          },
+          "content": {
+            "type": "string",
+            "enum": [
+              "core",
+              "dummy",
+              "all"
+            ],
+            "description": "The Scopus content category to search."
+          },
+          "facets": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An official Elsevier facet expression, including optional bucket dimensions in parentheses.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Scopus documents.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "view": {
+                  "const": "COMPLETE"
+                }
+              },
+              "required": [
+                "view"
+              ]
+            },
+            "then": {
+              "properties": {
+                "count": {
+                  "maximum": 25
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records."
+          },
+          "startIndex": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based offset of this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The zero-based offset of this result page."
+          },
+          "itemsPerPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records in this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of records in this result page."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw Scopus result records in this page."
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw facet buckets returned for this search."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The navigation links returned for this search."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "entries",
+          "facets",
+          "links",
+          "quota",
+          "raw"
+        ],
+        "description": "A normalized page of Scopus search results."
+      }
+    },
+    {
+      "id": "scopus.search_sources",
+      "service": "scopus",
+      "name": "search_sources",
+      "description": "Search Scopus serial sources by title, ISSN, publisher, subject, content type, or open-access status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A partial or complete serial source title.",
+            "pattern": "\\S"
+          },
+          "issn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISSN identifying a serial source.",
+            "pattern": "\\S"
+          },
+          "publisher": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A partial publisher name.",
+            "pattern": "\\S"
+          },
+          "subjectArea": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Scopus subject-area abbreviation such as COMP, MEDI, or SOCI.",
+            "pattern": "\\S"
+          },
+          "subjectCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Scopus subject-area code.",
+            "pattern": "\\S"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "tradejournal",
+              "journal",
+              "conferenceproceeding",
+              "bookseries"
+            ],
+            "description": "The serial source content type."
+          },
+          "openAccess": {
+            "type": "string",
+            "enum": [
+              "all",
+              "full",
+              "partial",
+              "none"
+            ],
+            "description": "The serial source open-access filter."
+          },
+          "dateRange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication year or inclusive year range, such as 2024 or 2020-2024.",
+            "pattern": "\\S"
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "STANDARD",
+              "ENHANCED",
+              "CITESCORE"
+            ],
+            "description": "The Serial Title response view."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of official Elsevier response fields. Supplying fields overrides the selected view.",
+            "pattern": "\\S"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of results to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching Scopus serial sources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records."
+          },
+          "startIndex": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based offset of this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The zero-based offset of this result page."
+          },
+          "itemsPerPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records in this result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of records in this result page."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw Scopus result records in this page."
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The raw facet buckets returned for this search."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One raw Scopus record returned by Elsevier."
+            },
+            "description": "The navigation links returned for this search."
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The weekly request quota when Elsevier returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The weekly request quota when Elsevier returns it."
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The remaining requests in the current quota window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining requests in the current quota window."
+              },
+              "resetAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 time when the current quota window resets.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 time when the current quota window resets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "limit",
+              "remaining",
+              "resetAt"
+            ],
+            "description": "The Scopus quota metadata returned in response headers."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw JSON response returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "entries",
+          "facets",
+          "links",
+          "quota",
+          "raw"
+        ],
+        "description": "A normalized page of Scopus search results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1080 @@
+{
+  "service": "baixiao",
+  "displayName": "Baixiao AI",
+  "description": "Use Baixiao AI knowledge, document, research, and productivity tools.",
+  "categories": [
+    "AI",
+    "Data & Analytics",
+    "Documents & Content",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "MCP Key",
+      "placeholder": "Paste your Baixiao MCP key",
+      "description": "The key sent to Baixiao MCP as an Authorization bearer token. Sign in and generate a key at https://chat.know-pa.cn/settings/mcp."
+    }
+  ],
+  "homepageUrl": "https://www.know-pa.cn/",
+  "actions": [
+    {
+      "id": "baixiao.advanced_search",
+      "service": "baixiao",
+      "name": "advanced_search",
+      "description": "Search across Baixiao's databases by title, author, journal, publisher, publication period, document type, and language.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "A fuzzy title query."
+          },
+          "author": {
+            "type": "string",
+            "description": "An exact author name, matched case-insensitively where supported."
+          },
+          "journal": {
+            "type": "string",
+            "description": "An exact journal name, matched case-insensitively where supported."
+          },
+          "publisher": {
+            "type": "string",
+            "description": "An exact publisher name, matched case-insensitively where supported."
+          },
+          "year": {
+            "type": "integer",
+            "description": "One publication year to match."
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest publication year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest publication year to include."
+          },
+          "doc_type": {
+            "type": "string",
+            "description": "The document type to include."
+          },
+          "language": {
+            "type": "string",
+            "description": "The result language filter."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of works to return. Defaults to 20.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional fields combined to narrow an academic search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      },
+      "followUpActions": [
+        "baixiao.get_pdf"
+      ]
+    },
+    {
+      "id": "baixiao.call_tool",
+      "service": "baixiao",
+      "name": "call_tool",
+      "description": "Call a current Baixiao MCP tool with JSON arguments after inspecting its live schema and behavior annotations with list_tools.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current Baixiao MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Baixiao MCP tool."
+      },
+      "followUpActions": [
+        "baixiao.list_tools"
+      ]
+    },
+    {
+      "id": "baixiao.citation_graph",
+      "service": "baixiao",
+      "name": "citation_graph",
+      "description": "Traverse the works that cite a paper or the references cited by that paper for literature-review expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paper_id": {
+            "type": "string",
+            "description": "A DOI or the external_id returned by a previous Baixiao search."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "cited_by",
+              "references"
+            ],
+            "description": "The citation-graph direction. Defaults to cited_by.",
+            "default": "cited_by"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of related works to return. Defaults to 20.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paper_id"
+        ],
+        "description": "A paper identifier and citation-graph direction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.corpus_search",
+      "service": "baixiao",
+      "name": "corpus_search",
+      "description": "Search Baixiao's curated humanities and social-science corpus, especially for Chinese-language scholarship and Chinese authors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The literature or research question to search for."
+          },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Baixiao collection ID."
+            },
+            "description": "Baixiao collection IDs used to restrict the search."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The maximum number of documents to return. Defaults to 15.",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "A query and optional Baixiao corpus filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      },
+      "followUpActions": [
+        "baixiao.get_pdf",
+        "baixiao.citation_graph"
+      ]
+    },
+    {
+      "id": "baixiao.external_search",
+      "service": "baixiao",
+      "name": "external_search",
+      "description": "Search Baixiao's international academic coverage for English-language papers and citable metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The international literature query."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of papers to return. Defaults to 15.",
+            "default": 15
+          },
+          "from_year": {
+            "type": "integer",
+            "description": "The earliest publication year to include."
+          },
+          "to_year": {
+            "type": "integer",
+            "description": "The latest publication year to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "A query, result limit, and optional publication-year range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      },
+      "followUpActions": [
+        "baixiao.citation_graph"
+      ]
+    },
+    {
+      "id": "baixiao.fetch_metadata",
+      "service": "baixiao",
+      "name": "fetch_metadata",
+      "description": "Complete a partial or messy citation into clean publication metadata and return alternate matches.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The partial citation, rough title, or author-year-title text."
+          },
+          "year": {
+            "type": "integer",
+            "description": "The publication year used to disambiguate matches."
+          },
+          "top": {
+            "type": "integer",
+            "description": "The maximum number of candidate matches to return. Defaults to 5.",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "A partial citation and optional disambiguation settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.fetch_metadata_batch",
+      "service": "baixiao",
+      "name": "fetch_metadata_batch",
+      "description": "Complete multiple partial references into clean publication metadata in one request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A partial citation, rough title, or author-year-title string."
+            },
+            "description": "Partial references to resolve."
+          },
+          "max_concurrency": {
+            "type": "integer",
+            "description": "The maximum number of parallel lookups performed by Baixiao. Defaults to 8.",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queries"
+        ],
+        "description": "Partial references and an optional concurrency limit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.find_reviewers",
+      "service": "baixiao",
+      "name": "find_reviewers",
+      "description": "Suggest potential peer reviewers by ranking authors of topic-matching works while excluding manuscript authors when requested.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A topic keyword."
+            },
+            "description": "Topic keywords used to rank relevant records."
+          },
+          "language": {
+            "type": "string",
+            "description": "The result language filter."
+          },
+          "exclude_authors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An author name to exclude."
+            },
+            "description": "Manuscript authors to exclude from reviewer suggestions."
+          },
+          "top": {
+            "type": "integer",
+            "description": "The maximum number of reviewers to return. Defaults to 15.",
+            "default": 15
+          },
+          "rounds": {
+            "type": "integer",
+            "description": "The number of deterministic keyword-expansion rounds. Defaults to 2.",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keywords"
+        ],
+        "description": "Manuscript keywords, optional author exclusions, and ranking options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.get_pdf",
+      "service": "baixiao",
+      "name": "get_pdf",
+      "description": "Get a short-lived PDF download link for an available document in Baixiao's public corpus; a successful lookup consumes the connected account's credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "The external_id returned by a Baixiao corpus or advanced search result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Baixiao corpus document to download."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.grants_award_search",
+      "service": "baixiao",
+      "name": "grants_award_search",
+      "description": "Search Baixiao's awarded research projects by topic, investigator, institution, geography, funder, program, discipline, outcome, or year.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Topic terms found in project titles or descriptions."
+          },
+          "person": {
+            "type": "string",
+            "description": "The principal investigator or project leader."
+          },
+          "institution": {
+            "type": "string",
+            "description": "The host or investigator institution."
+          },
+          "region": {
+            "type": "string",
+            "description": "A mainland China region associated with the investigator."
+          },
+          "funder": {
+            "type": "string",
+            "description": "A funding-body name or Baixiao funder ID."
+          },
+          "program": {
+            "type": "string",
+            "description": "The funding program or project category."
+          },
+          "discipline": {
+            "type": "string",
+            "description": "The academic discipline."
+          },
+          "outcome_grade": {
+            "type": "string",
+            "description": "The completion or outcome grade."
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest award year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest award year to include."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cn",
+                "nih",
+                "nsf",
+                "hk",
+                "eu"
+              ],
+              "description": "A geographic research-funding data source."
+            },
+            "description": "The geographic data sources to search."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of project records to return. Defaults to 10.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for awarded research projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.grants_cfp_search",
+      "service": "baixiao",
+      "name": "grants_cfp_search",
+      "description": "Search Baixiao's research funding calls by topic, geography, funder, status, deadline, year, and minimum award amount.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Topic terms without generic funding or application words."
+          },
+          "region": {
+            "type": "string",
+            "description": "A mainland China province or national for nationwide calls."
+          },
+          "funder": {
+            "type": "string",
+            "description": "A funding-body name or Baixiao funder ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "description": "The application status to include."
+          },
+          "deadline_from": {
+            "type": "string",
+            "description": "The earliest application deadline in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "deadline_to": {
+            "type": "string",
+            "description": "The latest application deadline in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest notice publication year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest notice publication year to include."
+          },
+          "amount_min": {
+            "type": "number",
+            "description": "The minimum parsed single-project award amount in yuan."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cn",
+                "nih",
+                "nsf",
+                "hk",
+                "eu"
+              ],
+              "description": "A geographic research-funding data source."
+            },
+            "description": "The geographic data sources to search."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of calls to return. Defaults to 10.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for research funding calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.hk_grants_search",
+      "service": "baixiao",
+      "name": "hk_grants_search",
+      "description": "Search Baixiao's Hong Kong RGC funded-project collection by free text and award period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "A short free-text query for a topic, principal investigator, institution, or funding scheme."
+          },
+          "year": {
+            "type": "integer",
+            "description": "One award year to match."
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest award year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest award year to include."
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 50,
+            "description": "The maximum number of projects to return, up to 50. Defaults to 5.",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for Hong Kong research grants."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.journal_fit",
+      "service": "baixiao",
+      "name": "journal_fit",
+      "description": "Recommend publication venues for a manuscript by ranking journals with topic-matching works in Baixiao's databases.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A topic keyword."
+            },
+            "description": "Topic keywords used to rank relevant records."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en"
+            ],
+            "description": "The result language, or omit it for automatic detection."
+          },
+          "top": {
+            "type": "integer",
+            "description": "The maximum number of journals to return. Defaults to 10.",
+            "default": 10
+          },
+          "rounds": {
+            "type": "integer",
+            "description": "The number of deterministic keyword-expansion rounds. Defaults to 2.",
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keywords"
+        ],
+        "description": "Manuscript keywords and ranking options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.list_my_kbs",
+      "service": "baixiao",
+      "name": "list_my_kbs",
+      "description": "List the connected user's available Baixiao knowledge bases and their collection IDs for later searches.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      },
+      "followUpActions": [
+        "baixiao.my_kb_search"
+      ]
+    },
+    {
+      "id": "baixiao.list_tools",
+      "service": "baixiao",
+      "name": "list_tools",
+      "description": "Discover the current Baixiao literature, knowledge-base, policy, and research-funding MCP tools with their live input schemas and behavior annotations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact Baixiao MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by Baixiao MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive operations."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside Baixiao."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by Baixiao for the tool."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Baixiao MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected Baixiao MCP service."
+            },
+            "description": "Tools currently exposed by the Baixiao MCP service."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Baixiao MCP tool catalog."
+      },
+      "followUpActions": [
+        "baixiao.call_tool"
+      ]
+    },
+    {
+      "id": "baixiao.my_kb_search",
+      "service": "baixiao",
+      "name": "my_kb_search",
+      "description": "Search the connected user's personal, team, teaching, and subscribed Baixiao knowledge bases.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The query to search across the connected user's knowledge bases."
+          },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Baixiao collection ID."
+            },
+            "description": "Baixiao collection IDs used to restrict the search."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of results to return. Defaults to 15.",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "A query and optional personal knowledge-base filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.policy_search",
+      "service": "baixiao",
+      "name": "policy_search",
+      "description": "Search Baixiao's central and local Chinese government policy collection by text, issuer, author, period, or document type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "A free-text policy topic or phrase."
+          },
+          "author": {
+            "type": "string",
+            "description": "The document author."
+          },
+          "issuer": {
+            "type": "string",
+            "description": "The issuing government body."
+          },
+          "year": {
+            "type": "integer",
+            "description": "One publication year to match."
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest publication year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest publication year to include."
+          },
+          "doc_type": {
+            "type": "string",
+            "description": "The policy document type to include."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of policies to return. Defaults to 15.",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for Chinese government policy documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.verify_reference",
+      "service": "baixiao",
+      "name": "verify_reference",
+      "description": "Look up one reference across Baixiao's databases and report its match status, best candidate, confidence, and metadata warnings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the work to verify."
+          },
+          "year": {
+            "type": "integer",
+            "description": "The expected publication year."
+          },
+          "journal": {
+            "type": "string",
+            "description": "The expected journal or publication venue."
+          },
+          "doi": {
+            "type": "string",
+            "description": "The expected DOI, with or without the DOI prefix."
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An expected author name."
+            },
+            "description": "The expected authors."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en"
+            ],
+            "description": "The result language, or omit it for automatic detection."
+          },
+          "is_book": {
+            "type": "boolean",
+            "description": "Whether the reference is a book.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Known metadata for one reference."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.verify_references",
+      "service": "baixiao",
+      "name": "verify_references",
+      "description": "Batch-check a bibliography across Baixiao's databases and return per-reference match results with aggregate counts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The work title, recommended when no DOI is available."
+                },
+                "year": {
+                  "type": "integer",
+                  "description": "The publication year."
+                },
+                "journal": {
+                  "type": "string",
+                  "description": "The journal or publication venue."
+                },
+                "doi": {
+                  "type": "string",
+                  "description": "The DOI, with or without the DOI prefix."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An author name."
+                  },
+                  "description": "The known authors."
+                },
+                "language": {
+                  "type": "string",
+                  "enum": [
+                    "zh",
+                    "en"
+                  ],
+                  "description": "The result language, or omit it for automatic detection."
+                },
+                "is_book": {
+                  "type": "boolean",
+                  "description": "Whether the reference is a book."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A reference to verify against Baixiao's databases."
+            },
+            "description": "References to verify."
+          },
+          "max_concurrency": {
+            "type": "integer",
+            "description": "The maximum number of parallel lookups performed by Baixiao. Defaults to 8.",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "references"
+        ],
+        "description": "A bibliography and optional concurrency limit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    },
+    {
+      "id": "baixiao.xi_thought_search",
+      "service": "baixiao",
+      "name": "xi_thought_search",
+      "description": "Search Baixiao's New Thought collection of key theoretical and ideological texts by topic, author, period, or document type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "A free-text topic or phrase."
+          },
+          "author": {
+            "type": "string",
+            "description": "The document author."
+          },
+          "year": {
+            "type": "integer",
+            "description": "One publication year to match."
+          },
+          "year_from": {
+            "type": "integer",
+            "description": "The earliest publication year to include."
+          },
+          "year_to": {
+            "type": "integer",
+            "description": "The latest publication year to include."
+          },
+          "doc_type": {
+            "type": "string",
+            "description": "The document type to include."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of texts to return. Defaults to 15.",
+            "default": 15
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters for theoretical and ideological texts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized structured result returned by the Baixiao MCP tool."
+      }
+    }
+  ]
+}

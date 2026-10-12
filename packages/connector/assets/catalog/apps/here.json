@@ -1,0 +1,528 @@
+{
+  "service": "here",
+  "displayName": "HERE",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HERE_API_KEY",
+      "description": "HERE API key sent as the apiKey query parameter. Create it in HERE Platform Access Manager on an app's Credentials tab: https://platform.here.com/."
+    }
+  ],
+  "homepageUrl": "https://www.here.com",
+  "actions": [
+    {
+      "id": "here.autocomplete",
+      "service": "here",
+      "name": "autocomplete",
+      "description": "Get HERE address and administrative-area completions for entered text.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial address or administrative-area text to complete."
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE location context formatted as latitude,longitude."
+          },
+          "in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE spatial or country filter, such as countryCode:USA."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The maximum number of autocomplete result items to return."
+          },
+          "politicalView": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional political view country code used by HERE."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for HERE address autocomplete suggestions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE result item."
+            },
+            "description": "The ordered HERE result items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HERE response containing ordered result items."
+      }
+    },
+    {
+      "id": "here.autosuggest",
+      "service": "here",
+      "name": "autosuggest",
+      "description": "Get HERE query and entity suggestions for incomplete or misspelled address and place text with required spatial context.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial HERE Autosuggest query."
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE location context formatted as latitude,longitude."
+          },
+          "in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE filter. Use circle:... or bbox:... as spatial context, or countryCode:... together with at."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of result items to return."
+          },
+          "politicalView": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional political view country code used by HERE."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for HERE Autosuggest query suggestions with required spatial context.",
+        "anyOf": [
+          {
+            "required": [
+              "at"
+            ],
+            "not": {
+              "required": [
+                "in"
+              ],
+              "properties": {
+                "in": {
+                  "type": "string",
+                  "pattern": "^(circle|bbox):"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "in"
+            ],
+            "properties": {
+              "in": {
+                "type": "string",
+                "pattern": "^(circle|bbox):"
+              }
+            },
+            "not": {
+              "required": [
+                "at"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE suggestion item."
+            },
+            "description": "The ordered HERE Autosuggest items."
+          },
+          "queryTerms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE query term suggestion."
+            },
+            "description": "The optional HERE completed query terms returned when term completion is requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The HERE Autosuggest response containing query or entity suggestions."
+      }
+    },
+    {
+      "id": "here.discover",
+      "service": "here",
+      "name": "discover",
+      "description": "Search HERE places or addresses with a free-form Discover query and required spatial context.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The free-form HERE Discover query."
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE location context formatted as latitude,longitude."
+          },
+          "in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE filter. Use circle:... or bbox:... as spatial context, or countryCode:... together with at."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of result items to return."
+          },
+          "types": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE result type filter."
+          },
+          "politicalView": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional political view country code used by HERE."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE response enrichment selector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for HERE Discover free-form place or address search with required spatial context.",
+        "anyOf": [
+          {
+            "required": [
+              "at"
+            ],
+            "not": {
+              "required": [
+                "in"
+              ],
+              "properties": {
+                "in": {
+                  "type": "string",
+                  "pattern": "^(circle|bbox):"
+                }
+              }
+            }
+          },
+          {
+            "required": [
+              "in"
+            ],
+            "properties": {
+              "in": {
+                "type": "string",
+                "pattern": "^(circle|bbox):"
+              }
+            },
+            "not": {
+              "required": [
+                "at"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE result item."
+            },
+            "description": "The ordered HERE result items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HERE response containing ordered result items."
+      }
+    },
+    {
+      "id": "here.geocode",
+      "service": "here",
+      "name": "geocode",
+      "description": "Geocode a free-form address, place, locality, or administrative-area query with HERE Geocoding and Search API v7.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The free-form HERE geocode query."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of result items to return."
+          },
+          "in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE spatial or country filter, such as countryCode:USA."
+          },
+          "at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional HERE location context formatted as latitude,longitude."
+          },
+          "types": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE result type filter."
+          },
+          "politicalView": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional political view country code used by HERE."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE response enrichment selector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for geocoding a HERE address, place, locality, or administrative area query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE result item."
+            },
+            "description": "The ordered HERE result items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HERE response containing ordered result items."
+      }
+    },
+    {
+      "id": "here.lookup",
+      "service": "here",
+      "name": "lookup",
+      "description": "Look up a HERE place or location object by an identifier returned from another HERE search result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HERE result identifier returned by geocode, reverse geocode, discover, or autocomplete."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE response enrichment selector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for looking up a HERE place or location object by identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The representative title for the HERE object."
+          },
+          "id": {
+            "type": "string",
+            "description": "The HERE identifier for the returned object."
+          },
+          "address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The detailed HERE address object."
+          },
+          "resultType": {
+            "type": "string",
+            "description": "The HERE result type for the returned object, when present."
+          },
+          "position": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The HERE WGS84 position object, when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "title",
+          "id",
+          "address"
+        ],
+        "description": "The HERE lookup result object."
+      }
+    },
+    {
+      "id": "here.reverse_geocode",
+      "service": "here",
+      "name": "reverse_geocode",
+      "description": "Find the nearest HERE address or place result for a latitude,longitude location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HERE location to reverse geocode, formatted as latitude,longitude."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional BCP 47 language tag for the response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of result items to return."
+          },
+          "types": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE result type filter."
+          },
+          "politicalView": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional political view country code used by HERE."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional comma-separated HERE response enrichment selector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "at"
+        ],
+        "description": "The input payload for reverse geocoding a HERE latitude,longitude location."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A HERE result item."
+            },
+            "description": "The ordered HERE result items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The HERE response containing ordered result items."
+      }
+    }
+  ]
+}

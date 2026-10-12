@@ -1,0 +1,881 @@
+{
+  "service": "wangdian",
+  "displayName": "Wangdian ERP",
+  "description": "Read shops, warehouses, goods, inventory, orders, stockouts, and refunds from Wangdian ERP.",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "sid",
+          "label": "SID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Your Wangdian seller account",
+          "description": "The seller account assigned when purchasing Wangdian ERP. View it with your production application credentials or ask the ERP purchaser: https://open.wangdian.cn/open/guide?path=guide_jkgf"
+        },
+        {
+          "key": "appKey",
+          "label": "AppKey",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Your Wangdian AppKey",
+          "description": "The production application AppKey created under Self-service Integration > Application Management in the Wangdian Open Platform: https://open.wangdian.cn/open/guide?path=guide_kfzn"
+        },
+        {
+          "key": "appSecret",
+          "label": "AppSecret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your Wangdian AppSecret",
+          "description": "The production AppSecret paired with the AppKey in Wangdian Open Platform Application Management. It is used only to sign requests and is never sent to Wangdian: https://open.wangdian.cn/open/guide?path=guide_signsf"
+        }
+      ],
+      "testAction": {
+        "actionName": "list_warehouses",
+        "input": {
+          "pageNo": 0,
+          "pageSize": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.wangdian.cn",
+  "actions": [
+    {
+      "id": "wangdian.list_goods",
+      "service": "wangdian",
+      "name": "list_goods",
+      "description": "List goods and SKU records from Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "specNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant SKU code to retrieve.",
+            "pattern": "\\S"
+          },
+          "goodsNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product or SPU code to retrieve.",
+            "pattern": "\\S"
+          },
+          "brandNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The brand code used to filter goods.",
+            "pattern": "\\S"
+          },
+          "className": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The goods category name used to filter results.",
+            "pattern": "\\S"
+          },
+          "barcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The barcode used to filter goods.",
+            "pattern": "\\S"
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "includeDeleted": {
+            "type": "boolean",
+            "description": "Whether to include deleted goods records."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP goods records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "goods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One goods record returned by Wangdian, including its nested SKU list when available."
+            },
+            "description": "One goods record returned by Wangdian, including its nested SKU list when available."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian goods result."
+      }
+    },
+    {
+      "id": "wangdian.list_inventory",
+      "service": "wangdian",
+      "name": "list_inventory",
+      "description": "List physical stock and inventory allocation records from Wangdian ERP.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "warehouseNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The warehouse code used to filter inventory.",
+            "pattern": "\\S"
+          },
+          "specNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant SKU code used to retrieve inventory.",
+            "pattern": "\\S"
+          },
+          "barcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The barcode used to retrieve inventory.",
+            "pattern": "\\S"
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "onlyExistingInventory": {
+            "type": "boolean",
+            "description": "Whether to return only inventory records that are not deleted in inventory management."
+          },
+          "includeDeletedGoods": {
+            "type": "boolean",
+            "description": "Whether to include inventory for deleted goods records."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP inventory records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inventory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One warehouse and SKU inventory record returned by Wangdian."
+            },
+            "description": "One warehouse and SKU inventory record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian inventory result."
+      }
+    },
+    {
+      "id": "wangdian.list_orders",
+      "service": "wangdian",
+      "name": "list_orders",
+      "description": "List sales orders from Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wangdian ERP sales order number to retrieve.",
+            "pattern": "\\S"
+          },
+          "sourceTradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original platform order number to retrieve.",
+            "pattern": "\\S"
+          },
+          "logisticsNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The outbound logistics number to retrieve.",
+            "pattern": "\\S"
+          },
+          "status": {
+            "type": "integer",
+            "enum": [
+              5,
+              10,
+              12,
+              13,
+              15,
+              16,
+              19,
+              20,
+              21,
+              22,
+              25,
+              27,
+              30,
+              35,
+              40,
+              45,
+              50,
+              53,
+              55,
+              95,
+              105,
+              110,
+              113
+            ],
+            "description": "The Wangdian sales order status code used to filter results."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "shopNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop code used to filter sales orders.",
+            "pattern": "\\S"
+          },
+          "shopNos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Wangdian shop code.",
+              "pattern": "\\S"
+            },
+            "description": "The shop codes used to filter records, with at most 20 shops per request.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "warehouseNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The warehouse code used to filter sales orders.",
+            "pattern": "\\S"
+          },
+          "logisticsState": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "description": "The logistics-number filter: 0 for any, 1 for present, or 2 for absent."
+          },
+          "fuzzySourceTradeNo": {
+            "type": "boolean",
+            "description": "Whether to use a fuzzy match when querying by sourceTradeNo."
+          },
+          "includePaymentDetails": {
+            "type": "boolean",
+            "description": "Whether to include payment transaction details in returned orders."
+          },
+          "calculateTaxBySku": {
+            "type": "boolean",
+            "description": "Whether Wangdian should calculate tax by individual SKU."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP sales orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sales order record returned by Wangdian."
+            },
+            "description": "One sales order record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian sales order result."
+      }
+    },
+    {
+      "id": "wangdian.list_refunds",
+      "service": "wangdian",
+      "name": "list_refunds",
+      "description": "List refund and exchange records from Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "refundNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wangdian ERP refund number to retrieve.",
+            "pattern": "\\S"
+          },
+          "sourceRefundNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original platform refund number to retrieve.",
+            "pattern": "\\S"
+          },
+          "tradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wangdian ERP sales order number to retrieve refunds for.",
+            "pattern": "\\S"
+          },
+          "sourceTradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original platform order number to retrieve refunds for.",
+            "pattern": "\\S"
+          },
+          "processStatus": {
+            "type": "integer",
+            "enum": [
+              5,
+              10,
+              20,
+              30,
+              40,
+              50,
+              60,
+              63,
+              64,
+              65,
+              69,
+              70,
+              71,
+              80,
+              90
+            ],
+            "description": "The Wangdian refund processing status code used to filter results."
+          },
+          "timeType": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "description": "The time field to query: 0 for modified, 1 for settlement, or 2 for creation time."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "shopNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop code used to filter refunds.",
+            "pattern": "\\S"
+          },
+          "shopNos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Wangdian shop code.",
+              "pattern": "\\S"
+            },
+            "description": "The shop codes used to filter records, with at most 20 shops per request.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "returnLogisticsNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The return logistics number used to filter refunds.",
+            "pattern": "\\S"
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 40,
+            "description": "The number of refund records to return, from 1 to 40."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP refund and exchange records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refunds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One refund or exchange record returned by Wangdian."
+            },
+            "description": "One refund or exchange record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian refund result."
+      }
+    },
+    {
+      "id": "wangdian.list_sales_stockouts",
+      "service": "wangdian",
+      "name": "list_sales_stockouts",
+      "description": "List sales stockout records from Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "stockoutNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wangdian sales stockout number to retrieve.",
+            "pattern": "\\S"
+          },
+          "tradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Wangdian ERP sales order number to retrieve.",
+            "pattern": "\\S"
+          },
+          "sourceTradeNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The original platform order number to retrieve.",
+            "pattern": "\\S"
+          },
+          "status": {
+            "type": "integer",
+            "enum": [
+              5,
+              55,
+              95,
+              105,
+              110,
+              113
+            ],
+            "description": "The Wangdian sales stockout status code used to filter results."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A China Standard Time timestamp in YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "\\S"
+          },
+          "shopNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop code used to filter sales stockouts.",
+            "pattern": "\\S"
+          },
+          "shopNos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Wangdian shop code.",
+              "pattern": "\\S"
+            },
+            "description": "The shop codes used to filter records, with at most 20 shops per request.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "warehouseNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The warehouse code used to filter sales stockouts.",
+            "pattern": "\\S"
+          },
+          "queryByModified": {
+            "type": "boolean",
+            "description": "Whether the time range should use last-modified time instead of consign time."
+          },
+          "includePositionDetails": {
+            "type": "boolean",
+            "description": "Whether to include warehouse position details in returned stockout records."
+          },
+          "stockOnly": {
+            "type": "boolean",
+            "description": "Whether to return only stock-related data."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP sales stockout records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stockouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sales stockout record returned by Wangdian."
+            },
+            "description": "One sales stockout record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian sales stockout result."
+      }
+    },
+    {
+      "id": "wangdian.list_shops",
+      "service": "wangdian",
+      "name": "list_shops",
+      "description": "List shop records configured in Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shopNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The shop code to retrieve.",
+            "pattern": "\\S"
+          },
+          "platformId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Wangdian platform ID used to filter shops."
+          },
+          "platformIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "One Wangdian platform ID."
+            },
+            "description": "The Wangdian platform IDs used to filter shops.",
+            "minItems": 1
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Whether to return disabled shops. Omit this field to return enabled shops."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP shops."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One shop record returned by Wangdian."
+            },
+            "description": "One shop record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian shop result."
+      }
+    },
+    {
+      "id": "wangdian.list_warehouses",
+      "service": "wangdian",
+      "name": "list_warehouses",
+      "description": "List warehouse records configured in Wangdian ERP Enterprise Edition.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "warehouseNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The warehouse code to retrieve.",
+            "pattern": "\\S"
+          },
+          "warehouseType": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              20,
+              22,
+              126,
+              127
+            ],
+            "description": "The Wangdian warehouse type code used to filter results."
+          },
+          "subType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The subtype used for warehouses whose type is Other."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Whether to return disabled warehouses. Omit this field to return enabled warehouses."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number. Defaults to 0."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Wangdian ERP warehouses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One warehouse record returned by Wangdian."
+            },
+            "description": "One warehouse record returned by Wangdian."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, or null when Wangdian omits it after page 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Wangdian warehouse result."
+      }
+    }
+  ]
+}

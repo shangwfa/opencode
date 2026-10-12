@@ -1,0 +1,157 @@
+{
+  "service": "dingtalk_mcp",
+  "displayName": "DingTalk MCP",
+  "description": "Discover and call live DingTalk tools through an official DingTalk MCP marketplace service, such as DingTalk Docs, Calendar, or Contacts.",
+  "categories": [
+    "Communication",
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "mcpUrl",
+          "label": "MCP URL",
+          "required": true,
+          "inputType": "password",
+          "secret": true,
+          "placeholder": "https://mcp-gw.dingtalk.com/mserver/...",
+          "description": "The secret Streamable HTTP URL of one DingTalk MCP marketplace service. Open a service on the DingTalk MCP marketplace (https://aihub.dingtalk.com/#/mcp-market/mcp, DingTalk login required), click 获取 MCP Server 配置 (Get MCP Server config), and copy the URL. Each connection exposes one marketplace service. Official guide: https://open.dingtalk.com/document/development/mcp-square-introduction."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.dingtalk.com",
+  "actions": [
+    {
+      "id": "dingtalk_mcp.call_tool",
+      "service": "dingtalk_mcp",
+      "name": "call_tool",
+      "description": "Call a current DingTalk MCP tool with JSON arguments. Discover the tool first and confirm the user's intent because the endpoint may expose actions that send, overwrite, cancel, or delete DingTalk data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current DingTalk MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the DingTalk MCP tool."
+      },
+      "followUpActions": [
+        "dingtalk_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "dingtalk_mcp.list_tools",
+      "service": "dingtalk_mcp",
+      "name": "list_tools",
+      "description": "Discover the current tools, behavior annotations, and live input schemas exposed by this DingTalk MCP connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact DingTalk MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by DingTalk MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify DingTalk data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform a destructive DingTalk operation."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeating the same call is expected to have no additional effect."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside DingTalk."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by the connected DingTalk server."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by DingTalk MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected DingTalk MCP endpoint."
+            },
+            "description": "Tools currently exposed by this DingTalk MCP connection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current DingTalk MCP tool catalog."
+      },
+      "followUpActions": [
+        "dingtalk_mcp.call_tool"
+      ]
+    }
+  ]
+}

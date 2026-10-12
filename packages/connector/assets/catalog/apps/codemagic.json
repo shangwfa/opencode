@@ -1,0 +1,1089 @@
+{
+  "service": "codemagic",
+  "displayName": "Codemagic",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "CM_API_TOKEN",
+      "description": "Codemagic personal API token used with the x-auth-token header. Find it under Teams > Personal Account > Integrations > Codemagic API > Show: https://docs.codemagic.io/rest-api/codemagic-rest-api/."
+    }
+  ],
+  "homepageUrl": "https://codemagic.io",
+  "actions": [
+    {
+      "id": "codemagic.cancel_build",
+      "service": "codemagic",
+      "name": "cancel_build",
+      "description": "Cancel a Codemagic build by its build ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "build_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Codemagic build ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "build_id"
+        ],
+        "description": "Input for canceling a Codemagic build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the cancel request was accepted."
+          },
+          "build_id": {
+            "type": "string",
+            "description": "The build ID that was targeted."
+          },
+          "already_finished": {
+            "type": "boolean",
+            "description": "Whether Codemagic reported that the build had already finished."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Acknowledgement returned after a cancel request."
+      }
+    },
+    {
+      "id": "codemagic.create_build",
+      "service": "codemagic",
+      "name": "create_build",
+      "description": "Start a new Codemagic build for the specified app and workflow.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Codemagic application ID."
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The workflow identifier as specified in the YAML file."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Git branch name to build. Either branch or tag is required."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Git tag name to build. Either branch or tag is required."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A build label to attach."
+            },
+            "description": "Labels to attach to the build."
+          },
+          "environment": {
+            "type": "object",
+            "properties": {
+              "variables": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "description": "Environment variable overrides keyed by variable name."
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Codemagic variable group name."
+                },
+                "description": "Variable groups to inject into the build."
+              },
+              "softwareVersions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Software version overrides keyed by tool name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Environment overrides applied when starting a build."
+          },
+          "instanceType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Build machine type, such as mac_mini_m2 or linux_standard."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "workflowId"
+        ],
+        "description": "Input for starting a new Codemagic build. Either branch or tag must be provided."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "buildId": {
+            "type": "string",
+            "description": "The newly created Codemagic build ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response returned after a build is created."
+      }
+    },
+    {
+      "id": "codemagic.get_build",
+      "service": "codemagic",
+      "name": "get_build",
+      "description": "Get detailed information about a single Codemagic build.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "build_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Codemagic build ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "build_id"
+        ],
+        "description": "Input for fetching a single build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Codemagic build ID."
+          },
+          "app_id": {
+            "type": "string",
+            "description": "The application ID that owns the build."
+          },
+          "workflow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Workflow identifier, when available."
+              },
+              "name": {
+                "type": "string",
+                "description": "Workflow name, when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Workflow metadata returned by Codemagic."
+          },
+          "status": {
+            "type": "string",
+            "description": "Build status reported by Codemagic, such as queued, building, or finished."
+          },
+          "index": {
+            "type": "integer",
+            "description": "Build sequence number."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A label attached to the build."
+            },
+            "description": "Labels attached to the build."
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Artifact metadata returned by Codemagic."
+            },
+            "description": "Artifacts attached to the build."
+          },
+          "release_notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Release note metadata returned by Codemagic."
+            },
+            "description": "Release notes attached to the build."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value or null when the field is not set."
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value or null when the field is not set."
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "hash": {
+                    "type": "string",
+                    "description": "Commit SHA, when available."
+                  },
+                  "author": {
+                    "type": "string",
+                    "description": "Commit author, when available."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Commit message, when available."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Commit metadata returned by Codemagic."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Commit metadata returned by Codemagic."
+          },
+          "pull_request": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pull request metadata returned by Codemagic."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pull request metadata returned by Codemagic."
+          },
+          "instance_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value or null when the field is not set."
+          },
+          "remote_access_enabled": {
+            "type": "boolean",
+            "description": "Whether remote access is enabled for the build."
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Codemagic object returned by the API."
+          },
+          "build_inputs": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Codemagic object returned by the API."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Codemagic build."
+      }
+    },
+    {
+      "id": "codemagic.get_current_user",
+      "service": "codemagic",
+      "name": "get_current_user",
+      "description": "Get the authenticated Codemagic user and their available team permissions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The authenticated Codemagic user ID."
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value or null when the field is not set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value or null when the field is not set."
+          },
+          "permissions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A granted Codemagic permission."
+              },
+              "description": "Permissions granted for a single team."
+            },
+            "description": "Permissions keyed by team ID."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Authenticated Codemagic user."
+      }
+    },
+    {
+      "id": "codemagic.list_team_apps",
+      "service": "codemagic",
+      "name": "list_team_apps",
+      "description": "List the applications that belong to a specific Codemagic team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Codemagic team ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to fetch."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return per page."
+          },
+          "id": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Codemagic application ID filter value."
+            },
+            "description": "Optional list of application IDs to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team_id"
+        ],
+        "description": "Input for listing team applications."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Codemagic application ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Application name."
+                },
+                "icon_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "last_build_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the application is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the application is archived."
+                },
+                "repository": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "description": "Repository provider reported by Codemagic, when available."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Repository URL, when available."
+                    },
+                    "default_branch": {
+                      "type": "string",
+                      "description": "Default repository branch, when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Repository metadata for the Codemagic application."
+                },
+                "settings_source": {
+                  "type": "string",
+                  "description": "Where the application settings are sourced from, when available."
+                },
+                "project_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Codemagic application."
+            },
+            "description": "Applications that belong to the specified team."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results returned per page."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Codemagic applications for a team."
+      }
+    },
+    {
+      "id": "codemagic.list_team_builds",
+      "service": "codemagic",
+      "name": "list_team_builds",
+      "description": "List builds for a specific Codemagic team with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Codemagic team ID."
+          },
+          "app_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this application ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "building",
+              "finished",
+              "failed",
+              "canceled",
+              "timeout",
+              "skipped"
+            ],
+            "description": "Only return builds with this status."
+          },
+          "workflow_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this workflow ID."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this branch."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this tag."
+          },
+          "label": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A build label filter value."
+            },
+            "description": "Only return builds that match these labels."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor returned by the previous response to continue listing results."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team_id"
+        ],
+        "description": "Input for listing team builds."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Codemagic build ID."
+                },
+                "app_id": {
+                  "type": "string",
+                  "description": "The application ID that owns the build."
+                },
+                "workflow": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Workflow identifier, when available."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Workflow name, when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Workflow metadata returned by Codemagic."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Build status reported by Codemagic, such as queued, building, or finished."
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "Build sequence number."
+                },
+                "labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A label attached to the build."
+                  },
+                  "description": "Labels attached to the build."
+                },
+                "artifacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Artifact metadata returned by Codemagic."
+                  },
+                  "description": "Artifacts attached to the build."
+                },
+                "release_notes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Release note metadata returned by Codemagic."
+                  },
+                  "description": "Release notes attached to the build."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "started_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+                },
+                "finished_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Timestamp in ISO 8601 format, or null when the field is not set."
+                },
+                "branch": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "tag": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "commit": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "hash": {
+                          "type": "string",
+                          "description": "Commit SHA, when available."
+                        },
+                        "author": {
+                          "type": "string",
+                          "description": "Commit author, when available."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "Commit message, when available."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Commit metadata returned by Codemagic."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Commit metadata returned by Codemagic."
+                },
+                "pull_request": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Pull request metadata returned by Codemagic."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Pull request metadata returned by Codemagic."
+                },
+                "instance_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "remote_access_enabled": {
+                  "type": "boolean",
+                  "description": "Whether remote access is enabled for the build."
+                },
+                "config": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Codemagic object returned by the API."
+                },
+                "build_inputs": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Codemagic object returned by the API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Codemagic build."
+            },
+            "description": "Builds returned for the specified team."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results returned per page."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when there are no more results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when there are no more results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cursor-paginated list of Codemagic builds."
+      }
+    },
+    {
+      "id": "codemagic.list_user_apps",
+      "service": "codemagic",
+      "name": "list_user_apps",
+      "description": "List the Codemagic applications accessible to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to fetch."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for authenticated-user list actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Codemagic application ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Application name."
+                },
+                "icon_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "last_build_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the application is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the application is archived."
+                },
+                "repository": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "description": "Repository provider reported by Codemagic, when available."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Repository URL, when available."
+                    },
+                    "default_branch": {
+                      "type": "string",
+                      "description": "Default repository branch, when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Repository metadata for the Codemagic application."
+                },
+                "settings_source": {
+                  "type": "string",
+                  "description": "Where the application settings are sourced from, when available."
+                },
+                "project_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Codemagic application."
+            },
+            "description": "Applications accessible to the authenticated user."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results returned per page."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Codemagic applications for the authenticated user."
+      }
+    },
+    {
+      "id": "codemagic.list_user_teams",
+      "service": "codemagic",
+      "name": "list_user_teams",
+      "description": "List the Codemagic teams accessible to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to fetch."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for authenticated-user list actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Codemagic team ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the team."
+                },
+                "icon_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value or null when the field is not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value or null when the field is not set."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Codemagic team."
+            },
+            "description": "Teams accessible to the authenticated user."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results returned per page."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Codemagic teams."
+      }
+    }
+  ]
+}

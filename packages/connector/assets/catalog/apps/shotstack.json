@@ -1,0 +1,265 @@
+{
+  "service": "shotstack",
+  "displayName": "Shotstack",
+  "categories": [
+    "Developer Tools",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_SHOTSTACK_API_KEY",
+      "description": "Shotstack API key sent in the x-api-key header. Create or copy an API key from the Shotstack dashboard at https://dashboard.shotstack.io/."
+    }
+  ],
+  "homepageUrl": "https://shotstack.io",
+  "actions": [
+    {
+      "id": "shotstack.get_render",
+      "service": "shotstack",
+      "name": "get_render",
+      "description": "Get the status and output URL for one Shotstack render, optionally including its original edit JSON.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Shotstack render task UUID.",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "boolean",
+            "description": "Whether to include the original edit data in the response."
+          },
+          "merged": {
+            "type": "boolean",
+            "description": "Whether returned edit data should include merged fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The identifier and optional response fields for one Shotstack render."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "render": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Shotstack render identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Shotstack render status."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary output URL when Shotstack has produced one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary output URL when Shotstack has produced one."
+              },
+              "poster": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The poster image URL when Shotstack generated one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The poster image URL when Shotstack generated one."
+              },
+              "thumbnail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The thumbnail image URL when Shotstack generated one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The thumbnail image URL when Shotstack generated one."
+              },
+              "owner": {
+                "type": "string",
+                "description": "The Shotstack account identifier that owns the render."
+              },
+              "plan": {
+                "type": "string",
+                "description": "The Shotstack subscription plan used for the render."
+              },
+              "error": {
+                "type": "string",
+                "description": "The error message returned when Shotstack cannot render the edit."
+              },
+              "duration": {
+                "type": "number",
+                "description": "The rendered media duration in seconds."
+              },
+              "renderTime": {
+                "type": "number",
+                "description": "The time Shotstack spent rendering the media in milliseconds."
+              },
+              "created": {
+                "type": "string",
+                "description": "The timestamp when Shotstack created the render."
+              },
+              "updated": {
+                "type": "string",
+                "description": "The timestamp when Shotstack last updated the render."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The original edit payload returned when requested."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "The current Shotstack render details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "render"
+        ],
+        "description": "The current Shotstack render response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "shotstack.render_edit",
+        "statusActionId": "shotstack.get_render"
+      }
+    },
+    {
+      "id": "shotstack.render_edit",
+      "service": "shotstack",
+      "name": "render_edit",
+      "description": "Submit a Shotstack edit JSON payload for asynchronous video, image, or audio rendering and return its render ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "edit": {
+            "type": "object",
+            "properties": {
+              "timeline": {
+                "type": "object",
+                "properties": {
+                  "tracks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One Shotstack track and its provider-defined clip configuration."
+                    },
+                    "description": "The ordered Shotstack tracks containing render clips."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "tracks"
+                ],
+                "description": "The Shotstack timeline containing the tracks to render."
+              },
+              "output": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "mp4",
+                      "gif",
+                      "jpg",
+                      "png",
+                      "bmp",
+                      "mp3"
+                    ],
+                    "description": "The output media format required by Shotstack."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "format"
+                ],
+                "description": "The Shotstack output configuration."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "timeline",
+              "output"
+            ],
+            "description": "The Shotstack Edit JSON body, including a timeline and output configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "edit"
+        ],
+        "description": "The Shotstack edit payload to queue for rendering."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "render": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Shotstack render identifier used to retrieve the result."
+              },
+              "message": {
+                "type": "string",
+                "description": "The queue confirmation message returned by Shotstack."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "message"
+            ],
+            "description": "The render job queued by Shotstack."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "render"
+        ],
+        "description": "The queued Shotstack render response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "shotstack.render_edit",
+        "statusActionId": "shotstack.get_render"
+      }
+    }
+  ]
+}

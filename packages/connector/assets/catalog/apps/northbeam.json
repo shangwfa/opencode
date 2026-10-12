@@ -1,0 +1,413 @@
+{
+  "service": "northbeam",
+  "displayName": "Northbeam",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NORTHBEAM_API_KEY",
+      "description": "Northbeam API key used in the Authorization header. Create or copy it from Settings > API Keys in the Northbeam dashboard.",
+      "extraFields": [
+        {
+          "key": "clientId",
+          "label": "Data-Client-ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "NORTHBEAM_DATA_CLIENT_ID",
+          "description": "Northbeam Data-Client-ID UUID generated together with the API key in Settings > API Keys."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.northbeam.io",
+  "actions": [
+    {
+      "id": "northbeam.list_attribution_models",
+      "service": "northbeam",
+      "name": "list_attribution_models",
+      "description": "List the attribution models available for Northbeam data exports.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Northbeam attribution models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attribution_models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Northbeam attribution model identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The human-readable attribution model name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The human-readable attribution model name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Northbeam attribution model."
+            },
+            "description": "The attribution models returned by Northbeam."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Northbeam attribution models response."
+      }
+    },
+    {
+      "id": "northbeam.list_breakdowns",
+      "service": "northbeam",
+      "name": "list_breakdowns",
+      "description": "List the breakdown keys and values available for Northbeam data exports.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Northbeam breakdowns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "breakdowns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Northbeam breakdown key.",
+                  "pattern": "\\S"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A breakdown value."
+                  },
+                  "description": "The values available for the breakdown key."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Northbeam breakdown definition."
+            },
+            "description": "The breakdowns returned by Northbeam."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Northbeam breakdowns response."
+      }
+    },
+    {
+      "id": "northbeam.list_hourly_spend",
+      "service": "northbeam",
+      "name": "list_hourly_spend",
+      "description": "List paginated Northbeam hourly spend records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hour_start_iso_begin": {
+            "type": "string",
+            "description": "The start date-time for the hourly spend range.",
+            "format": "date-time"
+          },
+          "hour_start_iso_end": {
+            "type": "string",
+            "description": "The end date-time for the hourly spend range.",
+            "format": "date-time"
+          },
+          "platform_account_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform account ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform campaign ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "adset_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform ad set ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "ad_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform ad ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page to fetch."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of results per page. Northbeam documents a maximum of 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query filters for listing Northbeam hourly spend records.",
+        "dependentRequired": {
+          "hour_start_iso_begin": [
+            "hour_start_iso_end"
+          ],
+          "hour_start_iso_end": [
+            "hour_start_iso_begin"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Northbeam spend record."
+            },
+            "description": "The spend records returned by Northbeam."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current result page."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results requested per page."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "The total number of spend records matching the filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Northbeam spend response."
+      }
+    },
+    {
+      "id": "northbeam.list_metrics",
+      "service": "northbeam",
+      "name": "list_metrics",
+      "description": "List the metrics available for Northbeam data exports.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Northbeam metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Northbeam metric identifier.",
+                  "pattern": "\\S"
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The human-readable metric label."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The human-readable metric label."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Northbeam export metric."
+            },
+            "description": "The metrics returned by Northbeam."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Northbeam metrics response."
+      }
+    },
+    {
+      "id": "northbeam.list_spend",
+      "service": "northbeam",
+      "name": "list_spend",
+      "description": "List paginated Northbeam daily spend records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The single spend date to fetch. Use this instead of date_start/date_end.",
+            "format": "date"
+          },
+          "date_start": {
+            "type": "string",
+            "description": "The start date for a spend date range.",
+            "format": "date"
+          },
+          "date_end": {
+            "type": "string",
+            "description": "The end date for a spend date range.",
+            "format": "date"
+          },
+          "platform_account_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform account ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "campaign_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform campaign ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "adset_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform ad set ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "ad_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ad platform ad ID to filter spend by.",
+            "pattern": "\\S"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page to fetch."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of results per page. Northbeam documents a maximum of 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query filters for listing Northbeam daily spend records.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "date",
+                "date_start"
+              ]
+            },
+            {
+              "required": [
+                "date",
+                "date_end"
+              ]
+            }
+          ]
+        },
+        "dependentRequired": {
+          "date_start": [
+            "date_end"
+          ],
+          "date_end": [
+            "date_start"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Northbeam spend record."
+            },
+            "description": "The spend records returned by Northbeam."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current result page."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of results requested per page."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "The total number of spend records matching the filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Northbeam spend response."
+      }
+    }
+  ]
+}

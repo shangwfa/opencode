@@ -1,0 +1,495 @@
+{
+  "service": "arcgis_online",
+  "displayName": "ArcGIS Online",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ARCGIS_ONLINE_API_KEY",
+      "description": "ArcGIS API key used as an access token for ArcGIS Location Services. Create API key credentials in your ArcGIS portal: https://developers.arcgis.com/documentation/security-and-authentication/api-key-authentication/tutorials/create-an-api-key/location-platform/."
+    }
+  ],
+  "homepageUrl": "https://www.arcgis.com",
+  "actions": [
+    {
+      "id": "arcgis_online.find_address_candidates",
+      "service": "arcgis_online",
+      "name": "find_address_candidates",
+      "description": "Convert an address or place query into ArcGIS geocoding candidates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "singleLine": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Street address, place name, postal code, or POI query."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Longitude in decimal degrees."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "longitude",
+              "latitude"
+            ],
+            "description": "A WGS84 coordinate used by ArcGIS geocoding."
+          },
+          "searchExtent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounding box that limits search results, formatted as xmin,ymin,xmax,ymax."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Place or address category filter supported by ArcGIS."
+          },
+          "sourceCountry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country code or comma-separated country codes used to restrict results."
+          },
+          "preferredLabelValues": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred label values returned by ArcGIS, such as postal city or local city."
+          },
+          "magicKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Magic key returned by the suggest action."
+          },
+          "outFields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated output fields to include, or * for all fields."
+          },
+          "outSr": {
+            "type": "integer",
+            "description": "Spatial reference WKID for returned coordinates."
+          },
+          "maxLocations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of candidates to return, from 1 to 50."
+          },
+          "forStorage": {
+            "type": "boolean",
+            "description": "Whether the geocoding results will be stored persistently."
+          },
+          "locationType": {
+            "type": "string",
+            "enum": [
+              "rooftop",
+              "street"
+            ],
+            "description": "Preferred output geometry location type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "singleLine"
+        ],
+        "description": "Input parameters for ArcGIS findAddressCandidates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spatialReference": {
+            "type": "object",
+            "properties": {
+              "wkid": {
+                "type": "integer",
+                "description": "Well-known ID for the spatial reference."
+              },
+              "latestWkid": {
+                "type": "integer",
+                "description": "Latest well-known ID for the spatial reference."
+              }
+            },
+            "additionalProperties": true,
+            "description": "ArcGIS spatial reference metadata."
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Formatted address for the candidate."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "description": "X coordinate returned by ArcGIS."
+                    },
+                    "y": {
+                      "type": "number",
+                      "description": "Y coordinate returned by ArcGIS."
+                    },
+                    "spatialReference": {
+                      "type": "object",
+                      "properties": {
+                        "wkid": {
+                          "type": "integer",
+                          "description": "Well-known ID for the spatial reference."
+                        },
+                        "latestWkid": {
+                          "type": "integer",
+                          "description": "Latest well-known ID for the spatial reference."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "ArcGIS spatial reference metadata."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "description": "Point geometry returned by ArcGIS."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "Match score for the candidate."
+                },
+                "attributes": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "An ArcGIS address attribute value."
+                  },
+                  "description": "Address attributes returned by ArcGIS, keyed by upstream field name."
+                },
+                "extent": {
+                  "type": "object",
+                  "properties": {
+                    "xmin": {
+                      "type": "number",
+                      "description": "Minimum X coordinate of the extent."
+                    },
+                    "ymin": {
+                      "type": "number",
+                      "description": "Minimum Y coordinate of the extent."
+                    },
+                    "xmax": {
+                      "type": "number",
+                      "description": "Maximum X coordinate of the extent."
+                    },
+                    "ymax": {
+                      "type": "number",
+                      "description": "Maximum Y coordinate of the extent."
+                    },
+                    "spatialReference": {
+                      "type": "object",
+                      "properties": {
+                        "wkid": {
+                          "type": "integer",
+                          "description": "Well-known ID for the spatial reference."
+                        },
+                        "latestWkid": {
+                          "type": "integer",
+                          "description": "Latest well-known ID for the spatial reference."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "ArcGIS spatial reference metadata."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Bounding extent returned by ArcGIS."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "address",
+                "location",
+                "score"
+              ],
+              "description": "One ArcGIS address candidate."
+            },
+            "description": "Address candidates returned by ArcGIS."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "candidates"
+        ],
+        "description": "ArcGIS findAddressCandidates response."
+      }
+    },
+    {
+      "id": "arcgis_online.reverse_geocode",
+      "service": "arcgis_online",
+      "name": "reverse_geocode",
+      "description": "Convert longitude and latitude into an ArcGIS address result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees."
+          },
+          "outSr": {
+            "type": "integer",
+            "description": "Spatial reference WKID for returned coordinates."
+          },
+          "langCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code for returned addresses."
+          },
+          "forStorage": {
+            "type": "boolean",
+            "description": "Whether the reverse geocoding result will be stored persistently."
+          },
+          "featureTypes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated feature types to limit possible matches."
+          },
+          "locationType": {
+            "type": "string",
+            "enum": [
+              "rooftop",
+              "street"
+            ],
+            "description": "Preferred output geometry location type."
+          },
+          "preferredLabelValues": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred label values returned by ArcGIS."
+          },
+          "outFields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated address fields to include, or * for all fields."
+          },
+          "returnInputLocation": {
+            "type": "boolean",
+            "description": "Whether the input coordinates should be returned in the location object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "longitude",
+          "latitude"
+        ],
+        "description": "Input parameters for ArcGIS reverseGeocode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An ArcGIS address attribute value."
+            },
+            "description": "Address attributes returned by ArcGIS, keyed by upstream field name."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "description": "X coordinate returned by ArcGIS."
+              },
+              "y": {
+                "type": "number",
+                "description": "Y coordinate returned by ArcGIS."
+              },
+              "spatialReference": {
+                "type": "object",
+                "properties": {
+                  "wkid": {
+                    "type": "integer",
+                    "description": "Well-known ID for the spatial reference."
+                  },
+                  "latestWkid": {
+                    "type": "integer",
+                    "description": "Latest well-known ID for the spatial reference."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "ArcGIS spatial reference metadata."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "x",
+              "y"
+            ],
+            "description": "Point geometry returned by ArcGIS."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "address",
+          "location"
+        ],
+        "description": "ArcGIS reverseGeocode response."
+      }
+    },
+    {
+      "id": "arcgis_online.suggest",
+      "service": "arcgis_online",
+      "name": "suggest",
+      "description": "Return ArcGIS address and place autocomplete suggestions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Input text to autocomplete."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Longitude in decimal degrees."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Latitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "longitude",
+              "latitude"
+            ],
+            "description": "A WGS84 coordinate used by ArcGIS geocoding."
+          },
+          "searchExtent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounding box that limits search results, formatted as xmin,ymin,xmax,ymax."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Place or address category filter supported by ArcGIS."
+          },
+          "sourceCountry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country code or comma-separated country codes used to restrict results."
+          },
+          "preferredLabelValues": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred label values returned by ArcGIS, such as postal city or local city."
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country code used to restrict suggestions."
+          },
+          "maxSuggestions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 15,
+            "description": "Maximum number of suggestions to return, from 1 to 15."
+          },
+          "returnCollections": {
+            "type": "boolean",
+            "description": "Whether collection suggestions should be returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Input parameters for ArcGIS geocoding suggestions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Suggestion text returned by ArcGIS."
+                },
+                "magicKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ArcGIS magic key that can be sent to find_address_candidates."
+                },
+                "isCollection": {
+                  "type": "boolean",
+                  "description": "Whether the suggestion represents a collection."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "text",
+                "magicKey"
+              ],
+              "description": "One ArcGIS geocoding suggestion."
+            },
+            "description": "Autocomplete suggestions returned by ArcGIS."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "suggestions"
+        ],
+        "description": "ArcGIS suggest response."
+      }
+    }
+  ]
+}

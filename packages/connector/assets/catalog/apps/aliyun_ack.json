@@ -1,0 +1,105 @@
+{
+  "service": "aliyun_ack",
+  "displayName": "Alibaba Cloud ACK",
+  "categories": [
+    "Developer Tools",
+    "Security"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "accessKeyId",
+          "label": "Access Key ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "LTAI...",
+          "description": "Alibaba Cloud RAM AccessKey ID used to call ACK. Create or manage AccessKey pairs here: https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair"
+        },
+        {
+          "key": "accessKeySecret",
+          "label": "Access Key Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your AccessKey secret",
+          "description": "Alibaba Cloud RAM AccessKey secret from the same pair. Alibaba Cloud shows it only when the key pair is created: https://www.alibabacloud.com/help/en/ram/user-guide/create-an-accesskey-pair"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.alibabacloud.com/product/kubernetes",
+  "actions": [
+    {
+      "id": "aliyun_ack.get_temporary_kubeconfig",
+      "service": "aliyun_ack",
+      "name": "get_temporary_kubeconfig",
+      "description": "Generate a short-lived kubeconfig for an Alibaba Cloud Container Service for Kubernetes (ACK) cluster.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "cs:DescribeClusterUserKubeconfig"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ACK cluster ID."
+          },
+          "regionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Alibaba Cloud region ID that contains the cluster, for example cn-hangzhou.",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "temporaryDurationMinutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 4320,
+            "description": "The temporary kubeconfig validity period in minutes, from 15 minutes to 3 days."
+          },
+          "privateIpAddress": {
+            "type": "boolean",
+            "description": "Whether the kubeconfig should use the cluster's internal API server endpoint. Defaults to false for the public endpoint.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clusterId",
+          "regionId",
+          "temporaryDurationMinutes"
+        ],
+        "description": "Input parameters for generating a temporary ACK cluster kubeconfig."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The kubeconfig YAML containing credentials for the connected Alibaba Cloud identity."
+          },
+          "expiration": {
+            "type": "string",
+            "description": "The RFC3339 UTC timestamp when the kubeconfig expires.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config",
+          "expiration"
+        ],
+        "description": "The generated temporary ACK kubeconfig and its expiration time."
+      }
+    }
+  ]
+}

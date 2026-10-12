@@ -1,0 +1,988 @@
+{
+  "service": "ably",
+  "displayName": "Ably",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "appId.keyId:keySecret",
+      "description": "Ably API key used with HTTP Basic authentication. Create or view app API keys in the Ably dashboard under App settings > API keys: https://ably.com/dashboard."
+    }
+  ],
+  "homepageUrl": "https://ably.com",
+  "actions": [
+    {
+      "id": "ably.batch_presence",
+      "service": "ably",
+      "name": "batch_presence",
+      "description": "Query current presence for multiple Ably channels.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Ably channel ID or channel name."
+                },
+                "description": "The Ably channel names to query.",
+                "minItems": 1,
+                "maxItems": 100
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A separator-delimited list of Ably channel names."
+              }
+            ],
+            "description": "One or more Ably channel names."
+          },
+          "separator": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The separator used when channels is provided as a string."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels"
+        ],
+        "description": "Input for querying Ably presence across multiple channels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "The Ably channel name."
+                },
+                "presence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The unique Ably presence member ID."
+                      },
+                      "clientId": {
+                        "type": "string",
+                        "description": "The Ably client ID associated with the presence member."
+                      },
+                      "connectionId": {
+                        "type": "string",
+                        "description": "The Ably connection ID associated with the presence member."
+                      },
+                      "timestamp": {
+                        "type": "integer",
+                        "description": "A timestamp in milliseconds since the Unix epoch."
+                      },
+                      "action": {
+                        "type": "integer",
+                        "description": "The Ably presence action enum value."
+                      },
+                      "data": {
+                        "description": "The JSON-encodable Ably message payload."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "An Ably presence message."
+                  },
+                  "description": "The presence members returned for the channel."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Presence data for one Ably channel."
+            },
+            "description": "Presence results returned by Ably."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": "string",
+                "description": "The URL for the first result page."
+              },
+              "current": {
+                "type": "string",
+                "description": "The URL for the current result page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Ably."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The normalized Ably batch presence response."
+      }
+    },
+    {
+      "id": "ably.batch_presence_history",
+      "service": "ably",
+      "name": "batch_presence_history",
+      "description": "Query presence history for multiple Ably channels.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Ably channel ID or channel name."
+                },
+                "description": "The Ably channel names to query.",
+                "minItems": 1,
+                "maxItems": 100
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A separator-delimited list of Ably channel names."
+              }
+            ],
+            "description": "One or more Ably channel names."
+          },
+          "separator": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The separator used when channels is provided as a string."
+          },
+          "start": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "end": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "backwards",
+              "forwards"
+            ],
+            "description": "The Ably pagination direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels"
+        ],
+        "description": "Input for querying Ably presence history across multiple channels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "The Ably channel name."
+                },
+                "presence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The unique Ably presence member ID."
+                      },
+                      "clientId": {
+                        "type": "string",
+                        "description": "The Ably client ID associated with the presence member."
+                      },
+                      "connectionId": {
+                        "type": "string",
+                        "description": "The Ably connection ID associated with the presence member."
+                      },
+                      "timestamp": {
+                        "type": "integer",
+                        "description": "A timestamp in milliseconds since the Unix epoch."
+                      },
+                      "action": {
+                        "type": "integer",
+                        "description": "The Ably presence action enum value."
+                      },
+                      "data": {
+                        "description": "The JSON-encodable Ably message payload."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "An Ably presence message."
+                  },
+                  "description": "The presence history records returned for the channel."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {
+                    "first": {
+                      "type": "string",
+                      "description": "The URL for the first result page."
+                    },
+                    "current": {
+                      "type": "string",
+                      "description": "The URL for the current result page."
+                    },
+                    "next": {
+                      "type": "string",
+                      "description": "The URL for the next result page."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Pagination links returned by Ably."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Presence history data for one Ably channel."
+            },
+            "description": "Presence history results returned for each requested channel."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The normalized Ably batch presence history response."
+      }
+    },
+    {
+      "id": "ably.create_channel",
+      "service": "ably",
+      "name": "create_channel",
+      "description": "Activate an Ably channel by retrieving its metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input containing one Ably channel ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "channel": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string",
+                "description": "The Ably channel ID."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "description": "Whether the channel is currently active."
+                  },
+                  "occupancy": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The Ably channel occupancy metrics."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Ably channel lifecycle status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Ably channel details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "channel"
+        ],
+        "description": "The normalized Ably channel activation response."
+      }
+    },
+    {
+      "id": "ably.delete_channel_subscription",
+      "service": "ably",
+      "name": "delete_channel_subscription",
+      "description": "Delete an Ably push notification subscription for a channel, device, or client.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably client ID to unsubscribe."
+          },
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably device ID to unsubscribe."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for deleting an Ably push channel subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Ably accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The normalized Ably channel subscription delete response."
+      }
+    },
+    {
+      "id": "ably.get_channel_details",
+      "service": "ably",
+      "name": "get_channel_details",
+      "description": "Retrieve Ably metadata and occupancy details for one channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input containing one Ably channel ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string",
+                "description": "The Ably channel ID."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean",
+                    "description": "Whether the channel is currently active."
+                  },
+                  "occupancy": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The Ably channel occupancy metrics."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Ably channel lifecycle status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Ably channel details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel"
+        ],
+        "description": "The normalized Ably channel details response."
+      }
+    },
+    {
+      "id": "ably.get_channel_history",
+      "service": "ably",
+      "name": "get_channel_history",
+      "description": "Retrieve message history for one Ably channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "start": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "end": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "backwards",
+              "forwards"
+            ],
+            "description": "The Ably pagination direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input for retrieving Ably channel message or presence history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Ably message ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Ably event name."
+                },
+                "data": {
+                  "description": "The JSON-encodable Ably message payload."
+                },
+                "encoding": {
+                  "type": "string",
+                  "description": "The Ably message encoding."
+                },
+                "clientId": {
+                  "type": "string",
+                  "description": "The Ably client ID associated with the message."
+                },
+                "connectionId": {
+                  "type": "string",
+                  "description": "The Ably connection ID associated with the message."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "A timestamp in milliseconds since the Unix epoch."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Ably message."
+            },
+            "description": "Ably messages returned by the history request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": "string",
+                "description": "The URL for the first result page."
+              },
+              "current": {
+                "type": "string",
+                "description": "The URL for the current result page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Ably."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The normalized Ably channel history response."
+      }
+    },
+    {
+      "id": "ably.get_presence_history",
+      "service": "ably",
+      "name": "get_presence_history",
+      "description": "Retrieve presence history for one Ably channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "start": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "end": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "backwards",
+              "forwards"
+            ],
+            "description": "The Ably pagination direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id"
+        ],
+        "description": "Input for retrieving Ably channel message or presence history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "presence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Ably presence member ID."
+                },
+                "clientId": {
+                  "type": "string",
+                  "description": "The Ably client ID associated with the presence member."
+                },
+                "connectionId": {
+                  "type": "string",
+                  "description": "The Ably connection ID associated with the presence member."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "A timestamp in milliseconds since the Unix epoch."
+                },
+                "action": {
+                  "type": "integer",
+                  "description": "The Ably presence action enum value."
+                },
+                "data": {
+                  "description": "The JSON-encodable Ably message payload."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Ably presence message."
+            },
+            "description": "Ably presence history records returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": "string",
+                "description": "The URL for the first result page."
+              },
+              "current": {
+                "type": "string",
+                "description": "The URL for the current result page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Ably."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "presence"
+        ],
+        "description": "The normalized Ably presence history response."
+      }
+    },
+    {
+      "id": "ably.get_service_time",
+      "service": "ably",
+      "name": "get_service_time",
+      "description": "Retrieve Ably service time in milliseconds since the Unix epoch.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve Ably service time."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time"
+        ],
+        "description": "The normalized Ably service time response."
+      }
+    },
+    {
+      "id": "ably.get_stats",
+      "service": "ably",
+      "name": "get_stats",
+      "description": "Retrieve Ably application usage statistics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "end": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "backwards",
+              "forwards"
+            ],
+            "description": "The Ably pagination direction."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "hour",
+              "day",
+              "month"
+            ],
+            "description": "The Ably statistics aggregation unit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving Ably application statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "intervalId": {
+                  "type": "string",
+                  "description": "The Ably statistics interval identifier."
+                },
+                "unit": {
+                  "type": "string",
+                  "description": "The interval unit used for the statistics record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Ably application statistics record."
+            },
+            "description": "Ably statistics records returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": "string",
+                "description": "The URL for the first result page."
+              },
+              "current": {
+                "type": "string",
+                "description": "The URL for the current result page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Ably."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stats"
+        ],
+        "description": "The normalized Ably application stats response."
+      }
+    },
+    {
+      "id": "ably.list_push_channel_subscriptions",
+      "service": "ably",
+      "name": "list_push_channel_subscriptions",
+      "description": "List Ably push notification channel subscriptions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter subscriptions by Ably client ID."
+          },
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter subscriptions by Ably device ID."
+          },
+          "concat_filters": {
+            "type": "boolean",
+            "description": "Whether to match either client_id or device_id when both are set."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Ably push channel subscriptions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channel": {
+                  "type": "string",
+                  "description": "The Ably channel name for the subscription."
+                },
+                "clientId": {
+                  "type": "string",
+                  "description": "The client ID associated with the subscription."
+                },
+                "deviceId": {
+                  "type": "string",
+                  "description": "The device ID associated with the subscription."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Ably push channel subscription."
+            },
+            "description": "Ably push channel subscriptions returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "type": "string",
+                "description": "The URL for the first result page."
+              },
+              "current": {
+                "type": "string",
+                "description": "The URL for the current result page."
+              },
+              "next": {
+                "type": "string",
+                "description": "The URL for the next result page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Ably."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriptions"
+        ],
+        "description": "The normalized Ably push channel subscriptions response."
+      }
+    },
+    {
+      "id": "ably.publish_message_to_channel",
+      "service": "ably",
+      "name": "publish_message_to_channel",
+      "description": "Publish one message to an Ably channel.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ably channel ID or channel name."
+          },
+          "data": {
+            "description": "The JSON-encodable Ably message payload."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Ably event name for the message."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Ably message ID used for idempotent publishing."
+          },
+          "encoding": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Ably message encoding."
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Ably client ID for the message."
+          },
+          "connection_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional private Ably connection key."
+          },
+          "extras": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Ably message extras, such as push notification payloads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "data"
+        ],
+        "description": "Input for publishing one message to an Ably channel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string",
+                "description": "The Ably channel that received the message."
+              },
+              "messageId": {
+                "type": "string",
+                "description": "The Ably message ID assigned to the published message."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Ably publish response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized Ably publish message response."
+      }
+    }
+  ]
+}

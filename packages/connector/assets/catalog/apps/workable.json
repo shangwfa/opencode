@@ -1,0 +1,453 @@
+{
+  "service": "workable",
+  "displayName": "Workable",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "WORKABLE_API_TOKEN",
+      "description": "Workable API token sent with the Authorization Bearer header. Generate it in Workable from Settings > Integrations > Apps as described at https://workable.readme.io/reference/generate-an-access-token.",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Workable Subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "acme",
+          "description": "Your Workable account subdomain, the part before .workable.com in your Workable account URL."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.workable.com/",
+  "actions": [
+    {
+      "id": "workable.get_candidate",
+      "service": "workable",
+      "name": "get_candidate",
+      "description": "Get full details for a Workable candidate by candidate ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Workable candidate identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for retrieving a Workable candidate."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candidate": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Workable candidate identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The candidate full name."
+              },
+              "firstname": {
+                "type": "string",
+                "description": "The candidate first name."
+              },
+              "lastname": {
+                "type": "string",
+                "description": "The candidate last name."
+              },
+              "headline": {
+                "type": "string",
+                "description": "The candidate headline."
+              },
+              "email": {
+                "type": "string",
+                "description": "The candidate email address."
+              },
+              "stage": {
+                "type": "string",
+                "description": "The candidate stage name or slug."
+              },
+              "profile_url": {
+                "type": "string",
+                "description": "The URL for the candidate profile in Workable."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Workable."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "raw"
+            ],
+            "description": "A Workable candidate object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "candidate"
+        ],
+        "description": "The Workable candidate response."
+      }
+    },
+    {
+      "id": "workable.get_job",
+      "service": "workable",
+      "name": "get_job",
+      "description": "Get full details for a Workable job by shortcode.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shortcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Workable system-generated job shortcode."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shortcode"
+        ],
+        "description": "The input payload for retrieving a Workable job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Workable job identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The short title of the job."
+              },
+              "shortcode": {
+                "type": "string",
+                "description": "The system-generated job code."
+              },
+              "state": {
+                "type": "string",
+                "description": "The current job state, such as draft, published, closed, or archived."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Workable."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "raw"
+            ],
+            "description": "A Workable job object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "job"
+        ],
+        "description": "The Workable job response."
+      }
+    },
+    {
+      "id": "workable.list_candidates",
+      "service": "workable",
+      "name": "list_candidates",
+      "description": "List candidates from a Workable account with optional job, stage, and timestamp filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The candidate email address to filter by."
+          },
+          "shortcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Workable system-generated job shortcode to filter by."
+          },
+          "stage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Workable stage slug to filter by."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to retrieve per page. Workable allows up to 100."
+          },
+          "since_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return candidates with an ID greater than or equal to this value."
+          },
+          "max_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return candidates with an ID less than or equal to this value."
+          },
+          "created_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return candidates created after this ISO 8601 or Unix timestamp."
+          },
+          "updated_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return candidates updated after this ISO 8601 or Unix timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Workable candidates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Workable candidate identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The candidate full name."
+                },
+                "firstname": {
+                  "type": "string",
+                  "description": "The candidate first name."
+                },
+                "lastname": {
+                  "type": "string",
+                  "description": "The candidate last name."
+                },
+                "headline": {
+                  "type": "string",
+                  "description": "The candidate headline."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The candidate email address."
+                },
+                "stage": {
+                  "type": "string",
+                  "description": "The candidate stage name or slug."
+                },
+                "profile_url": {
+                  "type": "string",
+                  "description": "The URL for the candidate profile in Workable."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Workable."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "raw"
+              ],
+              "description": "A Workable candidate object."
+            },
+            "description": "The candidates returned by Workable."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL for the next page when Workable returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL for the next page when Workable returns one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The pagination object returned by Workable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "candidates",
+          "paging"
+        ],
+        "description": "The Workable candidates list response."
+      }
+    },
+    {
+      "id": "workable.list_jobs",
+      "service": "workable",
+      "name": "list_jobs",
+      "description": "List jobs from a Workable account with optional state and timestamp filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "closed",
+              "archived"
+            ],
+            "description": "The current job state to filter by."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records to retrieve per page. Workable allows up to 100."
+          },
+          "since_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return jobs with an ID greater than or equal to this value."
+          },
+          "max_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return jobs with an ID less than or equal to this value."
+          },
+          "created_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return jobs created after this ISO 8601 or Unix timestamp."
+          },
+          "updated_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return jobs updated after this ISO 8601 or Unix timestamp."
+          },
+          "include_fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "description",
+                "full_description",
+                "requirements",
+                "benefits"
+              ],
+              "description": "One additional field such as description, full_description, requirements, or benefits."
+            },
+            "description": "Additional job fields to include in each result.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Workable jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Workable job identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The short title of the job."
+                },
+                "shortcode": {
+                  "type": "string",
+                  "description": "The system-generated job code."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current job state, such as draft, published, closed, or archived."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Workable."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "raw"
+              ],
+              "description": "A Workable job object."
+            },
+            "description": "The jobs returned by Workable."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL for the next page when Workable returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL for the next page when Workable returns one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The pagination object returned by Workable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobs",
+          "paging"
+        ],
+        "description": "The Workable jobs list response."
+      }
+    }
+  ]
+}

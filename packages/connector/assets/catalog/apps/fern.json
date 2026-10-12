@@ -1,0 +1,751 @@
+{
+  "service": "fern",
+  "displayName": "Fern",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FERN_API_KEY",
+      "description": "Fern API key sent as a Bearer token. Create or manage API keys in the Fern developer dashboard: https://dashboard.fernhq.com/."
+    }
+  ],
+  "homepageUrl": "https://fernhq.com",
+  "actions": [
+    {
+      "id": "fern.get_customer",
+      "service": "fern",
+      "name": "get_customer",
+      "description": "Retrieve one Fern customer by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "customers:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "Unique identifier of the customer.",
+            "format": "uuid"
+          },
+          "includeVerification": {
+            "type": "boolean",
+            "description": "Whether to include verification details."
+          },
+          "includePaymentMethods": {
+            "type": "boolean",
+            "description": "Whether to include available payment methods in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Input parameters for retrieving a Fern customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "Unique identifier of the customer."
+          },
+          "customerStatus": {
+            "type": "string",
+            "description": "Current status of the customer."
+          },
+          "customerType": {
+            "type": "string",
+            "description": "Customer type returned by Fern."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the customer.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name of the customer or business."
+          },
+          "verificationLink": {
+            "type": "string",
+            "description": "URL for the KYC or KYB verification process.",
+            "format": "uri"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp returned by Fern.",
+            "format": "date-time"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Organization identifier."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "customerId",
+          "customerStatus"
+        ],
+        "description": "A customer returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+      }
+    },
+    {
+      "id": "fern.get_exchange_rate",
+      "service": "fern",
+      "name": "get_exchange_rate",
+      "description": "Retrieve Fern exchange rate and fee details for source and destination currencies.",
+      "operationType": "read",
+      "requiredScopes": [
+        "exchange_rates:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceCurrency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency label or contract address for the source currency."
+          },
+          "sourcePaymentMethod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Payment method for the source exchange rate."
+          },
+          "sourceAmount": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Amount to be sent. When provided, Fern returns fees and destination amount."
+          },
+          "destinationPaymentMethod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Payment method for the destination exchange rate."
+          },
+          "destinationCurrency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency label or contract address for the destination currency."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceCurrency",
+          "sourcePaymentMethod",
+          "destinationPaymentMethod",
+          "destinationCurrency"
+        ],
+        "description": "Input parameters for retrieving a Fern exchange rate."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "exchangeRate": {
+            "type": "string",
+            "description": "The rate at which the source currency is multiplied to obtain the destination currency."
+          },
+          "destinationAmount": {
+            "type": "string",
+            "description": "Destination amount excluding Fern fees."
+          },
+          "feeComponents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "feeType": {
+                  "type": "string",
+                  "description": "The type of fee component."
+                },
+                "feeCurrency": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "description": "Currency label or contract address returned by Fern."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A fiat or crypto currency returned by Fern."
+                },
+                "feeAmount": {
+                  "type": "string",
+                  "description": "Amount of the fee component."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "feeType",
+                "feeAmount"
+              ],
+              "description": "A fee component returned by Fern for an exchange rate."
+            },
+            "description": "Fee components returned by Fern."
+          },
+          "fees": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Fee summary returned by Fern."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "exchangeRate",
+          "feeComponents"
+        ],
+        "description": "An exchange rate and fee response returned by Fern."
+      }
+    },
+    {
+      "id": "fern.get_payment_account",
+      "service": "fern",
+      "name": "get_payment_account",
+      "description": "Retrieve one Fern payment account by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "payment_accounts:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentAccountId": {
+            "type": "string",
+            "description": "Unique identifier of the payment account.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Fern payment account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentAccountId": {
+            "type": "string",
+            "description": "Identifier of the payment account returned by Fern."
+          },
+          "paymentAccountType": {
+            "type": "string",
+            "description": "Type of payment account."
+          },
+          "paymentAccountStatus": {
+            "type": "string",
+            "description": "Status of the payment account."
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Customer ID that owns the payment account."
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Nickname for the payment account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nickname for the payment account."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "An ISO 8601 timestamp returned by Fern.",
+            "format": "date-time"
+          },
+          "isThirdParty": {
+            "type": "boolean",
+            "description": "Whether the payment account is a third-party account."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "paymentAccountId",
+          "paymentAccountType",
+          "paymentAccountStatus"
+        ],
+        "description": "A payment account returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+      }
+    },
+    {
+      "id": "fern.get_transaction",
+      "service": "fern",
+      "name": "get_transaction",
+      "description": "Retrieve one Fern transaction by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "transactions:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Unique identifier of the transaction.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Fern transaction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Unique identifier of the transaction."
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Customer ID associated with the transaction."
+          },
+          "quoteId": {
+            "type": "string",
+            "description": "Quote ID used for the transaction."
+          },
+          "transactionStatus": {
+            "type": "string",
+            "description": "Current status of the transaction."
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Optional caller-provided correlation ID."
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "sourceCurrency": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Currency label or contract address returned by Fern."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A fiat or crypto currency returned by Fern."
+              },
+              "sourcePaymentMethod": {
+                "type": "string",
+                "description": "Payment method for the source transaction."
+              },
+              "sourceAmount": {
+                "type": "string",
+                "description": "The amount sent from the source."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Source transaction details returned by Fern."
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "destinationCurrency": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Currency label or contract address returned by Fern."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A fiat or crypto currency returned by Fern."
+              },
+              "destinationPaymentMethod": {
+                "type": "string",
+                "description": "Payment method for the destination transaction."
+              },
+              "exchangeRate": {
+                "type": "string",
+                "description": "Exchange rate used for the transaction."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Destination transaction details returned by Fern."
+          },
+          "fees": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Fee structure returned by Fern."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "transactionId",
+          "customerId",
+          "transactionStatus"
+        ],
+        "description": "A transaction returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+      }
+    },
+    {
+      "id": "fern.list_customers",
+      "service": "fern",
+      "name": "list_customers",
+      "description": "List Fern customers with optional organization filtering and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "customers:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of items per page, from 1 to 100."
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Organization ID to filter customers.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Fern customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customerId": {
+                  "type": "string",
+                  "description": "Unique identifier of the customer."
+                },
+                "customerStatus": {
+                  "type": "string",
+                  "description": "Current status of the customer."
+                },
+                "customerType": {
+                  "type": "string",
+                  "description": "Customer type returned by Fern."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the customer.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Full name of the customer or business."
+                },
+                "verificationLink": {
+                  "type": "string",
+                  "description": "URL for the KYC or KYB verification process.",
+                  "format": "uri"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "An ISO 8601 timestamp returned by Fern.",
+                  "format": "date-time"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "description": "Organization identifier."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "customerId",
+                "customerStatus"
+              ],
+              "description": "A customer returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+            },
+            "description": "Customers returned for the requested page."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customers"
+        ],
+        "description": "A page of Fern customers."
+      }
+    },
+    {
+      "id": "fern.list_payment_accounts",
+      "service": "fern",
+      "name": "list_payment_accounts",
+      "description": "List Fern payment accounts for a customer with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "payment_accounts:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "description": "Customer to list payment accounts for.",
+            "format": "uuid"
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of items per page, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Input parameters for listing Fern payment accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "paymentAccountId": {
+                  "type": "string",
+                  "description": "Identifier of the payment account returned by Fern."
+                },
+                "paymentAccountType": {
+                  "type": "string",
+                  "description": "Type of payment account."
+                },
+                "paymentAccountStatus": {
+                  "type": "string",
+                  "description": "Status of the payment account."
+                },
+                "customerId": {
+                  "type": "string",
+                  "description": "Customer ID that owns the payment account."
+                },
+                "nickname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Nickname for the payment account."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Nickname for the payment account."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "An ISO 8601 timestamp returned by Fern.",
+                  "format": "date-time"
+                },
+                "isThirdParty": {
+                  "type": "boolean",
+                  "description": "Whether the payment account is a third-party account."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "paymentAccountId",
+                "paymentAccountType",
+                "paymentAccountStatus"
+              ],
+              "description": "A payment account returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+            },
+            "description": "Payment accounts returned for the requested page."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paymentAccounts"
+        ],
+        "description": "A page of Fern payment accounts."
+      }
+    },
+    {
+      "id": "fern.list_transactions",
+      "service": "fern",
+      "name": "list_transactions",
+      "description": "List Fern transactions with optional customer, payment account, and organization filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "transactions:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of items per page, from 1 to 100."
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Customer to list transactions for.",
+            "format": "uuid"
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "description": "Payment account to list transactions for.",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Organization to list transactions for.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Fern transactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transactionId": {
+                  "type": "string",
+                  "description": "Unique identifier of the transaction."
+                },
+                "customerId": {
+                  "type": "string",
+                  "description": "Customer ID associated with the transaction."
+                },
+                "quoteId": {
+                  "type": "string",
+                  "description": "Quote ID used for the transaction."
+                },
+                "transactionStatus": {
+                  "type": "string",
+                  "description": "Current status of the transaction."
+                },
+                "correlationId": {
+                  "type": "string",
+                  "description": "Optional caller-provided correlation ID."
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "sourceCurrency": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "description": "Currency label or contract address returned by Fern."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A fiat or crypto currency returned by Fern."
+                    },
+                    "sourcePaymentMethod": {
+                      "type": "string",
+                      "description": "Payment method for the source transaction."
+                    },
+                    "sourceAmount": {
+                      "type": "string",
+                      "description": "The amount sent from the source."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Source transaction details returned by Fern."
+                },
+                "destination": {
+                  "type": "object",
+                  "properties": {
+                    "destinationCurrency": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "description": "Currency label or contract address returned by Fern."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A fiat or crypto currency returned by Fern."
+                    },
+                    "destinationPaymentMethod": {
+                      "type": "string",
+                      "description": "Payment method for the destination transaction."
+                    },
+                    "exchangeRate": {
+                      "type": "string",
+                      "description": "Exchange rate used for the transaction."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Destination transaction details returned by Fern."
+                },
+                "fees": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Fee structure returned by Fern."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "transactionId",
+                "customerId",
+                "transactionStatus"
+              ],
+              "description": "A transaction returned by the Fern API, with key fields normalized and the remaining upstream fields preserved."
+            },
+            "description": "Transactions returned for the requested page."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for forward pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transactions"
+        ],
+        "description": "A page of Fern transactions."
+      }
+    }
+  ]
+}

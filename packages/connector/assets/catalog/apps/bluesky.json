@@ -1,0 +1,531 @@
+{
+  "service": "bluesky",
+  "displayName": "Bluesky",
+  "categories": [
+    "Social",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "App Password",
+      "placeholder": "xxxx-xxxx-xxxx-xxxx",
+      "description": "Bluesky app password used to create an AT Protocol session. Create an app password in Bluesky Settings > Privacy and Security > App Passwords: https://bsky.app/settings/app-passwords",
+      "extraFields": [
+        {
+          "key": "handle",
+          "label": "Handle",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "alice.bsky.social",
+          "description": "Bluesky handle or DID used with the app password. Find your handle on your Bluesky profile or account settings: https://bsky.app/settings/account"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://bsky.social",
+  "actions": [
+    {
+      "id": "bluesky.create_text_post",
+      "service": "bluesky",
+      "name": "create_text_post",
+      "description": "Create a Bluesky text post in the authenticated account's repository.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000,
+            "description": "The primary post text."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Client-declared timestamp for the post.",
+            "format": "date-time"
+          },
+          "langs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A language code."
+            },
+            "description": "Human language codes for the post text.",
+            "maxItems": 3
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 640,
+              "description": "A hashtag value."
+            },
+            "description": "Additional hashtag values without the hash prefix.",
+            "maxItems": 8
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Bluesky rich text facet object."
+            },
+            "description": "Rich text facets to attach to the post."
+          },
+          "reply": {
+            "type": "object",
+            "properties": {
+              "root": {
+                "type": "object",
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Bluesky AT URI for a post or record."
+                  },
+                  "cid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Bluesky content identifier."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A Bluesky strong reference to a post."
+              },
+              "parent": {
+                "type": "object",
+                "properties": {
+                  "uri": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Bluesky AT URI for a post or record."
+                  },
+                  "cid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Bluesky content identifier."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A Bluesky strong reference to a post."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Reply references for creating a reply post."
+          },
+          "labels": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Bluesky self-label object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Fields for creating a Bluesky text post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Bluesky AT URI for a post or record."
+          },
+          "cid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Bluesky content identifier."
+          },
+          "validationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The validation status returned by Bluesky."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The validation status returned by Bluesky."
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Bluesky object returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Bluesky object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bluesky record creation response."
+      }
+    },
+    {
+      "id": "bluesky.get_profile",
+      "service": "bluesky",
+      "name": "get_profile",
+      "description": "Get the detailed Bluesky profile for a handle or DID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Bluesky handle or DID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for retrieving a Bluesky profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "did": {
+                "type": "string",
+                "description": "The decentralized identifier for the actor."
+              },
+              "handle": {
+                "type": "string",
+                "description": "The current handle for the actor."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name for the actor."
+              },
+              "description": {
+                "type": "string",
+                "description": "The profile description for the actor."
+              },
+              "avatar": {
+                "type": "string",
+                "description": "The actor avatar URL.",
+                "format": "uri"
+              },
+              "banner": {
+                "type": "string",
+                "description": "The actor banner URL.",
+                "format": "uri"
+              },
+              "followersCount": {
+                "type": "integer",
+                "description": "The number of followers for the actor."
+              },
+              "followsCount": {
+                "type": "integer",
+                "description": "The number of accounts followed by the actor."
+              },
+              "postsCount": {
+                "type": "integer",
+                "description": "The number of posts by the actor."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The detailed Bluesky profile object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bluesky profile response."
+      }
+    },
+    {
+      "id": "bluesky.get_timeline",
+      "service": "bluesky",
+      "name": "get_timeline",
+      "description": "Get the authenticated account's home timeline with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Bluesky feed algorithm identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of posts to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A cursor returned by Bluesky pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for retrieving the authenticated Bluesky timeline."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "post": {
+                  "type": "object",
+                  "properties": {
+                    "uri": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A Bluesky AT URI for a post or record."
+                    },
+                    "cid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A Bluesky content identifier."
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The Bluesky author view for the post."
+                    },
+                    "record": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw Bluesky object returned by the API."
+                    },
+                    "indexedAt": {
+                      "type": "string",
+                      "description": "The server timestamp when the post was indexed.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The raw Bluesky post view returned by a feed or search."
+                },
+                "reply": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Bluesky object returned by the API."
+                },
+                "reason": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Bluesky object returned by the API."
+                },
+                "feedContext": {
+                  "type": "string",
+                  "description": "Opaque feed-specific context returned by Bluesky."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "post"
+              ],
+              "description": "A Bluesky timeline feed item containing a post and optional reply or repost context."
+            },
+            "description": "Timeline feed items returned by Bluesky."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A cursor returned by Bluesky pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A cursor returned by Bluesky pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated Bluesky timeline response."
+      }
+    },
+    {
+      "id": "bluesky.search_posts",
+      "service": "bluesky",
+      "name": "search_posts",
+      "description": "Search Bluesky posts with common filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bluesky search query string."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "top",
+              "latest"
+            ],
+            "description": "The ranking order for matching posts."
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return posts after this ISO date or datetime."
+          },
+          "until": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return posts before this ISO date or datetime."
+          },
+          "mentions": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Bluesky handle or DID."
+          },
+          "author": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Bluesky handle or DID."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter posts by language code."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter posts by linked hostname."
+          },
+          "url": {
+            "type": "string",
+            "description": "Filter posts by linked URL.",
+            "format": "uri"
+          },
+          "tag": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 640,
+              "description": "A hashtag value."
+            },
+            "description": "Filter posts by hashtag values without the hash prefix."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of posts to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A cursor returned by Bluesky pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Parameters for searching Bluesky posts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Bluesky AT URI for a post or record."
+                },
+                "cid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Bluesky content identifier."
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The Bluesky author view for the post."
+                },
+                "record": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Bluesky object returned by the API."
+                },
+                "indexedAt": {
+                  "type": "string",
+                  "description": "The server timestamp when the post was indexed.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "The raw Bluesky post view returned by a feed or search."
+            },
+            "description": "Posts returned by Bluesky."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A cursor returned by Bluesky pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A cursor returned by Bluesky pagination."
+          },
+          "hitsTotal": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total hit count when returned by Bluesky."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total hit count when returned by Bluesky."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bluesky search response."
+      }
+    }
+  ]
+}

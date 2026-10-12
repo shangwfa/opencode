@@ -1,0 +1,685 @@
+{
+  "service": "sendmator",
+  "displayName": "Sendmator",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sk_live_...",
+      "description": "Sendmator API key sent in the X-API-Key header. Create or view API keys after signing in to the Sendmator app: https://app.sendmator.com.",
+      "extraFields": [
+        {
+          "key": "teamId",
+          "label": "Team ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "team_...",
+          "description": "Optional Sendmator team ID sent in the X-Team-ID header when your account requires team-scoped contact writes."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://sendmator.com",
+  "actions": [
+    {
+      "id": "sendmator.create_contact",
+      "service": "sendmator",
+      "name": "create_contact",
+      "description": "Create a Sendmator contact with optional external ID, tags, custom fields, and metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External contact ID used to map the contact to another system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact last name."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Sendmator contact tag."
+            },
+            "description": "Tags attached to the Sendmator contact."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom contact field value."
+            },
+            "description": "Custom contact fields keyed by field name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Request body for creating a Sendmator contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Sendmator contact ID."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "External contact ID used to map the contact to another system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact first name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact first name, or null when unavailable."
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact last name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact last name, or null when unavailable."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Sendmator contact tag."
+            },
+            "description": "Tags attached to the Sendmator contact."
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the contact is active."
+          },
+          "is_unsubscribed": {
+            "type": "boolean",
+            "description": "Whether the contact has unsubscribed."
+          },
+          "unsubscribed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the contact unsubscribed, or null when still subscribed.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the contact unsubscribed, or null when still subscribed."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom contact field value."
+            },
+            "description": "Custom contact fields keyed by field name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was created.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was last updated.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Sendmator contact object."
+      }
+    },
+    {
+      "id": "sendmator.delete_contact",
+      "service": "sendmator",
+      "name": "delete_contact",
+      "description": "Permanently delete a Sendmator contact by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sendmator contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a Sendmator contact endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the contact was deleted."
+          },
+          "id": {
+            "type": "string",
+            "description": "The deleted Sendmator contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Sendmator delete contact response."
+      }
+    },
+    {
+      "id": "sendmator.get_contact",
+      "service": "sendmator",
+      "name": "get_contact",
+      "description": "Get a Sendmator contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sendmator contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a Sendmator contact endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Sendmator contact ID."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "External contact ID used to map the contact to another system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact first name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact first name, or null when unavailable."
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact last name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact last name, or null when unavailable."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Sendmator contact tag."
+            },
+            "description": "Tags attached to the Sendmator contact."
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the contact is active."
+          },
+          "is_unsubscribed": {
+            "type": "boolean",
+            "description": "Whether the contact has unsubscribed."
+          },
+          "unsubscribed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the contact unsubscribed, or null when still subscribed.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the contact unsubscribed, or null when still subscribed."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom contact field value."
+            },
+            "description": "Custom contact fields keyed by field name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was created.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was last updated.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Sendmator contact object."
+      }
+    },
+    {
+      "id": "sendmator.list_contacts",
+      "service": "sendmator",
+      "name": "list_contacts",
+      "description": "List Sendmator contacts with cursor pagination and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Number of contacts to return, up to 100."
+          },
+          "starting_after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor for pagination."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter contacts by tag."
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Filter contacts by active status."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search across contact name, email, and external_id."
+          },
+          "created_after": {
+            "type": "string",
+            "description": "Return contacts created after this timestamp.",
+            "format": "date-time"
+          },
+          "created_before": {
+            "type": "string",
+            "description": "Return contacts created before this timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Sendmator contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Sendmator contact ID."
+                },
+                "external_id": {
+                  "type": "string",
+                  "description": "External contact ID used to map the contact to another system."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The contact email address.",
+                  "format": "email"
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact first name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact first name, or null when unavailable."
+                },
+                "last_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact last name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact last name, or null when unavailable."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One Sendmator contact tag."
+                  },
+                  "description": "Tags attached to the Sendmator contact."
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "description": "Whether the contact is active."
+                },
+                "is_unsubscribed": {
+                  "type": "boolean",
+                  "description": "Whether the contact has unsubscribed."
+                },
+                "unsubscribed_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the contact unsubscribed, or null when still subscribed.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the contact unsubscribed, or null when still subscribed."
+                },
+                "custom_fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A custom contact field value."
+                  },
+                  "description": "Custom contact fields keyed by field name."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the contact was created.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The timestamp when the contact was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Sendmator contact object."
+            },
+            "description": "Contacts returned for the current page."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more contacts are available after this page."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Sendmator contacts."
+      }
+    },
+    {
+      "id": "sendmator.update_contact",
+      "service": "sendmator",
+      "name": "update_contact",
+      "description": "Update a Sendmator contact's profile fields, active status, tags, custom fields, or metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sendmator contact ID."
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated external contact ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "Updated contact email address.",
+            "format": "email"
+          },
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated contact last name."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Sendmator contact tag."
+            },
+            "description": "Tags attached to the Sendmator contact."
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Updated active status for the contact."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom contact field value."
+            },
+            "description": "Custom contact fields keyed by field name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id"
+        ],
+        "description": "Path parameters and request body for updating a Sendmator contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Sendmator contact ID."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "External contact ID used to map the contact to another system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact first name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact first name, or null when unavailable."
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contact last name, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact last name, or null when unavailable."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Sendmator contact tag."
+            },
+            "description": "Tags attached to the Sendmator contact."
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Whether the contact is active."
+          },
+          "is_unsubscribed": {
+            "type": "boolean",
+            "description": "Whether the contact has unsubscribed."
+          },
+          "unsubscribed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the contact unsubscribed, or null when still subscribed.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the contact unsubscribed, or null when still subscribed."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom contact field value."
+            },
+            "description": "Custom contact fields keyed by field name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional contact metadata returned by Sendmator or provided by the caller."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was created.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the contact was last updated.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Sendmator contact object."
+      }
+    }
+  ]
+}

@@ -1,0 +1,464 @@
+{
+  "service": "weaviate",
+  "displayName": "Weaviate",
+  "categories": [
+    "Data",
+    "Developer Tools",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WEAVIATE_API_KEY",
+      "description": "Weaviate API key used with the Authorization Bearer header.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://your-cluster.weaviate.network",
+          "description": "The Weaviate cluster base URL. Use your cluster origin and the connector will call official REST endpoints under /v1."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://weaviate.io",
+  "actions": [
+    {
+      "id": "weaviate.get_collection",
+      "service": "weaviate",
+      "name": "get_collection",
+      "description": "Get one Weaviate collection definition by collection name, including properties and vectorizer settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "className": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Weaviate collection name to retrieve."
+          },
+          "consistency": {
+            "type": "boolean",
+            "description": "Whether Weaviate should proxy the schema request to the cluster leader for strong consistency."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "className"
+        ],
+        "description": "Input parameters for retrieving one Weaviate collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The collection name."
+              },
+              "description": {
+                "type": "string",
+                "description": "The collection description."
+              },
+              "vectorizer": {
+                "type": "string",
+                "description": "The collection vectorizer setting."
+              },
+              "vectorIndexType": {
+                "type": "string",
+                "description": "The collection vector index type."
+              },
+              "properties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One collection property definition."
+                },
+                "description": "Collection properties returned by Weaviate."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Weaviate collection definition."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Weaviate collection payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection",
+          "raw"
+        ],
+        "description": "Weaviate single collection response."
+      }
+    },
+    {
+      "id": "weaviate.get_instance_metadata",
+      "service": "weaviate",
+      "name": "get_instance_metadata",
+      "description": "Get Weaviate instance metadata, including version, hostname, loaded modules, and GRPC message size.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Weaviate instance metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "hostname": {
+                "type": "string",
+                "description": "The URL hostname reported by the Weaviate instance.",
+                "format": "uri"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Weaviate server version."
+              },
+              "modules": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Module-specific metadata returned by Weaviate."
+              },
+              "grpcMaxMessageSize": {
+                "type": "integer",
+                "description": "The maximum GRPC message size in bytes."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Weaviate instance metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Weaviate meta payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "raw"
+        ],
+        "description": "Weaviate instance metadata response."
+      }
+    },
+    {
+      "id": "weaviate.get_object",
+      "service": "weaviate",
+      "name": "get_object",
+      "description": "Get one Weaviate object by collection name and UUID with optional include flags, consistency, node, and tenant routing.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "className": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Weaviate collection name the object belongs to."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Weaviate object UUID.",
+            "format": "uuid"
+          },
+          "include": {
+            "type": "string",
+            "description": "Additional fields to include, such as classification, vector, or interpretation."
+          },
+          "consistencyLevel": {
+            "type": "string",
+            "description": "The optional consistency level query value to forward."
+          },
+          "nodeName": {
+            "type": "string",
+            "description": "The optional node name query value to forward."
+          },
+          "tenant": {
+            "type": "string",
+            "description": "The tenant name to target for a multi-tenant Weaviate collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "className",
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Weaviate object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "string",
+                "description": "The collection name the object belongs to."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Weaviate object UUID.",
+                "format": "uuid"
+              },
+              "tenant": {
+                "type": "string",
+                "description": "The tenant name the object belongs to."
+              },
+              "properties": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The object properties returned by Weaviate."
+              },
+              "additional": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional metadata returned by Weaviate."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Weaviate object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Weaviate object payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "object",
+          "raw"
+        ],
+        "description": "Weaviate single object response."
+      }
+    },
+    {
+      "id": "weaviate.list_collections",
+      "service": "weaviate",
+      "name": "list_collections",
+      "description": "List all Weaviate collection definitions currently registered in the instance schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "consistency": {
+            "type": "boolean",
+            "description": "Whether Weaviate should proxy the schema request to the cluster leader for strong consistency."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Weaviate collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "classes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The collection name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The collection description."
+                },
+                "vectorizer": {
+                  "type": "string",
+                  "description": "The collection vectorizer setting."
+                },
+                "vectorIndexType": {
+                  "type": "string",
+                  "description": "The collection vector index type."
+                },
+                "properties": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One collection property definition."
+                  },
+                  "description": "Collection properties returned by Weaviate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Weaviate collection definition."
+            },
+            "description": "The collection definitions returned by Weaviate."
+          },
+          "name": {
+            "type": "string",
+            "description": "The schema name returned by Weaviate."
+          },
+          "maintainer": {
+            "type": "string",
+            "description": "The schema maintainer email returned by Weaviate."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Weaviate schema payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "classes",
+          "name",
+          "maintainer",
+          "raw"
+        ],
+        "description": "Weaviate collection list response."
+      }
+    },
+    {
+      "id": "weaviate.list_objects",
+      "service": "weaviate",
+      "name": "list_objects",
+      "description": "List objects from one Weaviate collection with optional paging, sorting, include flags, and tenant selection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "className": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Weaviate collection name to query."
+          },
+          "tenant": {
+            "type": "string",
+            "description": "The tenant name to target for a multi-tenant Weaviate collection."
+          },
+          "after": {
+            "type": "string",
+            "description": "The threshold UUID to page after. Use an empty string only when intentionally following the official Weaviate after semantics."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of objects to return."
+          },
+          "include": {
+            "type": "string",
+            "description": "Additional fields to include, such as classification, vector, or interpretation."
+          },
+          "sort": {
+            "type": "string",
+            "description": "Comma-separated property names to sort by, such as city or country,city."
+          },
+          "order": {
+            "type": "string",
+            "description": "Comma-separated sort directions matching sort, such as asc or desc."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "className"
+        ],
+        "description": "Input parameters for listing Weaviate objects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "description": "The collection name the object belongs to."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Weaviate object UUID.",
+                  "format": "uuid"
+                },
+                "tenant": {
+                  "type": "string",
+                  "description": "The tenant name the object belongs to."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The object properties returned by Weaviate."
+                },
+                "additional": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional metadata returned by Weaviate."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Weaviate object."
+            },
+            "description": "The objects returned by Weaviate."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of matching objects."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Weaviate object list payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objects",
+          "totalResults",
+          "raw"
+        ],
+        "description": "Weaviate object list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,412 @@
+{
+  "service": "shodan",
+  "displayName": "Shodan",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SHODAN_API_KEY",
+      "description": "Shodan API key passed as the key query parameter. Get it from your account page at https://account.shodan.io.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.shodan.io",
+  "actions": [
+    {
+      "id": "shodan.count_search_results",
+      "service": "shodan",
+      "name": "count_search_results",
+      "description": "Count Shodan hosts matching a query and optionally return facet aggregations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query string passed to the Shodan host count endpoint."
+          },
+          "facets": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Facet aggregation string such as org:5,country:3."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for counting Shodan host search results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching hosts."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total"
+        ],
+        "description": "Normalized host count results returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.get_api_info",
+      "service": "shodan",
+      "name": "get_api_info",
+      "description": "Get API account information and remaining credits from Shodan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Shodan API account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Subscription plan name returned by Shodan."
+          },
+          "https": {
+            "type": "boolean",
+            "description": "Whether HTTPS scanning access is enabled for the API key."
+          },
+          "monitored_ips": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of monitored IP addresses currently tracked by the account."
+          },
+          "query_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Remaining query credits available to the API key."
+          },
+          "scan_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Remaining scan credits available to the API key."
+          },
+          "telnet": {
+            "type": "boolean",
+            "description": "Whether telnet access is enabled for the API key."
+          },
+          "unlocked": {
+            "type": "boolean",
+            "description": "Whether unlocked search filters are enabled for the API key."
+          },
+          "unlocked_left": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Remaining unlocked query credits available to the API key."
+          },
+          "usage_limits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "plan",
+          "monitored_ips",
+          "query_credits",
+          "scan_credits"
+        ],
+        "description": "API account information returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.get_domain_info",
+      "service": "shodan",
+      "name": "get_domain_info",
+      "description": "Get DNS domain information and known subdomains from Shodan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Domain name to inspect in the Shodan DNS endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Shodan domain information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Domain name returned by Shodan."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag returned by Shodan for the requested domain."
+            },
+            "description": "Tags returned by Shodan for the requested domain."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw JSON object returned by Shodan."
+            },
+            "description": "List of raw JSON objects returned by Shodan."
+          },
+          "subdomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One subdomain label returned by Shodan."
+            },
+            "description": "Known subdomain labels returned by Shodan."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "Whether Shodan has additional subdomain data beyond the current payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized domain information returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.get_host",
+      "service": "shodan",
+      "name": "get_host",
+      "description": "Get Shodan host details for one IP address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IPv4 or IPv6 address to inspect in Shodan."
+          },
+          "history": {
+            "type": "boolean",
+            "description": "Whether to include historical banners for the host."
+          },
+          "minify": {
+            "type": "boolean",
+            "description": "Whether to request a minified host payload from Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ip"
+        ],
+        "description": "Input parameters for retrieving Shodan host details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized host details returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.resolve_hostnames",
+      "service": "shodan",
+      "name": "resolve_hostnames",
+      "description": "Resolve hostnames to IP addresses with the Shodan DNS resolve endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One hostname to resolve in Shodan."
+            },
+            "description": "Hostnames to resolve with Shodan.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for resolving hostnames with Shodan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Resolved IP address returned by Shodan."
+            },
+            "description": "Mapping of hostname to resolved IP address returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized hostname resolution results returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.reverse_dns_lookup",
+      "service": "shodan",
+      "name": "reverse_dns_lookup",
+      "description": "Reverse-resolve IP addresses to hostnames with the Shodan DNS reverse endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ips": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One IP address to reverse-resolve in Shodan."
+            },
+            "description": "IP addresses to reverse-resolve with Shodan.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reverse-resolving IP addresses with Shodan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "One hostname returned by Shodan for the IP address."
+              },
+              "description": "Hostnames returned by Shodan for one IP address."
+            },
+            "description": "Mapping of IP address to hostnames returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized reverse DNS results returned by Shodan."
+      }
+    },
+    {
+      "id": "shodan.search_hosts",
+      "service": "shodan",
+      "name": "search_hosts",
+      "description": "Search Shodan hosts with a query string and optional facet aggregation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query string passed to the Shodan host search endpoint."
+          },
+          "facets": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Facet aggregation string such as org:5,country:3."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based results page to request from Shodan."
+          },
+          "minify": {
+            "type": "boolean",
+            "description": "Whether to request minified banner results from Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching hosts in Shodan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw JSON object returned by Shodan."
+            },
+            "description": "List of raw JSON objects returned by Shodan."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching hosts."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by Shodan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "matches",
+          "total"
+        ],
+        "description": "Normalized host search results returned by Shodan."
+      }
+    }
+  ]
+}

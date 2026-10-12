@@ -1,0 +1,1284 @@
+{
+  "service": "bazhuayu",
+  "displayName": "Bazhuayu",
+  "description": "Run and manage Bazhuayu web data collection tasks.",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "username",
+          "label": "Bazhuayu Account",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Username, email, or phone number",
+          "description": "The Bazhuayu username, email address, or phone number used to obtain an API access token."
+        },
+        {
+          "key": "password",
+          "label": "Bazhuayu Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your Bazhuayu account password",
+          "description": "The password used to obtain and renew a Bazhuayu API access token."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.bazhuayu.com/",
+  "actions": [
+    {
+      "id": "bazhuayu.copy_task",
+      "service": "bazhuayu",
+      "name": "copy_task",
+      "description": "Copy a Bazhuayu task into a task group and return the new task ID. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "taskGroupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The destination Bazhuayu task group ID. Omit it to copy into the source task's current group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The task to copy and its destination task group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "taskName": {
+            "type": "string",
+            "description": "The copied task name, when returned by Bazhuayu."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "requestId"
+        ],
+        "description": "The new Bazhuayu task created from the source task."
+      }
+    },
+    {
+      "id": "bazhuayu.get_task_actions",
+      "service": "bazhuayu",
+      "name": "get_task_actions",
+      "description": "Get API-addressable steps from Bazhuayu tasks so their action IDs can be used in parameter updates. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu task ID."
+            },
+            "description": "The Bazhuayu task IDs.",
+            "minItems": 1
+          },
+          "actionTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "LoopAction",
+                "NavigateAction",
+                "EnterTextAction"
+              ],
+              "description": "The Bazhuayu task step type."
+            },
+            "description": "The task step types to return.",
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "additionalProperties": false,
+        "description": "The tasks and step types to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Bazhuayu task ID."
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "actionType": {
+                        "type": "string",
+                        "description": "The task step type."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The task step name."
+                      },
+                      "actionId": {
+                        "type": "string",
+                        "description": "The task step ID used by update actions."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One API-addressable step in a Bazhuayu task."
+                  },
+                  "description": "The matching task steps."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The API-addressable steps for one Bazhuayu task."
+            },
+            "description": "The task step groups."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The API-addressable steps grouped by Bazhuayu task."
+      }
+    },
+    {
+      "id": "bazhuayu.get_task_batch_data",
+      "service": "bazhuayu",
+      "name": "get_task_batch_data",
+      "description": "Get a page of collected data from one Bazhuayu task execution batch. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "lotNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task execution batch number."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The data offset. Values less than or equal to 0 read from the beginning."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of records to return, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task execution batch and data page to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A provider-defined collected value."
+              },
+              "description": "One collected record whose fields are defined by the Bazhuayu task."
+            },
+            "description": "The collected records."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The offset to use for the next page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of records."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "The number of records remaining after this page."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of collected Bazhuayu task data."
+      }
+    },
+    {
+      "id": "bazhuayu.get_task_data",
+      "service": "bazhuayu",
+      "name": "get_task_data",
+      "description": "Get a page of collected data from a Bazhuayu task using the offset returned by the previous page. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The data offset. Values less than or equal to 0 read from the beginning."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of records to return, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task data page to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A provider-defined collected value."
+              },
+              "description": "One collected record whose fields are defined by the Bazhuayu task."
+            },
+            "description": "The collected records."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The offset to use for the next page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of records."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "The number of records remaining after this page."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of collected Bazhuayu task data."
+      }
+    },
+    {
+      "id": "bazhuayu.get_task_stats",
+      "service": "bazhuayu",
+      "name": "get_task_stats",
+      "description": "Get account-wide counts for waiting, extracting, and finished Bazhuayu cloud tasks and subtasks. Requires an Enterprise plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get Bazhuayu task statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "extractingCount": {
+                "type": "integer",
+                "description": "The number of extracting tasks."
+              },
+              "waitingCount": {
+                "type": "integer",
+                "description": "The number of waiting tasks."
+              },
+              "finishedCount": {
+                "type": "integer",
+                "description": "The number of finished tasks."
+              },
+              "waitingSubTaskCount": {
+                "type": "integer",
+                "description": "The number of waiting subtasks."
+              },
+              "executingSubTaskCount": {
+                "type": "integer",
+                "description": "The number of executing subtasks."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The account-wide task and subtask counts."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Bazhuayu cloud task counts."
+      }
+    },
+    {
+      "id": "bazhuayu.get_task_statuses",
+      "service": "bazhuayu",
+      "name": "get_task_statuses",
+      "description": "Get the latest execution status for Bazhuayu tasks. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu task ID."
+            },
+            "description": "The Bazhuayu task IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu tasks whose status should be returned."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Bazhuayu task ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current task status."
+                },
+                "currentTotalExtractCount": {
+                  "type": "integer",
+                  "description": "The number of records collected by this execution."
+                },
+                "executedTimes": {
+                  "type": "integer",
+                  "description": "The task execution count."
+                },
+                "subTaskCount": {
+                  "type": "integer",
+                  "description": "The number of subtasks."
+                },
+                "nextExecuteTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The next scheduled execution time, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The next scheduled execution time, when available."
+                },
+                "startExecuteTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task start time, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task start time, when available."
+                },
+                "executingTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task execution start time, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task execution start time, when available."
+                },
+                "endExecuteTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task end time, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task end time, when available."
+                },
+                "startExecuteTimeSeconds": {
+                  "type": "number",
+                  "description": "The task execution duration in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "taskId",
+                "status",
+                "currentTotalExtractCount",
+                "executedTimes",
+                "subTaskCount",
+                "nextExecuteTime",
+                "startExecuteTime",
+                "endExecuteTime"
+              ],
+              "description": "The latest execution status for one Bazhuayu task."
+            },
+            "description": "The task status results."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The latest Bazhuayu task statuses."
+      }
+    },
+    {
+      "id": "bazhuayu.get_unexported_data",
+      "service": "bazhuayu",
+      "name": "get_unexported_data",
+      "description": "Get the next unexported records from a Bazhuayu task. Use this with mark_data_exported through only one sequential consumer per task because Bazhuayu acknowledgements are task-scoped. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of records to return, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task and number of unexported records to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "A provider-defined collected value."
+              },
+              "description": "One collected record whose fields are defined by the Bazhuayu task."
+            },
+            "description": "The unexported records."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of unexported records."
+          },
+          "current": {
+            "type": "integer",
+            "description": "The number of records returned by this request."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The next unexported Bazhuayu task records."
+      }
+    },
+    {
+      "id": "bazhuayu.list_subtask_statuses",
+      "service": "bazhuayu",
+      "name": "list_subtask_statuses",
+      "description": "List the latest batch's Bazhuayu subtask statuses. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of subtasks to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task and page of subtasks to return."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subtasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subTaskId": {
+                  "type": "string",
+                  "description": "The subtask ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current subtask status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The latest status for one Bazhuayu subtask."
+            },
+            "description": "The subtask status results."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu subtask statuses on the requested page."
+      }
+    },
+    {
+      "id": "bazhuayu.list_task_groups",
+      "service": "bazhuayu",
+      "name": "list_task_groups",
+      "description": "List the task groups available to the connected Bazhuayu account. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Bazhuayu task groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskGroups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskGroupId": {
+                  "type": "integer",
+                  "description": "The task group ID."
+                },
+                "taskGroupName": {
+                  "type": "string",
+                  "description": "The task group name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Bazhuayu task group."
+            },
+            "description": "The available task groups."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connected account's Bazhuayu task groups."
+      }
+    },
+    {
+      "id": "bazhuayu.list_tasks",
+      "service": "bazhuayu",
+      "name": "list_tasks",
+      "description": "List the Bazhuayu tasks in one task group. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskGroupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Bazhuayu task group ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task group whose tasks should be listed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Bazhuayu task ID."
+                },
+                "taskName": {
+                  "type": "string",
+                  "description": "The task name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Bazhuayu task summary."
+            },
+            "description": "The matching tasks."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu tasks in the requested group."
+      }
+    },
+    {
+      "id": "bazhuayu.mark_data_exported",
+      "service": "bazhuayu",
+      "name": "mark_data_exported",
+      "description": "Mark the current unexported data for a Bazhuayu task as exported. Call this only after a single sequential consumer has persisted the preceding get_unexported_data result. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task whose current data should be marked as exported."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that Bazhuayu marked the data as exported."
+      }
+    },
+    {
+      "id": "bazhuayu.query_task_analytics",
+      "service": "bazhuayu",
+      "name": "query_task_analytics",
+      "description": "Query Bazhuayu collection volume, execution, success-rate, and resource-usage metrics for the last three months. Requires a Flagship, Flagship+, Enterprise, or Team plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "The inclusive UTC start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "The inclusive UTC end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of analytics rows to return.",
+            "default": 20
+          },
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu task ID."
+            },
+            "description": "Optional task IDs to include.",
+            "maxItems": 100
+          },
+          "memberNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu team member name."
+            },
+            "description": "Optional team member names to include.",
+            "maxItems": 100
+          },
+          "collectionMethod": {
+            "type": "string",
+            "enum": [
+              "Cloud",
+              "Local",
+              "All"
+            ],
+            "description": "The collection method to include."
+          },
+          "timeGranularity": {
+            "type": "string",
+            "enum": [
+              "Day",
+              "Week",
+              "Month"
+            ],
+            "description": "The time bucket used to aggregate analytics.",
+            "default": "Day"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start",
+          "end"
+        ],
+        "description": "The UTC date range, filters, granularity, and page of analytics to return."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Bazhuayu task ID."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The Bazhuayu user ID."
+                },
+                "taskName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task name, when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task name, when available."
+                },
+                "dayKey": {
+                  "type": "string",
+                  "description": "The day, week, or month bucket key."
+                },
+                "weekStartDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The week start date for weekly results."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The week start date for weekly results."
+                },
+                "weekEndDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The week end date for weekly results."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The week end date for weekly results."
+                },
+                "collectionMethod": {
+                  "type": "string",
+                  "description": "The collection method."
+                },
+                "dataVolumeMetrics": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-reported metrics for one task and period."
+                },
+                "executionMetrics": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-reported metrics for one task and period."
+                },
+                "resourceUsageMetrics": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-reported metrics for one task and period."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "taskId",
+                "userId",
+                "dayKey",
+                "collectionMethod",
+                "dataVolumeMetrics",
+                "executionMetrics",
+                "resourceUsageMetrics"
+              ],
+              "description": "Analytics for one Bazhuayu task and time bucket."
+            },
+            "description": "The analytics rows."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching analytics rows."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested page of Bazhuayu task analytics."
+      }
+    },
+    {
+      "id": "bazhuayu.start_subtasks",
+      "service": "bazhuayu",
+      "name": "start_subtasks",
+      "description": "Start selected cloud subtasks for a Bazhuayu task. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "subTaskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu subtask ID."
+            },
+            "description": "The Bazhuayu subtask IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu cloud subtasks to start."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that Bazhuayu accepted the subtask start request."
+      }
+    },
+    {
+      "id": "bazhuayu.start_task",
+      "service": "bazhuayu",
+      "name": "start_task",
+      "description": "Start a Bazhuayu task on cloud workers and return its batch number. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu task to start."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lotNo": {
+            "type": "string",
+            "description": "The task execution batch number."
+          },
+          "status": {
+            "type": "string",
+            "description": "The initial task execution status."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly queued Bazhuayu task execution."
+      }
+    },
+    {
+      "id": "bazhuayu.stop_subtasks",
+      "service": "bazhuayu",
+      "name": "stop_subtasks",
+      "description": "Stop selected cloud subtasks for a Bazhuayu task. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "subTaskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Bazhuayu subtask ID."
+            },
+            "description": "The Bazhuayu subtask IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu cloud subtasks to stop."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that Bazhuayu accepted the subtask stop request."
+      }
+    },
+    {
+      "id": "bazhuayu.stop_task",
+      "service": "bazhuayu",
+      "name": "stop_task",
+      "description": "Stop a running Bazhuayu cloud task. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu task to stop."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that Bazhuayu accepted the stop request."
+      }
+    },
+    {
+      "id": "bazhuayu.update_loop_items",
+      "service": "bazhuayu",
+      "name": "update_loop_items",
+      "description": "Replace or append the text or URL items used by one Bazhuayu loop step. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "actionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu loop step ID."
+          },
+          "loopType": {
+            "type": "string",
+            "enum": [
+              "TextList",
+              "UrlList"
+            ],
+            "description": "The loop item type accepted by this endpoint."
+          },
+          "loopItems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One URL or text loop item."
+            },
+            "description": "The replacement or appended loop items.",
+            "minItems": 1
+          },
+          "isAppend": {
+            "type": "boolean",
+            "description": "Whether to append the items instead of replacing the current list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The loop step and its new items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The provider update result message."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of updating the Bazhuayu loop step."
+      }
+    },
+    {
+      "id": "bazhuayu.update_task_parameters",
+      "service": "bazhuayu",
+      "name": "update_task_parameters",
+      "description": "Update supported properties and loop items in a Bazhuayu task. Requires a Flagship+, Enterprise, or Team plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionType": {
+                  "type": "string",
+                  "enum": [
+                    "LoopAction",
+                    "NavigateAction",
+                    "EnterTextAction"
+                  ],
+                  "description": "The Bazhuayu task step type."
+                },
+                "actionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The task step ID."
+                },
+                "properties": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Bazhuayu property name."
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The new property value."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One task step property update."
+                  },
+                  "description": "The properties to update.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Bazhuayu task step update."
+            },
+            "description": "The task step property updates."
+          },
+          "loopItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The loop step ID."
+                },
+                "loopType": {
+                  "type": "string",
+                  "enum": [
+                    "URLList",
+                    "TextList"
+                  ],
+                  "description": "The loop item type."
+                },
+                "loopItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One URL or text loop item."
+                  },
+                  "description": "The replacement or appended loop items.",
+                  "minItems": 1
+                },
+                "isAppend": {
+                  "type": "boolean",
+                  "description": "Whether to append the items instead of replacing the current list."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Bazhuayu loop step update."
+            },
+            "description": "The loop step updates."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task parameters and loop items to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Bazhuayu task ID."
+          },
+          "updatedParameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The updated task actions and loop items."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "The Bazhuayu request ID used for support and troubleshooting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Bazhuayu task parameters accepted by the update."
+      }
+    }
+  ]
+}

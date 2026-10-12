@@ -1,0 +1,1483 @@
+{
+  "service": "mem0",
+  "displayName": "Mem0",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "m0-...",
+      "description": "Mem0 API key used with Authorization: Token <api_key>. Get it from your Mem0 dashboard: https://docs.mem0.ai/platform/quickstart"
+    }
+  ],
+  "homepageUrl": "https://mem0.ai",
+  "actions": [
+    {
+      "id": "mem0.add_memories",
+      "service": "mem0",
+      "name": "add_memories",
+      "description": "Add new memories to Mem0 from messages or direct memory text.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A single memory string, sent as a user message with infer defaulting to false. Provide either memory or messages."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message role, such as user or assistant."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text content of the message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A single message used to create or update memory."
+            },
+            "description": "The list of messages used to generate memory.",
+            "minItems": 1
+          },
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The associated user identifier."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The associated agent identifier."
+          },
+          "app_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The associated application identifier."
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The associated run identifier."
+          },
+          "org_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional organization identifier."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional project identifier."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An arbitrary JSON object returned by Mem0."
+          },
+          "custom_categories": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A category description."
+            },
+            "description": "A map of custom category names to their descriptions."
+          },
+          "enable_graph": {
+            "type": "boolean",
+            "description": "Whether graph memory extraction should be enabled for this request."
+          },
+          "infer": {
+            "type": "boolean",
+            "description": "Whether Mem0 should infer structured memory. Defaults to false for memory; messages uses the upstream default. Explicit values are preserved."
+          },
+          "async_mode": {
+            "type": "boolean",
+            "description": "Whether the write should be processed asynchronously."
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "v1.0",
+              "v1.1"
+            ],
+            "description": "The response wrapper format version."
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "v1",
+              "v2"
+            ],
+            "description": "The memory extraction engine version."
+          },
+          "custom_instructions": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Additional instructions used to guide memory extraction."
+          },
+          "immutable": {
+            "type": "boolean",
+            "description": "Whether the created memory should be treated as immutable."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Unix timestamp associated with the memory input."
+          },
+          "expiration_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The expiration date to attach to the created memory."
+          },
+          "includes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string list of keywords that should be prioritized."
+          },
+          "excludes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A string list of keywords that should be excluded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for adding memories to Mem0.",
+        "oneOf": [
+          {
+            "required": [
+              "memory"
+            ]
+          },
+          {
+            "required": [
+              "messages"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "description": "The asynchronous event identifier."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The asynchronous processing status."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "A status message for asynchronous processing."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An asynchronous add_memories result item."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The identifier of the created or updated memory."
+                    },
+                    "event": {
+                      "type": "string",
+                      "description": "The event type associated with this result."
+                    },
+                    "memory": {
+                      "type": "string",
+                      "description": "The generated memory text returned by Mem0."
+                    },
+                    "structured_attributes": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The structured attributes extracted for the generated memory."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A processed add_memories result item with top-level memory fields."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The identifier of the created or updated memory."
+                    },
+                    "event": {
+                      "type": "string",
+                      "description": "The event type associated with this result."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "memory": {
+                          "type": "string",
+                          "description": "The generated memory text returned by Mem0."
+                        },
+                        "structured_attributes": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The structured attributes extracted for the generated memory."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "The nested memory payload returned by Mem0."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A processed add_memories result item with nested data."
+                }
+              ],
+              "description": "A single result item returned by add_memories."
+            },
+            "description": "The list of memory creation results."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "event_id": {
+                          "type": "string",
+                          "description": "The asynchronous event identifier."
+                        },
+                        "status": {
+                          "type": "string",
+                          "description": "The asynchronous processing status."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "A status message for asynchronous processing."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "An asynchronous add_memories result item."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The identifier of the created or updated memory."
+                        },
+                        "event": {
+                          "type": "string",
+                          "description": "The event type associated with this result."
+                        },
+                        "memory": {
+                          "type": "string",
+                          "description": "The generated memory text returned by Mem0."
+                        },
+                        "structured_attributes": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The structured attributes extracted for the generated memory."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A processed add_memories result item with top-level memory fields."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The identifier of the created or updated memory."
+                        },
+                        "event": {
+                          "type": "string",
+                          "description": "The event type associated with this result."
+                        },
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "memory": {
+                              "type": "string",
+                              "description": "The generated memory text returned by Mem0."
+                            },
+                            "structured_attributes": {
+                              "type": "object",
+                              "properties": {},
+                              "additionalProperties": true,
+                              "description": "The structured attributes extracted for the generated memory."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The nested memory payload returned by Mem0."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A processed add_memories result item with nested data."
+                    }
+                  ],
+                  "description": "A single result item returned by add_memories."
+                },
+                "description": "The list of memory creation results."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A memory creation response wrapped in the v1.1 format."
+          }
+        ],
+        "description": "The response payload for mem0.add_memories."
+      }
+    },
+    {
+      "id": "mem0.delete_memory",
+      "service": "mem0",
+      "name": "delete_memory",
+      "description": "Delete a Mem0 memory by memory ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the target memory."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting a Mem0 memory."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "description": "The identifier of the deleted memory."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the memory was deleted successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "A deletion status message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The explicit acknowledgment object returned after deleting a Mem0 memory."
+      }
+    },
+    {
+      "id": "mem0.get_event",
+      "service": "mem0",
+      "name": "get_event",
+      "description": "Get a single Mem0 event by event ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the target event."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a single Mem0 event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the event."
+          },
+          "event_type": {
+            "type": "string",
+            "description": "The event type."
+          },
+          "status": {
+            "type": "string",
+            "description": "The processing status of the event."
+          },
+          "payload": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw request payload captured for the event."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "description": "One event processing result."
+            },
+            "description": "The list of event processing results."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An arbitrary JSON object returned by Mem0."
+          },
+          "latency": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The event processing latency in milliseconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event processing latency in milliseconds."
+          },
+          "graph_status": {
+            "description": "The graph-memory processing status."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the event was created."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the event was last updated."
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Mem0 event object."
+      }
+    },
+    {
+      "id": "mem0.get_events",
+      "service": "mem0",
+      "name": "get_events",
+      "description": "List Mem0 events for the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter events by event type."
+          },
+          "start_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start date filter, typically in YYYY-MM-DD format."
+          },
+          "end_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end date filter, typically in YYYY-MM-DD format."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request, starting from 1."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results per page, up to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Mem0 events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "The total number of events matching the current query."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the event."
+                },
+                "event_type": {
+                  "type": "string",
+                  "description": "The event type."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The processing status of the event."
+                },
+                "payload": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw request payload captured for the event."
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "description": "One event processing result."
+                  },
+                  "description": "The list of event processing results."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "An arbitrary JSON object returned by Mem0."
+                },
+                "latency": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The event processing latency in milliseconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The event processing latency in milliseconds."
+                },
+                "graph_status": {
+                  "description": "The graph-memory processing status."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the event was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The timestamp when the event was last updated."
+                },
+                "started_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value returned by Mem0, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value returned by Mem0, or null."
+                },
+                "completed_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value returned by Mem0, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value returned by Mem0, or null."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mem0 event object."
+            },
+            "description": "The list of event records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated Mem0 event response."
+      }
+    },
+    {
+      "id": "mem0.get_memories",
+      "service": "mem0",
+      "name": "get_memories",
+      "description": "List memories from Mem0 with v2 advanced filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The advanced filter object supported by the Mem0 v2 memories API."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request, starting from 1."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results per page, up to 100."
+          },
+          "org_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional organization identifier."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional project identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filters"
+        ],
+        "description": "The input payload for listing memories with advanced filters."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The unique identifier of the memory."
+            },
+            "memory": {
+              "type": "string",
+              "description": "The memory text content."
+            },
+            "text": {
+              "type": "string",
+              "description": "The updated memory text returned by some write operations."
+            },
+            "hash": {
+              "type": "string",
+              "description": "The content hash of the memory."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "The associated user identifier."
+            },
+            "agent_id": {
+              "type": "string",
+              "description": "The associated agent identifier."
+            },
+            "app_id": {
+              "type": "string",
+              "description": "The associated application identifier."
+            },
+            "run_id": {
+              "type": "string",
+              "description": "The associated run identifier."
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An arbitrary JSON object returned by Mem0."
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "One category."
+              },
+              "description": "The categories assigned to the memory."
+            },
+            "created_at": {
+              "type": "string",
+              "description": "The timestamp when the memory was created."
+            },
+            "updated_at": {
+              "type": "string",
+              "description": "The timestamp when the memory was last updated."
+            },
+            "expiration_date": {
+              "type": "string",
+              "description": "The expiration date of the memory."
+            },
+            "score": {
+              "type": "number",
+              "description": "The relevance score returned by search results."
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The message role, such as user or assistant."
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The text content of the message."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "description": "A single message used to create or update memory."
+              },
+              "description": "The input messages used to generate the memory."
+            },
+            "structured_attributes": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Structured attributes extracted from the memory."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A Mem0 memory object."
+        },
+        "description": "The list of Mem0 memories matching the advanced filters."
+      }
+    },
+    {
+      "id": "mem0.get_memory",
+      "service": "mem0",
+      "name": "get_memory",
+      "description": "Get a single memory from Mem0 by memory ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the target memory."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a single Mem0 memory."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the memory."
+          },
+          "memory": {
+            "type": "string",
+            "description": "The memory text content."
+          },
+          "text": {
+            "type": "string",
+            "description": "The updated memory text returned by some write operations."
+          },
+          "hash": {
+            "type": "string",
+            "description": "The content hash of the memory."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The associated user identifier."
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "The associated agent identifier."
+          },
+          "app_id": {
+            "type": "string",
+            "description": "The associated application identifier."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The associated run identifier."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An arbitrary JSON object returned by Mem0."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One category."
+            },
+            "description": "The categories assigned to the memory."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the memory was created."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the memory was last updated."
+          },
+          "expiration_date": {
+            "type": "string",
+            "description": "The expiration date of the memory."
+          },
+          "score": {
+            "type": "number",
+            "description": "The relevance score returned by search results."
+          },
+          "input": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message role, such as user or assistant."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text content of the message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A single message used to create or update memory."
+            },
+            "description": "The input messages used to generate the memory."
+          },
+          "structured_attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Structured attributes extracted from the memory."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Mem0 memory object."
+      }
+    },
+    {
+      "id": "mem0.get_memory_history",
+      "service": "mem0",
+      "name": "get_memory_history",
+      "description": "Get the change history of a Mem0 memory by memory ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the target memory."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Mem0 memory history."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The unique identifier of the history entry."
+            },
+            "memory_id": {
+              "type": "string",
+              "description": "The identifier of the related memory."
+            },
+            "event": {
+              "type": "string",
+              "description": "The history event type."
+            },
+            "old_memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string value returned by Mem0, or null."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A string value returned by Mem0, or null."
+            },
+            "new_memory": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string value returned by Mem0, or null."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A string value returned by Mem0, or null."
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The message role, such as user or assistant."
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The text content of the message."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "description": "A single message used to create or update memory."
+              },
+              "description": "The input messages that triggered the change."
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An arbitrary JSON object returned by Mem0."
+            },
+            "created_at": {
+              "type": "string",
+              "description": "The timestamp when the history entry was created."
+            },
+            "updated_at": {
+              "type": "string",
+              "description": "The timestamp when the history entry was last updated."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "The associated user identifier."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A Mem0 memory history record."
+        },
+        "description": "The history entries for the requested memory."
+      }
+    },
+    {
+      "id": "mem0.get_users",
+      "service": "mem0",
+      "name": "get_users",
+      "description": "List user entities from Mem0, optionally scoped by org and project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional organization identifier."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional project identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Mem0 user entities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "description": "The entity type returned by the current query."
+          },
+          "count": {
+            "type": "number",
+            "description": "The total number of user entities."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string value returned by Mem0, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A string value returned by Mem0, or null."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the user entity."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the user entity."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The entity type."
+                },
+                "owner": {
+                  "type": "string",
+                  "description": "The owner of the entity."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "An arbitrary JSON object returned by Mem0."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the user entity was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The timestamp when the user entity was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mem0 user entity."
+            },
+            "description": "The list of user entities."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated Mem0 user entity response."
+      }
+    },
+    {
+      "id": "mem0.search_memories",
+      "service": "mem0",
+      "name": "search_memories",
+      "description": "Search memories in Mem0 with a semantic query and required non-empty filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language query used for semantic search."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Required non-empty advanced filters, such as a user_id filter.",
+            "minProperties": 1
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "rerank": {
+            "type": "boolean",
+            "description": "Whether Mem0 should rerank the initial search results."
+          },
+          "threshold": {
+            "type": "number",
+            "description": "The semantic similarity threshold."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The list of fields to return.",
+            "minItems": 1
+          },
+          "keyword_search": {
+            "type": "boolean",
+            "description": "Whether Mem0 should perform keyword search instead of semantic search."
+          },
+          "filter_memories": {
+            "type": "boolean",
+            "description": "Whether Mem0 should strictly apply the provided filters."
+          },
+          "org_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional organization identifier."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional project identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "filters"
+        ],
+        "description": "The input payload for searching memories in Mem0."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The unique identifier of the memory."
+            },
+            "memory": {
+              "type": "string",
+              "description": "The memory text content."
+            },
+            "text": {
+              "type": "string",
+              "description": "The updated memory text returned by some write operations."
+            },
+            "hash": {
+              "type": "string",
+              "description": "The content hash of the memory."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "The associated user identifier."
+            },
+            "agent_id": {
+              "type": "string",
+              "description": "The associated agent identifier."
+            },
+            "app_id": {
+              "type": "string",
+              "description": "The associated application identifier."
+            },
+            "run_id": {
+              "type": "string",
+              "description": "The associated run identifier."
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An arbitrary JSON object returned by Mem0."
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "One category."
+              },
+              "description": "The categories assigned to the memory."
+            },
+            "created_at": {
+              "type": "string",
+              "description": "The timestamp when the memory was created."
+            },
+            "updated_at": {
+              "type": "string",
+              "description": "The timestamp when the memory was last updated."
+            },
+            "expiration_date": {
+              "type": "string",
+              "description": "The expiration date of the memory."
+            },
+            "score": {
+              "type": "number",
+              "description": "The relevance score returned by search results."
+            },
+            "input": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The message role, such as user or assistant."
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The text content of the message."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "content"
+                ],
+                "description": "A single message used to create or update memory."
+              },
+              "description": "The input messages used to generate the memory."
+            },
+            "structured_attributes": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Structured attributes extracted from the memory."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A Mem0 memory object."
+        },
+        "description": "The list of memories returned by semantic search."
+      }
+    },
+    {
+      "id": "mem0.update_memory",
+      "service": "mem0",
+      "name": "update_memory",
+      "description": "Update text or metadata of a Mem0 memory by memory ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the target memory."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new memory text to store."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An arbitrary JSON object returned by Mem0."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memory_id"
+        ],
+        "description": "The input payload for updating a Mem0 memory."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the memory."
+          },
+          "memory": {
+            "type": "string",
+            "description": "The memory text content."
+          },
+          "text": {
+            "type": "string",
+            "description": "The updated memory text returned by some write operations."
+          },
+          "hash": {
+            "type": "string",
+            "description": "The content hash of the memory."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The associated user identifier."
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "The associated agent identifier."
+          },
+          "app_id": {
+            "type": "string",
+            "description": "The associated application identifier."
+          },
+          "run_id": {
+            "type": "string",
+            "description": "The associated run identifier."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An arbitrary JSON object returned by Mem0."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One category."
+            },
+            "description": "The categories assigned to the memory."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the memory was created."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The timestamp when the memory was last updated."
+          },
+          "expiration_date": {
+            "type": "string",
+            "description": "The expiration date of the memory."
+          },
+          "score": {
+            "type": "number",
+            "description": "The relevance score returned by search results."
+          },
+          "input": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message role, such as user or assistant."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text content of the message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A single message used to create or update memory."
+            },
+            "description": "The input messages used to generate the memory."
+          },
+          "structured_attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Structured attributes extracted from the memory."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Mem0 memory object."
+      }
+    }
+  ]
+}

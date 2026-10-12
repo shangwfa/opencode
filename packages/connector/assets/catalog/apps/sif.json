@@ -1,0 +1,705 @@
+{
+  "service": "sif",
+  "displayName": "Sif",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "MCP Key",
+      "placeholder": "Paste your Sif MCP key",
+      "description": "The secret key for Sif's Amazon analysis MCP service. Create it at https://www.sif.com/mcp?tab=secret.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.sif.com",
+  "actions": [
+    {
+      "id": "sif.call_tool",
+      "service": "sif",
+      "name": "call_tool",
+      "description": "Call a current Sif MCP Amazon analysis tool with JSON arguments after discovering its live input schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current Sif MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.list_tools"
+      ]
+    },
+    {
+      "id": "sif.list_tools",
+      "service": "sif",
+      "name": "list_tools",
+      "description": "Discover the current Sif Amazon analysis tools and their live input schemas before choosing a tool to call.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact Sif MCP tool name to pass to call_tool."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Sif MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected Sif MCP account."
+            },
+            "description": "Business tools currently exposed to the connected Sif account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The current Sif MCP business tool catalog."
+      },
+      "followUpActions": [
+        "sif.call_tool"
+      ]
+    },
+    {
+      "id": "sif.market_discover_competitors",
+      "service": "sif",
+      "name": "market_discover_competitors",
+      "description": "Analyze and filter a keyword's Top-100 competitor pool by price, review threshold, sales, and competitive posture. Costs 3 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to analyze."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "my_asin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The caller's ASIN. Sif excludes it and narrows results to its competing price range."
+          },
+          "max_results": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The maximum number of competitors to return, from 1 to 10."
+          },
+          "price_min": {
+            "type": "number",
+            "description": "The minimum competitor price used to narrow the result."
+          },
+          "price_max": {
+            "type": "number",
+            "description": "The maximum competitor price used to narrow the result."
+          },
+          "max_reviews": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum competitor review count used to narrow the result."
+          },
+          "posture_filter": {
+            "type": "string",
+            "enum": [
+              "自然权威型",
+              "广告依赖型",
+              "品牌型",
+              "曝光高销量低型",
+              "混合型"
+            ],
+            "description": "The competitive posture label used to narrow the result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Parameters for deep competitor discovery."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_asin_profile",
+        "sif.market_get_asin_aba_footprint"
+      ]
+    },
+    {
+      "id": "sif.market_get_asin_aba_footprint",
+      "service": "sif",
+      "name": "market_get_asin_aba_footprint",
+      "description": "Reverse-map an ASIN to search terms where it occupies an ABA Top-3 position. Costs 2 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Amazon Standard Identification Number (ASIN)."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "topN": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of keyword records to retrieve, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asin"
+        ],
+        "description": "Parameters for retrieving an ASIN's ABA Top-3 footprint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      }
+    },
+    {
+      "id": "sif.market_get_asin_keyword_signals",
+      "service": "sif",
+      "name": "market_get_asin_keyword_signals",
+      "description": "Analyze an ASIN's keyword traffic contribution, organic and paid dependence, rank stability, and health signals. Costs 3 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Amazon Standard Identification Number (ASIN)."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "listingSearch": {
+            "type": "boolean",
+            "description": "Whether to use Sif's listing-search scope."
+          },
+          "time_type": {
+            "type": "string",
+            "enum": [
+              "lately",
+              "week",
+              "month"
+            ],
+            "description": "The analysis time type."
+          },
+          "time_value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recent-day count, Sunday week date, or first-of-month date matching time_type."
+          },
+          "topN": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "description": "The maximum number of keywords to return, from 1 to 300."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asin"
+        ],
+        "description": "Parameters for analyzing ASIN keyword signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_keyword_demand",
+        "sif.market_get_keyword_competition"
+      ]
+    },
+    {
+      "id": "sif.market_get_asin_profile",
+      "service": "sif",
+      "name": "market_get_asin_profile",
+      "description": "Get product-positioning profiles such as price, rating, reviews, BSR, brand, listing age, variants, and dimensions for up to 20 ASINs. Costs 2 Sif points per input ASIN.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An Amazon Standard Identification Number (ASIN)."
+            },
+            "description": "One to twenty ASINs, including parent ASINs.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asins"
+        ],
+        "description": "Parameters for retrieving ASIN product profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_asin_keyword_signals",
+        "sif.market_get_asin_aba_footprint"
+      ]
+    },
+    {
+      "id": "sif.market_get_keyword_competition",
+      "service": "sif",
+      "name": "market_get_keyword_competition",
+      "description": "Analyze a keyword's traffic-share leaders, ABA Top-3 concentration, market accessibility, and optional ASIN competitive position. Costs 2 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to analyze."
+          },
+          "asin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Amazon Standard Identification Number (ASIN)."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "time_type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "week",
+              "month"
+            ],
+            "description": "The analysis time type."
+          },
+          "time_value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sunday date for week analysis or first-of-month date for month analysis."
+          },
+          "rank_evolution": {
+            "type": "boolean",
+            "description": "Whether to include rank-evolution data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Parameters for analyzing keyword competition."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      }
+    },
+    {
+      "id": "sif.market_get_keyword_demand",
+      "service": "sif",
+      "name": "market_get_keyword_demand",
+      "description": "Diagnose demand lifecycle and seasonal timing for up to 20 keywords. Costs 2 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword to analyze."
+            },
+            "description": "One to twenty keywords to analyze.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keywords"
+        ],
+        "description": "Parameters for diagnosing keyword demand."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_keyword_competition"
+      ]
+    },
+    {
+      "id": "sif.market_get_keyword_history",
+      "service": "sif",
+      "name": "market_get_keyword_history",
+      "description": "Get raw historical ABA search volume, rank, and Top-3 click and conversion concentration for up to 10 keywords. Costs 1 Sif point.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword to analyze."
+            },
+            "description": "One to ten keywords to compare.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month"
+            ],
+            "description": "The time granularity. Sif defaults to week when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keywords"
+        ],
+        "description": "Parameters for retrieving Sif keyword history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_keyword_root_trend",
+        "sif.market_screen_keyword_opportunities"
+      ]
+    },
+    {
+      "id": "sif.market_get_keyword_root_competitors",
+      "service": "sif",
+      "name": "market_get_keyword_root_competitors",
+      "description": "Discover the leading ASIN competitors across a keyword root using ABA buyer click behavior. Costs 2 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword_root": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword root. Sif also analyzes modifier variants that start with this value."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "topN": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of competitors to return, from 1 to 50."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword_root"
+        ],
+        "description": "Parameters for discovering keyword-root competitors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_discover_competitors"
+      ]
+    },
+    {
+      "id": "sif.market_get_keyword_root_trend",
+      "service": "sif",
+      "name": "market_get_keyword_root_trend",
+      "description": "Compare exact-keyword demand with aggregate keyword-root demand to assess market size and demand concentration. Costs 3 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to analyze."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month"
+            ],
+            "description": "The time granularity. Sif defaults to week when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Parameters for comparing exact-keyword and keyword-root demand."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_screen_keyword_opportunities"
+      ]
+    },
+    {
+      "id": "sif.market_screen_keyword_opportunities",
+      "service": "sif",
+      "name": "market_screen_keyword_opportunities",
+      "description": "Rank keyword-root variants by demand and click-concentration opportunity signals. Costs 3 Sif points.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword_root": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword root. Sif also analyzes modifier variants that start with this value."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Amazon marketplace code, such as US, UK, DE, or JP. Sif defaults to US when omitted."
+          },
+          "topN": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of opportunity keywords to return, from 1 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword_root"
+        ],
+        "description": "Parameters for screening keyword opportunities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Sif MCP tool."
+      },
+      "followUpActions": [
+        "sif.market_get_keyword_competition"
+      ]
+    }
+  ]
+}

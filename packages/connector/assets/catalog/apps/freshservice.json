@@ -1,0 +1,662 @@
+{
+  "service": "freshservice",
+  "displayName": "Freshservice",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "freshservice_api_key",
+      "description": "Freshservice API key used as the HTTP Basic auth username. Find it in your Freshservice profile settings as documented by Freshworks: https://support.freshservice.com/support/solutions/articles/50000000029-where-do-i-find-my-api-key-.",
+      "extraFields": [
+        {
+          "key": "domain",
+          "label": "Domain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-service-desk",
+          "description": "Freshservice account domain used to build https://<domain>.freshservice.com API requests."
+        },
+        {
+          "key": "workspaceId",
+          "label": "Workspace ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "2",
+          "description": "Optional default Freshservice workspace ID stored for MSP or multi-workspace accounts."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.freshworks.com/freshservice/",
+  "actions": [
+    {
+      "id": "freshservice.create_service_request",
+      "service": "freshservice",
+      "name": "create_service_request",
+      "description": "Create a Freshservice service request for one service catalog item.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemDisplayId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Display ID of the Freshservice service catalog item to request."
+          },
+          "email": {
+            "type": "string",
+            "description": "Requester email address used for the Freshservice service request.",
+            "format": "email"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quantity of the requested catalog item."
+          },
+          "parentTicketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Parent Freshservice ticket display ID used when creating a child service request."
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string custom field value."
+                },
+                {
+                  "type": "integer",
+                  "description": "An integer custom field value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean custom field value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric custom field value."
+                }
+              ],
+              "description": "One Freshservice service item custom field value."
+            },
+            "description": "Freshservice service item custom field values keyed by upstream field name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemDisplayId"
+        ],
+        "description": "Input parameters for creating a Freshservice service request from one catalog item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceRequest": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Freshservice service request object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceRequest"
+        ],
+        "description": "Freshservice create service request response wrapper."
+      }
+    },
+    {
+      "id": "freshservice.create_ticket",
+      "service": "freshservice",
+      "name": "create_ticket",
+      "description": "Create a Freshservice ticket for an incident or service request workflow.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Subject of the Freshservice ticket."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "HTML description of the Freshservice ticket."
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshservice ticket status value. Common defaults are 2=open, 3=pending, 4=resolved, and 5=closed."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Freshservice ticket priority value. Common defaults are 1=low, 2=medium, 3=high, and 4=urgent."
+          },
+          "email": {
+            "type": "string",
+            "description": "Requester email address used to create the Freshservice ticket.",
+            "format": "email"
+          },
+          "requesterId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Requester identifier used when the requester already exists in Freshservice."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Requester name used when creating a new contact from the ticket."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Incident",
+              "Service Request"
+            ],
+            "description": "Freshservice ticket type."
+          },
+          "source": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshservice ticket source value. Common values include 1=email, 2=portal, 3=phone, 7=chat, 8=feedback widget, and 9=outbound email."
+          },
+          "impact": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "Freshservice ticket impact value. Common defaults are 1=low, 2=medium, and 3=high."
+          },
+          "urgency": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Freshservice ticket urgency value. Common defaults are 1=low, 2=medium, 3=high, and 4=critical."
+          },
+          "emailConfigId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshservice email configuration identifier used for outbound email ticket creation."
+          },
+          "groupId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Support group identifier assigned to the ticket."
+          },
+          "responderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Agent identifier assigned to the ticket."
+          },
+          "requestedForId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Identifier of the user on whose behalf the request is raised."
+          },
+          "departmentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Department identifier assigned to the ticket."
+          },
+          "category": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category value assigned to the ticket."
+          },
+          "subCategory": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sub-category value assigned to the ticket."
+          },
+          "itemCategory": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Item category value assigned to the ticket."
+          },
+          "dueBy": {
+            "type": "string",
+            "description": "SLA due-by timestamp in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "frDueBy": {
+            "type": "string",
+            "description": "First-response due-by timestamp in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Freshservice tag."
+            },
+            "description": "Tags to attach to the Freshservice ticket.",
+            "minItems": 1
+          },
+          "ccEmails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A CC email address.",
+              "format": "email"
+            },
+            "description": "CC email addresses added to an outbound email ticket.",
+            "minItems": 1
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One Freshservice custom field value."
+            },
+            "description": "Freshservice custom field values keyed by upstream field name."
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "description",
+          "status",
+          "priority"
+        ],
+        "description": "Input parameters for creating a Freshservice ticket.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "requesterId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Freshservice ticket object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "Freshservice create ticket response wrapper."
+      }
+    },
+    {
+      "id": "freshservice.get_ticket",
+      "service": "freshservice",
+      "name": "get_ticket",
+      "description": "Get one Freshservice ticket by identifier with optional include expansions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshservice ticket identifier or display identifier."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "conversations",
+                "requester",
+                "requested_for",
+                "stats",
+                "problem",
+                "assets",
+                "changes",
+                "related_tickets",
+                "onboarding_context",
+                "offboarding_context",
+                "journey_requests",
+                "journey_data"
+              ],
+              "description": "A Freshservice include token used to embed related ticket details in the response."
+            },
+            "description": "Freshservice include tokens to expand related records in ticket responses.",
+            "minItems": 1
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input parameters for reading a single Freshservice ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Freshservice ticket object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "Freshservice single ticket response wrapper."
+      }
+    },
+    {
+      "id": "freshservice.list_locations",
+      "service": "freshservice",
+      "name": "list_locations",
+      "description": "List Freshservice locations to help callers resolve account-level location metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for the Freshservice list request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return per Freshservice page."
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Freshservice locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Freshservice location object."
+            },
+            "description": "Freshservice locations returned for the current page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another Freshservice locations page is likely available."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The next Freshservice locations page number when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Freshservice locations page number when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locations",
+          "hasMore",
+          "nextPage"
+        ],
+        "description": "Freshservice locations response wrapper."
+      }
+    },
+    {
+      "id": "freshservice.list_service_catalog_items",
+      "service": "freshservice",
+      "name": "list_service_catalog_items",
+      "description": "List Freshservice service catalog items so callers can discover item display IDs before placing requests.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for the Freshservice list request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return per Freshservice page."
+          },
+          "searchTerm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional search term used to search Freshservice service catalog items."
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Freshservice service catalog items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Freshservice service catalog item object."
+            },
+            "description": "Freshservice service catalog items returned for the current page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another Freshservice service catalog page is likely available."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The next Freshservice service catalog page number when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Freshservice service catalog page number when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "hasMore",
+          "nextPage"
+        ],
+        "description": "Freshservice service catalog list response wrapper."
+      }
+    },
+    {
+      "id": "freshservice.list_tickets",
+      "service": "freshservice",
+      "name": "list_tickets",
+      "description": "List Freshservice tickets with optional filters, pagination, and include expansions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for the Freshservice list request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return per Freshservice page."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "new_and_my_open",
+              "watching",
+              "spam",
+              "deleted"
+            ],
+            "description": "Freshservice predefined ticket filter to apply."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "conversations",
+                "requester",
+                "requested_for",
+                "stats",
+                "problem",
+                "assets",
+                "changes",
+                "related_tickets",
+                "onboarding_context",
+                "offboarding_context",
+                "journey_requests",
+                "journey_data"
+              ],
+              "description": "A Freshservice include token used to embed related ticket details in the response."
+            },
+            "description": "Freshservice include tokens to expand related records in ticket responses.",
+            "minItems": 1
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Freshservice ticket field used for ordering results."
+          },
+          "orderType": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Freshservice ticket list ordering direction."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "ISO 8601 timestamp used as the updated_since Freshservice filter.",
+            "format": "date-time"
+          },
+          "workspaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Workspace identifier used for MSP or multi-workspace Freshservice accounts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Freshservice tickets.",
+        "dependentRequired": {
+          "orderType": [
+            "orderBy"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Freshservice ticket object."
+            },
+            "description": "Freshservice tickets returned for the current page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another Freshservice page is likely available."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The next Freshservice page number when another page is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Freshservice page number when another page is available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tickets",
+          "hasMore",
+          "nextPage"
+        ],
+        "description": "Freshservice ticket list response wrapper."
+      }
+    }
+  ]
+}

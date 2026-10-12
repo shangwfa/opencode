@@ -1,0 +1,692 @@
+{
+  "service": "runpod",
+  "displayName": "Runpod",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "RUNPOD_API_KEY",
+      "description": "Runpod API key used with the Authorization Bearer header. Create it in Runpod Console API Keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.runpod.io",
+  "actions": [
+    {
+      "id": "runpod.delete_pod",
+      "service": "runpod",
+      "name": "delete_pod",
+      "description": "Delete a Runpod Pod.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Runpod Pod lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Pod ID targeted by the lifecycle request."
+          },
+          "action": {
+            "const": "delete",
+            "type": "string",
+            "description": "The lifecycle operation that was requested."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the lifecycle request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after requesting to delete a Runpod Pod."
+      }
+    },
+    {
+      "id": "runpod.get_pod",
+      "service": "runpod",
+      "name": "get_pod",
+      "description": "Get one Runpod Pod by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          },
+          "includeMachine": {
+            "type": "boolean",
+            "description": "Whether to include machine details for each returned Pod."
+          },
+          "includeNetworkVolume": {
+            "type": "boolean",
+            "description": "Whether to include attached network volume details for each returned Pod."
+          },
+          "includeSavingsPlans": {
+            "type": "boolean",
+            "description": "Whether to include savings plan details applied to each returned Pod."
+          },
+          "includeTemplate": {
+            "type": "boolean",
+            "description": "Whether to include template details for each returned Pod."
+          },
+          "includeWorkers": {
+            "type": "boolean",
+            "description": "Whether to include Pods that are serving as Serverless workers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "podId"
+        ],
+        "description": "The input payload for fetching one Runpod Pod."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pod": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Runpod Pod ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Pod name."
+              },
+              "desiredStatus": {
+                "type": "string",
+                "description": "The desired Pod status such as RUNNING, EXITED, or TERMINATED."
+              },
+              "image": {
+                "type": "string",
+                "description": "The image tag used by the Pod."
+              },
+              "machineId": {
+                "type": "string",
+                "description": "The backing machine ID."
+              },
+              "endpointId": {
+                "type": "string",
+                "description": "The attached Serverless endpoint ID when present."
+              },
+              "templateId": {
+                "type": "string",
+                "description": "The template ID used to create the Pod."
+              },
+              "publicIp": {
+                "type": "string",
+                "description": "The Pod public IPv4 address when available."
+              },
+              "costPerHr": {
+                "type": "number",
+                "description": "The Pod hourly cost before savings plans."
+              },
+              "adjustedCostPerHr": {
+                "type": "number",
+                "description": "The Pod hourly cost after active savings plans are applied."
+              },
+              "interruptible": {
+                "type": "boolean",
+                "description": "Whether the Pod is interruptible rather than reserved."
+              },
+              "locked": {
+                "type": "boolean",
+                "description": "Whether the Pod is locked against stop or reset."
+              },
+              "lastStartedAt": {
+                "type": "string",
+                "description": "The UTC timestamp when the Pod was last started."
+              },
+              "lastStatusChange": {
+                "type": "string",
+                "description": "The last Pod lifecycle status message."
+              },
+              "cpuFlavorId": {
+                "type": "string",
+                "description": "The Runpod CPU flavor ID for CPU Pods."
+              },
+              "vcpuCount": {
+                "type": "number",
+                "description": "The number of vCPUs assigned to the Pod."
+              },
+              "memoryInGb": {
+                "type": "number",
+                "description": "The amount of memory assigned to the Pod in GB."
+              },
+              "containerDiskInGb": {
+                "type": "integer",
+                "description": "The container disk size assigned to the Pod in GB."
+              },
+              "volumeInGb": {
+                "type": "integer",
+                "description": "The Pod volume size assigned in GB."
+              },
+              "volumeMountPath": {
+                "type": "string",
+                "description": "The filesystem mount path for the Pod or attached network volume."
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The exposed Pod ports."
+              },
+              "portMappings": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "description": "A public port."
+                },
+                "description": "A map from internal Pod ports to public ports."
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "An environment variable value."
+                },
+                "description": "The environment variables configured on the Pod."
+              },
+              "gpu": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The GPU summary for the Pod when present."
+              },
+              "machine": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Machine details for the Pod when included."
+              },
+              "networkVolume": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The attached network volume when includeNetworkVolume is enabled."
+              },
+              "savingsPlans": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true
+                },
+                "description": "Savings plans applied to the Pod when includeSavingsPlans is enabled."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "A Runpod Pod payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Runpod Pod."
+      }
+    },
+    {
+      "id": "runpod.list_pods",
+      "service": "runpod",
+      "name": "list_pods",
+      "description": "List Runpod Pods with optional official filter parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "computeType": {
+            "type": "string",
+            "enum": [
+              "GPU",
+              "CPU"
+            ],
+            "description": "Filter to GPU Pods or CPU Pods only."
+          },
+          "cpuFlavorId": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Runpod CPU flavor ID such as cpu3c."
+            },
+            "description": "Filter to CPU Pods with any of the provided Runpod CPU flavor IDs.",
+            "minItems": 1
+          },
+          "dataCenterId": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Runpod data center ID such as EU-RO-1."
+            },
+            "description": "Filter to Pods located in any of the provided Runpod data centers.",
+            "minItems": 1
+          },
+          "desiredStatus": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "EXITED",
+              "TERMINATED"
+            ],
+            "description": "Filter to Pods in the provided desired status."
+          },
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to Pods attached to the provided Runpod Serverless endpoint."
+          },
+          "gpuTypeId": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Runpod GPU type ID such as NVIDIA RTX A5000."
+            },
+            "description": "Filter to GPU Pods with any of the provided Runpod GPU type IDs.",
+            "minItems": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to a specific Pod by ID."
+          },
+          "imageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to Pods created from the provided image name."
+          },
+          "includeMachine": {
+            "type": "boolean",
+            "description": "Whether to include machine details for each returned Pod."
+          },
+          "includeNetworkVolume": {
+            "type": "boolean",
+            "description": "Whether to include attached network volume details for each returned Pod."
+          },
+          "includeSavingsPlans": {
+            "type": "boolean",
+            "description": "Whether to include savings plan details applied to each returned Pod."
+          },
+          "includeTemplate": {
+            "type": "boolean",
+            "description": "Whether to include template details for each returned Pod."
+          },
+          "includeWorkers": {
+            "type": "boolean",
+            "description": "Whether to include Pods that are serving as Serverless workers."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to Pods with the provided name."
+          },
+          "networkVolumeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to Pods with the provided attached network volume ID."
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter to Pods created from the provided template ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Runpod Pods."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Runpod Pod ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Pod name."
+                },
+                "desiredStatus": {
+                  "type": "string",
+                  "description": "The desired Pod status such as RUNNING, EXITED, or TERMINATED."
+                },
+                "image": {
+                  "type": "string",
+                  "description": "The image tag used by the Pod."
+                },
+                "machineId": {
+                  "type": "string",
+                  "description": "The backing machine ID."
+                },
+                "endpointId": {
+                  "type": "string",
+                  "description": "The attached Serverless endpoint ID when present."
+                },
+                "templateId": {
+                  "type": "string",
+                  "description": "The template ID used to create the Pod."
+                },
+                "publicIp": {
+                  "type": "string",
+                  "description": "The Pod public IPv4 address when available."
+                },
+                "costPerHr": {
+                  "type": "number",
+                  "description": "The Pod hourly cost before savings plans."
+                },
+                "adjustedCostPerHr": {
+                  "type": "number",
+                  "description": "The Pod hourly cost after active savings plans are applied."
+                },
+                "interruptible": {
+                  "type": "boolean",
+                  "description": "Whether the Pod is interruptible rather than reserved."
+                },
+                "locked": {
+                  "type": "boolean",
+                  "description": "Whether the Pod is locked against stop or reset."
+                },
+                "lastStartedAt": {
+                  "type": "string",
+                  "description": "The UTC timestamp when the Pod was last started."
+                },
+                "lastStatusChange": {
+                  "type": "string",
+                  "description": "The last Pod lifecycle status message."
+                },
+                "cpuFlavorId": {
+                  "type": "string",
+                  "description": "The Runpod CPU flavor ID for CPU Pods."
+                },
+                "vcpuCount": {
+                  "type": "number",
+                  "description": "The number of vCPUs assigned to the Pod."
+                },
+                "memoryInGb": {
+                  "type": "number",
+                  "description": "The amount of memory assigned to the Pod in GB."
+                },
+                "containerDiskInGb": {
+                  "type": "integer",
+                  "description": "The container disk size assigned to the Pod in GB."
+                },
+                "volumeInGb": {
+                  "type": "integer",
+                  "description": "The Pod volume size assigned in GB."
+                },
+                "volumeMountPath": {
+                  "type": "string",
+                  "description": "The filesystem mount path for the Pod or attached network volume."
+                },
+                "ports": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The exposed Pod ports."
+                },
+                "portMappings": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "description": "A public port."
+                  },
+                  "description": "A map from internal Pod ports to public ports."
+                },
+                "env": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "An environment variable value."
+                  },
+                  "description": "The environment variables configured on the Pod."
+                },
+                "gpu": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The GPU summary for the Pod when present."
+                },
+                "machine": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Machine details for the Pod when included."
+                },
+                "networkVolume": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The attached network volume when includeNetworkVolume is enabled."
+                },
+                "savingsPlans": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true
+                  },
+                  "description": "Savings plans applied to the Pod when includeSavingsPlans is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A Runpod Pod payload."
+            },
+            "description": "The Pods returned by Runpod."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Runpod Pods."
+      }
+    },
+    {
+      "id": "runpod.reset_pod",
+      "service": "runpod",
+      "name": "reset_pod",
+      "description": "Reset a Runpod Pod.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Runpod Pod lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Pod ID targeted by the lifecycle request."
+          },
+          "action": {
+            "const": "reset",
+            "type": "string",
+            "description": "The lifecycle operation that was requested."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the lifecycle request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after requesting to reset a Runpod Pod."
+      }
+    },
+    {
+      "id": "runpod.restart_pod",
+      "service": "runpod",
+      "name": "restart_pod",
+      "description": "Restart a Runpod Pod.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Runpod Pod lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Pod ID targeted by the lifecycle request."
+          },
+          "action": {
+            "const": "restart",
+            "type": "string",
+            "description": "The lifecycle operation that was requested."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the lifecycle request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after requesting to restart a Runpod Pod."
+      }
+    },
+    {
+      "id": "runpod.start_pod",
+      "service": "runpod",
+      "name": "start_pod",
+      "description": "Start or resume a Runpod Pod.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Runpod Pod lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Pod ID targeted by the lifecycle request."
+          },
+          "action": {
+            "const": "start",
+            "type": "string",
+            "description": "The lifecycle operation that was requested."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the lifecycle request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after requesting to start a Runpod Pod."
+      }
+    },
+    {
+      "id": "runpod.stop_pod",
+      "service": "runpod",
+      "name": "stop_pod",
+      "description": "Stop a Runpod Pod.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Runpod Pod ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Runpod Pod lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "podId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Pod ID targeted by the lifecycle request."
+          },
+          "action": {
+            "const": "stop",
+            "type": "string",
+            "description": "The lifecycle operation that was requested."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the lifecycle request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after requesting to stop a Runpod Pod."
+      }
+    }
+  ]
+}

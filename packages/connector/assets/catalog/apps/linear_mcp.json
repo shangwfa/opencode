@@ -1,0 +1,513 @@
+{
+  "service": "linear_mcp",
+  "displayName": "Linear MCP",
+  "description": "Read Linear issues and comments through Linear's official remote MCP server.",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://mcp.linear.app/authorize",
+      "tokenUrl": "https://mcp.linear.app/token",
+      "scopes": [
+        "read"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "resource": "https://mcp.linear.app/mcp"
+      },
+      "clientSetup": {
+        "docsUrl": "https://linear.app/docs/mcp",
+        "steps": [
+          "Copy the Callback URL shown below.",
+          "POST {\"client_name\":\"Open Connector\",\"redirect_uris\":[\"<Callback URL>\"],\"grant_types\":[\"authorization_code\",\"refresh_token\"],\"response_types\":[\"code\"],\"token_endpoint_auth_method\":\"none\",\"scope\":\"read\"} as JSON to https://mcp.linear.app/register.",
+          "Copy the returned client_id into the Client ID field below and leave Client Secret empty."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://linear.app/docs/mcp",
+  "actions": [
+    {
+      "id": "linear_mcp.get_issue",
+      "service": "linear_mcp",
+      "name": "get_issue",
+      "description": "Get one Linear issue with its full description through Linear's MCP get_issue tool.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or human identifier such as ENG-123, as returned by list_issues."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The issue to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Issue ID as Linear MCP returned it. This may be the human identifier such as ENG-123 rather than the UUID; see identifier and uuid."
+                  },
+                  "identifier": {
+                    "type": "string",
+                    "description": "Human identifier such as ENG-123, when known."
+                  },
+                  "uuid": {
+                    "type": "string",
+                    "description": "Issue UUID, when known."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Issue title."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Issue description in Markdown. Linear MCP may clip it in lists; see descriptionTruncated."
+                  },
+                  "descriptionTruncated": {
+                    "type": "boolean",
+                    "description": "Whether the description carries Linear's truncation marker. Call get_issue for the full text."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Link to the issue in Linear."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "Workflow state name."
+                  },
+                  "priority": {
+                    "description": "Priority as returned: a number or a label."
+                  },
+                  "assignee": {
+                    "type": "string",
+                    "description": "Assignee name, when assigned."
+                  },
+                  "assigneeId": {
+                    "type": "string",
+                    "description": "Assignee user ID, when the record carries one."
+                  },
+                  "creator": {
+                    "type": "string",
+                    "description": "Creator name, when returned."
+                  },
+                  "creatorId": {
+                    "type": "string",
+                    "description": "Creator user ID, when the record carries one."
+                  },
+                  "team": {
+                    "type": "string",
+                    "description": "Team name or key."
+                  },
+                  "project": {
+                    "type": "string",
+                    "description": "Project name, when the issue belongs to one."
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Label names."
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "description": "Creation time as returned by Linear."
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "description": "Last update time as returned by Linear."
+                  },
+                  "archivedAt": {
+                    "type": "string",
+                    "description": "Archive time, when archived."
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "description": "Completion time, when completed."
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "description": "Due date, when set."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id"
+                ],
+                "description": "A Linear issue. Typed fields are lifted from the MCP record when present; fields not listed here are only in the action's raw text."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Linear issue. Typed fields are lifted from the MCP record when present; fields not listed here are only in the action's raw text."
+          },
+          "raw": {
+            "type": "string",
+            "description": "The untouched text Linear's MCP tool returned. Read it when a typed field is missing: Linear can change its MCP output shape without notice."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "issue",
+          "raw"
+        ],
+        "description": "The requested issue."
+      }
+    },
+    {
+      "id": "linear_mcp.get_self",
+      "service": "linear_mcp",
+      "name": "get_self",
+      "description": "Get the signed-in Linear user through Linear's MCP get_user tool.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Linear user ID; the same viewer ID the Linear GraphQL API reports."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The user's email address, when returned."
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "description": "The user's display name, when returned."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The user's full name, when returned."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id"
+                ],
+                "description": "The signed-in Linear user."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signed-in Linear user."
+          },
+          "raw": {
+            "type": "string",
+            "description": "The untouched text Linear's MCP tool returned. Read it when a typed field is missing: Linear can change its MCP output shape without notice."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user",
+          "raw"
+        ],
+        "description": "The signed-in user."
+      }
+    },
+    {
+      "id": "linear_mcp.list_comments",
+      "service": "linear_mcp",
+      "name": "list_comments",
+      "description": "List the comments on one Linear issue through Linear's MCP list_comments tool.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue ID or human identifier such as ENG-123."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "issueId"
+        ],
+        "description": "The issue whose comments to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Comment ID."
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Comment body in Markdown."
+                },
+                "user": {
+                  "type": "string",
+                  "description": "Author name, when returned."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "Author user ID, when the record carries one."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Creation time as returned by Linear."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Last edit time, when returned."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Link to the comment in Linear."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A Linear issue comment."
+            },
+            "description": "Comments as returned, oldest first when Linear orders them."
+          },
+          "raw": {
+            "type": "string",
+            "description": "The untouched text Linear's MCP tool returned. Read it when a typed field is missing: Linear can change its MCP output shape without notice."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "comments",
+          "raw"
+        ],
+        "description": "Comments on the issue."
+      }
+    },
+    {
+      "id": "linear_mcp.list_issues",
+      "service": "linear_mcp",
+      "name": "list_issues",
+      "description": "List Linear issues through Linear's MCP list_issues tool with optional updated-since, ordering, limit, and cursor pagination. Descriptions may be clipped; call get_issue for the full text.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "updatedAt": {
+            "type": "string",
+            "description": "Only issues updated at or after this time, as the tool accepts it (an ISO 8601 timestamp or a relative duration such as -P1D)."
+          },
+          "orderBy": {
+            "type": "string",
+            "description": "Sort field, such as updatedAt or createdAt."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "Maximum number of issues to return on this page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by the previous page of the same query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters forwarded to Linear's MCP list_issues tool. Which filters the tool honours is decided by Linear's server; unknown values are rejected there."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Issue ID as Linear MCP returned it. This may be the human identifier such as ENG-123 rather than the UUID; see identifier and uuid."
+                },
+                "identifier": {
+                  "type": "string",
+                  "description": "Human identifier such as ENG-123, when known."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Issue UUID, when known."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Issue title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Issue description in Markdown. Linear MCP may clip it in lists; see descriptionTruncated."
+                },
+                "descriptionTruncated": {
+                  "type": "boolean",
+                  "description": "Whether the description carries Linear's truncation marker. Call get_issue for the full text."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Link to the issue in Linear."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "Workflow state name."
+                },
+                "priority": {
+                  "description": "Priority as returned: a number or a label."
+                },
+                "assignee": {
+                  "type": "string",
+                  "description": "Assignee name, when assigned."
+                },
+                "assigneeId": {
+                  "type": "string",
+                  "description": "Assignee user ID, when the record carries one."
+                },
+                "creator": {
+                  "type": "string",
+                  "description": "Creator name, when returned."
+                },
+                "creatorId": {
+                  "type": "string",
+                  "description": "Creator user ID, when the record carries one."
+                },
+                "team": {
+                  "type": "string",
+                  "description": "Team name or key."
+                },
+                "project": {
+                  "type": "string",
+                  "description": "Project name, when the issue belongs to one."
+                },
+                "labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Label names."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Creation time as returned by Linear."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Last update time as returned by Linear."
+                },
+                "archivedAt": {
+                  "type": "string",
+                  "description": "Archive time, when archived."
+                },
+                "completedAt": {
+                  "type": "string",
+                  "description": "Completion time, when completed."
+                },
+                "dueDate": {
+                  "type": "string",
+                  "description": "Due date, when set."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A Linear issue. Typed fields are lifted from the MCP record when present; fields not listed here are only in the action's raw text."
+            },
+            "description": "Issues on this page."
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether another page follows."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, when one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, when one is available."
+          },
+          "raw": {
+            "type": "string",
+            "description": "The untouched text Linear's MCP tool returned. Read it when a typed field is missing: Linear can change its MCP output shape without notice."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "issues",
+          "hasNextPage",
+          "cursor",
+          "raw"
+        ],
+        "description": "One page of issues."
+      },
+      "followUpActions": [
+        "linear_mcp.get_issue",
+        "linear_mcp.list_comments"
+      ]
+    }
+  ]
+}

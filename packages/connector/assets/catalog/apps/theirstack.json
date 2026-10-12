@@ -1,0 +1,726 @@
+{
+  "service": "theirstack",
+  "displayName": "TheirStack",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ts_...",
+      "description": "TheirStack API key sent as a Bearer token."
+    }
+  ],
+  "homepageUrl": "https://theirstack.com",
+  "actions": [
+    {
+      "id": "theirstack.get_credit_balance",
+      "service": "theirstack",
+      "name": "get_credit_balance",
+      "description": "Retrieve the authenticated TheirStack team's current credit balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve TheirStack credit balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ui_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of UI credits available to the team."
+          },
+          "used_ui_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of UI credits used in the current billing cycle."
+          },
+          "api_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of API credits available to the team."
+          },
+          "used_api_credits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of API credits used in the current billing cycle."
+          },
+          "earliest_expiration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Earliest expiration timestamp among invoices with remaining credits.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Earliest expiration timestamp among invoices with remaining credits."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ui_credits",
+          "used_ui_credits",
+          "api_credits",
+          "used_api_credits"
+        ],
+        "description": "TheirStack credit balance for the authenticated team."
+      }
+    },
+    {
+      "id": "theirstack.list_technographics",
+      "service": "theirstack",
+      "name": "list_technographics",
+      "description": "List technologies and buying-intent keywords detected by TheirStack for a company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain, URL, or email domain to identify the company."
+          },
+          "company_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact case-sensitive company name to identify the company."
+          },
+          "company_linkedin_url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "LinkedIn company URL to identify the company."
+          },
+          "keyword_slug_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return technologies or buying-intent topics matching any of these keyword slugs."
+          },
+          "keyword_category_slug_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return keywords from any of these keyword category slugs."
+          },
+          "confidence_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "description": "TheirStack confidence level."
+            },
+            "description": "Only return technologies with any of these confidence levels."
+          },
+          "min_jobs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum number of jobs found for each technology or keyword."
+          },
+          "max_jobs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of jobs found for each technology or keyword."
+          },
+          "first_date_found_gte": {
+            "type": "string",
+            "description": "Only return technologies first found on or after this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "first_date_found_lte": {
+            "type": "string",
+            "description": "Only return technologies first found on or before this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "last_date_found_gte": {
+            "type": "string",
+            "description": "Only return technologies last found on or after this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "last_date_found_lte": {
+            "type": "string",
+            "description": "Only return technologies last found on or before this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number for page-based pagination. TheirStack pages start at 0."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip for offset-based pagination."
+          },
+          "include_total_results": {
+            "type": "boolean",
+            "description": "When true, TheirStack calculates total result counts. This can slow down large searches."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "jobs",
+                    "jobs_last_7_days",
+                    "jobs_last_30_days",
+                    "jobs_last_180_days",
+                    "last_date_found",
+                    "first_date_found",
+                    "relative_occurrence_within_category",
+                    "theirstack_score",
+                    "confidence"
+                  ],
+                  "description": "Field to sort technographic results by."
+                },
+                "desc": {
+                  "type": "boolean",
+                  "description": "Whether to sort the field in descending order."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "Sort option for TheirStack technographic results."
+            },
+            "description": "Sort options for technographic results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "List technologies and buying-intent keywords TheirStack detected for a company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "technologies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A TheirStack record. The object keeps the upstream fields returned by the API."
+            },
+            "description": "Technology and buying-intent records returned by TheirStack."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "total_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of results when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of results when requested."
+              },
+              "total_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of companies when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of companies when requested."
+              },
+              "truncated_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of results omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of results omitted because the account lacked enough credits."
+              },
+              "truncated_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of companies omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of companies omitted because the account lacked enough credits."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination and count metadata returned by TheirStack."
+          }
+        },
+        "additionalProperties": false,
+        "description": "TheirStack technographic lookup response."
+      }
+    },
+    {
+      "id": "theirstack.search_companies",
+      "service": "theirstack",
+      "name": "search_companies",
+      "description": "Search TheirStack companies by firmographic, hiring, and technographic filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_domain_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return companies matching any of these domains, URLs, or email domains."
+          },
+          "company_linkedin_url_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return companies whose LinkedIn URL matches any of these values."
+          },
+          "company_name_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return companies whose name exactly matches any of these case-sensitive values."
+          },
+          "company_name_partial_match_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Return companies whose name contains any of these substrings, case-insensitively."
+          },
+          "company_country_code_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return companies headquartered in any of these ISO2 country codes."
+          },
+          "industry_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Industry names to match case-insensitively."
+          },
+          "company_keyword_slug_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Keyword or buying-intent slugs mentioned by matching companies in their jobs."
+          },
+          "company_technology_slug_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Technology slugs mentioned by matching companies in their jobs."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number for page-based pagination. TheirStack pages start at 0."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip for offset-based pagination."
+          },
+          "include_total_results": {
+            "type": "boolean",
+            "description": "When true, TheirStack calculates total result counts. This can slow down large searches."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "relevance",
+                    "name",
+                    "num_jobs",
+                    "num_jobs_last_30_days",
+                    "num_jobs_found",
+                    "employee_count",
+                    "alexa_ranking",
+                    "founded_year",
+                    "annual_revenue_usd",
+                    "total_funding_usd",
+                    "last_funding_round_date",
+                    "confidence",
+                    "jobs",
+                    "first_date_found"
+                  ],
+                  "description": "Field to sort company search results by."
+                },
+                "desc": {
+                  "type": "boolean",
+                  "description": "Whether to sort the field in descending order."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "Sort option for TheirStack company search results."
+            },
+            "description": "Sort options for company search results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search TheirStack companies by firmographic, hiring, and technographic filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A TheirStack record. The object keeps the upstream fields returned by the API."
+            },
+            "description": "Company records returned by TheirStack."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "total_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of results when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of results when requested."
+              },
+              "total_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of companies when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of companies when requested."
+              },
+              "truncated_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of results omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of results omitted because the account lacked enough credits."
+              },
+              "truncated_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of companies omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of companies omitted because the account lacked enough credits."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination and count metadata returned by TheirStack."
+          }
+        },
+        "additionalProperties": false,
+        "description": "TheirStack company search response."
+      }
+    },
+    {
+      "id": "theirstack.search_jobs",
+      "service": "theirstack",
+      "name": "search_jobs",
+      "description": "Search TheirStack job postings with company, title, keyword, location, and posting date filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_domain_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return jobs from companies matching any of these domains, URLs, or email domains."
+          },
+          "company_linkedin_url_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return jobs from companies whose LinkedIn URL matches any of these values."
+          },
+          "company_name_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Only return jobs from companies whose name exactly matches any of these case-sensitive values."
+          },
+          "job_title_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Keyword-based patterns to match job titles, case-insensitively."
+          },
+          "job_description_contains_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Whole words to search for in job descriptions. Matching is case-insensitive unless the word is uppercase."
+          },
+          "job_country_code_or": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string filter value."
+            },
+            "description": "Two-letter ISO country codes for job locations."
+          },
+          "posted_at_max_age_days": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum age in days for job posting dates. Use 0 for jobs posted today."
+          },
+          "posted_at_gte": {
+            "type": "string",
+            "description": "Only return jobs published on or after this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "posted_at_lte": {
+            "type": "string",
+            "description": "Only return jobs published on or before this YYYY-MM-DD date.",
+            "format": "date"
+          },
+          "remote": {
+            "type": "boolean",
+            "description": "When true, only show remote jobs. When false, only show non-remote jobs."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number for page-based pagination. TheirStack pages start at 0."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of results to skip for offset-based pagination."
+          },
+          "include_total_results": {
+            "type": "boolean",
+            "description": "When true, TheirStack calculates total result counts. This can slow down large searches."
+          },
+          "order_by": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "date_posted",
+                    "discovered_at",
+                    "salary",
+                    "job_title",
+                    "company",
+                    "num_jobs"
+                  ],
+                  "description": "Field to sort job search results by."
+                },
+                "desc": {
+                  "type": "boolean",
+                  "description": "Whether to sort the field in descending order."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "Sort option for TheirStack job search results."
+            },
+            "description": "Sort options for job search results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search TheirStack job postings by company, title, keyword, location, and posting date filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A TheirStack record. The object keeps the upstream fields returned by the API."
+            },
+            "description": "Job records returned by TheirStack."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "total_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of results when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of results when requested."
+              },
+              "total_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of companies when requested."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of companies when requested."
+              },
+              "truncated_results": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of results omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of results omitted because the account lacked enough credits."
+              },
+              "truncated_companies": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of companies omitted because the account lacked enough credits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of companies omitted because the account lacked enough credits."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination and count metadata returned by TheirStack."
+          }
+        },
+        "additionalProperties": false,
+        "description": "TheirStack job search response."
+      }
+    }
+  ]
+}

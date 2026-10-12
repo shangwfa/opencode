@@ -1,0 +1,2134 @@
+{
+  "service": "cursor",
+  "displayName": "Cursor",
+  "description": "Run coding agents, continue conversations, and track team usage and spending.",
+  "categories": [
+    "Developer Tools",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "crsr_...",
+      "description": "Create a user API key at https://cursor.com/dashboard/api, or use a service account or admin API key from your team settings."
+    }
+  ],
+  "homepageUrl": "https://cursor.com",
+  "actions": [
+    {
+      "id": "cursor.archive_agent",
+      "service": "cursor",
+      "name": "archive_agent",
+      "description": "Archive a session while retaining readable history. Call unarchive_agent before sending another prompt.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "Identify a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Affected agent or run ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Identifier acknowledged by Cursor."
+      }
+    },
+    {
+      "id": "cursor.cancel_run",
+      "service": "cursor",
+      "name": "cancel_run",
+      "description": "Cancel an active run. To continue afterward, create a new run on the same session.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId",
+          "runId"
+        ],
+        "description": "Identify a run within a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Affected agent or run ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Identifier acknowledged by Cursor."
+      }
+    },
+    {
+      "id": "cursor.create_agent",
+      "service": "cursor",
+      "name": "create_agent",
+      "description": "Create a durable Cursor cloud session and enqueue its first run. Returns immediately; poll get_run for the result. MCP servers can give the session access to external tools.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Task or follow-up instructions.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Instructions for one run."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Session name; generated from the prompt when omitted."
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "GitHub repository URL, including https://.",
+                  "format": "uri"
+                },
+                "startingRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Starting branch or commit; ignored when prUrl is supplied."
+                },
+                "prUrl": {
+                  "type": "string",
+                  "description": "Existing pull request to work on; url is still required.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "Repository available to the Cursor GitHub App."
+            },
+            "description": "Repositories to clone. Omit for a no-repo VM, if enabled for your account.",
+            "maxItems": 20
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Model ID from list_models."
+              },
+              "params": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Parameter ID."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "Parameter value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "value"
+                  ],
+                  "description": "A model parameter supported by list_models."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "Omit to use Cursor's configured model."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "plan"
+            ],
+            "description": "Choose plan to explore and propose changes, or agent to implement them."
+          },
+          "mcpServers": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Unique server name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "http",
+                        "sse"
+                      ]
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "HTTP(S) MCP endpoint that Cursor can reach, without embedded credentials.",
+                      "format": "uri"
+                    },
+                    "headers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Headers sent by Cursor to this MCP server."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url"
+                  ],
+                  "description": "Remote MCP tools used by the cloud agent."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Unique server name."
+                    },
+                    "type": {
+                      "const": "stdio",
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Command to run inside the cloud VM."
+                    },
+                    "args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "env": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Environment variables for the MCP process."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "command"
+                  ],
+                  "description": "MCP server started inside the Cursor cloud VM."
+                }
+              ]
+            },
+            "description": "Inline MCP servers. On a follow-up, replaces the current inline servers for that run; omit to retain them.",
+            "maxItems": 50
+          },
+          "autoCreatePR": {
+            "type": "boolean",
+            "description": "Open a pull request after the run finishes."
+          },
+          "workOnCurrentBranch": {
+            "type": "boolean",
+            "description": "Push to the starting branch or existing PR head; false creates a new branch."
+          },
+          "skipReviewerRequest": {
+            "type": "boolean",
+            "description": "Skip requesting the user as reviewer when autoCreatePR is true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "Start a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+              },
+              "name": {
+                "type": "string",
+                "description": "Agent name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "IDLE",
+                  "ARCHIVED"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation time.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update time.",
+                "format": "date-time"
+              },
+              "url": {
+                "type": "string",
+                "description": "Open this session in Cursor.",
+                "format": "uri"
+              },
+              "latestRunId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+              },
+              "env": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Execution environment."
+              },
+              "repos": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "GitHub repository URL, including https://.",
+                      "format": "uri"
+                    },
+                    "startingRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Starting branch or commit; ignored when prUrl is supplied."
+                    },
+                    "prUrl": {
+                      "type": "string",
+                      "description": "Existing pull request to work on; url is still required.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "url"
+                  ],
+                  "description": "Repository available to the Cursor GitHub App."
+                }
+              },
+              "workOnCurrentBranch": {
+                "type": "boolean",
+                "description": "Whether commits are pushed to the starting branch."
+              },
+              "autoCreatePR": {
+                "type": "boolean",
+                "description": "Whether Cursor opens a pull request."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "status",
+              "createdAt",
+              "updatedAt"
+            ],
+            "description": "Durable cloud session. Read latestRunId with get_run for execution progress."
+          },
+          "run": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+              },
+              "agentId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "CREATING",
+                  "RUNNING",
+                  "FINISHED",
+                  "ERROR",
+                  "CANCELLED",
+                  "EXPIRED"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation time.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update time.",
+                "format": "date-time"
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Elapsed milliseconds for a terminal run."
+              },
+              "result": {
+                "type": "string",
+                "description": "Final assistant reply when available."
+              },
+              "git": {
+                "type": "object",
+                "properties": {
+                  "branches": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "repoUrl": {
+                          "type": "string",
+                          "description": "Repository host and path, without a URL scheme."
+                        },
+                        "branch": {
+                          "type": "string",
+                          "description": "Pushed branch name."
+                        },
+                        "prUrl": {
+                          "type": "string",
+                          "description": "Pull request URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "repoUrl"
+                      ],
+                      "description": "A pushed branch."
+                    }
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Current pushed branches across the agent, shared by all of its runs."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "agentId",
+              "status",
+              "createdAt",
+              "updatedAt"
+            ],
+            "description": "One prompt execution. Poll get_run until a terminal status to read result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agent",
+          "run"
+        ],
+        "description": "Agent and initial run accepted by Cursor."
+      },
+      "followUpActions": [
+        "cursor.get_run",
+        "cursor.create_run"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "cursor.create_agent",
+        "statusActionId": "cursor.get_run",
+        "cancelActionId": "cursor.cancel_run"
+      }
+    },
+    {
+      "id": "cursor.create_run",
+      "service": "cursor",
+      "name": "create_run",
+      "description": "Send a follow-up using the session's conversation and workspace. Wait for or cancel an active run before starting another. Unarchive archived sessions first.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "prompt": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Task or follow-up instructions.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Instructions for one run."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "plan"
+            ],
+            "description": "Choose plan to explore and propose changes, or agent to implement them."
+          },
+          "mcpServers": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Unique server name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "http",
+                        "sse"
+                      ]
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "HTTP(S) MCP endpoint that Cursor can reach, without embedded credentials.",
+                      "format": "uri"
+                    },
+                    "headers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Headers sent by Cursor to this MCP server."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "url"
+                  ],
+                  "description": "Remote MCP tools used by the cloud agent."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Unique server name."
+                    },
+                    "type": {
+                      "const": "stdio",
+                      "type": "string"
+                    },
+                    "command": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Command to run inside the cloud VM."
+                    },
+                    "args": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "env": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Environment variables for the MCP process."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "command"
+                  ],
+                  "description": "MCP server started inside the Cursor cloud VM."
+                }
+              ]
+            },
+            "description": "Inline MCP servers. On a follow-up, replaces the current inline servers for that run; omit to retain them.",
+            "maxItems": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId",
+          "prompt"
+        ],
+        "description": "Continue a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+              },
+              "agentId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "CREATING",
+                  "RUNNING",
+                  "FINISHED",
+                  "ERROR",
+                  "CANCELLED",
+                  "EXPIRED"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation time.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update time.",
+                "format": "date-time"
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Elapsed milliseconds for a terminal run."
+              },
+              "result": {
+                "type": "string",
+                "description": "Final assistant reply when available."
+              },
+              "git": {
+                "type": "object",
+                "properties": {
+                  "branches": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "repoUrl": {
+                          "type": "string",
+                          "description": "Repository host and path, without a URL scheme."
+                        },
+                        "branch": {
+                          "type": "string",
+                          "description": "Pushed branch name."
+                        },
+                        "prUrl": {
+                          "type": "string",
+                          "description": "Pull request URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "repoUrl"
+                      ],
+                      "description": "A pushed branch."
+                    }
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Current pushed branches across the agent, shared by all of its runs."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "agentId",
+              "status",
+              "createdAt",
+              "updatedAt"
+            ],
+            "description": "One prompt execution. Poll get_run until a terminal status to read result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "run"
+        ],
+        "description": "Accepted follow-up run."
+      },
+      "followUpActions": [
+        "cursor.get_run"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "cursor.create_run",
+        "statusActionId": "cursor.get_run",
+        "cancelActionId": "cursor.cancel_run"
+      }
+    },
+    {
+      "id": "cursor.delete_agent",
+      "service": "cursor",
+      "name": "delete_agent",
+      "description": "Permanently delete a cloud session. This is irreversible; archive_agent provides reversible removal.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "Identify a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Affected agent or run ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Identifier acknowledged by Cursor."
+      }
+    },
+    {
+      "id": "cursor.get_agent",
+      "service": "cursor",
+      "name": "get_agent",
+      "description": "Read a cloud session's configuration and latestRunId. Use get_run for execution status and results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "Identify a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Agent name."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "IDLE",
+              "ARCHIVED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation time.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last update time.",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "Open this session in Cursor.",
+            "format": "uri"
+          },
+          "latestRunId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+          },
+          "env": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true,
+            "description": "Execution environment."
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "GitHub repository URL, including https://.",
+                  "format": "uri"
+                },
+                "startingRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Starting branch or commit; ignored when prUrl is supplied."
+                },
+                "prUrl": {
+                  "type": "string",
+                  "description": "Existing pull request to work on; url is still required.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "Repository available to the Cursor GitHub App."
+            }
+          },
+          "workOnCurrentBranch": {
+            "type": "boolean",
+            "description": "Whether commits are pushed to the starting branch."
+          },
+          "autoCreatePR": {
+            "type": "boolean",
+            "description": "Whether Cursor opens a pull request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "description": "Durable cloud session. Read latestRunId with get_run for execution progress."
+      }
+    },
+    {
+      "id": "cursor.get_daily_usage_data",
+      "service": "cursor",
+      "name": "get_daily_usage_data",
+      "description": "Retrieve up to 30 days of team usage metrics. Requires Enterprise Admin API access.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:*"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "integer",
+            "description": "The inclusive start date in epoch milliseconds."
+          },
+          "endDate": {
+            "type": "integer",
+            "description": "The inclusive end date in epoch milliseconds."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-indexed page number to request."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of users to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "The input for retrieving Cursor daily usage data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "integer",
+                  "description": "The Cursor user ID."
+                },
+                "day": {
+                  "type": "string",
+                  "description": "The day covered by this usage row.",
+                  "format": "date"
+                },
+                "date": {
+                  "type": "integer",
+                  "description": "The day timestamp in epoch milliseconds."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user email address.",
+                  "format": "email"
+                },
+                "isActive": {
+                  "type": "boolean",
+                  "description": "Whether the user had activity on this day."
+                },
+                "totalLinesAdded": {
+                  "type": "integer",
+                  "description": "The total lines added."
+                },
+                "totalLinesDeleted": {
+                  "type": "integer",
+                  "description": "The total lines deleted."
+                },
+                "acceptedLinesAdded": {
+                  "type": "integer",
+                  "description": "The AI-suggested added lines that were accepted."
+                },
+                "acceptedLinesDeleted": {
+                  "type": "integer",
+                  "description": "The AI-suggested deleted lines that were accepted."
+                },
+                "totalApplies": {
+                  "type": "integer",
+                  "description": "The total AI code apply actions."
+                },
+                "totalAccepts": {
+                  "type": "integer",
+                  "description": "The total accepted AI suggestions."
+                },
+                "totalRejects": {
+                  "type": "integer",
+                  "description": "The total rejected AI suggestions."
+                },
+                "totalTabsShown": {
+                  "type": "integer",
+                  "description": "The total Tab completions shown."
+                },
+                "totalTabsAccepted": {
+                  "type": "integer",
+                  "description": "The total Tab completions accepted."
+                },
+                "composerRequests": {
+                  "type": "integer",
+                  "description": "The number of Composer requests."
+                },
+                "chatRequests": {
+                  "type": "integer",
+                  "description": "The number of chat requests."
+                },
+                "agentRequests": {
+                  "type": "integer",
+                  "description": "The number of Agent mode requests."
+                },
+                "cmdkUsages": {
+                  "type": "integer",
+                  "description": "The number of Cmd+K inline edit uses."
+                },
+                "subscriptionIncludedReqs": {
+                  "type": "integer",
+                  "description": "The subscription-included request count."
+                },
+                "apiKeyReqs": {
+                  "type": "integer",
+                  "description": "The API key request count."
+                },
+                "usageBasedReqs": {
+                  "type": "integer",
+                  "description": "The usage-based request count."
+                },
+                "bugbotUsages": {
+                  "type": "integer",
+                  "description": "The Bugbot usage count."
+                },
+                "mostUsedModel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The most frequently used model for the day."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The most frequently used model for the day."
+                },
+                "applyMostUsedExtension": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The most common file extension for apply actions."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The most common file extension for apply actions."
+                },
+                "tabMostUsedExtension": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The most common file extension for Tab completions."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The most common file extension for Tab completions."
+                },
+                "clientVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Cursor client version used."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Cursor client version used."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Cursor daily usage row."
+            },
+            "description": "The Cursor daily usage rows."
+          },
+          "period": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current 1-indexed page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The number of records requested per page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              },
+              "totalUsers": {
+                "type": "integer",
+                "description": "The total number of matching users."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether another result page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous result page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cursor pagination metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "period",
+          "raw"
+        ],
+        "description": "The Cursor daily usage data response."
+      }
+    },
+    {
+      "id": "cursor.get_run",
+      "service": "cursor",
+      "name": "get_run",
+      "description": "Read a run's progress, final assistant reply, and pushed branches. FINISHED, ERROR, CANCELLED, and EXPIRED are terminal statuses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId",
+          "runId"
+        ],
+        "description": "Identify a run within a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+          },
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "CREATING",
+              "RUNNING",
+              "FINISHED",
+              "ERROR",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation time.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last update time.",
+            "format": "date-time"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Elapsed milliseconds for a terminal run."
+          },
+          "result": {
+            "type": "string",
+            "description": "Final assistant reply when available."
+          },
+          "git": {
+            "type": "object",
+            "properties": {
+              "branches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "repoUrl": {
+                      "type": "string",
+                      "description": "Repository host and path, without a URL scheme."
+                    },
+                    "branch": {
+                      "type": "string",
+                      "description": "Pushed branch name."
+                    },
+                    "prUrl": {
+                      "type": "string",
+                      "description": "Pull request URL.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "repoUrl"
+                  ],
+                  "description": "A pushed branch."
+                }
+              }
+            },
+            "additionalProperties": true,
+            "description": "Current pushed branches across the agent, shared by all of its runs."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "agentId",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "description": "One prompt execution. Poll get_run until a terminal status to read result."
+      }
+    },
+    {
+      "id": "cursor.get_team_spend",
+      "service": "cursor",
+      "name": "get_team_spend",
+      "description": "Retrieve team spending for the current billing cycle with search, sorting, and pagination. Requires Enterprise Admin API access.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:*"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchTerm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search text matched against user names and emails."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "amount",
+              "date",
+              "user"
+            ],
+            "description": "The field used to sort spending rows."
+          },
+          "sortDirection": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for spending rows."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-indexed page number to request."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of spending rows to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for retrieving Cursor team spending."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teamMemberSpend": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "integer",
+                  "description": "The Cursor user ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The user display name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user email address.",
+                  "format": "email"
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The team role such as member or owner."
+                },
+                "spendCents": {
+                  "type": "number",
+                  "description": "The on-demand spend in cents for the current billing cycle."
+                },
+                "overallSpendCents": {
+                  "type": "number",
+                  "description": "The total spend in cents for the current billing cycle, including included usage."
+                },
+                "fastPremiumRequests": {
+                  "type": "integer",
+                  "description": "The number of usage-based premium requests."
+                },
+                "hardLimitOverrideDollars": {
+                  "type": "number",
+                  "description": "The custom hard spending limit override in dollars."
+                },
+                "monthlyLimitDollars": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The monthly spending limit in dollars, or null when none is set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monthly spending limit in dollars, or null when none is set."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Cursor team member spending row."
+            },
+            "description": "The Cursor team member spending rows."
+          },
+          "subscriptionCycleStart": {
+            "type": "integer",
+            "description": "The current subscription cycle start timestamp in epoch milliseconds."
+          },
+          "totalMembers": {
+            "type": "integer",
+            "description": "The total number of matching team members."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of spending pages."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamMemberSpend",
+          "subscriptionCycleStart",
+          "totalMembers",
+          "totalPages",
+          "raw"
+        ],
+        "description": "The Cursor team spending response."
+      }
+    },
+    {
+      "id": "cursor.list_agents",
+      "service": "cursor",
+      "name": "list_agents",
+      "description": "List cloud sessions, newest first. Use nextCursor to request another page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Page size; Cursor defaults to 20."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Use nextCursor from the previous page; omit for the first page."
+          },
+          "prUrl": {
+            "type": "string",
+            "description": "Filter by pull request URL.",
+            "format": "uri"
+          },
+          "includeArchived": {
+            "type": "boolean",
+            "description": "Include archived sessions; Cursor defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filter cloud sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Agent name."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ACTIVE",
+                    "IDLE",
+                    "ARCHIVED"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Creation time.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Last update time.",
+                  "format": "date-time"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Open this session in Cursor.",
+                  "format": "uri"
+                },
+                "latestRunId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+                },
+                "env": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Execution environment."
+                },
+                "repos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "description": "GitHub repository URL, including https://.",
+                        "format": "uri"
+                      },
+                      "startingRef": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Starting branch or commit; ignored when prUrl is supplied."
+                      },
+                      "prUrl": {
+                        "type": "string",
+                        "description": "Existing pull request to work on; url is still required.",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "url"
+                    ],
+                    "description": "Repository available to the Cursor GitHub App."
+                  }
+                },
+                "workOnCurrentBranch": {
+                  "type": "boolean",
+                  "description": "Whether commits are pushed to the starting branch."
+                },
+                "autoCreatePR": {
+                  "type": "boolean",
+                  "description": "Whether Cursor opens a pull request."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "status",
+                "createdAt",
+                "updatedAt"
+              ],
+              "description": "Durable cloud session. Read latestRunId with get_run for execution progress."
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Use nextCursor from the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "One page of cloud sessions."
+      }
+    },
+    {
+      "id": "cursor.list_audit_logs",
+      "service": "cursor",
+      "name": "list_audit_logs",
+      "description": "List team audit events with time, user, event type, and page filters. Requires Enterprise Admin API access.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:*"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start time as a Cursor date shortcut, ISO timestamp, date, or Unix timestamp."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end time as a Cursor date shortcut, ISO timestamp, date, or Unix timestamp."
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Cursor audit event types to include.",
+            "minItems": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search term used to filter audit events."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-indexed page number to request."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of records to return per page."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "User emails or encoded Cursor user IDs to filter by.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing Cursor audit logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event_id": {
+                  "type": "string",
+                  "description": "The Cursor audit event ID."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The event timestamp.",
+                  "format": "date-time"
+                },
+                "ip_address": {
+                  "type": "string",
+                  "description": "The IP address associated with the event."
+                },
+                "user_email": {
+                  "type": "string",
+                  "description": "The user email address associated with the event.",
+                  "format": "email"
+                },
+                "event_type": {
+                  "type": "string",
+                  "description": "The Cursor audit event type."
+                },
+                "event_data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object returned by Cursor."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Cursor audit log event."
+            },
+            "description": "The Cursor audit log events."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current 1-indexed page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The number of records requested per page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              },
+              "totalUsers": {
+                "type": "integer",
+                "description": "The total number of matching users."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether another result page is available."
+              },
+              "hasPreviousPage": {
+                "type": "boolean",
+                "description": "Whether a previous result page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cursor pagination metadata."
+          },
+          "params": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "pagination",
+          "raw"
+        ],
+        "description": "The Cursor audit logs response."
+      }
+    },
+    {
+      "id": "cursor.list_models",
+      "service": "cursor",
+      "name": "list_models",
+      "description": "List available cloud agent models and their supported parameters and variants.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Model ID for create_agent."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Model name."
+                },
+                "description": {
+                  "type": "string"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Alternative model IDs."
+                },
+                "parameters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "value"
+                          ],
+                          "description": "An allowed value."
+                        }
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "values"
+                    ],
+                    "description": "Supported parameter values."
+                  }
+                },
+                "variants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "params": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Parameter ID."
+                            },
+                            "value": {
+                              "type": "string",
+                              "description": "Parameter value."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "value"
+                          ],
+                          "description": "A model parameter supported by list_models."
+                        }
+                      },
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "isDefault": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "params",
+                      "displayName"
+                    ],
+                    "description": "A supported model configuration."
+                  }
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "displayName"
+              ],
+              "description": "A model available to this key."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Available models."
+      }
+    },
+    {
+      "id": "cursor.list_runs",
+      "service": "cursor",
+      "name": "list_runs",
+      "description": "List a cloud session's runs, newest first, with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Page size; Cursor defaults to 20."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Use nextCursor from the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "List session runs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Run ID returned by create_agent, create_run, or list_runs (run-...)."
+                },
+                "agentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "CREATING",
+                    "RUNNING",
+                    "FINISHED",
+                    "ERROR",
+                    "CANCELLED",
+                    "EXPIRED"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Creation time.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Last update time.",
+                  "format": "date-time"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Elapsed milliseconds for a terminal run."
+                },
+                "result": {
+                  "type": "string",
+                  "description": "Final assistant reply when available."
+                },
+                "git": {
+                  "type": "object",
+                  "properties": {
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoUrl": {
+                            "type": "string",
+                            "description": "Repository host and path, without a URL scheme."
+                          },
+                          "branch": {
+                            "type": "string",
+                            "description": "Pushed branch name."
+                          },
+                          "prUrl": {
+                            "type": "string",
+                            "description": "Pull request URL.",
+                            "format": "uri"
+                          }
+                        },
+                        "additionalProperties": true,
+                        "required": [
+                          "repoUrl"
+                        ],
+                        "description": "A pushed branch."
+                      }
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Current pushed branches across the agent, shared by all of its runs."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "agentId",
+                "status",
+                "createdAt",
+                "updatedAt"
+              ],
+              "description": "One prompt execution. Poll get_run until a terminal status to read result."
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Use nextCursor from the previous page; omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "One page of runs."
+      }
+    },
+    {
+      "id": "cursor.list_team_members",
+      "service": "cursor",
+      "name": "list_team_members",
+      "description": "List team members. Requires Enterprise Admin API access.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:*"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for listing Cursor team members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teamMembers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique Cursor team member ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The team member email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The team member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The team role such as member or owner."
+                },
+                "isRemoved": {
+                  "type": "boolean",
+                  "description": "Whether this member has been removed from the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "email"
+              ],
+              "description": "A Cursor team member."
+            },
+            "description": "The Cursor team members."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by Cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamMembers",
+          "raw"
+        ],
+        "description": "The Cursor team members response."
+      }
+    },
+    {
+      "id": "cursor.unarchive_agent",
+      "service": "cursor",
+      "name": "unarchive_agent",
+      "description": "Restore an archived session so it can accept new runs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cloud agent ID returned by create_agent or list_agents (bc-...)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agentId"
+        ],
+        "description": "Identify a cloud session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Affected agent or run ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Identifier acknowledged by Cursor."
+      }
+    }
+  ]
+}

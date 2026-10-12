@@ -1,0 +1,304 @@
+{
+  "service": "bloomerang",
+  "displayName": "Bloomerang",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Private API Key",
+      "placeholder": "BLOOMERANG_API_KEY",
+      "description": "Bloomerang CRM private API key sent in the X-API-KEY header. Generate it from Profile > My Profile > API Keys 2.0: https://help.bloomerang.com/en/articles/12632849-generate-and-deactivate-private-api-keys."
+    }
+  ],
+  "homepageUrl": "https://bloomerang.com/",
+  "actions": [
+    {
+      "id": "bloomerang.get_constituent",
+      "service": "bloomerang",
+      "name": "get_constituent",
+      "description": "Get one Bloomerang constituent by its API ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "constituentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The constituent ID used by the Bloomerang API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "constituentId"
+        ],
+        "description": "The identifier of the Bloomerang constituent to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "constituent": {
+            "type": "object",
+            "properties": {
+              "Id": {
+                "type": "integer",
+                "description": "The record ID used by the Bloomerang API."
+              },
+              "Type": {
+                "type": "string",
+                "description": "The Bloomerang record type."
+              },
+              "FullName": {
+                "type": "string",
+                "description": "The display name returned for the record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One constituent or household record returned by Bloomerang."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "constituent"
+        ],
+        "description": "The constituent returned by Bloomerang."
+      }
+    },
+    {
+      "id": "bloomerang.list_constituents",
+      "service": "bloomerang",
+      "name": "list_constituents",
+      "description": "List Bloomerang constituents with pagination, identity, and modification filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip before returning results."
+          },
+          "take": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return."
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "Return constituents modified after this date and time.",
+            "format": "date-time"
+          },
+          "isFavorite": {
+            "type": "boolean",
+            "description": "Return only constituents favorited by the connected user."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Individual",
+              "Organization"
+            ],
+            "description": "Return only constituents of this type."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Bloomerang constituent API ID."
+            },
+            "description": "Return only constituents with these API IDs.",
+            "minItems": 1
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "Id",
+              "CreatedDate",
+              "LastModifiedDate"
+            ],
+            "description": "The field used to sort the results."
+          },
+          "orderDirection": {
+            "type": "string",
+            "enum": [
+              "Asc",
+              "Desc"
+            ],
+            "description": "The direction used to sort the results."
+          },
+          "customFieldId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The custom field ID used to filter constituents."
+          },
+          "customFieldValue": {
+            "type": "string",
+            "description": "The custom field value used to filter constituents."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Bloomerang constituents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "The total number of records available in Bloomerang."
+          },
+          "totalFiltered": {
+            "type": "integer",
+            "description": "The total number of records matching the supplied filters."
+          },
+          "start": {
+            "type": "integer",
+            "description": "The zero-based index of the first returned record."
+          },
+          "resultCount": {
+            "type": "integer",
+            "description": "The number of records in this response."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Id": {
+                  "type": "integer",
+                  "description": "The record ID used by the Bloomerang API."
+                },
+                "Type": {
+                  "type": "string",
+                  "description": "The Bloomerang record type."
+                },
+                "FullName": {
+                  "type": "string",
+                  "description": "The display name returned for the record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One constituent or household record returned by Bloomerang."
+            },
+            "description": "The constituent or household records in this response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "totalFiltered",
+          "start",
+          "resultCount",
+          "records"
+        ],
+        "description": "A page of records returned by Bloomerang."
+      }
+    },
+    {
+      "id": "bloomerang.search_constituents",
+      "service": "bloomerang",
+      "name": "search_constituents",
+      "description": "Search Bloomerang constituents and households by text.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip before returning results."
+          },
+          "take": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of records to return."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to search for in constituents and households."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Individual",
+              "Organization",
+              "Household"
+            ],
+            "description": "Return only records of this type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search"
+        ],
+        "description": "Text, type filter, and pagination for searching Bloomerang records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "The total number of records available in Bloomerang."
+          },
+          "totalFiltered": {
+            "type": "integer",
+            "description": "The total number of records matching the supplied filters."
+          },
+          "start": {
+            "type": "integer",
+            "description": "The zero-based index of the first returned record."
+          },
+          "resultCount": {
+            "type": "integer",
+            "description": "The number of records in this response."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Id": {
+                  "type": "integer",
+                  "description": "The record ID used by the Bloomerang API."
+                },
+                "Type": {
+                  "type": "string",
+                  "description": "The Bloomerang record type."
+                },
+                "FullName": {
+                  "type": "string",
+                  "description": "The display name returned for the record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One constituent or household record returned by Bloomerang."
+            },
+            "description": "The constituent or household records in this response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total",
+          "totalFiltered",
+          "start",
+          "resultCount",
+          "records"
+        ],
+        "description": "A page of records returned by Bloomerang."
+      }
+    }
+  ]
+}

@@ -1,0 +1,992 @@
+{
+  "service": "everhour",
+  "displayName": "Everhour",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "abcd-efgh-1234567-7890ab-cdefgh12",
+      "description": "Everhour API key used with the X-Api-Key header. Find it at the bottom of your Everhour profile page."
+    }
+  ],
+  "homepageUrl": "https://everhour.com",
+  "actions": [
+    {
+      "id": "everhour.create_time_record",
+      "service": "everhour",
+      "name": "create_time_record",
+      "description": "Create one Everhour time record with a duration, date, and optional task or user assignment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The duration to log in seconds."
+          },
+          "date": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour task ID."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Everhour user ID."
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional comment to save on the time record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time",
+          "date"
+        ],
+        "description": "Input parameters for creating one Everhour time record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeRecord": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Everhour time record ID."
+              },
+              "time": {
+                "type": "integer",
+                "description": "The tracked duration in seconds."
+              },
+              "user": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Everhour user ID."
+              },
+              "date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task name."
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour project ID."
+                    },
+                    "description": "The Everhour project IDs linked to the task."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour task record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour time record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour created time record response wrapper."
+      }
+    },
+    {
+      "id": "everhour.get_current_timer",
+      "service": "everhour",
+      "name": "get_current_timer",
+      "description": "Get the current running Everhour timer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for reading the current Everhour timer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "stopped"
+                ],
+                "description": "The Everhour timer status."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "The running duration in seconds."
+              },
+              "today": {
+                "type": "integer",
+                "description": "The total tracked time for the timer's day in seconds."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task name."
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour project ID."
+                    },
+                    "description": "The Everhour project IDs linked to the task."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour task record."
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Everhour user ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour user name."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "supervisor",
+                      "member"
+                    ],
+                    "description": "The Everhour user role."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "invited",
+                      "pending",
+                      "removed"
+                    ],
+                    "description": "The Everhour user status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour user record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour timer record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour timer response wrapper."
+      }
+    },
+    {
+      "id": "everhour.get_current_user",
+      "service": "everhour",
+      "name": "get_current_user",
+      "description": "Get the current Everhour user profile associated with the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for reading the current Everhour user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Everhour user ID."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Everhour user name."
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "admin",
+                  "supervisor",
+                  "member"
+                ],
+                "description": "The Everhour user role."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "invited",
+                  "pending",
+                  "removed"
+                ],
+                "description": "The Everhour user status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour user record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour current user response wrapper."
+      }
+    },
+    {
+      "id": "everhour.get_project",
+      "service": "everhour",
+      "name": "get_project",
+      "description": "Get one Everhour project by its project ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading one Everhour project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Everhour project ID."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Everhour project name."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour project record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour single project response wrapper."
+      }
+    },
+    {
+      "id": "everhour.get_task",
+      "service": "everhour",
+      "name": "get_task",
+      "description": "Get one Everhour task by its task ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour task ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading one Everhour task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Everhour task ID."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Everhour task name."
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour project ID."
+                },
+                "description": "The Everhour project IDs linked to the task."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour task record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour single task response wrapper."
+      }
+    },
+    {
+      "id": "everhour.list_project_tasks",
+      "service": "everhour",
+      "name": "list_project_tasks",
+      "description": "List the tasks in one Everhour project with optional paging and search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour project ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter tasks by task name text."
+          },
+          "excludeClosed": {
+            "type": "boolean",
+            "description": "Whether closed tasks should be excluded from the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Input parameters for listing tasks in one Everhour project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour task name."
+                },
+                "projects": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour project ID."
+                  },
+                  "description": "The Everhour project IDs linked to the task."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Everhour task record."
+            },
+            "description": "The Everhour tasks returned for the requested project."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour project tasks response wrapper."
+      }
+    },
+    {
+      "id": "everhour.list_projects",
+      "service": "everhour",
+      "name": "list_projects",
+      "description": "List Everhour projects with optional text, platform, and limit filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter projects by project name text."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "platform": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour platform slug used to filter integration-backed projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Everhour projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour project name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Everhour project record."
+            },
+            "description": "The Everhour projects returned for the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour projects list response wrapper."
+      }
+    },
+    {
+      "id": "everhour.list_time_records",
+      "service": "everhour",
+      "name": "list_time_records",
+      "description": "List Everhour team time records with optional date range and paging filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Everhour team time records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeRecords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Everhour time record ID."
+                },
+                "time": {
+                  "type": "integer",
+                  "description": "The tracked duration in seconds."
+                },
+                "user": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Everhour user ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour task ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour task name."
+                    },
+                    "projects": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Everhour project ID."
+                      },
+                      "description": "The Everhour project IDs linked to the task."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An Everhour task record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Everhour time record."
+            },
+            "description": "The Everhour time records returned for the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour time records response wrapper."
+      }
+    },
+    {
+      "id": "everhour.list_users",
+      "service": "everhour",
+      "name": "list_users",
+      "description": "List the users in the Everhour team that the API key can access.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Everhour users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Everhour user ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour user name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "admin",
+                    "supervisor",
+                    "member"
+                  ],
+                  "description": "The Everhour user role."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "invited",
+                    "pending",
+                    "removed"
+                  ],
+                  "description": "The Everhour user status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Everhour user record."
+            },
+            "description": "The Everhour users returned for the current team."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour users list response wrapper."
+      }
+    },
+    {
+      "id": "everhour.search_tasks",
+      "service": "everhour",
+      "name": "search_tasks",
+      "description": "Search Everhour tasks across accessible projects.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task name text to search for."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "searchInClosed": {
+            "type": "boolean",
+            "description": "Whether closed tasks should be included in the search results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Everhour tasks across projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Everhour task name."
+                },
+                "projects": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour project ID."
+                  },
+                  "description": "The Everhour project IDs linked to the task."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Everhour task record."
+            },
+            "description": "The Everhour tasks matching the search query."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour task search response wrapper."
+      }
+    },
+    {
+      "id": "everhour.start_timer",
+      "service": "everhour",
+      "name": "start_timer",
+      "description": "Start an Everhour timer for a task with an optional user date and comment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Everhour task ID."
+          },
+          "userDate": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional comment to save on the running timer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input parameters for starting an Everhour timer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "stopped"
+                ],
+                "description": "The Everhour timer status."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "The running duration in seconds."
+              },
+              "today": {
+                "type": "integer",
+                "description": "The total tracked time for the timer's day in seconds."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task name."
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour project ID."
+                    },
+                    "description": "The Everhour project IDs linked to the task."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour task record."
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Everhour user ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour user name."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "supervisor",
+                      "member"
+                    ],
+                    "description": "The Everhour user role."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "invited",
+                      "pending",
+                      "removed"
+                    ],
+                    "description": "The Everhour user status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour user record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour timer record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour timer response wrapper."
+      }
+    },
+    {
+      "id": "everhour.stop_timer",
+      "service": "everhour",
+      "name": "stop_timer",
+      "description": "Stop the current Everhour timer and return the final timer snapshot.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for stopping the current Everhour timer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "stopped"
+                ],
+                "description": "The Everhour timer status."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "The running duration in seconds."
+              },
+              "today": {
+                "type": "integer",
+                "description": "The total tracked time for the timer's day in seconds."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour task name."
+                  },
+                  "projects": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Everhour project ID."
+                    },
+                    "description": "The Everhour project IDs linked to the task."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour task record."
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Everhour user ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Everhour user name."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "supervisor",
+                      "member"
+                    ],
+                    "description": "The Everhour user role."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "invited",
+                      "pending",
+                      "removed"
+                    ],
+                    "description": "The Everhour user status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An Everhour user record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Everhour timer record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everhour timer response wrapper."
+      }
+    }
+  ]
+}

@@ -1,0 +1,2714 @@
+{
+  "service": "supportbee",
+  "displayName": "SupportBee",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "supportbee_api_token",
+      "description": "SupportBee API token sent as an Authorization Bearer token. Find it from your SupportBee desk by clicking your profile picture and then API Token: https://supportbee.com/docs/api/api",
+      "extraFields": [
+        {
+          "key": "company",
+          "label": "Company Subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-company",
+          "description": "The SupportBee desk subdomain used to build https://<company>.supportbee.com API requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://supportbee.com",
+  "actions": [
+    {
+      "id": "supportbee.add_label_to_ticket",
+      "service": "supportbee",
+      "name": "add_label_to_ticket",
+      "description": "Add an existing SupportBee label to a ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "label_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The existing SupportBee label name to add."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id",
+          "label_name"
+        ],
+        "description": "Input parameters for adding a SupportBee label to a ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee label ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee label ID."
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee label name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee label name."
+              },
+              "ticket": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee ticket ID associated with the label."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee ticket ID associated with the label."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A SupportBee label."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when adding a SupportBee label."
+      }
+    },
+    {
+      "id": "supportbee.create_ticket",
+      "service": "supportbee",
+      "name": "create_ticket",
+      "description": "Create a SupportBee ticket with JSON body content and optional email recipients.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subject of the ticket."
+          },
+          "requester_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the ticket requester."
+          },
+          "requester_email": {
+            "type": "string",
+            "description": "The email address of the ticket requester.",
+            "format": "email"
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One email address.",
+              "format": "email"
+            },
+            "description": "Email addresses sent to SupportBee.",
+            "minItems": 1
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One email address.",
+              "format": "email"
+            },
+            "description": "Email addresses sent to SupportBee.",
+            "minItems": 1
+          },
+          "notify_requester": {
+            "type": "boolean",
+            "description": "Whether SupportBee should email a copy of the ticket to the requester, CC, and BCC recipients."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The plain-text ticket body. Either text or html must be provided."
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML ticket body. Either text or html must be provided."
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive SupportBee numeric identifier."
+            },
+            "description": "SupportBee attachment IDs that were already uploaded through the SupportBee attachment API.",
+            "minItems": 1
+          },
+          "forwarding_address_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SupportBee forwarding address ID used as the sender for ticket copies or auto-responses."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for creating a SupportBee ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee ticket ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee ticket ID."
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket subject."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket subject."
+              },
+              "replies_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of replies on the ticket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of replies on the ticket."
+              },
+              "comments_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of comments on the ticket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of comments on the ticket."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket creation time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket creation time returned by SupportBee."
+              },
+              "last_activity_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket last-activity time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket last-activity time returned by SupportBee."
+              },
+              "unanswered": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is currently unanswered."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is currently unanswered."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is archived."
+              },
+              "spam": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is marked as spam."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is marked as spam."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A label name."
+                },
+                "description": "The label names returned with the ticket."
+              },
+              "requester": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The ticket, reply, or comment content object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket, reply, or comment content object returned by SupportBee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee ticket."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a SupportBee ticket."
+      }
+    },
+    {
+      "id": "supportbee.create_ticket_comment",
+      "service": "supportbee",
+      "name": "create_ticket_comment",
+      "description": "Create a SupportBee ticket comment with JSON body content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The plain-text comment body. Either text or html must be provided."
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML comment body. Either text or html must be provided."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "Input fields for creating a SupportBee ticket comment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee comment ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee comment ID."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The comment creation time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The comment creation time returned by SupportBee."
+              },
+              "commenter": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The ticket, reply, or comment content object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket, reply, or comment content object returned by SupportBee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee ticket comment."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a SupportBee ticket comment."
+      }
+    },
+    {
+      "id": "supportbee.create_ticket_reply",
+      "service": "supportbee",
+      "name": "create_ticket_reply",
+      "description": "Create a SupportBee ticket reply with JSON body content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The plain-text reply body. Either text or html must be provided."
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML reply body. Either text or html must be provided."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One email address.",
+              "format": "email"
+            },
+            "description": "Email addresses sent to SupportBee.",
+            "minItems": 1
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One email address.",
+              "format": "email"
+            },
+            "description": "Email addresses sent to SupportBee.",
+            "minItems": 1
+          },
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive SupportBee numeric identifier."
+            },
+            "description": "SupportBee attachment IDs that were already uploaded through the SupportBee attachment API.",
+            "minItems": 1
+          },
+          "on_behalf_of": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive SupportBee numeric identifier."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address of the agent to reply on behalf of.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The SupportBee agent to reply on behalf of. Admin rights are required upstream."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "Input fields for creating a SupportBee ticket reply."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee reply ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee reply ID."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reply creation time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reply creation time returned by SupportBee."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reply summary returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reply summary returned by SupportBee."
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A CC email address."
+                },
+                "description": "The CC email addresses returned with the reply."
+              },
+              "bcc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A BCC email address."
+                },
+                "description": "The BCC email addresses returned with the reply."
+              },
+              "replier": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The ticket, reply, or comment content object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket, reply, or comment content object returned by SupportBee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee ticket reply."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a SupportBee ticket reply."
+      }
+    },
+    {
+      "id": "supportbee.create_user",
+      "service": "supportbee",
+      "name": "create_user",
+      "description": "Create a SupportBee user or customer group.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The user email address. Required when type is user or omitted.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user or customer group name."
+          },
+          "role": {
+            "type": "integer",
+            "description": "The SupportBee role value: 9 for Collaborator, 10 for Agent, or 20 for Admin."
+          },
+          "team_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive SupportBee numeric identifier."
+            },
+            "description": "SupportBee team IDs to associate with the user.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "customer_group"
+            ],
+            "description": "Whether to create or update a user or customer group."
+          },
+          "can_members_access_group_tickets": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether customer group members can access group tickets from the portal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether customer group members can access group tickets from the portal."
+          },
+          "email_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An email domain."
+            },
+            "description": "Email domains whose users should automatically join the customer group.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input fields for creating or updating a SupportBee user or customer group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee user or customer group ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user or customer group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee user type when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user type when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user email address when returned."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user or customer group display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user or customer group display name."
+              },
+              "role": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee role string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee role string when returned."
+              },
+              "agent": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether SupportBee marks the user as an agent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether SupportBee marks the user as an agent."
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A SupportBee team object."
+                },
+                "description": "The teams returned with the user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee user or customer group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a SupportBee user."
+      }
+    },
+    {
+      "id": "supportbee.get_ticket",
+      "service": "supportbee",
+      "name": "get_ticket",
+      "description": "Retrieve a SupportBee ticket by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving a SupportBee ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee ticket ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee ticket ID."
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket subject."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket subject."
+              },
+              "replies_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of replies on the ticket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of replies on the ticket."
+              },
+              "comments_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of comments on the ticket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of comments on the ticket."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket creation time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket creation time returned by SupportBee."
+              },
+              "last_activity_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ticket last-activity time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket last-activity time returned by SupportBee."
+              },
+              "unanswered": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is currently unanswered."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is currently unanswered."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is archived."
+              },
+              "spam": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the ticket is marked as spam."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the ticket is marked as spam."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A label name."
+                },
+                "description": "The label names returned with the ticket."
+              },
+              "requester": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The ticket, reply, or comment content object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket, reply, or comment content object returned by SupportBee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee ticket."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a SupportBee ticket."
+      }
+    },
+    {
+      "id": "supportbee.get_ticket_reply",
+      "service": "supportbee",
+      "name": "get_ticket_reply",
+      "description": "Retrieve one SupportBee ticket reply by ticket ID and reply ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "reply_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id",
+          "reply_id"
+        ],
+        "description": "Input parameters for retrieving a SupportBee ticket reply."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee reply ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee reply ID."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reply creation time returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reply creation time returned by SupportBee."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reply summary returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reply summary returned by SupportBee."
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A CC email address."
+                },
+                "description": "The CC email addresses returned with the reply."
+              },
+              "bcc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A BCC email address."
+                },
+                "description": "The BCC email addresses returned with the reply."
+              },
+              "replier": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The ticket, reply, or comment content object returned by SupportBee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ticket, reply, or comment content object returned by SupportBee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee ticket reply."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a SupportBee ticket reply."
+      }
+    },
+    {
+      "id": "supportbee.get_user",
+      "service": "supportbee",
+      "name": "get_user",
+      "description": "Retrieve one SupportBee user or customer group by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "max_tickets": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of tickets SupportBee should include for the user."
+              },
+              {
+                "const": false,
+                "type": "boolean",
+                "description": "Request all tickets for the user."
+              }
+            ],
+            "description": "The maximum number of tickets SupportBee should include for the user, or false to request all tickets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving a SupportBee user or customer group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee user or customer group ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user or customer group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee user type when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user type when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user email address when returned."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user or customer group display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user or customer group display name."
+              },
+              "role": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee role string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee role string when returned."
+              },
+              "agent": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether SupportBee marks the user as an agent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether SupportBee marks the user as an agent."
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A SupportBee team object."
+                },
+                "description": "The teams returned with the user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee user or customer group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a SupportBee user."
+      }
+    },
+    {
+      "id": "supportbee.list_labels",
+      "service": "supportbee",
+      "name": "list_labels",
+      "description": "List custom SupportBee labels for the connected desk.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing SupportBee labels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee label ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee label ID."
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The SupportBee label name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee label name."
+                },
+                "ticket": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee ticket ID associated with the label."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee ticket ID associated with the label."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SupportBee label."
+            },
+            "description": "The labels returned by SupportBee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee labels."
+      }
+    },
+    {
+      "id": "supportbee.list_teams",
+      "service": "supportbee",
+      "name": "list_teams",
+      "description": "List SupportBee teams with optional user expansion filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "with_users": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include users in each team."
+          },
+          "user": {
+            "type": "string",
+            "enum": [
+              "me"
+            ],
+            "description": "The SupportBee user filter. Official docs currently support me."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input filters for listing SupportBee teams."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee team ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee team ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The SupportBee team name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee team name."
+                },
+                "users": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw object returned by SupportBee."
+                  },
+                  "description": "The users returned with the team when requested."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee team."
+            },
+            "description": "The teams returned by SupportBee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee teams."
+      }
+    },
+    {
+      "id": "supportbee.list_ticket_comments",
+      "service": "supportbee",
+      "name": "list_ticket_comments",
+      "description": "List comments for a SupportBee ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "Input parameters for listing SupportBee ticket comments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee comment ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee comment ID."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The comment creation time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The comment creation time returned by SupportBee."
+                },
+                "commenter": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The ticket, reply, or comment content object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket, reply, or comment content object returned by SupportBee."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee ticket comment."
+            },
+            "description": "The comments returned by SupportBee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee ticket comments."
+      }
+    },
+    {
+      "id": "supportbee.list_ticket_replies",
+      "service": "supportbee",
+      "name": "list_ticket_replies",
+      "description": "List replies for a SupportBee ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "Input parameters for listing SupportBee ticket replies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee reply ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee reply ID."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reply creation time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reply creation time returned by SupportBee."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reply summary returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reply summary returned by SupportBee."
+                },
+                "cc": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A CC email address."
+                  },
+                  "description": "The CC email addresses returned with the reply."
+                },
+                "bcc": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A BCC email address."
+                  },
+                  "description": "The BCC email addresses returned with the reply."
+                },
+                "replier": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The ticket, reply, or comment content object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket, reply, or comment content object returned by SupportBee."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee ticket reply."
+            },
+            "description": "The replies returned by SupportBee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee ticket replies."
+      }
+    },
+    {
+      "id": "supportbee.list_tickets",
+      "service": "supportbee",
+      "name": "list_tickets",
+      "description": "List SupportBee tickets with optional official ticket filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "The number of records to retrieve. SupportBee requires this to be less than 100."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based SupportBee page number to retrieve."
+          },
+          "archived": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false",
+              "any"
+            ],
+            "description": "How SupportBee should include archived tickets: true, false, or any."
+          },
+          "spam": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include tickets marked as spam."
+          },
+          "trash": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include trashed tickets."
+          },
+          "replies": {
+            "type": "boolean",
+            "description": "Whether SupportBee should return only tickets with replies or only tickets without replies."
+          },
+          "max_replies": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The exact number of replies a ticket must have."
+          },
+          "assigned_user": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SupportBee assigned_user filter such as me, any, none, or an agent ID."
+          },
+          "assigned_team": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SupportBee assigned_team filter such as mine, none, or a team ID."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SupportBee label name used to filter tickets."
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A SupportBee date, date-time, or timestamp lower bound for ticket activity."
+          },
+          "until": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A SupportBee date, date-time, or timestamp upper bound for ticket activity."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "last_activity",
+              "creation_time"
+            ],
+            "description": "The SupportBee ticket sort mode."
+          },
+          "requester_emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One email address.",
+              "format": "email"
+            },
+            "description": "Email addresses sent to SupportBee.",
+            "minItems": 1
+          },
+          "total_only": {
+            "type": "boolean",
+            "description": "Whether SupportBee should return only the total ticket count."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input filters for listing SupportBee tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee ticket ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee ticket ID."
+                },
+                "subject": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket subject."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket subject."
+                },
+                "replies_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of replies on the ticket."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of replies on the ticket."
+                },
+                "comments_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of comments on the ticket."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of comments on the ticket."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket creation time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket creation time returned by SupportBee."
+                },
+                "last_activity_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket last-activity time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket last-activity time returned by SupportBee."
+                },
+                "unanswered": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is currently unanswered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is currently unanswered."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is archived."
+                },
+                "spam": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is marked as spam."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is marked as spam."
+                },
+                "labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A label name."
+                  },
+                  "description": "The label names returned with the ticket."
+                },
+                "requester": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The ticket, reply, or comment content object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket, reply, or comment content object returned by SupportBee."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee ticket."
+            },
+            "description": "The tickets returned by SupportBee."
+          },
+          "current_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current SupportBee page number when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current SupportBee page number when returned."
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The SupportBee page size when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SupportBee page size when returned."
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of SupportBee pages when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of SupportBee pages when returned."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of SupportBee tickets when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of SupportBee tickets when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee tickets."
+      }
+    },
+    {
+      "id": "supportbee.list_users",
+      "service": "supportbee",
+      "name": "list_users",
+      "description": "List SupportBee users and customer groups.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "with_invited": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include invited users."
+          },
+          "with_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "agent",
+                "collaborator",
+                "customer"
+              ],
+              "description": "A SupportBee user role."
+            },
+            "description": "Role names SupportBee should include, sent as a comma-separated with_roles query value.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "customer_group"
+            ],
+            "description": "The SupportBee user type filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input filters for listing SupportBee users and customer groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee user or customer group ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee user or customer group ID."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The SupportBee user type when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee user type when returned."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user email address when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user email address when returned."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user or customer group display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user or customer group display name."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The SupportBee role string when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee role string when returned."
+                },
+                "agent": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether SupportBee marks the user as an agent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether SupportBee marks the user as an agent."
+                },
+                "teams": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A SupportBee team object."
+                  },
+                  "description": "The teams returned with the user."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee user or customer group."
+            },
+            "description": "The users and customer groups returned by SupportBee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee users."
+      }
+    },
+    {
+      "id": "supportbee.remove_label_from_ticket",
+      "service": "supportbee",
+      "name": "remove_label_from_ticket",
+      "description": "Remove a SupportBee label from a ticket.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "label_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SupportBee label name to remove."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id",
+          "label_name"
+        ],
+        "description": "Input parameters for removing a SupportBee label from a ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the label operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when removing a SupportBee label."
+      }
+    },
+    {
+      "id": "supportbee.search_tickets",
+      "service": "supportbee",
+      "name": "search_tickets",
+      "description": "Search SupportBee tickets by query text with optional pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SupportBee ticket search query."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99,
+            "description": "The number of records to retrieve. SupportBee requires this to be less than 100."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based SupportBee page number to retrieve."
+          },
+          "spam": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include tickets marked as spam."
+          },
+          "trash": {
+            "type": "boolean",
+            "description": "Whether SupportBee should include trashed tickets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching SupportBee tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The SupportBee ticket ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SupportBee ticket ID."
+                },
+                "subject": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket subject."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket subject."
+                },
+                "replies_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of replies on the ticket."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of replies on the ticket."
+                },
+                "comments_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of comments on the ticket."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of comments on the ticket."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket creation time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket creation time returned by SupportBee."
+                },
+                "last_activity_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ticket last-activity time returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket last-activity time returned by SupportBee."
+                },
+                "unanswered": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is currently unanswered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is currently unanswered."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is archived."
+                },
+                "spam": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the ticket is marked as spam."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the ticket is marked as spam."
+                },
+                "labels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A label name."
+                  },
+                  "description": "The label names returned with the ticket."
+                },
+                "requester": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user, requester, agent, commenter, or replier object returned by SupportBee."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The ticket, reply, or comment content object returned by SupportBee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ticket, reply, or comment content object returned by SupportBee."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by SupportBee."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized SupportBee ticket."
+            },
+            "description": "The tickets returned by SupportBee."
+          },
+          "current_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current SupportBee page number when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current SupportBee page number when returned."
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The SupportBee page size when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SupportBee page size when returned."
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of SupportBee pages when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of SupportBee pages when returned."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of SupportBee tickets when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of SupportBee tickets when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing SupportBee tickets."
+      }
+    },
+    {
+      "id": "supportbee.update_user",
+      "service": "supportbee",
+      "name": "update_user",
+      "description": "Update a SupportBee user or customer group by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A positive SupportBee numeric identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user email address. Required when type is user or omitted.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user or customer group name."
+          },
+          "role": {
+            "type": "integer",
+            "description": "The SupportBee role value: 9 for Collaborator, 10 for Agent, or 20 for Admin."
+          },
+          "team_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive SupportBee numeric identifier."
+            },
+            "description": "SupportBee team IDs to associate with the user.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "customer_group"
+            ],
+            "description": "Whether to update a user or customer group."
+          },
+          "can_members_access_group_tickets": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether customer group members can access group tickets from the portal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether customer group members can access group tickets from the portal."
+          },
+          "email_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An email domain."
+            },
+            "description": "Email domains whose users should automatically join the customer group.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "Input parameters for updating a SupportBee user or customer group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The SupportBee user or customer group ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user or customer group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee user type when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee user type when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user email address when returned."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user or customer group display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user or customer group display name."
+              },
+              "role": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The SupportBee role string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The SupportBee role string when returned."
+              },
+              "agent": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether SupportBee marks the user as an agent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether SupportBee marks the user as an agent."
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A SupportBee team object."
+                },
+                "description": "The teams returned with the user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by SupportBee."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized SupportBee user or customer group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by SupportBee."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when updating a SupportBee user."
+      }
+    }
+  ]
+}

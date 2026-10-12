@@ -1,0 +1,877 @@
+{
+  "service": "subvisory",
+  "displayName": "Subvisory",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "subvisory_api_key",
+      "description": "Subvisory API key sent with the X-API-Key header. Generate or copy it from Settings > API Keys in Subvisory: https://www.subvisory.com/api/v1/docs."
+    }
+  ],
+  "homepageUrl": "https://www.subvisory.com",
+  "actions": [
+    {
+      "id": "subvisory.create_category",
+      "service": "subvisory",
+      "name": "create_category",
+      "description": "Create a category in Subvisory.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Category name."
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color code for UI display.",
+            "default": "#6366f1",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Icon identifier, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Icon identifier, or null to clear it."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is a default category.",
+            "default": false
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Sort position for UI ordering.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating a Subvisory category."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory category response."
+      }
+    },
+    {
+      "id": "subvisory.create_payment_method",
+      "service": "subvisory",
+      "name": "create_payment_method",
+      "description": "Create a payment method in Subvisory.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display label for the payment method."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Payment type such as credit_card or bank_transfer, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Payment type such as credit_card or bank_transfer, or null to clear it."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Icon identifier, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Icon identifier, or null to clear it."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Sort position for UI ordering.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "description": "Input parameters for creating a Subvisory payment method."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory payment method response."
+      }
+    },
+    {
+      "id": "subvisory.create_subscription",
+      "service": "subvisory",
+      "name": "create_subscription",
+      "description": "Create a subscription in Subvisory.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Subscription name."
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost per billing cycle as a decimal string."
+              },
+              {
+                "type": "number",
+                "description": "Cost per billing cycle as a number."
+              }
+            ],
+            "description": "Cost per billing cycle as a string or number."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "ISO 4217 currency code.",
+            "default": "USD"
+          },
+          "billingCycle": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "biannual",
+              "yearly",
+              "custom"
+            ],
+            "description": "How often the subscription is billed.",
+            "default": "monthly"
+          },
+          "customCycleDays": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days per cycle when billingCycle is custom."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 date or timestamp accepted by Subvisory."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "trial",
+              "paused",
+              "cancelled",
+              "lifetime"
+            ],
+            "description": "Current subscription status.",
+            "default": "active"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Category ID, or null to unassign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Category ID, or null to unassign."
+          },
+          "paymentMethodId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Payment method ID, or null to unassign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Payment method ID, or null to unassign."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Free-text notes, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free-text notes, or null to clear it."
+          },
+          "cancellationReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Reason for cancellation, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason for cancellation, or null to clear it."
+          },
+          "logoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Custom logo URL, empty string, or null.",
+                "format": "uri"
+              },
+              {
+                "const": "",
+                "type": "string",
+                "description": "Empty string clears the value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom logo URL, empty string, or null."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Service URL, empty string, or null.",
+                "format": "uri"
+              },
+              {
+                "const": "",
+                "type": "string",
+                "description": "Empty string clears the value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Service URL, empty string, or null."
+          },
+          "autoRenew": {
+            "type": "boolean",
+            "description": "Whether the subscription auto-renews.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "cost",
+          "startDate"
+        ],
+        "description": "Input parameters for creating a Subvisory subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory subscription response."
+      }
+    },
+    {
+      "id": "subvisory.delete_category",
+      "service": "subvisory",
+      "name": "delete_category",
+      "description": "Delete a Subvisory category.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates the operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Subvisory success response."
+      }
+    },
+    {
+      "id": "subvisory.delete_payment_method",
+      "service": "subvisory",
+      "name": "delete_payment_method",
+      "description": "Delete a Subvisory payment method.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates the operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Subvisory success response."
+      }
+    },
+    {
+      "id": "subvisory.delete_subscription",
+      "service": "subvisory",
+      "name": "delete_subscription",
+      "description": "Delete a Subvisory subscription.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Indicates the operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Subvisory success response."
+      }
+    },
+    {
+      "id": "subvisory.get_category",
+      "service": "subvisory",
+      "name": "get_category",
+      "description": "Retrieve a Subvisory category by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory category response."
+      }
+    },
+    {
+      "id": "subvisory.get_payment_method",
+      "service": "subvisory",
+      "name": "get_payment_method",
+      "description": "Retrieve a Subvisory payment method by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory payment method response."
+      }
+    },
+    {
+      "id": "subvisory.get_subscription",
+      "service": "subvisory",
+      "name": "get_subscription",
+      "description": "Retrieve a Subvisory subscription by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Subvisory resource lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory subscription response."
+      }
+    },
+    {
+      "id": "subvisory.list_categories",
+      "service": "subvisory",
+      "name": "list_categories",
+      "description": "List all Subvisory categories.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "description": "Subvisory category list response."
+        },
+        "additionalProperties": true,
+        "description": "Subvisory category list response."
+      }
+    },
+    {
+      "id": "subvisory.list_payment_methods",
+      "service": "subvisory",
+      "name": "list_payment_methods",
+      "description": "List all Subvisory payment methods.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "description": "Subvisory payment method list response."
+        },
+        "additionalProperties": true,
+        "description": "Subvisory payment method list response."
+      }
+    },
+    {
+      "id": "subvisory.list_subscriptions",
+      "service": "subvisory",
+      "name": "list_subscriptions",
+      "description": "List all subscriptions from Subvisory.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "description": "Subvisory subscription list response."
+        },
+        "additionalProperties": true,
+        "description": "Subvisory subscription list response."
+      }
+    },
+    {
+      "id": "subvisory.update_category",
+      "service": "subvisory",
+      "name": "update_category",
+      "description": "Update a Subvisory category.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Category name."
+          },
+          "color": {
+            "type": "string",
+            "description": "Hex color code for UI display.",
+            "default": "#6366f1",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Icon identifier, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Icon identifier, or null to clear it."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is a default category.",
+            "default": false
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Sort position for UI ordering.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating a Subvisory category."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory category response."
+      }
+    },
+    {
+      "id": "subvisory.update_payment_method",
+      "service": "subvisory",
+      "name": "update_payment_method",
+      "description": "Update a Subvisory payment method.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Display label for the payment method."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Payment type such as credit_card or bank_transfer, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Payment type such as credit_card or bank_transfer, or null to clear it."
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Icon identifier, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Icon identifier, or null to clear it."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Sort position for UI ordering.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating a Subvisory payment method."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory payment method response."
+      }
+    },
+    {
+      "id": "subvisory.update_subscription",
+      "service": "subvisory",
+      "name": "update_subscription",
+      "description": "Update a Subvisory subscription.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique Subvisory resource ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Subscription name."
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost per billing cycle as a decimal string."
+              },
+              {
+                "type": "number",
+                "description": "Cost per billing cycle as a number."
+              }
+            ],
+            "description": "Cost per billing cycle as a string or number."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "ISO 4217 currency code.",
+            "default": "USD"
+          },
+          "billingCycle": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "biannual",
+              "yearly",
+              "custom"
+            ],
+            "description": "How often the subscription is billed.",
+            "default": "monthly"
+          },
+          "customCycleDays": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days per cycle when billingCycle is custom."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 date or timestamp accepted by Subvisory."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "trial",
+              "paused",
+              "cancelled",
+              "lifetime"
+            ],
+            "description": "Current subscription status.",
+            "default": "active"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Category ID, or null to unassign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Category ID, or null to unassign."
+          },
+          "paymentMethodId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Payment method ID, or null to unassign."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Payment method ID, or null to unassign."
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Free-text notes, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free-text notes, or null to clear it."
+          },
+          "cancellationReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Reason for cancellation, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason for cancellation, or null to clear it."
+          },
+          "logoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Custom logo URL, empty string, or null.",
+                "format": "uri"
+              },
+              {
+                "const": "",
+                "type": "string",
+                "description": "Empty string clears the value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom logo URL, empty string, or null."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Service URL, empty string, or null.",
+                "format": "uri"
+              },
+              {
+                "const": "",
+                "type": "string",
+                "description": "Empty string clears the value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Service URL, empty string, or null."
+          },
+          "autoRenew": {
+            "type": "boolean",
+            "description": "Whether the subscription auto-renews.",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating a Subvisory subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Subvisory subscription response."
+      }
+    }
+  ]
+}

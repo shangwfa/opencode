@@ -1,0 +1,510 @@
+{
+  "service": "terminus_app",
+  "displayName": "Terminus App",
+  "description": "Manage Terminus App short links, projects, tags, and analytics.",
+  "categories": [
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_API_KEY",
+      "description": "Terminus App API key used as the HTTP Basic username. Create and copy it from Account Settings > API Keys: https://app.terminusapp.com/account/api_keys"
+    }
+  ],
+  "homepageUrl": "https://www.terminusapp.com/",
+  "actions": [
+    {
+      "id": "terminus_app.create_link",
+      "service": "terminus_app",
+      "name": "create_link",
+      "description": "Create a tagged and optionally shortened link in a Terminus project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 5,
+            "description": "The Terminus project ID, starting with prj_.",
+            "pattern": "^prj_"
+          },
+          "url": {
+            "type": "string",
+            "description": "The destination URL.",
+            "format": "uri"
+          },
+          "convention": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The convention ID."
+              },
+              "inputFields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "integer",
+                      "description": "The convention field ID."
+                    },
+                    "inputValue": {
+                      "type": "string",
+                      "description": "The input value for the convention field."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A value supplied for one convention field."
+                },
+                "description": "Values for the convention fields.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "A convention and the values for its fields."
+          },
+          "utm": {
+            "type": "object",
+            "properties": {
+              "campaign": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "The UTM parameter value."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A UTM parameter value."
+              },
+              "medium": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "The UTM parameter value."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A UTM parameter value."
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "The UTM parameter value."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A UTM parameter value."
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "The UTM parameter value."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A UTM parameter value."
+              },
+              "term": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "description": "The UTM parameter value."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A UTM parameter value."
+              }
+            },
+            "additionalProperties": false,
+            "description": "UTM values not supplied by a convention."
+          },
+          "custom": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string",
+                  "description": "The UTM parameter value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A UTM parameter value."
+            },
+            "description": "Values keyed by the configured Terminus field or custom parameter name."
+          },
+          "info": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string",
+                  "description": "The UTM parameter value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A UTM parameter value."
+            },
+            "description": "Values keyed by the configured Terminus field or custom parameter name."
+          },
+          "labelNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A label name."
+            },
+            "description": "Labels to apply to the link."
+          },
+          "description": {
+            "type": "string",
+            "description": "A description for the link."
+          },
+          "skipMonitoring": {
+            "type": "boolean",
+            "description": "Whether to skip URL monitoring."
+          },
+          "shortUrlKey": {
+            "type": "string",
+            "description": "A custom short URL key."
+          },
+          "skipUrlValidation": {
+            "type": "boolean",
+            "description": "Whether to skip destination URL validation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "url"
+        ],
+        "description": "The tracked link to create in a Terminus project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The link ID."
+              },
+              "url": {
+                "type": "string",
+                "description": "The destination URL."
+              },
+              "long_url": {
+                "type": "string",
+                "description": "The destination URL with generated tracking parameters."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A tracked Terminus link."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Terminus link."
+      }
+    },
+    {
+      "id": "terminus_app.get_convention",
+      "service": "terminus_app",
+      "name": "get_convention",
+      "description": "Get a Terminus convention and its field definitions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 5,
+            "description": "The Terminus project ID, starting with prj_.",
+            "pattern": "^prj_"
+          },
+          "conventionId": {
+            "type": "integer",
+            "description": "The convention ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Terminus convention to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "convention": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The convention ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The convention name."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Terminus convention and its field definitions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Terminus convention response."
+      }
+    },
+    {
+      "id": "terminus_app.list_conventions",
+      "service": "terminus_app",
+      "name": "list_conventions",
+      "description": "List tracking conventions configured for a Terminus project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 5,
+            "description": "The Terminus project ID, starting with prj_.",
+            "pattern": "^prj_"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "A Terminus project and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conventions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The convention ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The convention name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Terminus convention summary."
+            },
+            "description": "Conventions returned by Terminus."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Terminus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Terminus conventions."
+      }
+    },
+    {
+      "id": "terminus_app.list_links",
+      "service": "terminus_app",
+      "name": "list_links",
+      "description": "List tracked links in a Terminus project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 5,
+            "description": "The Terminus project ID, starting with prj_.",
+            "pattern": "^prj_"
+          },
+          "createdAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Return links created after this Unix timestamp."
+          },
+          "updatedAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Return links updated after this Unix timestamp."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Filters and pagination options for listing Terminus links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The link ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The destination URL."
+                },
+                "long_url": {
+                  "type": "string",
+                  "description": "The destination URL with generated tracking parameters."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A tracked Terminus link."
+            },
+            "description": "Links returned by Terminus."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Terminus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Terminus links."
+      }
+    },
+    {
+      "id": "terminus_app.list_projects",
+      "service": "terminus_app",
+      "name": "list_projects",
+      "description": "List the Terminus projects available to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Terminus projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The permanent project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Terminus project."
+            },
+            "description": "Projects returned by Terminus."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Terminus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Terminus projects."
+      }
+    }
+  ]
+}

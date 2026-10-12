@@ -1,0 +1,381 @@
+{
+  "service": "tpscheck",
+  "displayName": "TPSCheck",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TPSCHECK_API_KEY",
+      "description": "TPSCheck API key sent with the Authorization Token header. Retrieve it from your profile page: https://www.tpscheck.uk/profile/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.tpscheck.uk",
+  "actions": [
+    {
+      "id": "tpscheck.batch_check_phones",
+      "service": "tpscheck",
+      "name": "batch_check_phones",
+      "description": "Check up to 100 UK phone numbers against TPS and CTPS and return the TPSCheck v2 batch response.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phones": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One UK phone number to check with TPSCheck."
+            },
+            "description": "List of 1 to 100 UK phone numbers to check with TPSCheck.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phones"
+        ],
+        "description": "Input payload for checking up to 100 UK phone numbers with TPSCheck v2."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Number of results returned by TPSCheck."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Phone number as submitted to TPSCheck."
+                },
+                "e164": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "E.164 formatted phone number returned by TPSCheck."
+                },
+                "valid": {
+                  "type": "boolean",
+                  "description": "Whether TPSCheck considers the phone number valid."
+                },
+                "line": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Line type returned by TPSCheck, such as landline or mobile."
+                    },
+                    "original_carrier": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Original carrier name returned by TPSCheck for the phone number."
+                    },
+                    "location": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Location returned by TPSCheck for the phone number."
+                    },
+                    "country": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Country or nation name returned by TPSCheck."
+                    },
+                    "prefix": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Dialling prefix returned by TPSCheck for the phone number."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Line details returned by TPSCheck in the v2 phone check response."
+                },
+                "reachability": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Reachability status returned by TPSCheck."
+                    },
+                    "confidence": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Reachability confidence returned by TPSCheck."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Reachability details returned by TPSCheck in the v2 phone check response."
+                },
+                "tps": {
+                  "type": "boolean",
+                  "description": "Whether the number is registered with the TPS."
+                },
+                "ctps": {
+                  "type": "boolean",
+                  "description": "Whether the number is registered with the CTPS."
+                },
+                "risk": {
+                  "type": "object",
+                  "properties": {
+                    "score": {
+                      "type": "integer",
+                      "description": "Compliance risk score returned by TPSCheck."
+                    },
+                    "level": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Risk level returned by TPSCheck, such as LOW or CRITICAL."
+                    },
+                    "factors": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "One textual risk factor returned by TPSCheck."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "One textual risk factor returned by TPSCheck."
+                          },
+                          "description": "List of risk factors returned by TPSCheck."
+                        }
+                      ],
+                      "description": "Risk factors returned by TPSCheck when risk scoring is available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Risk scoring block returned by TPSCheck v2 plans when available."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "input",
+                "valid"
+              ],
+              "description": "Normalized TPSCheck v2 result for one phone number."
+            },
+            "description": "Batch TPSCheck v2 results for each submitted phone number."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "total",
+          "results"
+        ],
+        "description": "TPSCheck v2 batch response for multiple phone numbers."
+      }
+    },
+    {
+      "id": "tpscheck.check_phone",
+      "service": "tpscheck",
+      "name": "check_phone",
+      "description": "Check one UK phone number against TPS and CTPS and return the TPSCheck v2 response.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "UK phone number to check with TPSCheck."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone"
+        ],
+        "description": "Input payload for checking one UK phone number with TPSCheck v2."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Phone number as submitted to TPSCheck."
+          },
+          "e164": {
+            "type": "string",
+            "minLength": 1,
+            "description": "E.164 formatted phone number returned by TPSCheck."
+          },
+          "valid": {
+            "type": "boolean",
+            "description": "Whether TPSCheck considers the phone number valid."
+          },
+          "line": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Line type returned by TPSCheck, such as landline or mobile."
+              },
+              "original_carrier": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Original carrier name returned by TPSCheck for the phone number."
+              },
+              "location": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Location returned by TPSCheck for the phone number."
+              },
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Country or nation name returned by TPSCheck."
+              },
+              "prefix": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Dialling prefix returned by TPSCheck for the phone number."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Line details returned by TPSCheck in the v2 phone check response."
+          },
+          "reachability": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Reachability status returned by TPSCheck."
+              },
+              "confidence": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Reachability confidence returned by TPSCheck."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Reachability details returned by TPSCheck in the v2 phone check response."
+          },
+          "tps": {
+            "type": "boolean",
+            "description": "Whether the number is registered with the TPS."
+          },
+          "ctps": {
+            "type": "boolean",
+            "description": "Whether the number is registered with the CTPS."
+          },
+          "risk": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "integer",
+                "description": "Compliance risk score returned by TPSCheck."
+              },
+              "level": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Risk level returned by TPSCheck, such as LOW or CRITICAL."
+              },
+              "factors": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One textual risk factor returned by TPSCheck."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One textual risk factor returned by TPSCheck."
+                    },
+                    "description": "List of risk factors returned by TPSCheck."
+                  }
+                ],
+                "description": "Risk factors returned by TPSCheck when risk scoring is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Risk scoring block returned by TPSCheck v2 plans when available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "input",
+          "valid"
+        ],
+        "description": "Normalized TPSCheck v2 result for one phone number."
+      }
+    },
+    {
+      "id": "tpscheck.get_credits",
+      "service": "tpscheck",
+      "name": "get_credits",
+      "description": "Retrieve current TPSCheck usage, remaining requests, and plan reset details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input payload for retrieving the current TPSCheck credits summary."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requests_used": {
+            "type": "integer",
+            "description": "Number of API requests used in the current billing period."
+          },
+          "requests_remaining": {
+            "type": "integer",
+            "description": "Number of API requests remaining in the current billing period."
+          },
+          "monthly_limit": {
+            "type": "integer",
+            "description": "Monthly request limit for the current TPSCheck plan."
+          },
+          "plan": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Current TPSCheck subscription plan name."
+          },
+          "reset_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 timestamp when TPSCheck usage resets."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "requests_used",
+          "requests_remaining",
+          "monthly_limit",
+          "plan",
+          "reset_date"
+        ],
+        "description": "Current TPSCheck credits and usage summary."
+      }
+    }
+  ]
+}

@@ -1,0 +1,613 @@
+{
+  "service": "lifx",
+  "displayName": "LIFX",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "LIFX_ACCESS_TOKEN",
+      "description": "LIFX access token sent with the Authorization Bearer header. Generate or view access tokens in LIFX Cloud settings: https://cloud.lifx.com/settings."
+    }
+  ],
+  "homepageUrl": "https://www.lifx.com",
+  "actions": [
+    {
+      "id": "lifx.activate_scene",
+      "service": "lifx",
+      "name": "activate_scene",
+      "description": "Activate a LIFX scene by UUID, optionally overriding or ignoring state fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sceneUuid": {
+            "type": "string",
+            "description": "The UUID of the LIFX scene to activate.",
+            "format": "uuid"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The transition duration in seconds."
+          },
+          "ignore": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "power",
+                "infrared",
+                "duration",
+                "intensity",
+                "hue",
+                "saturation",
+                "brightness",
+                "kelvin"
+              ],
+              "description": "A scene state field to ignore."
+            },
+            "description": "Scene state fields LIFX should not change when applying the scene."
+          },
+          "overrides": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A LIFX state object to apply to all devices in the scene, overriding the scene configuration."
+          },
+          "fast": {
+            "type": "boolean",
+            "description": "Whether to use LIFX fast mode and return as soon as the request is accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sceneUuid"
+        ],
+        "description": "Input parameters for activating a LIFX scene."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether LIFX accepted the request without returning per-light results."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LIFX light id."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The LIFX light label."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The operation status returned by LIFX."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One result returned by LIFX for a light control operation."
+            },
+            "description": "The per-light operation results returned by LIFX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "results"
+        ],
+        "description": "The normalized LIFX operation response."
+      }
+    },
+    {
+      "id": "lifx.list_lights",
+      "service": "lifx",
+      "name": "list_lights",
+      "description": "List LIFX lights visible to the API token, optionally limited by a selector.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX selector to address lights, such as `all`, `id:d073d5141876`, `group:Kitchen`, or a comma-separated selector list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing LIFX lights."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LIFX light id."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The LIFX light UUID."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The user-visible light label."
+                },
+                "connected": {
+                  "type": "boolean",
+                  "description": "Whether the light is connected."
+                },
+                "power": {
+                  "type": "string",
+                  "description": "The light power state."
+                },
+                "color": {
+                  "type": "object",
+                  "properties": {
+                    "hue": {
+                      "type": "number",
+                      "description": "The color hue value."
+                    },
+                    "saturation": {
+                      "type": "number",
+                      "description": "The color saturation value."
+                    },
+                    "kelvin": {
+                      "type": "integer",
+                      "description": "The color temperature in kelvin."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The color state returned by LIFX."
+                },
+                "brightness": {
+                  "type": "number",
+                  "description": "The light brightness from 0.0 to 1.0."
+                },
+                "effect": {
+                  "type": "string",
+                  "description": "The active firmware effect name, or OFF."
+                },
+                "group": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The LIFX group object for the light."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The LIFX location object for the light."
+                },
+                "product": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The LIFX product object for the light."
+                },
+                "last_seen": {
+                  "type": "string",
+                  "description": "The last time LIFX saw the device."
+                },
+                "seconds_since_seen": {
+                  "type": "integer",
+                  "description": "The seconds since LIFX last saw the device."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A LIFX light returned by the List Lights endpoint."
+            },
+            "description": "The matching LIFX lights."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lights"
+        ],
+        "description": "The LIFX lights matching the selector."
+      }
+    },
+    {
+      "id": "lifx.list_scenes",
+      "service": "lifx",
+      "name": "list_scenes",
+      "description": "List scenes available to the authenticated LIFX account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing LIFX scenes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The LIFX scene UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The scene name."
+                },
+                "account": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The LIFX account object for the scene."
+                },
+                "states": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A scene state."
+                  },
+                  "description": "The light states configured in the scene."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when the scene was created."
+                },
+                "updated_at": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when the scene was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A LIFX scene returned by the List Scenes endpoint."
+            },
+            "description": "The available LIFX scenes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ],
+        "description": "The LIFX scenes available to the account."
+      }
+    },
+    {
+      "id": "lifx.set_state",
+      "service": "lifx",
+      "name": "set_state",
+      "description": "Set power, color, brightness, infrared, or transition duration for LIFX lights matching a selector.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX selector to address lights, such as `all`, `id:d073d5141876`, `group:Kitchen`, or a comma-separated selector list."
+          },
+          "power": {
+            "type": "string",
+            "enum": [
+              "on",
+              "off"
+            ],
+            "description": "The target power state."
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX color string to set, such as `blue saturation:0.5`."
+          },
+          "brightness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The brightness level from 0.0 to 1.0."
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The transition duration in seconds."
+          },
+          "infrared": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The maximum brightness of the infrared channel from 0.0 to 1.0."
+          },
+          "fast": {
+            "type": "boolean",
+            "description": "Whether to use LIFX fast mode and return as soon as the request is accepted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "description": "Input parameters for setting LIFX light state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether LIFX accepted the request without returning per-light results."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LIFX light id."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The LIFX light label."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The operation status returned by LIFX."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One result returned by LIFX for a light control operation."
+            },
+            "description": "The per-light operation results returned by LIFX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "results"
+        ],
+        "description": "The normalized LIFX operation response."
+      }
+    },
+    {
+      "id": "lifx.toggle_power",
+      "service": "lifx",
+      "name": "toggle_power",
+      "description": "Toggle the power state for LIFX lights matching a selector.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX selector to address lights, such as `all`, `id:d073d5141876`, `group:Kitchen`, or a comma-separated selector list."
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The transition duration in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "description": "Input parameters for toggling LIFX light power."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether LIFX accepted the request without returning per-light results."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LIFX light id."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The LIFX light label."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The operation status returned by LIFX."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One result returned by LIFX for a light control operation."
+            },
+            "description": "The per-light operation results returned by LIFX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "results"
+        ],
+        "description": "The normalized LIFX operation response."
+      }
+    },
+    {
+      "id": "lifx.turn_effects_off",
+      "service": "lifx",
+      "name": "turn_effects_off",
+      "description": "Turn off running LIFX effects for lights matching a selector, optionally powering the lights off.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX selector to address lights, such as `all`, `id:d073d5141876`, `group:Kitchen`, or a comma-separated selector list."
+          },
+          "powerOff": {
+            "type": "boolean",
+            "description": "Whether LIFX should also power the devices off."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "selector"
+        ],
+        "description": "Input parameters for turning LIFX effects off."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether LIFX accepted the request without returning per-light results."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LIFX light id."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The LIFX light label."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The operation status returned by LIFX."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One result returned by LIFX for a light control operation."
+            },
+            "description": "The per-light operation results returned by LIFX."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "results"
+        ],
+        "description": "The normalized LIFX operation response."
+      }
+    },
+    {
+      "id": "lifx.validate_color",
+      "service": "lifx",
+      "name": "validate_color",
+      "description": "Validate a LIFX color string and return the hue, saturation, brightness, and kelvin values LIFX will use.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LIFX color string to validate, such as `red` or `kelvin:2700`."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "color"
+        ],
+        "description": "Input parameters for validating a LIFX color string."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hue": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The parsed hue value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parsed hue value."
+          },
+          "saturation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The parsed saturation value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parsed saturation value."
+          },
+          "brightness": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The parsed brightness value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parsed brightness value."
+          },
+          "kelvin": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The parsed kelvin value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parsed kelvin value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hue",
+          "saturation",
+          "brightness",
+          "kelvin"
+        ],
+        "description": "The parsed LIFX color values."
+      }
+    }
+  ]
+}

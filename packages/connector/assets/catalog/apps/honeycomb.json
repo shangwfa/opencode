@@ -1,0 +1,908 @@
+{
+  "service": "honeycomb",
+  "displayName": "Honeycomb",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Configuration API Key",
+      "placeholder": "HONEYCOMB_API_KEY",
+      "description": "Honeycomb Configuration API key sent in the X-Honeycomb-Team header. Create or view environment API keys in Honeycomb Environment Settings.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.honeycomb.io",
+          "description": "Optional Honeycomb regional API base URL. Use https://api.eu1.honeycomb.io for EU accounts."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.honeycomb.io/",
+  "actions": [
+    {
+      "id": "honeycomb.create_marker",
+      "service": "honeycomb",
+      "name": "create_marker",
+      "description": "Create a Honeycomb marker for a dataset or for the environment-wide __all__ marker scope.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset slug, or __all__ to create an environment-wide marker."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A message that describes this marker."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The marker type used to group similar markers."
+          },
+          "startTime": {
+            "type": "integer",
+            "description": "The Unix timestamp where the marker starts. Honeycomb defaults this to request time when omitted."
+          },
+          "endTime": {
+            "type": "integer",
+            "description": "The Unix timestamp where the marker ends."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A URL attached to the marker."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetSlug",
+          "message",
+          "type"
+        ],
+        "description": "Input parameters for creating a Honeycomb marker."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Honeycomb marker identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Honeycomb marker identifier."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The marker message."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The marker message."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The marker type used to group similar markers."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The marker type used to group similar markers."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp where the marker starts."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp where the marker starts."
+              },
+              "endTime": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp where the marker ends."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp where the marker ends."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL attached to the marker."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL attached to the marker."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The marker color returned by Honeycomb when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The marker color returned by Honeycomb when available."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the marker was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the marker was created."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the marker was updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the marker was updated."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Honeycomb object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Honeycomb marker summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marker"
+        ],
+        "description": "The Honeycomb marker creation result."
+      }
+    },
+    {
+      "id": "honeycomb.get_auth",
+      "service": "honeycomb",
+      "name": "get_auth",
+      "description": "Validate the Honeycomb API key and return the team, environment, key type, and permission metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for reading Honeycomb authorization metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authorization": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier of the API key."
+              },
+              "type": {
+                "type": "string",
+                "description": "The Honeycomb API key type, such as configuration or ingest."
+              },
+              "apiKeyAccess": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The permission flags returned for this API key."
+              },
+              "environment": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The environment name, or an empty string for Honeycomb Classic."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The environment slug, or an empty string for Honeycomb Classic."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Honeycomb environment associated with the API key."
+              },
+              "team": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The team name."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The team slug."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Honeycomb team associated with the API key."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Honeycomb object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Honeycomb API key authorization metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorization"
+        ],
+        "description": "The Honeycomb authorization metadata result."
+      }
+    },
+    {
+      "id": "honeycomb.get_board",
+      "service": "honeycomb",
+      "name": "get_board",
+      "description": "Get one Honeycomb board by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Honeycomb board ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Input parameters for reading a Honeycomb board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Honeycomb board identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Honeycomb board identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The board name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The board description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The board description."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The board type returned by Honeycomb."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The board type returned by Honeycomb."
+              },
+              "boardUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Honeycomb UI URL for the board when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Honeycomb UI URL for the board when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Honeycomb board tag."
+                },
+                "description": "The key-value tags attached to the board."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Honeycomb object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Honeycomb board summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "board"
+        ],
+        "description": "The Honeycomb board lookup result."
+      }
+    },
+    {
+      "id": "honeycomb.get_dataset",
+      "service": "honeycomb",
+      "name": "get_dataset",
+      "description": "Get one Honeycomb dataset by slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset slug used in Honeycomb API paths."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetSlug"
+        ],
+        "description": "Input identifying a Honeycomb dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The dataset name."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The dataset slug used in Honeycomb API paths."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The dataset slug used in Honeycomb API paths."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The dataset description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The dataset description."
+              },
+              "expandJsonDepth": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum unpacking depth of nested JSON fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum unpacking depth of nested JSON fields."
+              },
+              "regularColumnsCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of unique regular columns in the dataset."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of unique regular columns in the dataset."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the dataset was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the dataset was created."
+              },
+              "lastWrittenAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the dataset last received event data."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the dataset last received event data."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Honeycomb object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Honeycomb dataset summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "The Honeycomb dataset lookup result."
+      }
+    },
+    {
+      "id": "honeycomb.list_boards",
+      "service": "honeycomb",
+      "name": "list_boards",
+      "description": "List non-secret Honeycomb boards available in the API key environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Honeycomb boards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Honeycomb board identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Honeycomb board identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The board name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The board description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The board description."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The board type returned by Honeycomb."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The board type returned by Honeycomb."
+                },
+                "boardUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Honeycomb UI URL for the board when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Honeycomb UI URL for the board when returned."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Honeycomb board tag."
+                  },
+                  "description": "The key-value tags attached to the board."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Honeycomb object returned by the API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Honeycomb board summary."
+            },
+            "description": "The boards returned by Honeycomb."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boards"
+        ],
+        "description": "The Honeycomb board list result."
+      }
+    },
+    {
+      "id": "honeycomb.list_datasets",
+      "service": "honeycomb",
+      "name": "list_datasets",
+      "description": "List datasets available in the Honeycomb environment tied to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Honeycomb datasets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The dataset name."
+                },
+                "slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The dataset slug used in Honeycomb API paths."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The dataset slug used in Honeycomb API paths."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The dataset description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The dataset description."
+                },
+                "expandJsonDepth": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The maximum unpacking depth of nested JSON fields."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum unpacking depth of nested JSON fields."
+                },
+                "regularColumnsCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of unique regular columns in the dataset."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of unique regular columns in the dataset."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the dataset was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the dataset was created."
+                },
+                "lastWrittenAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the dataset last received event data."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the dataset last received event data."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Honeycomb object returned by the API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Honeycomb dataset summary."
+            },
+            "description": "The datasets returned by Honeycomb."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasets"
+        ],
+        "description": "The Honeycomb dataset list result."
+      }
+    },
+    {
+      "id": "honeycomb.list_markers",
+      "service": "honeycomb",
+      "name": "list_markers",
+      "description": "List Honeycomb markers for a dataset or for the environment-wide __all__ marker scope.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset slug, or __all__ to operate on environment-wide markers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetSlug"
+        ],
+        "description": "Input identifying a Honeycomb dataset or the environment-wide marker namespace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "markers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Honeycomb marker identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Honeycomb marker identifier."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The marker message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The marker message."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The marker type used to group similar markers."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The marker type used to group similar markers."
+                },
+                "startTime": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Unix timestamp where the marker starts."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Unix timestamp where the marker starts."
+                },
+                "endTime": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Unix timestamp where the marker ends."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Unix timestamp where the marker ends."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The URL attached to the marker."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The URL attached to the marker."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The marker color returned by Honeycomb when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The marker color returned by Honeycomb when available."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the marker was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the marker was created."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the marker was updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the marker was updated."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Honeycomb object returned by the API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Honeycomb marker summary."
+            },
+            "description": "The markers returned by Honeycomb."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "markers"
+        ],
+        "description": "The Honeycomb marker list result."
+      }
+    }
+  ]
+}

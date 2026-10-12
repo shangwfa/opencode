@@ -1,0 +1,634 @@
+{
+  "service": "twochat",
+  "displayName": "2Chat",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_2CHAT_API_KEY",
+      "description": "2Chat API key sent with the X-User-API-Key header. Create or view it from the API Access tab in the 2Chat dashboard: https://app.2chat.io/developers?tab=api-access."
+    }
+  ],
+  "homepageUrl": "https://2chat.co",
+  "actions": [
+    {
+      "id": "twochat.create_contact",
+      "service": "twochat",
+      "name": "create_contact",
+      "description": "Create a contact in 2Chat with one or more contact details and optional channel and profile picture metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first name of the contact to create."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional last name of the contact to create."
+          },
+          "channelUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional channel UUID to associate with the created contact."
+          },
+          "profilePicUrl": {
+            "type": "string",
+            "description": "Optional public profile picture URL for the contact.",
+            "format": "uri"
+          },
+          "contactDetails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "E",
+                    "A",
+                    "PH",
+                    "WAPH"
+                  ],
+                  "description": "Contact detail type: E for email, A for address, PH for phone, WAPH for WhatsApp phone."
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact detail value, such as an email address or phone number."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One 2Chat contact detail to create."
+            },
+            "description": "The contact details to create with the new contact.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "firstName",
+          "contactDetails"
+        ],
+        "description": "Parameters for creating a new 2Chat contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The 2Chat contact ID, or null when the response omits it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The 2Chat contact ID, or null when the response omits it."
+              },
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The 2Chat contact UUID."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The contact first name."
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact last name, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact last name, or null when unavailable."
+              },
+              "channelUuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The connected channel UUID associated with the contact, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The connected channel UUID associated with the contact, or null when unavailable."
+              },
+              "profilePicUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact profile picture URL, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact profile picture URL, or null when unavailable."
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The 2Chat contact detail ID."
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The contact detail value returned by 2Chat."
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The 2Chat contact detail type code."
+                    },
+                    "createdAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "An ISO 8601 timestamp.",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "An ISO 8601 timestamp."
+                    },
+                    "updatedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "An ISO 8601 timestamp.",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "An ISO 8601 timestamp."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One normalized 2Chat contact detail."
+                },
+                "description": "The contact details stored for the contact."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized 2Chat contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2Chat contact creation response."
+      }
+    },
+    {
+      "id": "twochat.get_api_usage_info",
+      "service": "twochat",
+      "name": "get_api_usage_info",
+      "description": "Fetch the current 2Chat account, rate limit, and usage counters for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve the current 2Chat usage information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The 2Chat account name."
+              },
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The 2Chat account UUID."
+              },
+              "onTrial": {
+                "type": "boolean",
+                "description": "Whether the account is currently on a trial plan."
+              },
+              "blocked": {
+                "type": "boolean",
+                "description": "Whether the account is currently blocked."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized 2Chat account information."
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "requestsPerMinute": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of API requests allowed per minute."
+              }
+            },
+            "additionalProperties": false,
+            "description": "2Chat API rate limit information."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "apiRequestCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of API requests already used in the current period."
+              },
+              "maxApiRequestCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of API requests included in the current plan."
+              },
+              "numberCheckCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of phone number checks already used in the current period."
+              },
+              "maxNumberCheckCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of phone number checks included in the current plan."
+              }
+            },
+            "additionalProperties": false,
+            "description": "2Chat API usage counters for the current billing period."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2Chat account, limit, and usage information."
+      }
+    },
+    {
+      "id": "twochat.list_contacts",
+      "service": "twochat",
+      "name": "list_contacts",
+      "description": "List contacts from the connected 2Chat account, with optional pagination and channel filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional page number to retrieve."
+          },
+          "resultsPerPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Optional page size to request from 2Chat, from 1 to 100."
+          },
+          "channelUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional connected number UUID used to filter contacts by channel."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing contacts from 2Chat."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page number returned by 2Chat."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of contacts available for the current query."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The 2Chat contact ID, or null when the response omits it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The 2Chat contact ID, or null when the response omits it."
+                },
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The 2Chat contact UUID."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The contact first name."
+                },
+                "lastName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact last name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact last name, or null when unavailable."
+                },
+                "channelUuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The connected channel UUID associated with the contact, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The connected channel UUID associated with the contact, or null when unavailable."
+                },
+                "profilePicUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact profile picture URL, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact profile picture URL, or null when unavailable."
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The 2Chat contact detail ID."
+                      },
+                      "value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The contact detail value returned by 2Chat."
+                      },
+                      "type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The 2Chat contact detail type code."
+                      },
+                      "createdAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "An ISO 8601 timestamp.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "An ISO 8601 timestamp."
+                      },
+                      "updatedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "An ISO 8601 timestamp.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "An ISO 8601 timestamp."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One normalized 2Chat contact detail."
+                  },
+                  "description": "The contact details stored for the contact."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized 2Chat contact."
+            },
+            "description": "Contacts returned by the requested 2Chat page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2Chat contact listing response."
+      }
+    },
+    {
+      "id": "twochat.list_webhooks",
+      "service": "twochat",
+      "name": "list_webhooks",
+      "description": "List the webhook subscriptions currently configured in the connected 2Chat account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list the configured 2Chat webhooks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The 2Chat webhook UUID."
+                },
+                "eventName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The event name subscribed by the webhook."
+                },
+                "channelUuid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The channel UUID monitored by the webhook."
+                },
+                "hookUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The callback URL configured for the webhook."
+                },
+                "hookParams": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional webhook parameters returned by 2Chat."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "An ISO 8601 timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized 2Chat webhook subscription."
+            },
+            "description": "Webhook subscriptions configured in the connected 2Chat account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2Chat webhook listing response."
+      }
+    },
+    {
+      "id": "twochat.test_api_key",
+      "service": "twochat",
+      "name": "test_api_key",
+      "description": "Validate the connected 2Chat API key and return normalized account, limit, and usage information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to validate the 2Chat API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The 2Chat account name."
+              },
+              "uuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The 2Chat account UUID."
+              },
+              "onTrial": {
+                "type": "boolean",
+                "description": "Whether the account is currently on a trial plan."
+              },
+              "blocked": {
+                "type": "boolean",
+                "description": "Whether the account is currently blocked."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized 2Chat account information."
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "requestsPerMinute": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of API requests allowed per minute."
+              }
+            },
+            "additionalProperties": false,
+            "description": "2Chat API rate limit information."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "apiRequestCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of API requests already used in the current period."
+              },
+              "maxApiRequestCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of API requests included in the current plan."
+              },
+              "numberCheckCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of phone number checks already used in the current period."
+              },
+              "maxNumberCheckCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of phone number checks included in the current plan."
+              }
+            },
+            "additionalProperties": false,
+            "description": "2Chat API usage counters for the current billing period."
+          }
+        },
+        "additionalProperties": false,
+        "description": "2Chat account, limit, and usage information."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1670 @@
+{
+  "service": "memos",
+  "displayName": "Memos",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "memos_pat_...",
+      "description": "Memos personal access token sent as a Bearer credential. Create one in account settings.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://memos.example.com",
+          "description": "The HTTP or HTTPS URL of your Memos instance. Private targets require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://usememos.com",
+  "actions": [
+    {
+      "id": "memos.create_memo",
+      "service": "memos",
+      "name": "create_memo",
+      "description": "Create a Markdown memo on the connected Memos instance.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The memo content in Markdown format."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PROTECTED",
+              "PUBLIC"
+            ],
+            "description": "The memo visibility."
+          },
+          "memoId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "An optional caller-selected memo ID."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "An optional creation time for imported content.",
+            "format": "date-time"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "Whether the new memo should be pinned."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "placeholder": {
+                "type": "string",
+                "description": "The location label."
+              },
+              "latitude": {
+                "type": "number",
+                "description": "The latitude in decimal degrees."
+              },
+              "longitude": {
+                "type": "number",
+                "description": "The longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A geographic location to attach to a memo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "Input parameters for creating a memo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "state": {
+                "type": "string",
+                "description": "The memo state returned by Memos."
+              },
+              "creator": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos user resource name in the format users/{user}."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The memo creation time.",
+                "format": "date-time"
+              },
+              "updateTime": {
+                "type": "string",
+                "description": "The memo update time.",
+                "format": "date-time"
+              },
+              "content": {
+                "type": "string",
+                "description": "The memo Markdown content."
+              },
+              "visibility": {
+                "type": "string",
+                "description": "The memo visibility returned by Memos."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An extracted memo tag."
+                },
+                "description": "Tags extracted from the memo content."
+              },
+              "pinned": {
+                "type": "boolean",
+                "description": "Whether the memo is pinned."
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 13,
+                      "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                    },
+                    "createTime": {
+                      "type": "string",
+                      "description": "The attachment creation time.",
+                      "format": "date-time"
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "The attachment filename."
+                    },
+                    "externalLink": {
+                      "type": "string",
+                      "description": "The external storage URL when returned by Memos."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The attachment MIME type."
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                    },
+                    "memo": {
+                      "type": "string",
+                      "minLength": 7,
+                      "description": "The Memos memo resource name in the format memos/{memo}."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Memos attachment metadata."
+                },
+                "description": "Attachments associated with the memo."
+              },
+              "parent": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "snippet": {
+                "type": "string",
+                "description": "A plain-text preview of the memo content."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "placeholder": {
+                    "type": "string",
+                    "description": "The location label."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A geographic location attached to a memo."
+              },
+              "property": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Computed memo properties."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memos memo resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memo"
+        ],
+        "description": "The created memo response."
+      },
+      "followUpActions": [
+        "memos.get_memo",
+        "memos.upload_attachment"
+      ]
+    },
+    {
+      "id": "memos.delete_attachment",
+      "service": "memos",
+      "name": "delete_attachment",
+      "description": "Delete one attachment by resource name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 13,
+            "description": "The Memos attachment resource name in the format attachments/{attachment}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for deleting an attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Memos accepted the deletion."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 13,
+            "description": "The Memos attachment resource name in the format attachments/{attachment}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "name"
+        ],
+        "description": "The attachment deletion result."
+      }
+    },
+    {
+      "id": "memos.delete_memo",
+      "service": "memos",
+      "name": "delete_memo",
+      "description": "Delete one memo, optionally forcing deletion when associated data exists.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "force": {
+            "type": "boolean",
+            "description": "Whether to force deletion when the memo has associated data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for deleting a memo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Memos accepted the deletion."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "name"
+        ],
+        "description": "The memo deletion result."
+      }
+    },
+    {
+      "id": "memos.get_attachment",
+      "service": "memos",
+      "name": "get_attachment",
+      "description": "Retrieve one attachment's metadata by resource name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 13,
+            "description": "The Memos attachment resource name in the format attachments/{attachment}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for reading an attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 13,
+                "description": "The Memos attachment resource name in the format attachments/{attachment}."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The attachment creation time.",
+                "format": "date-time"
+              },
+              "filename": {
+                "type": "string",
+                "description": "The attachment filename."
+              },
+              "externalLink": {
+                "type": "string",
+                "description": "The external storage URL when returned by Memos."
+              },
+              "type": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "size": {
+                "type": "string",
+                "description": "The attachment size in bytes, encoded as a string by the Memos API."
+              },
+              "memo": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Memos attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The attachment metadata response."
+      }
+    },
+    {
+      "id": "memos.get_current_user",
+      "service": "memos",
+      "name": "get_current_user",
+      "description": "Retrieve the Memos user associated with the connected personal access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the current Memos user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos user resource name in the format users/{user}."
+              },
+              "role": {
+                "type": "string",
+                "description": "The user role returned by Memos."
+              },
+              "username": {
+                "type": "string",
+                "description": "The unique Memos username."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The user's display name."
+              },
+              "avatarUrl": {
+                "type": "string",
+                "description": "The user's avatar URL."
+              },
+              "description": {
+                "type": "string",
+                "description": "The user's profile description."
+              },
+              "state": {
+                "type": "string",
+                "description": "The user state returned by Memos."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The user creation time.",
+                "format": "date-time"
+              },
+              "updateTime": {
+                "type": "string",
+                "description": "The user update time.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memos user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The current Memos user response."
+      }
+    },
+    {
+      "id": "memos.get_memo",
+      "service": "memos",
+      "name": "get_memo",
+      "description": "Retrieve one memo by its Memos resource name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for reading a memo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "state": {
+                "type": "string",
+                "description": "The memo state returned by Memos."
+              },
+              "creator": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos user resource name in the format users/{user}."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The memo creation time.",
+                "format": "date-time"
+              },
+              "updateTime": {
+                "type": "string",
+                "description": "The memo update time.",
+                "format": "date-time"
+              },
+              "content": {
+                "type": "string",
+                "description": "The memo Markdown content."
+              },
+              "visibility": {
+                "type": "string",
+                "description": "The memo visibility returned by Memos."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An extracted memo tag."
+                },
+                "description": "Tags extracted from the memo content."
+              },
+              "pinned": {
+                "type": "boolean",
+                "description": "Whether the memo is pinned."
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 13,
+                      "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                    },
+                    "createTime": {
+                      "type": "string",
+                      "description": "The attachment creation time.",
+                      "format": "date-time"
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "The attachment filename."
+                    },
+                    "externalLink": {
+                      "type": "string",
+                      "description": "The external storage URL when returned by Memos."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The attachment MIME type."
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                    },
+                    "memo": {
+                      "type": "string",
+                      "minLength": 7,
+                      "description": "The Memos memo resource name in the format memos/{memo}."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Memos attachment metadata."
+                },
+                "description": "Attachments associated with the memo."
+              },
+              "parent": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "snippet": {
+                "type": "string",
+                "description": "A plain-text preview of the memo content."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "placeholder": {
+                    "type": "string",
+                    "description": "The location label."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A geographic location attached to a memo."
+              },
+              "property": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Computed memo properties."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memos memo resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memo"
+        ],
+        "description": "The memo response."
+      }
+    },
+    {
+      "id": "memos.get_user",
+      "service": "memos",
+      "name": "get_user",
+      "description": "Retrieve one Memos user by resource name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos user resource name in the format users/{user}."
+          },
+          "readMask": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional comma-separated field mask for the user response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for reading a Memos user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos user resource name in the format users/{user}."
+              },
+              "role": {
+                "type": "string",
+                "description": "The user role returned by Memos."
+              },
+              "username": {
+                "type": "string",
+                "description": "The unique Memos username."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The user's display name."
+              },
+              "avatarUrl": {
+                "type": "string",
+                "description": "The user's avatar URL."
+              },
+              "description": {
+                "type": "string",
+                "description": "The user's profile description."
+              },
+              "state": {
+                "type": "string",
+                "description": "The user state returned by Memos."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The user creation time.",
+                "format": "date-time"
+              },
+              "updateTime": {
+                "type": "string",
+                "description": "The user update time.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memos user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The Memos user response."
+      }
+    },
+    {
+      "id": "memos.list_attachments",
+      "service": "memos",
+      "name": "list_attachments",
+      "description": "List attachment metadata with pagination, filtering, and ordering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list action."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memos attachment filter expression."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment ordering expression, such as create_time desc."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing attachments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 13,
+                  "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The attachment creation time.",
+                  "format": "date-time"
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "The attachment filename."
+                },
+                "externalLink": {
+                  "type": "string",
+                  "description": "The external storage URL when returned by Memos."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The attachment MIME type."
+                },
+                "size": {
+                  "type": "string",
+                  "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                },
+                "memo": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos memo resource name in the format memos/{memo}."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Memos attachment metadata."
+            },
+            "description": "The attachments returned by Memos."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachments",
+          "nextPageToken"
+        ],
+        "description": "A page of Memos attachment metadata."
+      },
+      "followUpActions": [
+        "memos.get_attachment"
+      ]
+    },
+    {
+      "id": "memos.list_memo_attachments",
+      "service": "memos",
+      "name": "list_memo_attachments",
+      "description": "List attachments associated with one memo.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for listing a memo's attachments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 13,
+                  "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The attachment creation time.",
+                  "format": "date-time"
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "The attachment filename."
+                },
+                "externalLink": {
+                  "type": "string",
+                  "description": "The external storage URL when returned by Memos."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The attachment MIME type."
+                },
+                "size": {
+                  "type": "string",
+                  "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                },
+                "memo": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos memo resource name in the format memos/{memo}."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Memos attachment metadata."
+            },
+            "description": "The memo attachments returned by Memos."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachments",
+          "nextPageToken"
+        ],
+        "description": "A page of attachments associated with the memo."
+      }
+    },
+    {
+      "id": "memos.list_memos",
+      "service": "memos",
+      "name": "list_memos",
+      "description": "List memos with pagination, state selection, ordering, and CEL filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list action."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "ARCHIVED"
+            ],
+            "description": "The memo state."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AIP-132 ordering expression, such as pinned desc, create_time desc."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memos CEL filter expression, including content, creator, visibility, tags, timestamps, and computed properties."
+          },
+          "showDeleted": {
+            "type": "boolean",
+            "description": "Whether deleted memos should be included."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing memos."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos memo resource name in the format memos/{memo}."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The memo state returned by Memos."
+                },
+                "creator": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos user resource name in the format users/{user}."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The memo creation time.",
+                  "format": "date-time"
+                },
+                "updateTime": {
+                  "type": "string",
+                  "description": "The memo update time.",
+                  "format": "date-time"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The memo Markdown content."
+                },
+                "visibility": {
+                  "type": "string",
+                  "description": "The memo visibility returned by Memos."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An extracted memo tag."
+                  },
+                  "description": "Tags extracted from the memo content."
+                },
+                "pinned": {
+                  "type": "boolean",
+                  "description": "Whether the memo is pinned."
+                },
+                "attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 13,
+                        "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                      },
+                      "createTime": {
+                        "type": "string",
+                        "description": "The attachment creation time.",
+                        "format": "date-time"
+                      },
+                      "filename": {
+                        "type": "string",
+                        "description": "The attachment filename."
+                      },
+                      "externalLink": {
+                        "type": "string",
+                        "description": "The external storage URL when returned by Memos."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The attachment MIME type."
+                      },
+                      "size": {
+                        "type": "string",
+                        "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                      },
+                      "memo": {
+                        "type": "string",
+                        "minLength": 7,
+                        "description": "The Memos memo resource name in the format memos/{memo}."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Memos attachment metadata."
+                  },
+                  "description": "Attachments associated with the memo."
+                },
+                "parent": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos memo resource name in the format memos/{memo}."
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "A plain-text preview of the memo content."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "placeholder": {
+                      "type": "string",
+                      "description": "The location label."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "The latitude in decimal degrees."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "The longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A geographic location attached to a memo."
+                },
+                "property": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Computed memo properties."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Memos memo resource."
+            },
+            "description": "The memos returned by the instance."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memos",
+          "nextPageToken"
+        ],
+        "description": "A page of Memos memo resources."
+      },
+      "followUpActions": [
+        "memos.get_memo"
+      ]
+    },
+    {
+      "id": "memos.list_users",
+      "service": "memos",
+      "name": "list_users",
+      "description": "List users visible to the connected Memos account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of resources to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuation token returned by a previous list action."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user filter expression; Memos v0.29 supports username equality."
+          },
+          "showDeleted": {
+            "type": "boolean",
+            "description": "Whether deleted users should be included."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Memos users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 7,
+                  "description": "The Memos user resource name in the format users/{user}."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The user role returned by Memos."
+                },
+                "username": {
+                  "type": "string",
+                  "description": "The unique Memos username."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The user's display name."
+                },
+                "avatarUrl": {
+                  "type": "string",
+                  "description": "The user's avatar URL."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The user's profile description."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The user state returned by Memos."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The user creation time.",
+                  "format": "date-time"
+                },
+                "updateTime": {
+                  "type": "string",
+                  "description": "The user update time.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Memos user resource."
+            },
+            "description": "The users returned by Memos."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The continuation token for the next page, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The continuation token for the next page, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "nextPageToken"
+        ],
+        "description": "A page of Memos users."
+      },
+      "followUpActions": [
+        "memos.get_user"
+      ]
+    },
+    {
+      "id": "memos.set_memo_attachments",
+      "service": "memos",
+      "name": "set_memo_attachments",
+      "description": "Replace the complete attachment set associated with one memo.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "attachmentNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 13,
+              "description": "The Memos attachment resource name in the format attachments/{attachment}."
+            },
+            "description": "The complete desired list of attachment resource names; use an empty array to clear all attachments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "attachmentNames"
+        ],
+        "description": "Input parameters for replacing a memo's attachment set."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Memos accepted the attachment replacement."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "attachmentNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 13,
+              "description": "The Memos attachment resource name in the format attachments/{attachment}."
+            },
+            "description": "The attachment resource names sent to Memos."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated",
+          "name",
+          "attachmentNames"
+        ],
+        "description": "The memo attachment replacement result."
+      }
+    },
+    {
+      "id": "memos.update_memo",
+      "service": "memos",
+      "name": "update_memo",
+      "description": "Update selected content, visibility, pin, state, time, or location fields on a memo.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "content": {
+            "type": "string",
+            "description": "The replacement memo content."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PROTECTED",
+              "PUBLIC"
+            ],
+            "description": "The memo visibility."
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "Whether the memo should be pinned."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "ARCHIVED"
+            ],
+            "description": "The memo state."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The replacement memo creation time.",
+            "format": "date-time"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "placeholder": {
+                    "type": "string",
+                    "description": "The location label."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A geographic location to attach to a memo."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A geographic location to attach to a memo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for updating selected memo fields.",
+        "anyOf": [
+          {
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "required": [
+              "visibility"
+            ]
+          },
+          {
+            "required": [
+              "pinned"
+            ]
+          },
+          {
+            "required": [
+              "state"
+            ]
+          },
+          {
+            "required": [
+              "createTime"
+            ]
+          },
+          {
+            "required": [
+              "location"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memo": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "state": {
+                "type": "string",
+                "description": "The memo state returned by Memos."
+              },
+              "creator": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos user resource name in the format users/{user}."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The memo creation time.",
+                "format": "date-time"
+              },
+              "updateTime": {
+                "type": "string",
+                "description": "The memo update time.",
+                "format": "date-time"
+              },
+              "content": {
+                "type": "string",
+                "description": "The memo Markdown content."
+              },
+              "visibility": {
+                "type": "string",
+                "description": "The memo visibility returned by Memos."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An extracted memo tag."
+                },
+                "description": "Tags extracted from the memo content."
+              },
+              "pinned": {
+                "type": "boolean",
+                "description": "Whether the memo is pinned."
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 13,
+                      "description": "The Memos attachment resource name in the format attachments/{attachment}."
+                    },
+                    "createTime": {
+                      "type": "string",
+                      "description": "The attachment creation time.",
+                      "format": "date-time"
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "The attachment filename."
+                    },
+                    "externalLink": {
+                      "type": "string",
+                      "description": "The external storage URL when returned by Memos."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The attachment MIME type."
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "The attachment size in bytes, encoded as a string by the Memos API."
+                    },
+                    "memo": {
+                      "type": "string",
+                      "minLength": 7,
+                      "description": "The Memos memo resource name in the format memos/{memo}."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Memos attachment metadata."
+                },
+                "description": "Attachments associated with the memo."
+              },
+              "parent": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              },
+              "snippet": {
+                "type": "string",
+                "description": "A plain-text preview of the memo content."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "placeholder": {
+                    "type": "string",
+                    "description": "The location label."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A geographic location attached to a memo."
+              },
+              "property": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Computed memo properties."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memos memo resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memo"
+        ],
+        "description": "The updated memo response."
+      },
+      "followUpActions": [
+        "memos.get_memo"
+      ]
+    },
+    {
+      "id": "memos.upload_attachment",
+      "service": "memos",
+      "name": "upload_attachment",
+      "description": "Download a public file URL and upload its bytes to the connected Memos instance.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "The public HTTP or HTTPS URL of the file to upload.",
+            "format": "uri"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The filename to store in Memos."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MIME type; inferred from the download response when omitted."
+          },
+          "memo": {
+            "type": "string",
+            "minLength": 7,
+            "description": "The Memos memo resource name in the format memos/{memo}."
+          },
+          "attachmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "An optional caller-selected attachment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl",
+          "filename"
+        ],
+        "description": "Input parameters for uploading an attachment from a URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 13,
+                "description": "The Memos attachment resource name in the format attachments/{attachment}."
+              },
+              "createTime": {
+                "type": "string",
+                "description": "The attachment creation time.",
+                "format": "date-time"
+              },
+              "filename": {
+                "type": "string",
+                "description": "The attachment filename."
+              },
+              "externalLink": {
+                "type": "string",
+                "description": "The external storage URL when returned by Memos."
+              },
+              "type": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "size": {
+                "type": "string",
+                "description": "The attachment size in bytes, encoded as a string by the Memos API."
+              },
+              "memo": {
+                "type": "string",
+                "minLength": 7,
+                "description": "The Memos memo resource name in the format memos/{memo}."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Memos attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The uploaded attachment response."
+      },
+      "followUpActions": [
+        "memos.get_attachment"
+      ]
+    }
+  ]
+}

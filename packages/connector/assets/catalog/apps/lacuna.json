@@ -1,0 +1,909 @@
+{
+  "service": "lacuna",
+  "displayName": "Lacuna",
+  "description": "Search and navigate Lacuna's machine-learning research map, including papers, research directions, authors, and generated hypotheses.",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    }
+  ],
+  "homepageUrl": "https://lacuna.tiptreesystems.com",
+  "actions": [
+    {
+      "id": "lacuna.get_author_context",
+      "service": "lacuna",
+      "name": "get_author_context",
+      "description": "Get a source-linked Lacuna research context for an author.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorIdOrUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Lacuna author ID or Lacuna author URL."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "context",
+              "full"
+            ],
+            "description": "The Lacuna response view."
+          },
+          "includeNeighbors": {
+            "type": "boolean",
+            "description": "Whether to include similar researchers in the author context."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorIdOrUrl"
+        ],
+        "description": "Input parameters for getting a Lacuna author context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "paper",
+              "cluster",
+              "direction",
+              "author",
+              "institution",
+              "venue",
+              "hypothesis"
+            ],
+            "description": "The Lacuna entity type."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna entity identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna entity identifier."
+              }
+            ],
+            "description": "The Lacuna entity identifier."
+          },
+          "context_key": {
+            "type": "string",
+            "description": "The stable Lacuna context key."
+          },
+          "title": {
+            "type": "string",
+            "description": "The entity title when present."
+          },
+          "name": {
+            "type": "string",
+            "description": "The entity name when present."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical Lacuna page URL for the entity.",
+            "format": "uri"
+          },
+          "markdown_url": {
+            "type": "string",
+            "description": "The Lacuna Markdown page URL when present.",
+            "format": "uri"
+          },
+          "summary_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna summary in Markdown when present."
+          },
+          "profile_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna author profile in Markdown when present."
+          },
+          "author_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The normalized Lacuna author identifier."
+          },
+          "papers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Lacuna paper artifact identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical Lacuna page URL for the entity.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The paper title."
+                },
+                "year": {
+                  "type": "integer",
+                  "description": "The publication year."
+                },
+                "venue": {
+                  "type": "string",
+                  "description": "The publication venue when present."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "An author name."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A Lacuna author record."
+                      }
+                    ]
+                  },
+                  "description": "The compact author names or author objects returned for the paper."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "url",
+                "title"
+              ],
+              "description": "A compact Lacuna paper record. Additional fields may be present in full views."
+            },
+            "description": "A compact set of the author's papers when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "author_id"
+        ],
+        "description": "A Lacuna author context with papers, research directions, and source-linked profile content."
+      }
+    },
+    {
+      "id": "lacuna.get_direction",
+      "service": "lacuna",
+      "name": "get_direction",
+      "description": "Get a Lacuna research direction by numeric ID or Lacuna direction URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "directionIdOrUrl": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna research direction identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna research direction identifier or URL."
+              }
+            ],
+            "description": "A Lacuna research direction identifier or URL."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "context",
+              "full"
+            ],
+            "description": "The Lacuna response view."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "directionIdOrUrl"
+        ],
+        "description": "Input parameters for getting a Lacuna research direction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "paper",
+              "cluster",
+              "direction",
+              "author",
+              "institution",
+              "venue",
+              "hypothesis"
+            ],
+            "description": "The Lacuna entity type."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna entity identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna entity identifier."
+              }
+            ],
+            "description": "The Lacuna entity identifier."
+          },
+          "context_key": {
+            "type": "string",
+            "description": "The stable Lacuna context key."
+          },
+          "title": {
+            "type": "string",
+            "description": "The entity title when present."
+          },
+          "name": {
+            "type": "string",
+            "description": "The entity name when present."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical Lacuna page URL for the entity.",
+            "format": "uri"
+          },
+          "markdown_url": {
+            "type": "string",
+            "description": "The Lacuna Markdown page URL when present.",
+            "format": "uri"
+          },
+          "summary_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna summary in Markdown when present."
+          },
+          "profile_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna author profile in Markdown when present."
+          },
+          "cluster_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The normalized Lacuna research direction identifier."
+          },
+          "papers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Lacuna paper artifact identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical Lacuna page URL for the entity.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The paper title."
+                },
+                "year": {
+                  "type": "integer",
+                  "description": "The publication year."
+                },
+                "venue": {
+                  "type": "string",
+                  "description": "The publication venue when present."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "An author name."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A Lacuna author record."
+                      }
+                    ]
+                  },
+                  "description": "The compact author names or author objects returned for the paper."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "url",
+                "title"
+              ],
+              "description": "A compact Lacuna paper record. Additional fields may be present in full views."
+            },
+            "description": "A compact set of papers in the direction when present."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "cluster_id"
+        ],
+        "description": "A Lacuna research direction view with source-linked summaries and related entities."
+      }
+    },
+    {
+      "id": "lacuna.get_direction_papers",
+      "service": "lacuna",
+      "name": "get_direction_papers",
+      "description": "List papers attached to a Lacuna research direction.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "directionIdOrUrl": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna research direction identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna research direction identifier or URL."
+              }
+            ],
+            "description": "A Lacuna research direction identifier or URL."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of papers to return."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "compact",
+              "full"
+            ],
+            "description": "The per-paper response view."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "directionIdOrUrl"
+        ],
+        "description": "Input parameters for listing papers in a Lacuna research direction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cluster_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The normalized Lacuna research direction identifier."
+          },
+          "papers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Lacuna paper artifact identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical Lacuna page URL for the entity.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The paper title."
+                },
+                "year": {
+                  "type": "integer",
+                  "description": "The publication year."
+                },
+                "venue": {
+                  "type": "string",
+                  "description": "The publication venue when present."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "An author name."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A Lacuna author record."
+                      }
+                    ]
+                  },
+                  "description": "The compact author names or author objects returned for the paper."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "url",
+                "title"
+              ],
+              "description": "A compact Lacuna paper record. Additional fields may be present in full views."
+            },
+            "description": "The papers attached to the research direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The returned one-based page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The returned page size."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of papers in the direction."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "cluster_id",
+          "papers"
+        ],
+        "description": "One page of papers attached to a Lacuna research direction."
+      }
+    },
+    {
+      "id": "lacuna.get_hypothesis",
+      "service": "lacuna",
+      "name": "get_hypothesis",
+      "description": "Get a generated Lacuna research hypothesis by ID or Lacuna hypothesis URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hypothesisIdOrUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Lacuna hypothesis ID or Lacuna hypothesis URL."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "context",
+              "full"
+            ],
+            "description": "The Lacuna response view."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hypothesisIdOrUrl"
+        ],
+        "description": "Input parameters for getting a Lacuna research hypothesis."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "paper",
+              "cluster",
+              "direction",
+              "author",
+              "institution",
+              "venue",
+              "hypothesis"
+            ],
+            "description": "The Lacuna entity type."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna entity identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna entity identifier."
+              }
+            ],
+            "description": "The Lacuna entity identifier."
+          },
+          "context_key": {
+            "type": "string",
+            "description": "The stable Lacuna context key."
+          },
+          "title": {
+            "type": "string",
+            "description": "The entity title when present."
+          },
+          "name": {
+            "type": "string",
+            "description": "The entity name when present."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical Lacuna page URL for the entity.",
+            "format": "uri"
+          },
+          "markdown_url": {
+            "type": "string",
+            "description": "The Lacuna Markdown page URL when present.",
+            "format": "uri"
+          },
+          "summary_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna summary in Markdown when present."
+          },
+          "profile_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna author profile in Markdown when present."
+          },
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The normalized Lacuna hypothesis identifier."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "hypothesis_id"
+        ],
+        "description": "A Lacuna generated research hypothesis with its source-linked summary and directions."
+      }
+    },
+    {
+      "id": "lacuna.get_paper",
+      "service": "lacuna",
+      "name": "get_paper",
+      "description": "Get a Lacuna paper by artifact ID or Lacuna paper URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paperIdOrUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Lacuna paper artifact ID or Lacuna paper URL."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "context",
+              "full",
+              "preview",
+              "blog",
+              "figures",
+              "concepts",
+              "neighbors"
+            ],
+            "description": "The paper response view."
+          },
+          "figureLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of figures in the context view."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paperIdOrUrl"
+        ],
+        "description": "Input parameters for getting a Lacuna paper."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "paper",
+              "cluster",
+              "direction",
+              "author",
+              "institution",
+              "venue",
+              "hypothesis"
+            ],
+            "description": "The Lacuna entity type."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Lacuna entity identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A numeric Lacuna entity identifier."
+              }
+            ],
+            "description": "The Lacuna entity identifier."
+          },
+          "context_key": {
+            "type": "string",
+            "description": "The stable Lacuna context key."
+          },
+          "title": {
+            "type": "string",
+            "description": "The entity title when present."
+          },
+          "name": {
+            "type": "string",
+            "description": "The entity name when present."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical Lacuna page URL for the entity.",
+            "format": "uri"
+          },
+          "markdown_url": {
+            "type": "string",
+            "description": "The Lacuna Markdown page URL when present.",
+            "format": "uri"
+          },
+          "summary_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna summary in Markdown when present."
+          },
+          "profile_markdown": {
+            "type": "string",
+            "description": "The source-linked Lacuna author profile in Markdown when present."
+          },
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The normalized Lacuna paper artifact identifier."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "artifact_id"
+        ],
+        "description": "A Lacuna paper view with source links and view-specific fields."
+      }
+    },
+    {
+      "id": "lacuna.search",
+      "service": "lacuna",
+      "name": "search",
+      "description": "Search Lacuna's machine-learning research map for papers, research directions, authors, venues, institutions, or generated hypotheses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The research query."
+          },
+          "searchType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "paper",
+              "papers",
+              "cluster",
+              "clusters",
+              "direction",
+              "directions",
+              "author",
+              "authors",
+              "institution",
+              "institutions",
+              "venue",
+              "venues",
+              "hypothesis",
+              "hypotheses",
+              "proposal",
+              "proposals"
+            ],
+            "description": "The entity type to search, including official aliases."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of results to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "An inclusive publication date bound in YYYY, YYYY-MM, or YYYY-MM-DD format.",
+            "pattern": "^(?!0000)\\d{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\\d|3[01]))?)?$"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "An inclusive publication date bound in YYYY, YYYY-MM, or YYYY-MM-DD format.",
+            "pattern": "^(?!0000)\\d{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\\d|3[01]))?)?$"
+          },
+          "venue": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A venue name or key used to filter paper results."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "year_desc",
+              "year_asc"
+            ],
+            "description": "The result ordering."
+          },
+          "rankingProfile": {
+            "type": "string",
+            "enum": [
+              "default",
+              "lexical",
+              "semantic",
+              "bm25",
+              "bm25_title_abstract"
+            ],
+            "description": "The Lacuna ranking profile."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional comma-separated lexical fields with optional weights, such as title^4,abstract. Each field must exist on the searched type: title (paper, cluster, venue, hypothesis), abstract/summary/concepts (paper), name (author, institution, venue), top_names (cluster, hypothesis), venue (paper, venue)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Lacuna."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The normalized search query."
+          },
+          "type_filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "paper",
+              "cluster",
+              "author",
+              "institution",
+              "venue",
+              "hypothesis"
+            ],
+            "description": "The normalized entity type applied by Lacuna."
+          },
+          "total_results": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching Lacuna entities."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "paper",
+                    "cluster",
+                    "direction",
+                    "author",
+                    "institution",
+                    "venue",
+                    "hypothesis"
+                  ],
+                  "description": "The Lacuna entity type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Lacuna entity identifier."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "The relevance score reported by Lacuna."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical Lacuna page URL for the entity.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The paper, direction, venue, or hypothesis title when present."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The author or institution name when present."
+                },
+                "year": {
+                  "type": "integer",
+                  "description": "The publication year when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "id",
+                "score",
+                "url"
+              ],
+              "description": "One Lacuna search result. Additional fields depend on the entity type."
+            },
+            "description": "The matching Lacuna entities."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "type_filter",
+          "total_results",
+          "results"
+        ],
+        "description": "A page of Lacuna search results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1115 @@
+{
+  "service": "homebox",
+  "displayName": "HomeBox",
+  "description": "Home inventory and organization (entities, tags, entity types, maintenance, attachments) on a self-hosted HomeBox instance.",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HOMEBOX_API_KEY",
+      "description": "A static API key issued from the HomeBox web interface under Users -> API Keys. The key has the same permissions as the issuing account, so the provider acts as that account and shares its group collection.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "http://homebox.local:7745",
+          "description": "The root URL for your HomeBox instance. The API is served below it at /api/v1, so http://homebox.local or http://homebox.local/api both work."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://homebox.software",
+  "actions": [
+    {
+      "id": "homebox.add_entity_attachment",
+      "service": "homebox",
+      "name": "add_entity_attachment",
+      "description": "Attach a file (photo or document) to one HomeBox entity. The file type is detected from the extension when omitted.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID to attach the file to."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The file to attach."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "manual",
+              "warranty",
+              "attachment",
+              "receipt",
+              "thumbnail"
+            ],
+            "description": "The attachment type."
+          },
+          "name": {
+            "type": "string",
+            "description": "Override the stored file name, including the extension."
+          },
+          "primary": {
+            "type": "boolean",
+            "description": "Mark this photo as the entity's primary image."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId",
+          "file"
+        ],
+        "description": "Input parameters for attaching one file to an entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The entity as returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity"
+        ],
+        "description": "The HomeBox entity with the new attachment."
+      }
+    },
+    {
+      "id": "homebox.add_maintenance_entry",
+      "service": "homebox",
+      "name": "add_maintenance_entry",
+      "description": "Add a maintenance entry (repair, inspection, scheduled service) to one HomeBox entity. Provide completedDate, scheduledDate, or both.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The maintenance entry name, for example Air filter replacement."
+          },
+          "completedDate": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "scheduledDate": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "description": {
+            "type": "string",
+            "description": "An optional description of the maintenance work."
+          },
+          "cost": {
+            "type": "string",
+            "description": "The maintenance cost as a number string, for example 1500."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId",
+          "name"
+        ],
+        "description": "Input parameters for adding one maintenance entry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The created maintenance entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entry"
+        ],
+        "description": "The created HomeBox maintenance entry."
+      }
+    },
+    {
+      "id": "homebox.create_entity",
+      "service": "homebox",
+      "name": "create_entity",
+      "description": "Create a new HomeBox entity with a name and optional type, parent, description, and tags.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity name."
+          },
+          "entityTypeId": {
+            "type": "string",
+            "description": "The UUID of the entity type the entity belongs to. HomeBox entities are typed, so pass one or the create request may fail."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "The UUID of a parent entity, for nested entities."
+          },
+          "description": {
+            "type": "string",
+            "description": "An optional description."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "The quantity."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One tag UUID."
+            },
+            "description": "The UUIDs of tags to attach."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating one HomeBox entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The entity as returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity"
+        ],
+        "description": "The created HomeBox entity."
+      }
+    },
+    {
+      "id": "homebox.create_entity_type",
+      "service": "homebox",
+      "name": "create_entity_type",
+      "description": "Create a new HomeBox entity type, optionally flagged as a location.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity type name."
+          },
+          "description": {
+            "type": "string",
+            "description": "An optional description."
+          },
+          "icon": {
+            "type": "string",
+            "description": "An icon identifier for the type."
+          },
+          "isLocation": {
+            "type": "boolean",
+            "description": "Whether this type represents a location."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating one HomeBox entity type."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The created HomeBox entity type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityType"
+        ],
+        "description": "The created HomeBox entity type."
+      }
+    },
+    {
+      "id": "homebox.create_tag",
+      "service": "homebox",
+      "name": "create_tag",
+      "description": "Create a new HomeBox tag.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tag name."
+          },
+          "description": {
+            "type": "string",
+            "description": "An optional description."
+          },
+          "color": {
+            "type": "string",
+            "description": "A tag color, for example #ff0000."
+          },
+          "icon": {
+            "type": "string",
+            "description": "An icon identifier for the tag."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "The UUID of a parent tag, for nested tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating one HomeBox tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The created HomeBox tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag"
+        ],
+        "description": "The created HomeBox tag."
+      }
+    },
+    {
+      "id": "homebox.delete_entity",
+      "service": "homebox",
+      "name": "delete_entity",
+      "description": "Delete one HomeBox entity.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId"
+        ],
+        "description": "Input parameters for deleting one entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the entity was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "homebox.delete_entity_type",
+      "service": "homebox",
+      "name": "delete_entity_type",
+      "description": "Delete one HomeBox entity type.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityTypeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity type UUID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityTypeId"
+        ],
+        "description": "Input parameters for deleting one HomeBox entity type."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the entity type was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "homebox.delete_tag",
+      "service": "homebox",
+      "name": "delete_tag",
+      "description": "Delete one HomeBox tag.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tag UUID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tagId"
+        ],
+        "description": "Input parameters for deleting one HomeBox tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the tag was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "homebox.get_entity",
+      "service": "homebox",
+      "name": "get_entity",
+      "description": "Fetch one HomeBox entity with its full details, including attachments and custom fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId"
+        ],
+        "description": "Input parameters for fetching one entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The entity as returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity"
+        ],
+        "description": "The requested HomeBox entity."
+      }
+    },
+    {
+      "id": "homebox.get_group_statistics",
+      "service": "homebox",
+      "name": "get_group_statistics",
+      "description": "Fetch the HomeBox group dashboard statistics: total entities, locations, tags, price, and warranties.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statistics": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The HomeBox group statistics payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "statistics"
+        ],
+        "description": "The HomeBox group statistics."
+      }
+    },
+    {
+      "id": "homebox.get_maintenance_log",
+      "service": "homebox",
+      "name": "get_maintenance_log",
+      "description": "Fetch the maintenance log of one HomeBox entity, optionally filtered by status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "completed",
+              "both"
+            ],
+            "description": "Which maintenance entries to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId"
+        ],
+        "description": "Input parameters for fetching one maintenance log."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One maintenance entry."
+            },
+            "description": "The maintenance entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entries"
+        ],
+        "description": "The HomeBox maintenance log."
+      }
+    },
+    {
+      "id": "homebox.get_status",
+      "service": "homebox",
+      "name": "get_status",
+      "description": "Fetch the HomeBox instance status: health, version, and whether registration is open.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The HomeBox status payload returned by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summary"
+        ],
+        "description": "The HomeBox instance status."
+      }
+    },
+    {
+      "id": "homebox.list_custom_field_names",
+      "service": "homebox",
+      "name": "list_custom_field_names",
+      "description": "List the custom field names in use across the HomeBox group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One custom field name."
+            },
+            "description": "The custom field names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "names"
+        ],
+        "description": "The HomeBox custom field names."
+      }
+    },
+    {
+      "id": "homebox.list_custom_field_values",
+      "service": "homebox",
+      "name": "list_custom_field_values",
+      "description": "List the values in use for one custom field name across the HomeBox group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom field name, for example Color."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "field"
+        ],
+        "description": "Input parameters for listing one custom field's values."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One custom field value."
+            },
+            "description": "The custom field values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values"
+        ],
+        "description": "The HomeBox custom field values."
+      }
+    },
+    {
+      "id": "homebox.list_entities",
+      "service": "homebox",
+      "name": "list_entities",
+      "description": "Search HomeBox entities with optional text search, pagination, and tag/parent filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Free-text search string."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number, starting at 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Maximum number of entities per page."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One tag UUID."
+            },
+            "description": "Only entities carrying any of these tag UUIDs."
+          },
+          "parentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One parent entity UUID."
+            },
+            "description": "Only entities under any of these parent entity UUIDs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching HomeBox entities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One HomeBox entity summary."
+            },
+            "description": "The matching entity summaries."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The page size used by the instance."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching entities."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "description": "The matching HomeBox entities."
+      }
+    },
+    {
+      "id": "homebox.list_entity_types",
+      "service": "homebox",
+      "name": "list_entity_types",
+      "description": "List all HomeBox entity types, including location-flagged types.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One HomeBox entity type."
+            },
+            "description": "The entity types."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityTypes"
+        ],
+        "description": "The HomeBox entity types."
+      }
+    },
+    {
+      "id": "homebox.list_tags",
+      "service": "homebox",
+      "name": "list_tags",
+      "description": "List all HomeBox tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One HomeBox tag."
+            },
+            "description": "The tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tags"
+        ],
+        "description": "The HomeBox tags."
+      }
+    },
+    {
+      "id": "homebox.update_entity",
+      "service": "homebox",
+      "name": "update_entity",
+      "description": "Update one HomeBox entity. Only the provided fields change; all other entity data (serial number, warranty, custom fields, ...) is preserved. Custom fields are replaced as a whole when fields is provided.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity UUID to update."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The entity description; pass null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The entity description; pass null to clear it."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "The quantity."
+          },
+          "insured": {
+            "type": "boolean",
+            "description": "Whether the entity is insured."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the entity is archived."
+          },
+          "entityTypeId": {
+            "type": "string",
+            "description": "The entity type UUID; when omitted the current type is kept."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One tag UUID."
+            },
+            "description": "The tag UUIDs."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent entity UUID, or null to unset it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent entity UUID, or null to unset it."
+          },
+          "serialNumber": {
+            "type": "string",
+            "description": "The serial number."
+          },
+          "modelNumber": {
+            "type": "string",
+            "description": "The model number."
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "The manufacturer."
+          },
+          "lifetimeWarranty": {
+            "type": "boolean",
+            "description": "Whether the entity has a lifetime warranty."
+          },
+          "warrantyExpires": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "warrantyDetails": {
+            "type": "string",
+            "description": "Warranty details."
+          },
+          "purchaseDate": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "purchaseFrom": {
+            "type": "string",
+            "description": "Where the entity was purchased."
+          },
+          "purchasePrice": {
+            "type": "number",
+            "description": "The purchase price."
+          },
+          "soldDate": {
+            "type": "string",
+            "description": "A date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "soldTo": {
+            "type": "string",
+            "description": "Who the entity was sold to."
+          },
+          "soldPrice": {
+            "type": "number",
+            "description": "The sale price."
+          },
+          "soldNotes": {
+            "type": "string",
+            "description": "Notes about the sale."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Free-form entity notes."
+          },
+          "syncChildEntityLocations": {
+            "type": "boolean",
+            "description": "Recursively apply type changes to child entities."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name, for example Color or Serial."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text"
+                      ],
+                      "description": "The field type."
+                    },
+                    "textValue": {
+                      "type": "string",
+                      "description": "The text value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "type",
+                    "textValue"
+                  ],
+                  "description": "A text custom field."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name, for example Color or Serial."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "number"
+                      ],
+                      "description": "The field type."
+                    },
+                    "numberValue": {
+                      "type": "integer",
+                      "description": "The numeric value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "type",
+                    "numberValue"
+                  ],
+                  "description": "A numeric custom field."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name, for example Color or Serial."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "boolean"
+                      ],
+                      "description": "The field type."
+                    },
+                    "booleanValue": {
+                      "type": "boolean",
+                      "description": "The boolean value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "type",
+                    "booleanValue"
+                  ],
+                  "description": "A boolean custom field."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field name, for example Color or Serial."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "time"
+                      ],
+                      "description": "The field type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "type"
+                  ],
+                  "description": "A time custom field. HomeBox stores the timestamp server-side, so no value property is sent."
+                }
+              ],
+              "description": "One custom field attached to the entity. The value property must match the declared type."
+            },
+            "description": "The custom fields to set; replaces all existing fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entityId"
+        ],
+        "description": "Input parameters for updating one HomeBox entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The entity as returned by HomeBox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity"
+        ],
+        "description": "The updated HomeBox entity."
+      }
+    }
+  ]
+}

@@ -1,0 +1,302 @@
+{
+  "service": "dropcontact",
+  "displayName": "Dropcontact",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DROPCONTACT_API_KEY",
+      "description": "Dropcontact access token sent in the X-Access-Token header. Subscribe for API access and retrieve your token through the official developer documentation: https://developer.dropcontact.com/."
+    }
+  ],
+  "homepageUrl": "https://www.dropcontact.com/",
+  "actions": [
+    {
+      "id": "dropcontact.get_enrichment_result",
+      "service": "dropcontact",
+      "name": "get_enrichment_result",
+      "description": "Retrieve the pending or completed contacts for a Dropcontact enrichment request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The request ID returned by submit_enrichment."
+          },
+          "forceResults": {
+            "type": "boolean",
+            "description": "Whether to return processed records immediately while unprocessed records remain unchanged."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "request_id"
+        ],
+        "description": "Input for retrieving a Dropcontact enrichment request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean",
+            "description": "Whether Dropcontact reported an error for the result request."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether Dropcontact has completed the enrichment request."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "description": "The connector lifecycle state derived from the Dropcontact response."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The text returned by Dropcontact when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The text returned by Dropcontact when present."
+          },
+          "credits_left": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The integer value returned by Dropcontact when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The integer value returned by Dropcontact when present."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw object returned by Dropcontact."
+            },
+            "description": "Contacts returned by Dropcontact."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw object returned by Dropcontact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "error",
+          "success",
+          "status",
+          "reason",
+          "credits_left",
+          "data",
+          "raw"
+        ],
+        "description": "The Dropcontact enrichment result response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "dropcontact.submit_enrichment",
+        "statusActionId": "dropcontact.get_enrichment_result"
+      }
+    },
+    {
+      "id": "dropcontact.submit_enrichment",
+      "service": "dropcontact",
+      "name": "submit_enrichment",
+      "description": "Submit up to 250 contacts to Dropcontact for asynchronous email verification and enrichment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email address to verify or enrich."
+                },
+                "first_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's first name."
+                },
+                "last_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's last name."
+                },
+                "full_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's full name."
+                },
+                "phone": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's phone number."
+                },
+                "company": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's company name."
+                },
+                "website": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The company website or domain."
+                },
+                "num_siren": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The French company SIREN number."
+                },
+                "linkedin": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's LinkedIn URL or identifier."
+                },
+                "siret": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The French company SIRET number."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The country code used to guide enrichment."
+                },
+                "job": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact's job title."
+                },
+                "company_linkedin": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The company's LinkedIn URL or identifier."
+                },
+                "custom_fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "One custom field value."
+                  },
+                  "description": "Custom string fields that Dropcontact returns unchanged."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One contact or organization record for Dropcontact to enrich."
+            },
+            "description": "Contacts to enrich in one Dropcontact batch.",
+            "minItems": 1,
+            "maxItems": 250
+          },
+          "siren": {
+            "type": "boolean",
+            "description": "Whether to request French company identifiers, address data, and company-leader information."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en"
+            ],
+            "description": "The language for enriched data. Dropcontact documents English."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Input for submitting a Dropcontact enrichment batch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "boolean",
+            "description": "Whether Dropcontact reported an error for the submission."
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The text returned by Dropcontact when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The text returned by Dropcontact when present."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether Dropcontact accepted the enrichment batch."
+          },
+          "credits_left": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The integer value returned by Dropcontact when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The integer value returned by Dropcontact when present."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw object returned by Dropcontact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "error",
+          "request_id",
+          "success",
+          "credits_left",
+          "raw"
+        ],
+        "description": "The Dropcontact enrichment submission response."
+      },
+      "followUpActions": [
+        "dropcontact.get_enrichment_result"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "dropcontact.submit_enrichment",
+        "statusActionId": "dropcontact.get_enrichment_result"
+      }
+    }
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "service": "geokeo",
+  "displayName": "Geokeo",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GEOKEO_API_KEY",
+      "description": "Geokeo API key sent as the api query parameter. Sign in at https://geokeo.com/login.php, then open Dashboard -> API to copy the key."
+    }
+  ],
+  "homepageUrl": "https://geokeo.com",
+  "actions": [
+    {
+      "id": "geokeo.geocode_forward",
+      "service": "geokeo",
+      "name": "geocode_forward",
+      "description": "Convert an address or place query into Geokeo geocoding results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address or place query string to geocode."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Optional ISO 3166-1 alpha-2 country code used to narrow the search."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input parameters for forward geocoding an address or place with Geokeo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OpenStreetMap class of the matched place."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OpenStreetMap type of the matched place."
+                },
+                "address_components": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "One upstream address component value."
+                  },
+                  "description": "Structured address components keyed by upstream field name."
+                },
+                "formatted_address": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The formatted postal-style address returned by Geokeo."
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Latitude in WGS 84 format returned by Geokeo."
+                        },
+                        "lng": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Longitude in WGS 84 format returned by Geokeo."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "lat",
+                        "lng"
+                      ],
+                      "description": "The centroid coordinates of the matched place."
+                    },
+                    "viewport": {
+                      "type": "object",
+                      "properties": {
+                        "northeast": {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Latitude in WGS 84 format returned by Geokeo."
+                            },
+                            "lng": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Longitude in WGS 84 format returned by Geokeo."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "lat",
+                            "lng"
+                          ],
+                          "description": "The northeast corner of the bounding box."
+                        },
+                        "southwest": {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Latitude in WGS 84 format returned by Geokeo."
+                            },
+                            "lng": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Longitude in WGS 84 format returned by Geokeo."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "lat",
+                            "lng"
+                          ],
+                          "description": "The southwest corner of the bounding box."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "northeast",
+                        "southwest"
+                      ],
+                      "description": "The bounding box of the matched place."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "location",
+                    "viewport"
+                  ],
+                  "description": "Geometry details for the matched place."
+                },
+                "osmurl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "OpenStreetMap URL for the matched coordinates."
+                },
+                "distance": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Distance from the reverse query coordinates in kilometers."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Geokeo result item."
+            },
+            "description": "The ordered geocoding results returned by Geokeo."
+          },
+          "credits": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Credits URL returned by Geokeo."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Geokeo status string such as ok or ZERO_RESULTS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The JSON response payload returned by Geokeo geocoding endpoints."
+      }
+    },
+    {
+      "id": "geokeo.geocode_reverse",
+      "service": "geokeo",
+      "name": "geocode_reverse",
+      "description": "Convert coordinates into Geokeo reverse geocoding results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude to reverse geocode."
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude to reverse geocode."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "description": "Input parameters for reverse geocoding coordinates with Geokeo."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "class": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OpenStreetMap class of the matched place."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OpenStreetMap type of the matched place."
+                },
+                "address_components": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "One upstream address component value."
+                  },
+                  "description": "Structured address components keyed by upstream field name."
+                },
+                "formatted_address": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The formatted postal-style address returned by Geokeo."
+                },
+                "geometry": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Latitude in WGS 84 format returned by Geokeo."
+                        },
+                        "lng": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Longitude in WGS 84 format returned by Geokeo."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "lat",
+                        "lng"
+                      ],
+                      "description": "The centroid coordinates of the matched place."
+                    },
+                    "viewport": {
+                      "type": "object",
+                      "properties": {
+                        "northeast": {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Latitude in WGS 84 format returned by Geokeo."
+                            },
+                            "lng": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Longitude in WGS 84 format returned by Geokeo."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "lat",
+                            "lng"
+                          ],
+                          "description": "The northeast corner of the bounding box."
+                        },
+                        "southwest": {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Latitude in WGS 84 format returned by Geokeo."
+                            },
+                            "lng": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Longitude in WGS 84 format returned by Geokeo."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "lat",
+                            "lng"
+                          ],
+                          "description": "The southwest corner of the bounding box."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "northeast",
+                        "southwest"
+                      ],
+                      "description": "The bounding box of the matched place."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "location",
+                    "viewport"
+                  ],
+                  "description": "Geometry details for the matched place."
+                },
+                "osmurl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "OpenStreetMap URL for the matched coordinates."
+                },
+                "distance": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Distance from the reverse query coordinates in kilometers."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Geokeo result item."
+            },
+            "description": "The ordered geocoding results returned by Geokeo."
+          },
+          "credits": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Credits URL returned by Geokeo."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Geokeo status string such as ok or ZERO_RESULTS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The JSON response payload returned by Geokeo geocoding endpoints."
+      }
+    }
+  ]
+}

@@ -1,0 +1,640 @@
+{
+  "service": "hex",
+  "displayName": "Hex",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "hxtp_... or hxtw_...",
+      "description": "Hex personal access token or workspace token used with the Authorization Bearer header. Create it from User settings > Account > API keys."
+    }
+  ],
+  "homepageUrl": "https://hex.tech",
+  "actions": [
+    {
+      "id": "hex.cancel_run",
+      "service": "hex",
+      "name": "cancel_run",
+      "description": "Cancel an in-progress Hex project run.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "description": "Unique ID for a run of a Hex project.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "runId"
+        ],
+        "description": "Request parameters for cancelling a Hex project run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Hex project run cancellation response."
+      }
+    },
+    {
+      "id": "hex.get_project",
+      "service": "hex",
+      "name": "get_project",
+      "description": "Get metadata for a single Hex project by project ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "includeSharing": {
+            "type": "boolean",
+            "description": "Whether to include sharing information in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Request parameters for getting a Hex project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hex project metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Hex response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project",
+          "raw"
+        ],
+        "description": "Hex project response."
+      }
+    },
+    {
+      "id": "hex.get_run_status",
+      "service": "hex",
+      "name": "get_run_status",
+      "description": "Get the status and metadata for a specific Hex project run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "description": "Unique ID for a run of a Hex project.",
+            "format": "uuid"
+          },
+          "enableExpandedStats": {
+            "type": "boolean",
+            "description": "Whether to request expanded run statistics from Hex."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "runId"
+        ],
+        "description": "Request parameters for getting a Hex project run status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "description": "Unique ID for a run of a Hex project.",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "ERRORED",
+              "COMPLETED",
+              "KILLED",
+              "UNABLE_TO_ALLOCATE_KERNEL"
+            ],
+            "description": "Hex project run status."
+          },
+          "run": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hex project run metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Hex response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "projectId",
+          "status",
+          "run",
+          "raw"
+        ],
+        "description": "Hex project run status response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "hex.run_project",
+        "statusActionId": "hex.get_run_status",
+        "cancelActionId": "hex.cancel_run"
+      }
+    },
+    {
+      "id": "hex.list_project_runs",
+      "service": "hex",
+      "name": "list_project_runs",
+      "description": "List API-triggered runs for a Hex project, optionally filtered by status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of runs to skip before returning results."
+          },
+          "statusFilter": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "ERRORED",
+              "COMPLETED",
+              "KILLED",
+              "UNABLE_TO_ALLOCATE_KERNEL"
+            ],
+            "description": "Hex project run status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Request parameters for listing Hex project runs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hex project run metadata."
+            },
+            "description": "Project runs returned by Hex."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next page URL or token returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next page URL or token returned by Hex."
+          },
+          "previousPage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Previous page URL or token returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Previous page URL or token returned by Hex."
+          },
+          "traceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Trace ID returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trace ID returned by Hex."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Hex response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runs",
+          "nextPage",
+          "previousPage",
+          "traceId",
+          "raw"
+        ],
+        "description": "Hex project runs response."
+      }
+    },
+    {
+      "id": "hex.list_projects",
+      "service": "hex",
+      "name": "list_projects",
+      "description": "List Hex projects visible to the connected token, with pagination and common project filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Hex."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Hex."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "CREATED_AT",
+              "LAST_EDITED_AT",
+              "LAST_PUBLISHED_AT"
+            ],
+            "description": "Field used to sort Hex projects."
+          },
+          "sortDirection": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "Sort direction accepted by Hex."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project status name."
+            },
+            "description": "Project statuses to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project category name."
+            },
+            "description": "Project categories to include.",
+            "minItems": 1
+          },
+          "ownerEmail": {
+            "type": "string",
+            "description": "Owner email address used to filter projects.",
+            "format": "email"
+          },
+          "creatorEmail": {
+            "type": "string",
+            "description": "Creator email address used to filter projects.",
+            "format": "email"
+          },
+          "collectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Collection ID used to filter projects."
+          },
+          "includeSharing": {
+            "type": "boolean",
+            "description": "Whether to include sharing information for each project."
+          },
+          "includeArchived": {
+            "type": "boolean",
+            "description": "Whether to include archived projects."
+          },
+          "includeTrashed": {
+            "type": "boolean",
+            "description": "Whether to include trashed projects."
+          },
+          "includeComponents": {
+            "type": "boolean",
+            "description": "Whether to include component projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for listing Hex projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hex project metadata."
+            },
+            "description": "Projects returned by Hex."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by Hex."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Hex response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values",
+          "pagination",
+          "raw"
+        ],
+        "description": "Hex project list response."
+      }
+    },
+    {
+      "id": "hex.run_project",
+      "service": "hex",
+      "name": "run_project",
+      "description": "Trigger a run of the latest published version of a Hex project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "inputParams": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A Hex project input value."
+            },
+            "description": "Input parameters for the Hex project run, keyed by project variable name."
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Notification type, such as slack, user, or group."
+                },
+                "recipient": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Notification recipient identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Notification recipient for a Hex project run."
+            },
+            "description": "Notifications to send when the run completes.",
+            "minItems": 1
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Whether to validate run inputs without executing the project."
+          },
+          "updatePublishedResults": {
+            "type": "boolean",
+            "description": "Whether to update the cached state of the published app after a successful run."
+          },
+          "useCachedSqlResults": {
+            "type": "boolean",
+            "description": "Whether to use cached SQL results when available."
+          },
+          "viewId": {
+            "type": "string",
+            "description": "Saved view ID to use for project run inputs.",
+            "format": "uuid"
+          },
+          "flagConfigOverride": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Feature flag configuration override for the run."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Request parameters for running a Hex project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "description": "Unique ID for a run of a Hex project.",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Unique ID for a Hex project.",
+            "format": "uuid"
+          },
+          "runUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL to view the run in Hex.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL to view the run in Hex."
+          },
+          "runStatusUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "API URL to check the run status.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API URL to check the run status."
+          },
+          "traceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Trace ID returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trace ID returned by Hex."
+          },
+          "projectVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Project version used by the run."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Project version used by the run."
+          },
+          "notifications": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "Notification."
+                },
+                "description": "Notifications returned by Hex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Notifications returned by Hex."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Hex response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "projectId",
+          "runUrl",
+          "runStatusUrl",
+          "traceId",
+          "projectVersion",
+          "notifications",
+          "raw"
+        ],
+        "description": "Hex project run creation response."
+      },
+      "followUpActions": [
+        "hex.get_run_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "hex.run_project",
+        "statusActionId": "hex.get_run_status",
+        "cancelActionId": "hex.cancel_run"
+      }
+    }
+  ]
+}

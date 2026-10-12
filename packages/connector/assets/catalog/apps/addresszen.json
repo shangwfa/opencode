@@ -1,0 +1,526 @@
+{
+  "service": "addresszen",
+  "displayName": "AddressZen",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ak_xxx",
+      "description": "AddressZen API key used as the api_key query parameter. Find or create it from your AddressZen dashboard: https://docs.addresszen.com/docs/guides/api-key"
+    }
+  ],
+  "homepageUrl": "https://addresszen.com",
+  "actions": [
+    {
+      "id": "addresszen.find_address",
+      "service": "addresszen",
+      "name": "find_address",
+      "description": "Autocomplete addresses from a partial query and return the official AddressZen suggestions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150,
+            "description": "The partial address string to autocomplete."
+          },
+          "context": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional AddressZen context used to narrow the search."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional country name used to filter results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of suggestions to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for retrieving address autocomplete suggestions from AddressZen."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The AddressZen response code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The AddressZen response message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "hits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The opaque suggestion identifier returned by AddressZen."
+                    },
+                    "suggestion": {
+                      "type": "string",
+                      "description": "The suggestion string that should be shown to the user."
+                    },
+                    "urls": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "description": "A related URL value."
+                          },
+                          "description": "Any related URLs that AddressZen returns for the suggestion."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Any related URLs that AddressZen returns for the suggestion."
+                    },
+                    "udprn": {
+                      "type": "integer",
+                      "description": "The optional UK delivery point reference number."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "suggestion",
+                    "urls"
+                  ],
+                  "description": "One AddressZen autocomplete suggestion."
+                },
+                "description": "The ordered list of suggestions returned by AddressZen."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hits"
+            ],
+            "description": "The AddressZen autocomplete payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "result"
+        ],
+        "description": "The autocomplete suggestions returned by AddressZen."
+      }
+    },
+    {
+      "id": "addresszen.get_key_availability",
+      "service": "addresszen",
+      "name": "get_key_availability",
+      "description": "Retrieve the current AddressZen key availability and context list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the current AddressZen key availability."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The AddressZen response code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The AddressZen response message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "boolean",
+                "description": "Whether the connected key is currently usable."
+              },
+              "context": {
+                "type": "string",
+                "description": "The current context returned by AddressZen, or an empty string."
+              },
+              "contexts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "iso_3": {
+                      "type": "string",
+                      "description": "The 3-letter ISO country code."
+                    },
+                    "iso_2": {
+                      "type": "string",
+                      "description": "The 2-letter ISO country code."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "The human-readable context description."
+                    },
+                    "emoji": {
+                      "type": "string",
+                      "description": "The emoji associated with the context."
+                    },
+                    "rgeo": {
+                      "type": "boolean",
+                      "description": "Whether reverse geolocation is available in this context."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "iso_3",
+                    "iso_2",
+                    "description",
+                    "emoji",
+                    "rgeo"
+                  ],
+                  "description": "One AddressZen context available to the connected API key."
+                },
+                "description": "The list of contexts available to the key."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "available",
+              "context",
+              "contexts"
+            ],
+            "description": "The AddressZen key availability payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "result"
+        ],
+        "description": "The current key availability result returned by AddressZen."
+      }
+    },
+    {
+      "id": "addresszen.retrieve_address_usa",
+      "service": "addresszen",
+      "name": "retrieve_address_usa",
+      "description": "Retrieve a USA-formatted address from an AddressZen suggestion identifier and return the official response wrapper.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The suggestion identifier returned by the AddressZen autocomplete API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address"
+        ],
+        "description": "The input payload for retrieving a USA-formatted address from AddressZen."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The AddressZen response code."
+          },
+          "message": {
+            "type": "string",
+            "description": "The AddressZen response message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique address identifier."
+              },
+              "dataset": {
+                "type": "string",
+                "description": "The AddressZen dataset that produced the address."
+              },
+              "country": {
+                "type": "string",
+                "description": "The full country name."
+              },
+              "country_iso": {
+                "type": "string",
+                "description": "The 3-letter ISO country code."
+              },
+              "country_iso_2": {
+                "type": "string",
+                "description": "The 2-letter ISO country code."
+              },
+              "language": {
+                "type": "string",
+                "description": "The language code for the address."
+              },
+              "primary_number": {
+                "type": "string",
+                "description": "The primary building or house number."
+              },
+              "secondary_number": {
+                "type": "string",
+                "description": "The secondary unit or apartment number."
+              },
+              "plus_4_code": {
+                "type": "string",
+                "description": "The USPS plus-4 component."
+              },
+              "line_1": {
+                "type": "string",
+                "description": "The first line of the address."
+              },
+              "line_2": {
+                "type": "string",
+                "description": "The second line of the address."
+              },
+              "last_line": {
+                "type": "string",
+                "description": "The combined city, state, and postal code line."
+              },
+              "zip_code": {
+                "type": "string",
+                "description": "The 5-digit ZIP code."
+              },
+              "zip_plus_4_code": {
+                "type": "string",
+                "description": "The full ZIP+4 code."
+              },
+              "update_key_number": {
+                "type": "string",
+                "description": "The update key number returned by AddressZen."
+              },
+              "record_type_code": {
+                "type": "string",
+                "description": "The USPS record type code."
+              },
+              "carrier_route_id": {
+                "type": "string",
+                "description": "The USPS carrier route identifier."
+              },
+              "street_pre_directional_abbreviation": {
+                "type": "string",
+                "description": "The street pre-directional abbreviation."
+              },
+              "street_name": {
+                "type": "string",
+                "description": "The street name."
+              },
+              "street_suffix_abbreviation": {
+                "type": "string",
+                "description": "The street suffix abbreviation."
+              },
+              "street_post_directional_abbreviation": {
+                "type": "string",
+                "description": "The street post-directional abbreviation."
+              },
+              "building_or_firm_name": {
+                "type": "string",
+                "description": "The building or firm name."
+              },
+              "address_secondary_abbreviation": {
+                "type": "string",
+                "description": "The secondary address abbreviation."
+              },
+              "base_alternate_code": {
+                "type": "string",
+                "description": "The base alternate code."
+              },
+              "lacs_status_indicator": {
+                "type": "string",
+                "description": "The LACS status indicator."
+              },
+              "government_building_indicator": {
+                "type": "string",
+                "description": "The government building indicator."
+              },
+              "state_abbreviation": {
+                "type": "string",
+                "description": "The state abbreviation."
+              },
+              "state": {
+                "type": "string",
+                "description": "The full state name."
+              },
+              "municipality_city_state_key": {
+                "type": "string",
+                "description": "The municipality city state key."
+              },
+              "urbanization_city_state_key": {
+                "type": "string",
+                "description": "The urbanization city state key."
+              },
+              "preferred_last_line_city_state_key": {
+                "type": "string",
+                "description": "The preferred last line city state key."
+              },
+              "county": {
+                "type": "string",
+                "description": "The county name."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city name."
+              },
+              "city_abbreviation": {
+                "type": "string",
+                "description": "The city abbreviation."
+              },
+              "preferred_city": {
+                "type": "string",
+                "description": "The preferred city name."
+              },
+              "city_state_name_facility_code": {
+                "type": "string",
+                "description": "The city state name facility code."
+              },
+              "zip_classification_code": {
+                "type": "string",
+                "description": "The ZIP classification code."
+              },
+              "city_state_mailing_name_indicator": {
+                "type": "string",
+                "description": "The city state mailing name indicator."
+              },
+              "carrier_route_rate_sortation": {
+                "type": "string",
+                "description": "The carrier route rate sortation code."
+              },
+              "finance_number": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by AddressZen when available."
+                  },
+                  {
+                    "type": "string",
+                    "description": "An empty string returned by AddressZen when this value is unavailable."
+                  }
+                ],
+                "description": "The AddressZen value, which may be numeric or an empty string when unavailable."
+              },
+              "congressional_district_number": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by AddressZen when available."
+                  },
+                  {
+                    "type": "string",
+                    "description": "An empty string returned by AddressZen when this value is unavailable."
+                  }
+                ],
+                "description": "The AddressZen value, which may be numeric or an empty string when unavailable."
+              },
+              "county_number": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by AddressZen when available."
+                  },
+                  {
+                    "type": "string",
+                    "description": "An empty string returned by AddressZen when this value is unavailable."
+                  }
+                ],
+                "description": "The AddressZen value, which may be numeric or an empty string when unavailable."
+              },
+              "native": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The native nested address payload, when present."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "dataset",
+              "country",
+              "country_iso",
+              "country_iso_2",
+              "language",
+              "primary_number",
+              "secondary_number",
+              "plus_4_code",
+              "line_1",
+              "line_2",
+              "last_line",
+              "zip_code",
+              "zip_plus_4_code",
+              "update_key_number",
+              "record_type_code",
+              "carrier_route_id",
+              "street_pre_directional_abbreviation",
+              "street_name",
+              "street_suffix_abbreviation",
+              "street_post_directional_abbreviation",
+              "building_or_firm_name",
+              "address_secondary_abbreviation",
+              "base_alternate_code",
+              "lacs_status_indicator",
+              "government_building_indicator",
+              "state_abbreviation",
+              "state",
+              "municipality_city_state_key",
+              "urbanization_city_state_key",
+              "preferred_last_line_city_state_key",
+              "county",
+              "city",
+              "city_abbreviation",
+              "preferred_city",
+              "city_state_name_facility_code",
+              "zip_classification_code",
+              "city_state_mailing_name_indicator",
+              "carrier_route_rate_sortation",
+              "finance_number",
+              "congressional_district_number",
+              "county_number"
+            ],
+            "description": "The USA-formatted address object returned by AddressZen."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "result"
+        ],
+        "description": "The USA address retrieval result returned by AddressZen."
+      }
+    }
+  ]
+}

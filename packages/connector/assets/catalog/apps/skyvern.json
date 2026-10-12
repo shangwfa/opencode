@@ -1,0 +1,640 @@
+{
+  "service": "skyvern",
+  "displayName": "Skyvern",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_SKYVERN_API_KEY",
+      "description": "Skyvern API key sent in the x-api-key header. Reveal or copy it at https://app.skyvern.com/settings.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.skyvern.com",
+  "actions": [
+    {
+      "id": "skyvern.cancel_run",
+      "service": "skyvern",
+      "name": "cancel_run",
+      "description": "Cancel one active Skyvern task or workflow run.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task or workflow run identifier to cancel.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Skyvern run to cancel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "description": "The Skyvern run identifier sent for cancellation."
+          },
+          "canceled": {
+            "type": "boolean",
+            "description": "Whether Skyvern accepted the cancellation request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that the cancellation request succeeded."
+      }
+    },
+    {
+      "id": "skyvern.get_run",
+      "service": "skyvern",
+      "name": "get_run",
+      "description": "Get the current state, output, hosted files, screenshots, and recording URLs for one Skyvern run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task or workflow run identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Skyvern run to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "runId": {
+                "type": "string",
+                "description": "The unique Skyvern task or workflow run identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "queued",
+                  "running",
+                  "paused",
+                  "timed_out",
+                  "failed",
+                  "terminated",
+                  "completed",
+                  "canceled"
+                ],
+                "description": "The current lifecycle status of the run."
+              },
+              "runType": {
+                "type": "string",
+                "description": "The Skyvern engine or workflow type used for this run."
+              },
+              "output": {
+                "anyOf": [
+                  {
+                    "description": "The provider-defined structured or textual run output."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider-defined structured or textual run output."
+              },
+              "failureReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reason the run failed or terminated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reason the run failed or terminated."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when Skyvern created the run.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "The timestamp when Skyvern last modified the run.",
+                "format": "date-time"
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when execution started.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when execution started."
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when execution finished.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when execution finished."
+              },
+              "recordingUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider-hosted recording URL for the run.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider-hosted recording URL for the run."
+              },
+              "screenshotUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A provider-hosted screenshot URL.",
+                  "format": "uri"
+                },
+                "description": "Provider-hosted screenshot URLs in reverse chronological order."
+              },
+              "downloadedFiles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The provider-hosted URL used to access the downloaded file.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "url"
+                  ],
+                  "description": "One file downloaded during the run."
+                },
+                "description": "Metadata and provider-hosted URLs for files downloaded during the run."
+              },
+              "appUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Skyvern application URL for viewing this run.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Skyvern application URL for viewing this run."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "runId",
+              "status",
+              "runType",
+              "createdAt"
+            ],
+            "description": "A normalized Skyvern run with stable lifecycle fields and provider-defined result data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Skyvern run details."
+      }
+    },
+    {
+      "id": "skyvern.list_runs",
+      "service": "skyvern",
+      "name": "list_runs",
+      "description": "List Skyvern task and workflow runs with pagination and optional status, type, or text filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The one-based results page to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of runs to return per page."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "created",
+                "queued",
+                "running",
+                "paused",
+                "timed_out",
+                "failed",
+                "terminated",
+                "completed",
+                "canceled"
+              ],
+              "description": "A Skyvern run status."
+            },
+            "description": "The run statuses to include."
+          },
+          "searchKey": {
+            "type": "string",
+            "minLength": 3,
+            "description": "A case-insensitive substring to search for."
+          },
+          "runTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "task_v1",
+                "task_v2",
+                "task_v3",
+                "workflow_run",
+                "openai_cua",
+                "anthropic_cua",
+                "ui_tars",
+                "yutori_navigator"
+              ],
+              "description": "A Skyvern run type."
+            },
+            "description": "The task or workflow run types to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and filters for Skyvern run history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "runId": {
+                  "type": "string",
+                  "description": "The unique Skyvern run identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current lifecycle status reported by Skyvern."
+                },
+                "runType": {
+                  "type": "string",
+                  "description": "The Skyvern task or workflow run type."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when Skyvern created the run.",
+                  "format": "date-time"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional title of the run."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional title of the run."
+                },
+                "startedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when execution started.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when execution started."
+                },
+                "finishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when execution finished.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when execution finished."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "runId",
+                "status",
+                "runType",
+                "createdAt"
+              ],
+              "description": "A compact Skyvern run-history item."
+            },
+            "description": "The runs returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching Skyvern runs."
+      }
+    },
+    {
+      "id": "skyvern.run_task",
+      "service": "skyvern",
+      "name": "run_task",
+      "description": "Start a high-level Skyvern browser automation task and return a run ID that can be polled until completion.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The goal or task Skyvern should accomplish.",
+            "pattern": "\\S"
+          },
+          "url": {
+            "type": "string",
+            "description": "The optional starting URL for the browser task.",
+            "format": "uri"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "skyvern-1.0",
+              "skyvern-2.0",
+              "skyvern-3.0",
+              "openai-cua",
+              "anthropic-cua",
+              "ui-tars",
+              "yutori-navigator"
+            ],
+            "description": "The Skyvern engine that should run the task."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional title for identifying the task."
+          },
+          "dataExtractionSchema": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A JSON object extraction schema."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One schema array item."
+                },
+                "description": "A JSON array extraction schema."
+              },
+              {
+                "type": "string",
+                "description": "A textual extraction schema."
+              }
+            ],
+            "description": "An optional JSON Schema or provider-supported extraction schema for consistent output."
+          },
+          "maxSteps": {
+            "type": "integer",
+            "description": "The maximum number of browser steps Skyvern may execute before failing the task."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "The optional HTTPS endpoint Skyvern should notify after completion.",
+            "format": "uri"
+          },
+          "browserSessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An existing Skyvern browser session identifier to continue using."
+          },
+          "browserProfileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An existing Skyvern browser profile identifier to reuse."
+          },
+          "startFreshBrowser": {
+            "type": "boolean",
+            "description": "Whether to start with an empty browser and ignore saved browser memory."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "The prompt and optional browser settings for a new Skyvern task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "runId": {
+                "type": "string",
+                "description": "The unique Skyvern task or workflow run identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "queued",
+                  "running",
+                  "paused",
+                  "timed_out",
+                  "failed",
+                  "terminated",
+                  "completed",
+                  "canceled"
+                ],
+                "description": "The current lifecycle status of the run."
+              },
+              "runType": {
+                "type": "string",
+                "description": "The Skyvern engine or workflow type used for this run."
+              },
+              "output": {
+                "anyOf": [
+                  {
+                    "description": "The provider-defined structured or textual run output."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider-defined structured or textual run output."
+              },
+              "failureReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reason the run failed or terminated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reason the run failed or terminated."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when Skyvern created the run.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "The timestamp when Skyvern last modified the run.",
+                "format": "date-time"
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when execution started.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when execution started."
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when execution finished.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when execution finished."
+              },
+              "recordingUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider-hosted recording URL for the run.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider-hosted recording URL for the run."
+              },
+              "screenshotUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A provider-hosted screenshot URL.",
+                  "format": "uri"
+                },
+                "description": "Provider-hosted screenshot URLs in reverse chronological order."
+              },
+              "downloadedFiles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The provider-hosted URL used to access the downloaded file.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "url"
+                  ],
+                  "description": "One file downloaded during the run."
+                },
+                "description": "Metadata and provider-hosted URLs for files downloaded during the run."
+              },
+              "appUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Skyvern application URL for viewing this run.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Skyvern application URL for viewing this run."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "runId",
+              "status",
+              "runType",
+              "createdAt"
+            ],
+            "description": "A normalized Skyvern run with stable lifecycle fields and provider-defined result data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Skyvern run created for the task."
+      },
+      "asyncLifecycle": {
+        "startActionId": "skyvern.run_task",
+        "statusActionId": "skyvern.get_run"
+      }
+    }
+  ]
+}

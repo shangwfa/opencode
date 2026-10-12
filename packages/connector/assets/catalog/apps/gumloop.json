@@ -1,0 +1,586 @@
+{
+  "service": "gumloop",
+  "displayName": "Gumloop",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GUMLOOP_API_KEY",
+      "description": "Gumloop API key sent as a bearer token. Generate one from the Gumloop credentials page: https://www.gumloop.com/settings/profile/credentials.",
+      "extraFields": [
+        {
+          "key": "userId",
+          "label": "User ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "GUMLOOP_USER_ID",
+          "description": "Gumloop user ID sent with the x-auth-key header for personal API keys. Find it in Profile Settings: https://www.gumloop.com/settings/profile/general."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.gumloop.com",
+  "actions": [
+    {
+      "id": "gumloop.get_input_schema",
+      "service": "gumloop",
+      "name": "get_input_schema",
+      "description": "Retrieve the input schema for a Gumloop saved flow.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "savedItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop saved flow ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedItemId"
+        ],
+        "description": "Input parameters for retrieving a Gumloop saved flow input schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "data_type": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "file"
+                  ],
+                  "description": "The Gumloop input data type."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The input description, if Gumloop provides one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The input description, if Gumloop provides one."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The input name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gumloop saved flow input definition."
+            },
+            "description": "Input definitions returned by Gumloop."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inputs",
+          "raw"
+        ],
+        "description": "Gumloop saved flow input schema response."
+      }
+    },
+    {
+      "id": "gumloop.get_run_details",
+      "service": "gumloop",
+      "name": "get_run_details",
+      "description": "Poll a Gumloop flow run and retrieve state, logs, and output node values.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop run ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId"
+        ],
+        "description": "Input parameters for a Gumloop flow run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The Gumloop user ID associated with the run."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "DONE",
+              "TERMINATING",
+              "FAILED",
+              "TERMINATED",
+              "QUEUED"
+            ],
+            "description": "The Gumloop run state."
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A Gumloop output value."
+            },
+            "description": "Output values keyed by Gumloop output node name."
+          },
+          "createdTs": {
+            "type": "string",
+            "description": "The timestamp when the run was created.",
+            "format": "date-time"
+          },
+          "finishedTs": {
+            "type": "string",
+            "description": "The timestamp when the run finished.",
+            "format": "date-time"
+          },
+          "log": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Gumloop log entry."
+            },
+            "description": "Log entries returned by Gumloop."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "raw"
+        ],
+        "description": "Gumloop run details response with normalized state and outputs."
+      }
+    },
+    {
+      "id": "gumloop.kill_flow_run",
+      "service": "gumloop",
+      "name": "kill_flow_run",
+      "description": "Kill a Gumloop flow run and its subflow runs.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop run ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId"
+        ],
+        "description": "Input parameters for a Gumloop flow run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Gumloop reports that the run was killed."
+          },
+          "runId": {
+            "type": "string",
+            "description": "The Gumloop run ID that was killed."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "runId",
+          "raw"
+        ],
+        "description": "Gumloop kill flow run response."
+      }
+    },
+    {
+      "id": "gumloop.list_run_history",
+      "service": "gumloop",
+      "name": "list_run_history",
+      "description": "Retrieve recent Gumloop run history for a workbook or saved flow.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workbookId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop workbook ID."
+          },
+          "savedItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop saved flow ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Gumloop recent run history.",
+        "anyOf": [
+          {
+            "required": [
+              "workbookId"
+            ]
+          },
+          {
+            "required": [
+              "savedItemId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runHistory": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runHistory",
+          "raw"
+        ],
+        "description": "Gumloop recent run history response."
+      }
+    },
+    {
+      "id": "gumloop.list_saved_flows",
+      "service": "gumloop",
+      "name": "list_saved_flows",
+      "description": "List Gumloop saved flows for a user or team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gumloop user or team execution context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedFlows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "saved_item_id": {
+                  "type": "string",
+                  "description": "The ID of the saved flow."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the saved flow."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The description of the saved flow."
+                },
+                "created_ts": {
+                  "type": "string",
+                  "description": "The timestamp when the saved flow was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gumloop saved flow."
+            },
+            "description": "Saved flows returned by Gumloop."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedFlows",
+          "raw"
+        ],
+        "description": "Gumloop saved flow list response."
+      }
+    },
+    {
+      "id": "gumloop.list_workbooks",
+      "service": "gumloop",
+      "name": "list_workbooks",
+      "description": "List Gumloop workbooks and their saved flows for a user or team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gumloop user or team execution context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workbooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workbook_id": {
+                  "type": "string",
+                  "description": "The ID of the workbook."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the workbook."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The description of the workbook."
+                },
+                "created_ts": {
+                  "type": "string",
+                  "description": "The timestamp when the workbook was created.",
+                  "format": "date-time"
+                },
+                "saved_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "saved_item_id": {
+                        "type": "string",
+                        "description": "The ID of the saved flow."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the saved flow."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "The description of the saved flow."
+                      },
+                      "created_ts": {
+                        "type": "string",
+                        "description": "The timestamp when the saved flow was created.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Gumloop saved flow."
+                  },
+                  "description": "Saved flows in the workbook."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gumloop workbook with its saved flows."
+            },
+            "description": "Workbooks returned by Gumloop."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workbooks",
+          "raw"
+        ],
+        "description": "Gumloop workbook list response."
+      }
+    },
+    {
+      "id": "gumloop.start_flow_run",
+      "service": "gumloop",
+      "name": "start_flow_run",
+      "description": "Start a Gumloop saved flow run with small JSON input values.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "savedItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop saved flow ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop user ID. If omitted, the user ID stored during connection is used."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gumloop project or team ID."
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON input value for the Gumloop flow."
+            },
+            "description": "Small JSON input values keyed by Gumloop Input node name. File inputs are deferred in this connector pass."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedItemId"
+        ],
+        "description": "Input parameters for starting a Gumloop saved flow run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "description": "The started Gumloop run ID."
+          },
+          "savedItemId": {
+            "type": "string",
+            "description": "The Gumloop saved flow ID returned for the run."
+          },
+          "workbookId": {
+            "type": "string",
+            "description": "The Gumloop workbook ID returned for the run."
+          },
+          "url": {
+            "type": "string",
+            "description": "The Gumloop run URL returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw Gumloop object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "savedItemId",
+          "workbookId",
+          "url",
+          "raw"
+        ],
+        "description": "Gumloop start flow run response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "gumloop.start_flow_run",
+        "statusActionId": "gumloop.get_run_details",
+        "cancelActionId": "gumloop.kill_flow_run"
+      }
+    }
+  ]
+}

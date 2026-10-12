@@ -1,0 +1,393 @@
+{
+  "service": "godial",
+  "displayName": "GoDial",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "GODIAL_ACCESS_TOKEN",
+      "description": "GoDial external API access token passed as the access_token query parameter. Generate or view it in GoDial at Dashboard -> Integration -> External API, as described in the official integration guide: https://godial.cc/blog/integrating-your-website-or-crm-with-godial-using-api/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://godial.cc",
+  "actions": [
+    {
+      "id": "godial.create_contact",
+      "service": "godial",
+      "name": "create_contact",
+      "description": "Create one GoDial contact in a target list using the official external API form fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact name."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact email address."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The primary phone number of the contact."
+          },
+          "secondPhone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An alternate phone number for the contact."
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact company name."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note text saved for the contact."
+          },
+          "remarks": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The remarks text saved for the contact."
+          },
+          "extra": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Extra note content saved for the contact."
+          },
+          "assignmentMode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "roundrobin"
+            ],
+            "description": "How GoDial should assign the new contact when an explicit assignee is not used."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The custom field name."
+                },
+                "value": {
+                  "description": "The custom field value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One custom field entry sent to GoDial."
+            },
+            "description": "Custom fields forwarded to GoDial."
+          },
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GoDial list ID where the contact should be stored."
+          },
+          "assignedAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GoDial account ID assigned to the contact."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead source label for the contact."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact address."
+          },
+          "sourceMarketing": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "UTM-style marketing attribution object forwarded to GoDial."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone",
+          "listId"
+        ],
+        "description": "Input for creating one GoDial contact in a list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw GoDial response returned after contact creation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "Normalized output for creating one GoDial contact."
+      }
+    },
+    {
+      "id": "godial.get_contact",
+      "service": "godial",
+      "name": "get_contact",
+      "description": "Fetch one GoDial contact by contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GoDial contact ID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading one GoDial contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The GoDial contact identifier."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "One raw GoDial item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized contact returned by GoDial."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "Normalized output for reading one GoDial contact."
+      }
+    },
+    {
+      "id": "godial.list_accounts",
+      "service": "godial",
+      "name": "list_accounts",
+      "description": "List GoDial accounts in the current company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing GoDial accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The GoDial account identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The GoDial account display name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One raw GoDial item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GoDial account summary."
+            },
+            "description": "Accounts returned by GoDial."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw GoDial item."
+            },
+            "description": "The raw account payload returned by GoDial."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts",
+          "raw"
+        ],
+        "description": "Normalized output for GoDial account listing."
+      }
+    },
+    {
+      "id": "godial.list_contacts_in_list",
+      "service": "godial",
+      "name": "list_contacts_in_list",
+      "description": "List all contacts currently stored in one GoDial list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GoDial list ID whose contacts should be returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing contacts in one GoDial list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The GoDial contact identifier."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "The primary phone number returned for the contact."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The contact name when GoDial returns it."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One raw GoDial item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GoDial contact summary."
+            },
+            "description": "Contacts returned for the GoDial list."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw GoDial item."
+            },
+            "description": "The raw contact payload returned by GoDial."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "raw"
+        ],
+        "description": "Normalized output for listing contacts in one GoDial list."
+      }
+    },
+    {
+      "id": "godial.list_lists",
+      "service": "godial",
+      "name": "list_lists",
+      "description": "List GoDial lists in the current company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing GoDial lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The GoDial list identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The GoDial list display name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One raw GoDial item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GoDial list summary."
+            },
+            "description": "Lists returned by GoDial."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw GoDial item."
+            },
+            "description": "The raw list payload returned by GoDial."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lists",
+          "raw"
+        ],
+        "description": "Normalized output for GoDial list listing."
+      }
+    }
+  ]
+}

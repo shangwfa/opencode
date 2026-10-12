@@ -1,0 +1,684 @@
+{
+  "service": "scrape_do",
+  "displayName": "Scrape.do",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "SCRAPE_DO_TOKEN",
+      "description": "Scrape.do API token passed as the token query parameter. Create or copy it from the Scrape.do dashboard.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://scrape.do",
+  "actions": [
+    {
+      "id": "scrape_do.fetch_html",
+      "service": "scrape_do",
+      "name": "fetch_html",
+      "description": "Fetch one public URL through Scrape.do and return the synchronous response body.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public target URL Scrape.do should request.",
+            "format": "uri"
+          },
+          "super": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should use residential and mobile proxy networks."
+          },
+          "geoCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The two-letter country code used for Scrape.do geo-targeting.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "regionalGeoCode": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The continent code used for Scrape.do regional geo-targeting."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The sticky Scrape.do session identifier."
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should render the page with a headless browser."
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile",
+              "tablet"
+            ],
+            "description": "The browser device profile Scrape.do should emulate."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport height in pixels."
+          },
+          "blockResources": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should block CSS, image, and font resources while rendering."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 120000,
+            "description": "The maximum Scrape.do request timeout in milliseconds."
+          },
+          "retryTimeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 55000,
+            "description": "The maximum Scrape.do retry timeout in milliseconds."
+          },
+          "disableRetry": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable its retry mechanism."
+          },
+          "disableRedirection": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable target request redirection."
+          },
+          "setCookies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cookie header value Scrape.do should send to the target website."
+          },
+          "customHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should handle all request headers."
+          },
+          "forwardHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should forward caller headers to the target."
+          },
+          "output": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "markdown"
+            ],
+            "description": "The Scrape.do output format for page content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Common synchronous Scrape.do API parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The response body returned by Scrape.do."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Scrape.do."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One HTTP response header value."
+            },
+            "description": "The HTTP response headers returned by Scrape.do or the target website."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "statusCode": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Scrape.do."
+              },
+              "requestCost": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Scrape.do credit cost reported for this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrape.do credit cost reported for this request."
+              },
+              "remainingCredits": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining Scrape.do credits reported after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining Scrape.do credits reported after this request."
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response Content-Type header when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response Content-Type header when returned."
+              },
+              "finalUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final response URL observed by the connector."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final response URL observed by the connector."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from Scrape.do response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned by a synchronous Scrape.do request."
+      }
+    },
+    {
+      "id": "scrape_do.fetch_json",
+      "service": "scrape_do",
+      "name": "fetch_json",
+      "description": "Fetch one public URL through Scrape.do returnJSON mode and return the parsed JSON payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public target URL Scrape.do should request.",
+            "format": "uri"
+          },
+          "super": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should use residential and mobile proxy networks."
+          },
+          "geoCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The two-letter country code used for Scrape.do geo-targeting.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "regionalGeoCode": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The continent code used for Scrape.do regional geo-targeting."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The sticky Scrape.do session identifier."
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should render the page with a headless browser."
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile",
+              "tablet"
+            ],
+            "description": "The browser device profile Scrape.do should emulate."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport height in pixels."
+          },
+          "blockResources": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should block CSS, image, and font resources while rendering."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 120000,
+            "description": "The maximum Scrape.do request timeout in milliseconds."
+          },
+          "retryTimeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 55000,
+            "description": "The maximum Scrape.do retry timeout in milliseconds."
+          },
+          "disableRetry": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable its retry mechanism."
+          },
+          "disableRedirection": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable target request redirection."
+          },
+          "setCookies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cookie header value Scrape.do should send to the target website."
+          },
+          "customHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should handle all request headers."
+          },
+          "forwardHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should forward caller headers to the target."
+          },
+          "output": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "markdown"
+            ],
+            "description": "The Scrape.do output format for page content."
+          },
+          "showFrames": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should include iframe content when render and returnJSON are enabled."
+          },
+          "showWebsocketRequests": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should include WebSocket requests when render and returnJSON are enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for fetching a Scrape.do returnJSON response."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The parsed JSON payload returned by Scrape.do."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Scrape.do."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One HTTP response header value."
+            },
+            "description": "The HTTP response headers returned by Scrape.do or the target website."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "statusCode": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Scrape.do."
+              },
+              "requestCost": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Scrape.do credit cost reported for this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrape.do credit cost reported for this request."
+              },
+              "remainingCredits": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining Scrape.do credits reported after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining Scrape.do credits reported after this request."
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response Content-Type header when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response Content-Type header when returned."
+              },
+              "finalUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final response URL observed by the connector."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final response URL observed by the connector."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from Scrape.do response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The JSON response returned by Scrape.do returnJSON mode."
+      }
+    },
+    {
+      "id": "scrape_do.get_account_info",
+      "service": "scrape_do",
+      "name": "get_account_info",
+      "description": "Retrieve Scrape.do account information and usage counters for the API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Scrape.do account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the Scrape.do subscription is active."
+              },
+              "concurrent_request": {
+                "type": "integer",
+                "description": "The maximum concurrent request count for the account."
+              },
+              "max_monthly_request": {
+                "type": "integer",
+                "description": "The maximum monthly request count for the account."
+              },
+              "remaining_concurrent_request": {
+                "type": "integer",
+                "description": "The remaining concurrent request count for the account."
+              },
+              "remaining_monthly_request": {
+                "type": "integer",
+                "description": "The remaining monthly request count for the account."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "is_active",
+              "concurrent_request",
+              "max_monthly_request",
+              "remaining_concurrent_request",
+              "remaining_monthly_request"
+            ],
+            "description": "The account information and usage payload returned by Scrape.do."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for Scrape.do account information."
+      }
+    },
+    {
+      "id": "scrape_do.take_screenshot",
+      "service": "scrape_do",
+      "name": "take_screenshot",
+      "description": "Render one public URL through Scrape.do and return a screenshot as base64.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public target URL Scrape.do should request.",
+            "format": "uri"
+          },
+          "super": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should use residential and mobile proxy networks."
+          },
+          "geoCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The two-letter country code used for Scrape.do geo-targeting.",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "regionalGeoCode": {
+            "type": "string",
+            "minLength": 2,
+            "description": "The continent code used for Scrape.do regional geo-targeting."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The sticky Scrape.do session identifier."
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should render the page with a headless browser."
+          },
+          "device": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "mobile",
+              "tablet"
+            ],
+            "description": "The browser device profile Scrape.do should emulate."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The browser viewport height in pixels."
+          },
+          "blockResources": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should block CSS, image, and font resources while rendering."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 120000,
+            "description": "The maximum Scrape.do request timeout in milliseconds."
+          },
+          "retryTimeout": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 55000,
+            "description": "The maximum Scrape.do retry timeout in milliseconds."
+          },
+          "disableRetry": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable its retry mechanism."
+          },
+          "disableRedirection": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should disable target request redirection."
+          },
+          "setCookies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cookie header value Scrape.do should send to the target website."
+          },
+          "customHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should handle all request headers."
+          },
+          "forwardHeaders": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should forward caller headers to the target."
+          },
+          "output": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "markdown"
+            ],
+            "description": "The Scrape.do output format for page content."
+          },
+          "fullPage": {
+            "type": "boolean",
+            "description": "Whether Scrape.do should capture a full-page screenshot."
+          },
+          "selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A CSS selector for a partial screenshot area."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for taking a screenshot with Scrape.do."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "imageBase64": {
+            "type": "string",
+            "description": "The screenshot image encoded as a base64 string."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The screenshot response content type."
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "The HTTP status code returned by Scrape.do."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One HTTP response header value."
+            },
+            "description": "The HTTP response headers returned by Scrape.do or the target website."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "statusCode": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Scrape.do."
+              },
+              "requestCost": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Scrape.do credit cost reported for this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Scrape.do credit cost reported for this request."
+              },
+              "remainingCredits": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The remaining Scrape.do credits reported after this request."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The remaining Scrape.do credits reported after this request."
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response Content-Type header when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response Content-Type header when returned."
+              },
+              "finalUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The final response URL observed by the connector."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The final response URL observed by the connector."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata collected from Scrape.do response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The screenshot response returned by Scrape.do."
+      }
+    }
+  ]
+}

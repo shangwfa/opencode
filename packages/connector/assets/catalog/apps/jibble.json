@@ -1,0 +1,466 @@
+{
+  "service": "jibble",
+  "displayName": "Jibble",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "JIBBLE_PERSONAL_ACCESS_TOKEN",
+      "description": "Jibble personal access token sent as a Bearer token. Generate one under Organization Settings > API Keys: https://www.jibble.io/help/using-jibbles-api-for-your-custom-needs."
+    }
+  ],
+  "homepageUrl": "https://www.jibble.io",
+  "actions": [
+    {
+      "id": "jibble.create_location",
+      "service": "jibble",
+      "name": "create_location",
+      "description": "Create a work location in Jibble.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The display name of the Jibble location."
+          },
+          "address": {
+            "type": "string",
+            "description": "The postal address of the Jibble location."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Archived"
+            ],
+            "description": "The lifecycle status of the Jibble location."
+          },
+          "geoFence": {
+            "type": "object",
+            "properties": {
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The geofence radius."
+              },
+              "units": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Jibble distance unit used for the geofence radius."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The geofence surrounding a Jibble location."
+          },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude in decimal degrees."
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The geographic coordinates of a Jibble location."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for creating a Jibble location."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Jibble location returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Jibble location response."
+      }
+    },
+    {
+      "id": "jibble.delete_location",
+      "service": "jibble",
+      "name": "delete_location",
+      "description": "Permanently delete a Jibble work location.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "description": "The Jibble location identifier to delete.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting a Jibble location."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Jibble accepted the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Jibble operation response."
+      }
+    },
+    {
+      "id": "jibble.get_organizations",
+      "service": "jibble",
+      "name": "get_organizations",
+      "description": "List the Jibble organizations accessible to the personal access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Jibble organizations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Jibble organizations."
+            },
+            "description": "The returned Jibble organizations."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when Jibble returned it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when Jibble returned it."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next OData page when Jibble returned one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next OData page when Jibble returned one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "A normalized Jibble OData collection response."
+      }
+    },
+    {
+      "id": "jibble.list_locations",
+      "service": "jibble",
+      "name": "list_locations",
+      "description": "List Jibble work locations with optional OData filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "select": {
+            "type": "string",
+            "description": "The comma-separated Jibble fields to return through the OData $select option."
+          },
+          "filter": {
+            "type": "string",
+            "description": "The OData $filter expression used to limit returned Jibble records."
+          },
+          "expand": {
+            "type": "string",
+            "description": "The OData $expand expression used to include related Jibble records."
+          },
+          "orderBy": {
+            "type": "string",
+            "description": "The OData $orderby expression used to sort returned Jibble records."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching Jibble records to skip."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of Jibble records to return."
+          },
+          "count": {
+            "type": "boolean",
+            "description": "Whether Jibble should include the total matching record count."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Jibble locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Jibble locations."
+            },
+            "description": "The returned Jibble locations."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when Jibble returned it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when Jibble returned it."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next OData page when Jibble returned one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next OData page when Jibble returned one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "A normalized Jibble OData collection response."
+      }
+    },
+    {
+      "id": "jibble.list_members",
+      "service": "jibble",
+      "name": "list_members",
+      "description": "List people in the Jibble organization with optional OData filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "select": {
+            "type": "string",
+            "description": "The comma-separated Jibble fields to return through the OData $select option."
+          },
+          "filter": {
+            "type": "string",
+            "description": "The OData $filter expression used to limit returned Jibble records."
+          },
+          "expand": {
+            "type": "string",
+            "description": "The OData $expand expression used to include related Jibble records."
+          },
+          "orderBy": {
+            "type": "string",
+            "description": "The OData $orderby expression used to sort returned Jibble records."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching Jibble records to skip."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of Jibble records to return."
+          },
+          "count": {
+            "type": "boolean",
+            "description": "Whether Jibble should include the total matching record count."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Jibble organization members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Jibble members."
+            },
+            "description": "The returned Jibble members."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when Jibble returned it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when Jibble returned it."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next OData page when Jibble returned one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next OData page when Jibble returned one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "A normalized Jibble OData collection response."
+      }
+    },
+    {
+      "id": "jibble.update_location",
+      "service": "jibble",
+      "name": "update_location",
+      "description": "Update or archive an existing Jibble work location.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "description": "The Jibble location identifier.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The display name of the Jibble location."
+          },
+          "address": {
+            "type": "string",
+            "description": "The postal address of the Jibble location."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Archived"
+            ],
+            "description": "The lifecycle status of the Jibble location."
+          },
+          "geoFence": {
+            "type": "object",
+            "properties": {
+              "radius": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The geofence radius."
+              },
+              "units": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Jibble distance unit used for the geofence radius."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The geofence surrounding a Jibble location."
+          },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude in decimal degrees."
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The geographic coordinates of a Jibble location."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "locationId"
+        ],
+        "description": "The input payload for updating a Jibble location."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Jibble accepted the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful Jibble operation response."
+      }
+    }
+  ]
+}

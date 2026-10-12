@@ -1,0 +1,651 @@
+{
+  "service": "placekey",
+  "displayName": "Placekey",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "pk_live_...",
+      "description": "Placekey API key used with the apikey request header. Generate it from the Placekey Developer Portal dashboard: https://docs.placekey.io/documentation/api-overview/authentication.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.placekey.io",
+  "actions": [
+    {
+      "id": "placekey.get_geocode_from_address",
+      "service": "placekey",
+      "name": "get_geocode_from_address",
+      "description": "Resolve a postal address with Placekey and return the matched geocode response for the location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "street_address": {
+            "type": "string",
+            "description": "The street address of the location to resolve into a Placekey."
+          },
+          "city": {
+            "type": "string",
+            "description": "The city of the location."
+          },
+          "region": {
+            "type": "string",
+            "description": "The region or state of the location."
+          },
+          "postal_code": {
+            "type": "string",
+            "description": "The postal code of the location."
+          },
+          "iso_country_code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code for the queried location."
+          },
+          "location_name": {
+            "type": "string",
+            "description": "The point-of-interest name used to improve Placekey matching."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "street_address",
+          "region",
+          "iso_country_code"
+        ],
+        "description": "The input payload for converting an address with Placekey."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "description": "The query identifier echoed back by Placekey."
+          },
+          "placekey": {
+            "type": "string",
+            "description": "The Placekey identifier returned for the matched address."
+          },
+          "geocode": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "description": "The latitude returned by Placekey geocoding."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "description": "The longitude returned by Placekey geocoding."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The geocoded latitude and longitude for the matched location."
+              },
+              "location_type": {
+                "type": "string",
+                "description": "The Placekey geocode precision level for the matched location."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Geocode data returned by the Placekey geocoder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response payload for converting an address into geocode data."
+      }
+    },
+    {
+      "id": "placekey.get_placekey",
+      "service": "placekey",
+      "name": "get_placekey",
+      "description": "Look up a single location with Placekey and return its Placekey identifier plus optional enrichment fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "description": "A custom identifier echoed back in the Placekey response."
+          },
+          "street_address": {
+            "type": "string",
+            "description": "The street address of the location to resolve."
+          },
+          "city": {
+            "type": "string",
+            "description": "The city of the queried location."
+          },
+          "region": {
+            "type": "string",
+            "description": "The second-level administrative region, such as a US state code."
+          },
+          "postal_code": {
+            "type": "string",
+            "description": "The postal code of the queried location."
+          },
+          "iso_country_code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code for the queried location."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The WGS-84 latitude of the queried location."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The WGS-84 longitude of the queried location."
+          },
+          "location_name": {
+            "type": "string",
+            "description": "The point-of-interest name used to improve Placekey matching."
+          },
+          "place_metadata": {
+            "type": "object",
+            "properties": {
+              "website": {
+                "type": "string",
+                "description": "The business website URL used to improve point-of-interest matching.",
+                "format": "uri"
+              },
+              "mcc_code": {
+                "type": "string",
+                "description": "The merchant category code associated with the point of interest."
+              },
+              "store_id": {
+                "type": "string",
+                "description": "A brand-specific store identifier used to improve matching accuracy."
+              },
+              "naics_code": {
+                "type": "string",
+                "description": "The 4-digit or 6-digit NAICS code associated with the business."
+              },
+              "phone_number": {
+                "type": "string",
+                "description": "The phone number of the point of interest used to improve matching."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional metadata used by Placekey to improve point-of-interest matching."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "address_placekey",
+                    "building_placekey",
+                    "confidence_score",
+                    "normalized_address",
+                    "geocode",
+                    "upi",
+                    "parcel",
+                    "geoid",
+                    "gers"
+                  ],
+                  "description": "An optional response field exposed by the Placekey API."
+                },
+                "description": "Optional Placekey response fields to include in the lookup result.",
+                "minItems": 1
+              },
+              "strict_name_match": {
+                "type": "boolean",
+                "description": "Whether Placekey should require an exact point-of-interest name match."
+              },
+              "strict_address_match": {
+                "type": "boolean",
+                "description": "Whether Placekey should require an exact address match."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Options that customize the Placekey lookup response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a single Placekey lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "description": "The query identifier echoed back by Placekey."
+          },
+          "placekey": {
+            "type": "string",
+            "description": "The Placekey identifier returned for the matched location."
+          },
+          "error": {
+            "type": "string",
+            "description": "The lookup error returned by Placekey."
+          },
+          "address_placekey": {
+            "type": "string",
+            "description": "The Placekey for the address without the point-of-interest component."
+          },
+          "building_placekey": {
+            "type": "string",
+            "description": "The building-level Placekey returned by Placekey."
+          },
+          "confidence_score": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "description": "The confidence score returned by Placekey for the match."
+          },
+          "normalized_address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The normalized address returned by Placekey for a successful lookup."
+          },
+          "geocode": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "description": "The latitude returned by Placekey geocoding."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "description": "The longitude returned by Placekey geocoding."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The geocoded latitude and longitude for the matched location."
+              },
+              "location_type": {
+                "type": "string",
+                "description": "The Placekey geocode precision level for the matched location."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Geocode data returned by the Placekey geocoder."
+          },
+          "upi": {
+            "type": "string",
+            "description": "The universal parcel identifier returned by Placekey."
+          },
+          "parcel": {
+            "type": "string",
+            "description": "The parcel identifier returned by Placekey when available."
+          },
+          "geoid": {
+            "type": "string",
+            "description": "The census geography identifier returned by Placekey when available."
+          },
+          "gers": {
+            "type": "string",
+            "description": "The Overture Maps identifier returned by Placekey when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query_id"
+        ],
+        "description": "The response payload for a successful or failed Placekey lookup."
+      }
+    },
+    {
+      "id": "placekey.get_placekey_from_address",
+      "service": "placekey",
+      "name": "get_placekey_from_address",
+      "description": "Resolve a postal address into a Placekey identifier using the Placekey single-lookup API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "street_address": {
+            "type": "string",
+            "description": "The street address of the location to resolve into a Placekey."
+          },
+          "city": {
+            "type": "string",
+            "description": "The city of the location."
+          },
+          "region": {
+            "type": "string",
+            "description": "The region or state of the location."
+          },
+          "postal_code": {
+            "type": "string",
+            "description": "The postal code of the location."
+          },
+          "iso_country_code": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code for the queried location."
+          },
+          "location_name": {
+            "type": "string",
+            "description": "The point-of-interest name used to improve Placekey matching."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "street_address",
+          "region",
+          "iso_country_code"
+        ],
+        "description": "The input payload for converting an address with Placekey."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "description": "The query identifier echoed back by Placekey."
+          },
+          "placekey": {
+            "type": "string",
+            "description": "The Placekey identifier returned for the matched address."
+          },
+          "error": {
+            "type": "string",
+            "description": "The lookup error returned by Placekey."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query_id"
+        ],
+        "description": "The response payload for converting an address into a Placekey."
+      }
+    },
+    {
+      "id": "placekey.get_placekeys_bulk",
+      "service": "placekey",
+      "name": "get_placekeys_bulk",
+      "description": "Look up up to 100 locations in one Placekey bulk request and return the result for each query item.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "query_id": {
+                  "type": "string",
+                  "description": "A custom identifier echoed back in the Placekey response."
+                },
+                "street_address": {
+                  "type": "string",
+                  "description": "The street address of the location to resolve."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city of the queried location."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "The second-level administrative region, such as a US state code."
+                },
+                "postal_code": {
+                  "type": "string",
+                  "description": "The postal code of the queried location."
+                },
+                "iso_country_code": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 2,
+                  "description": "The ISO 3166-1 alpha-2 country code for the queried location."
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "The WGS-84 latitude of the queried location."
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "The WGS-84 longitude of the queried location."
+                },
+                "location_name": {
+                  "type": "string",
+                  "description": "The point-of-interest name used to improve Placekey matching."
+                },
+                "place_metadata": {
+                  "type": "object",
+                  "properties": {
+                    "website": {
+                      "type": "string",
+                      "description": "The business website URL used to improve point-of-interest matching.",
+                      "format": "uri"
+                    },
+                    "mcc_code": {
+                      "type": "string",
+                      "description": "The merchant category code associated with the point of interest."
+                    },
+                    "store_id": {
+                      "type": "string",
+                      "description": "A brand-specific store identifier used to improve matching accuracy."
+                    },
+                    "naics_code": {
+                      "type": "string",
+                      "description": "The 4-digit or 6-digit NAICS code associated with the business."
+                    },
+                    "phone_number": {
+                      "type": "string",
+                      "description": "The phone number of the point of interest used to improve matching."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Additional metadata used by Placekey to improve point-of-interest matching."
+                },
+                "options": {
+                  "type": "object",
+                  "properties": {
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "address_placekey",
+                          "building_placekey",
+                          "confidence_score",
+                          "normalized_address",
+                          "geocode",
+                          "upi",
+                          "parcel",
+                          "geoid",
+                          "gers"
+                        ],
+                        "description": "An optional response field exposed by the Placekey API."
+                      },
+                      "description": "Optional Placekey response fields to include in the lookup result.",
+                      "minItems": 1
+                    },
+                    "strict_name_match": {
+                      "type": "boolean",
+                      "description": "Whether Placekey should require an exact point-of-interest name match."
+                    },
+                    "strict_address_match": {
+                      "type": "boolean",
+                      "description": "Whether Placekey should require an exact address match."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Options that customize the Placekey lookup response."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The input payload for a single Placekey lookup."
+            },
+            "description": "The list of location queries to resolve with Placekey.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "address_placekey",
+                    "building_placekey",
+                    "confidence_score",
+                    "normalized_address",
+                    "geocode",
+                    "upi",
+                    "parcel",
+                    "geoid",
+                    "gers"
+                  ],
+                  "description": "An optional response field exposed by the Placekey API."
+                },
+                "description": "Optional Placekey response fields to include in the lookup result.",
+                "minItems": 1
+              },
+              "strict_name_match": {
+                "type": "boolean",
+                "description": "Whether Placekey should require an exact point-of-interest name match."
+              },
+              "strict_address_match": {
+                "type": "boolean",
+                "description": "Whether Placekey should require an exact address match."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Options that customize the Placekey lookup response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queries"
+        ],
+        "description": "The input payload for a Placekey bulk lookup."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "query_id": {
+              "type": "string",
+              "description": "The query identifier echoed back by Placekey."
+            },
+            "placekey": {
+              "type": "string",
+              "description": "The Placekey identifier returned for the matched location."
+            },
+            "error": {
+              "type": "string",
+              "description": "The lookup error returned by Placekey."
+            },
+            "address_placekey": {
+              "type": "string",
+              "description": "The Placekey for the address without the point-of-interest component."
+            },
+            "building_placekey": {
+              "type": "string",
+              "description": "The building-level Placekey returned by Placekey."
+            },
+            "confidence_score": {
+              "type": "string",
+              "enum": [
+                "HIGH",
+                "MEDIUM",
+                "LOW"
+              ],
+              "description": "The confidence score returned by Placekey for the match."
+            },
+            "normalized_address": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The normalized address returned by Placekey for a successful lookup."
+            },
+            "geocode": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "description": "The latitude returned by Placekey geocoding."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "description": "The longitude returned by Placekey geocoding."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The geocoded latitude and longitude for the matched location."
+                },
+                "location_type": {
+                  "type": "string",
+                  "description": "The Placekey geocode precision level for the matched location."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Geocode data returned by the Placekey geocoder."
+            },
+            "upi": {
+              "type": "string",
+              "description": "The universal parcel identifier returned by Placekey."
+            },
+            "parcel": {
+              "type": "string",
+              "description": "The parcel identifier returned by Placekey when available."
+            },
+            "geoid": {
+              "type": "string",
+              "description": "The census geography identifier returned by Placekey when available."
+            },
+            "gers": {
+              "type": "string",
+              "description": "The Overture Maps identifier returned by Placekey when available."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "query_id"
+          ],
+          "description": "The response payload for a successful or failed Placekey lookup."
+        },
+        "description": "The list of results returned by the Placekey bulk API."
+      }
+    }
+  ]
+}

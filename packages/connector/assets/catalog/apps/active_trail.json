@@ -1,0 +1,1740 @@
+{
+  "service": "active_trail",
+  "displayName": "ActiveTrail",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "active_trail_api_token",
+      "description": "ActiveTrail API token used as the Authorization request header. Create a token in the ActiveTrail web interface under Settings > API Apps, as described in the official API guide: https://webapi.mymarketing.co.il/api/docs/Guides"
+    }
+  ],
+  "homepageUrl": "https://www.activetrail.com/",
+  "actions": [
+    {
+      "id": "active_trail.add_group_member",
+      "service": "active_trail",
+      "name": "add_group_member",
+      "description": "Add or update a contact inside an ActiveTrail group.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          },
+          "subscribe_ip": {
+            "type": "string",
+            "description": "The subscribe IP address recorded for the contact."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "sms_status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "sms": {
+            "type": "string",
+            "description": "The contact SMS value."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The contact last name."
+          },
+          "anniversary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact anniversary timestamp."
+          },
+          "birthday": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact birthday timestamp."
+          },
+          "city": {
+            "type": "string",
+            "description": "The contact city."
+          },
+          "fax": {
+            "type": "string",
+            "description": "The contact fax number."
+          },
+          "phone1": {
+            "type": "string",
+            "description": "The contact primary phone number."
+          },
+          "phone2": {
+            "type": "string",
+            "description": "The contact secondary phone number."
+          },
+          "street": {
+            "type": "string",
+            "description": "The contact street address."
+          },
+          "zip_code": {
+            "type": "string",
+            "description": "The contact ZIP or postal code."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "group_id"
+        ],
+        "description": "Input parameters for adding or updating an ActiveTrail group member.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact email address."
+              }
+            }
+          },
+          {
+            "required": [
+              "sms"
+            ],
+            "properties": {
+              "sms": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact SMS value."
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail contact ID."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ActiveTrail contact state when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ActiveTrail contact state when returned."
+              },
+              "is_optined": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the contact is opted in when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the contact is opted in when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact email address when returned."
+              },
+              "sms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact SMS value when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact SMS value when returned."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact first name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact first name when returned."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact last name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact last name when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail contact record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail contact."
+      }
+    },
+    {
+      "id": "active_trail.create_contact",
+      "service": "active_trail",
+      "name": "create_contact",
+      "description": "Create an ActiveTrail contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscribe_ip": {
+            "type": "string",
+            "description": "The subscribe IP address recorded for the contact."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "sms_status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "sms": {
+            "type": "string",
+            "description": "The contact SMS value."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The contact last name."
+          },
+          "anniversary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact anniversary timestamp."
+          },
+          "birthday": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact birthday timestamp."
+          },
+          "city": {
+            "type": "string",
+            "description": "The contact city."
+          },
+          "fax": {
+            "type": "string",
+            "description": "The contact fax number."
+          },
+          "phone1": {
+            "type": "string",
+            "description": "The contact primary phone number."
+          },
+          "phone2": {
+            "type": "string",
+            "description": "The contact secondary phone number."
+          },
+          "street": {
+            "type": "string",
+            "description": "The contact street address."
+          },
+          "zip_code": {
+            "type": "string",
+            "description": "The contact ZIP or postal code."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for creating an ActiveTrail contact. Either email or sms must be provided. Additional ActiveTrail contact fields are passed through.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact email address."
+              }
+            }
+          },
+          {
+            "required": [
+              "sms"
+            ],
+            "properties": {
+              "sms": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact SMS value."
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail contact ID."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ActiveTrail contact state when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ActiveTrail contact state when returned."
+              },
+              "is_optined": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the contact is opted in when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the contact is opted in when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact email address when returned."
+              },
+              "sms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact SMS value when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact SMS value when returned."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact first name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact first name when returned."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact last name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact last name when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail contact record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail contact."
+      }
+    },
+    {
+      "id": "active_trail.create_group",
+      "service": "active_trail",
+      "name": "create_group",
+      "description": "Create an ActiveTrail group.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The group name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating an ActiveTrail group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail group ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The ActiveTrail group name."
+              },
+              "active_counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of active contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of active contacts in the group when returned."
+              },
+              "counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of contacts in the group when returned."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The group creation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group creation timestamp when returned."
+              },
+              "last_generated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last dynamic-group generation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last dynamic-group generation timestamp when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail group record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail group."
+      }
+    },
+    {
+      "id": "active_trail.delete_contact",
+      "service": "active_trail",
+      "name": "delete_contact",
+      "description": "Delete one ActiveTrail contact by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for deleting an ActiveTrail contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request was accepted by ActiveTrail."
+          },
+          "data": {
+            "description": "The raw delete response returned by ActiveTrail, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting an ActiveTrail record."
+      }
+    },
+    {
+      "id": "active_trail.delete_group",
+      "service": "active_trail",
+      "name": "delete_group",
+      "description": "Delete one ActiveTrail group by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for deleting an ActiveTrail group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request was accepted by ActiveTrail."
+          },
+          "data": {
+            "description": "The raw delete response returned by ActiveTrail, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting an ActiveTrail record."
+      }
+    },
+    {
+      "id": "active_trail.get_account_balance",
+      "service": "active_trail",
+      "name": "get_account_balance",
+      "description": "Fetch the current ActiveTrail email, SMS, and coupon account balances.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty input payload for this ActiveTrail action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "number",
+                "description": "The remaining credits in this balance bucket."
+              },
+              "percent": {
+                "type": "number",
+                "description": "The balance percentage reported by ActiveTrail."
+              },
+              "alert_type": {
+                "type": "string",
+                "description": "The ActiveTrail alert type for this balance bucket."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One ActiveTrail balance bucket."
+          },
+          "sms": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "number",
+                "description": "The remaining credits in this balance bucket."
+              },
+              "percent": {
+                "type": "number",
+                "description": "The balance percentage reported by ActiveTrail."
+              },
+              "alert_type": {
+                "type": "string",
+                "description": "The ActiveTrail alert type for this balance bucket."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One ActiveTrail balance bucket."
+          },
+          "coupons": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The coupon balance information returned by ActiveTrail."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ActiveTrail account balance response."
+      }
+    },
+    {
+      "id": "active_trail.get_contact",
+      "service": "active_trail",
+      "name": "get_contact",
+      "description": "Fetch one ActiveTrail contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for fetching an ActiveTrail contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail contact ID."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ActiveTrail contact state when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ActiveTrail contact state when returned."
+              },
+              "is_optined": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the contact is opted in when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the contact is opted in when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact email address when returned."
+              },
+              "sms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact SMS value when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact SMS value when returned."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact first name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact first name when returned."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact last name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact last name when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail contact record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail contact."
+      }
+    },
+    {
+      "id": "active_trail.get_group",
+      "service": "active_trail",
+      "name": "get_group",
+      "description": "Fetch one ActiveTrail group by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for fetching an ActiveTrail group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail group ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The ActiveTrail group name."
+              },
+              "active_counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of active contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of active contacts in the group when returned."
+              },
+              "counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of contacts in the group when returned."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The group creation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group creation timestamp when returned."
+              },
+              "last_generated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last dynamic-group generation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last dynamic-group generation timestamp when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail group record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail group."
+      }
+    },
+    {
+      "id": "active_trail.list_contacts",
+      "service": "active_trail",
+      "name": "list_contacts",
+      "description": "List ActiveTrail contacts with optional state, search, date, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_state": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "ACTIVE",
+              "INACTIVE",
+              "CUSTOMER_REQUEST",
+              "BOUNCED",
+              "SPAM_COMPLIENT",
+              "QUARANTINED"
+            ],
+            "description": "The ActiveTrail CustomerStates filter used by contact list endpoints."
+          },
+          "search_term": {
+            "type": "string",
+            "description": "Text used to filter ActiveTrail contacts."
+          },
+          "from_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include contacts changed on or after this date."
+          },
+          "to_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include contacts changed on or before this date."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number requested from ActiveTrail."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to request from ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing ActiveTrail contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ActiveTrail contact ID."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ActiveTrail contact state when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ActiveTrail contact state when returned."
+                },
+                "is_optined": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the contact is opted in when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the contact is opted in when returned."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact email address when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact email address when returned."
+                },
+                "sms": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact SMS value when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact SMS value when returned."
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact first name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact first name when returned."
+                },
+                "last_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact last name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact last name when returned."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by ActiveTrail."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ActiveTrail contact record."
+            },
+            "description": "The contacts returned by ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing contacts."
+      }
+    },
+    {
+      "id": "active_trail.list_group_members",
+      "service": "active_trail",
+      "name": "list_group_members",
+      "description": "List members in an ActiveTrail group with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          },
+          "customer_state": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "ACTIVE",
+              "INACTIVE",
+              "CUSTOMER_REQUEST",
+              "BOUNCED",
+              "SPAM_COMPLIENT",
+              "QUARANTINED"
+            ],
+            "description": "The ActiveTrail CustomerStates filter used by contact list endpoints."
+          },
+          "search_term": {
+            "type": "string",
+            "description": "Text used to filter group members."
+          },
+          "from_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include members changed on or after this date."
+          },
+          "to_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include members changed on or before this date."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number requested from ActiveTrail."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to request from ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group_id"
+        ],
+        "description": "Input parameters for listing ActiveTrail group members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total count returned by ActiveTrail when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total count returned by ActiveTrail when present."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ActiveTrail contact ID."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ActiveTrail contact state when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ActiveTrail contact state when returned."
+                },
+                "is_optined": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the contact is opted in when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the contact is opted in when returned."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact email address when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact email address when returned."
+                },
+                "sms": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact SMS value when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact SMS value when returned."
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact first name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact first name when returned."
+                },
+                "last_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact last name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact last name when returned."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by ActiveTrail."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ActiveTrail contact record."
+            },
+            "description": "The group members returned by ActiveTrail."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing group members."
+      }
+    },
+    {
+      "id": "active_trail.list_groups",
+      "service": "active_trail",
+      "name": "list_groups",
+      "description": "List ActiveTrail groups with optional search and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_term": {
+            "type": "string",
+            "description": "Text used to filter ActiveTrail groups."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number requested from ActiveTrail."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to request from ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing ActiveTrail groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ActiveTrail group ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The ActiveTrail group name."
+                },
+                "active_counter": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of active contacts in the group when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of active contacts in the group when returned."
+                },
+                "counter": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of contacts in the group when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of contacts in the group when returned."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The group creation timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The group creation timestamp when returned."
+                },
+                "last_generated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The last dynamic-group generation timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last dynamic-group generation timestamp when returned."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by ActiveTrail."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ActiveTrail group record."
+            },
+            "description": "The groups returned by ActiveTrail."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing groups."
+      }
+    },
+    {
+      "id": "active_trail.remove_group_member",
+      "service": "active_trail",
+      "name": "remove_group_member",
+      "description": "Remove one contact from an ActiveTrail group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "group_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          },
+          "member_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail contact ID to remove from the group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group_id",
+          "member_id"
+        ],
+        "description": "Input parameters for removing a group member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request was accepted by ActiveTrail."
+          },
+          "data": {
+            "description": "The raw delete response returned by ActiveTrail, if any."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting an ActiveTrail record."
+      }
+    },
+    {
+      "id": "active_trail.update_contact",
+      "service": "active_trail",
+      "name": "update_contact",
+      "description": "Update an ActiveTrail contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail contact ID."
+          },
+          "subscribe_ip": {
+            "type": "string",
+            "description": "The subscribe IP address recorded for the contact."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "sms_status": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Subscribed",
+              "Unsubscribed",
+              "Pending"
+            ],
+            "description": "The ActiveTrail contact status value."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "sms": {
+            "type": "string",
+            "description": "The contact SMS value."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The contact last name."
+          },
+          "anniversary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact anniversary timestamp."
+          },
+          "birthday": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contact birthday timestamp."
+          },
+          "city": {
+            "type": "string",
+            "description": "The contact city."
+          },
+          "fax": {
+            "type": "string",
+            "description": "The contact fax number."
+          },
+          "phone1": {
+            "type": "string",
+            "description": "The contact primary phone number."
+          },
+          "phone2": {
+            "type": "string",
+            "description": "The contact secondary phone number."
+          },
+          "street": {
+            "type": "string",
+            "description": "The contact street address."
+          },
+          "zip_code": {
+            "type": "string",
+            "description": "The contact ZIP or postal code."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating an ActiveTrail contact. Additional ActiveTrail contact fields are passed through.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact email address."
+              }
+            }
+          },
+          {
+            "required": [
+              "sms"
+            ],
+            "properties": {
+              "sms": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact SMS value."
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail contact ID."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ActiveTrail contact state when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ActiveTrail contact state when returned."
+              },
+              "is_optined": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the contact is opted in when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the contact is opted in when returned."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact email address when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact email address when returned."
+              },
+              "sms": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact SMS value when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact SMS value when returned."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact first name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact first name when returned."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact last name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact last name when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail contact record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail contact."
+      }
+    },
+    {
+      "id": "active_trail.update_group",
+      "service": "active_trail",
+      "name": "update_group",
+      "description": "Update an ActiveTrail group name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ActiveTrail group ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated group name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "Input parameters for updating an ActiveTrail group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The ActiveTrail group ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The ActiveTrail group name."
+              },
+              "active_counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of active contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of active contacts in the group when returned."
+              },
+              "counter": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of contacts in the group when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of contacts in the group when returned."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The group creation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group creation timestamp when returned."
+              },
+              "last_generated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last dynamic-group generation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last dynamic-group generation timestamp when returned."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by ActiveTrail."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ActiveTrail group record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one ActiveTrail group."
+      }
+    }
+  ]
+}

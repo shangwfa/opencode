@@ -1,0 +1,1594 @@
+{
+  "service": "baidu_maps",
+  "displayName": "Baidu Maps",
+  "categories": [
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "AK (Access Key)",
+      "placeholder": "Baidu Maps AK",
+      "description": "Baidu Maps AK passed via the ak query parameter. Create or manage keys in the official console: https://lbsyun.baidu.com/apiconsole/key. Provide an SK in the optional field when your application requires SN validation.",
+      "extraFields": [
+        {
+          "key": "sk",
+          "label": "SK (Secret Key)",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "Only required for SN-signed endpoints",
+          "description": "The SK is used only to compute the SN signature locally; it is never sent to Baidu. Baidu's SN check is an AK-level setting (chosen in the console as the AK's request-verification method), so when an SK is provided every request is signed automatically. Leave blank when your AK uses IP-whitelist verification instead of SN."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://lbsyun.baidu.com",
+  "actions": [
+    {
+      "id": "baidu_maps.district_search",
+      "service": "baidu_maps",
+      "name": "district_search",
+      "description": "Query the Baidu Maps administrative division API (api_region_search).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The district name or administrative code (adcode) to look up."
+          },
+          "sub_admin": {
+            "type": "integer",
+            "description": "Number of subordinate levels to return (0-3, default 0)."
+          },
+          "extensions_code": {
+            "type": "integer",
+            "description": "1 to also return standard administrative codes (default 0)."
+          },
+          "boundary": {
+            "type": "integer",
+            "description": "1 to return boundary coordinates (default 0)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Input parameters for the administrative district query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result_size": {
+            "type": "integer",
+            "description": "The number of matched administrative divisions."
+          },
+          "districts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One administrative division (code, name, level, nested districts, ...)."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result_size",
+          "districts"
+        ],
+        "description": "The district query response."
+      }
+    },
+    {
+      "id": "baidu_maps.geocode",
+      "service": "baidu_maps",
+      "name": "geocode",
+      "description": "Geocode an address with Baidu Maps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address to geocode."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restrict results to a city, for example '北京市'."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address"
+        ],
+        "description": "Input parameters for geocoding an address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "location": {
+            "type": "string",
+            "description": "The geocoded coordinate string formatted as latitude,longitude."
+          },
+          "precise": {
+            "type": "integer",
+            "description": "Whether the result is precise (1) or fuzzy (0)."
+          },
+          "confidence": {
+            "type": "integer",
+            "description": "The confidence score from 0 to 100."
+          },
+          "comprehension": {
+            "type": "integer",
+            "description": "Whether the address was understood as a comprehension query."
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A raw object returned by Baidu Maps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "location",
+          "precise",
+          "confidence",
+          "comprehension",
+          "result"
+        ],
+        "description": "The geocoding response."
+      }
+    },
+    {
+      "id": "baidu_maps.get_place_detail",
+      "service": "baidu_maps",
+      "name": "get_place_detail",
+      "description": "Look up a Baidu Maps place by its uid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Baidu Maps place identifier (uid)."
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "1",
+                  "2"
+                ]
+              },
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2
+                ],
+                "description": "The integer-form scope (1 or 2)."
+              }
+            ],
+            "description": "The detail scope. Baidu accepts either the string or the integer form."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of returned locations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uid"
+        ],
+        "description": "Input parameters for place detail lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A raw object returned by Baidu Maps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The place detail response."
+      }
+    },
+    {
+      "id": "baidu_maps.input_tips",
+      "service": "baidu_maps",
+      "name": "input_tips",
+      "description": "Fetch Baidu Maps input suggestions (keywordsuggestion).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword to suggest completions for."
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restrict suggestions to a region (e.g. '北京')."
+          },
+          "city_limit": {
+            "type": "integer",
+            "description": "Whether to restrict suggestions to the supplied region."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The center coordinate used for location bias."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of the input location."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for input suggestions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One suggestion (name, location, uid, ...)."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The input tips response."
+      }
+    },
+    {
+      "id": "baidu_maps.ip_locate",
+      "service": "baidu_maps",
+      "name": "ip_locate",
+      "description": "Locate an IP address with Baidu Maps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "The IP address to locate. Omit to locate the caller."
+          },
+          "coor": {
+            "type": "string",
+            "description": "The coordinate system of the returned location."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for IP geolocation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "address": {
+            "type": "string",
+            "description": "The formatted address."
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "string",
+                "description": "The formatted address."
+              },
+              "point": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "The longitude."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "The latitude."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "description": "The coordinate object."
+              },
+              "address_detail": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city."
+                  },
+                  "city_code": {
+                    "type": "integer",
+                    "description": "The numeric city code."
+                  },
+                  "province": {
+                    "type": "string",
+                    "description": "The province."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "city",
+                  "city_code",
+                  "province"
+                ],
+                "description": "The structured address detail."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "address",
+              "point",
+              "address_detail"
+            ],
+            "description": "The structured IP location content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "address",
+          "content"
+        ],
+        "description": "The IP location response."
+      }
+    },
+    {
+      "id": "baidu_maps.reverse_geocode",
+      "service": "baidu_maps",
+      "name": "reverse_geocode",
+      "description": "Reverse geocode coordinates with Baidu Maps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coordinate string formatted as latitude,longitude (bd09ll by default)."
+          },
+          "coordtype": {
+            "type": "string",
+            "description": "The coordinate system of the input location."
+          },
+          "radius": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The radius in meters to include nearby points of interest."
+          },
+          "extensions_poi": {
+            "type": "integer",
+            "description": "0 to only return the address (default), 1 to also return nearby POIs."
+          },
+          "poi_types": {
+            "type": "string",
+            "description": "Comma separated extensions_poi types filter (when extensions_poi=1)."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "zh-CN",
+              "zh-HK",
+              "zh-TW",
+              "ja",
+              "ko",
+              "fr",
+              "th",
+              "es",
+              "pt",
+              "ru",
+              "de",
+              "it",
+              "vi",
+              "ar",
+              "hi"
+            ],
+            "description": "The language of the result."
+          },
+          "latest_admin": {
+            "type": "integer",
+            "description": "Whether to return the latest administrative division (1) or the historical one (0, default)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location"
+        ],
+        "description": "Input parameters for reverse geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "formatted_address": {
+            "type": "string",
+            "description": "The formatted address."
+          },
+          "addressComponent": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The country."
+              },
+              "country_code": {
+                "type": "integer",
+                "description": "The numeric country code."
+              },
+              "country_code_iso": {
+                "type": "string",
+                "description": "The ISO country code."
+              },
+              "province": {
+                "type": "string",
+                "description": "The province."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city."
+              },
+              "city_level": {
+                "type": "integer",
+                "description": "Whether the city field is filled (0/1)."
+              },
+              "district": {
+                "type": "string",
+                "description": "The district."
+              },
+              "district_level": {
+                "type": "integer",
+                "description": "Whether the district field is filled (0/1)."
+              },
+              "town": {
+                "type": "string",
+                "description": "The town."
+              },
+              "town_level": {
+                "type": "integer",
+                "description": "Whether the town field is filled (0/1)."
+              },
+              "adcode": {
+                "type": "string",
+                "description": "The administrative code."
+              },
+              "street": {
+                "type": "string",
+                "description": "The street."
+              },
+              "street_number": {
+                "type": "string",
+                "description": "The street number."
+              },
+              "direction": {
+                "type": "string",
+                "description": "The facing direction relative to the coordinate."
+              },
+              "distance": {
+                "type": "string",
+                "description": "The signed distance to the nearest road."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "country",
+              "country_code",
+              "country_code_iso",
+              "province",
+              "city",
+              "city_level",
+              "district",
+              "district_level",
+              "town",
+              "town_level",
+              "adcode",
+              "street",
+              "street_number",
+              "direction",
+              "distance"
+            ],
+            "description": "The structured address component."
+          },
+          "pois": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Baidu Maps point of interest identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The point of interest name."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The formatted address."
+                },
+                "location": {
+                  "description": "The coordinate; Baidu returns a { lng, lat } object for place search."
+                },
+                "province": {
+                  "type": "string",
+                  "description": "The province."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city."
+                },
+                "district": {
+                  "type": "string",
+                  "description": "The district (Baidu field 'area')."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The point of interest category (when scope=2)."
+                },
+                "detail": {
+                  "type": "integer",
+                  "description": "The detail level flag returned by Baidu Maps."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the search center in meters (circular search only)."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baidu Maps point of interest record. Fields are passed through from Baidu and vary by endpoint."
+            }
+          },
+          "roads": {
+            "description": "The nearby roads as returned by Baidu Maps."
+          },
+          "poiRegions": {
+            "description": "The POI region breakdown as returned by Baidu Maps."
+          },
+          "sematic_description": {
+            "type": "string",
+            "description": "A sematic description returned by Baidu Maps."
+          },
+          "cityCode": {
+            "type": "integer",
+            "description": "The numeric city code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "formatted_address",
+          "addressComponent",
+          "pois",
+          "roads",
+          "poiRegions",
+          "sematic_description",
+          "cityCode"
+        ],
+        "description": "The reverse geocoding response."
+      }
+    },
+    {
+      "id": "baidu_maps.route_bicycling",
+      "service": "baidu_maps",
+      "name": "route_bicycling",
+      "description": "Plan a Baidu Maps bicycling route.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin coordinate formatted as latitude,longitude."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination coordinate formatted as latitude,longitude."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of origin/destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "destination"
+        ],
+        "description": "Input parameters for bicycling routing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "origin": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The origin as a { lng, lat } object."
+              },
+              "destination": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The destination as a { lng, lat } object."
+              },
+              "routes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One bicycling route alternative."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "origin",
+              "destination",
+              "routes"
+            ],
+            "description": "The bicycling route result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The bicycling route response."
+      }
+    },
+    {
+      "id": "baidu_maps.route_driving",
+      "service": "baidu_maps",
+      "name": "route_driving",
+      "description": "Plan a Baidu Maps driving route.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin coordinate formatted as latitude,longitude."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination coordinate formatted as latitude,longitude."
+          },
+          "origin_uid": {
+            "type": "string",
+            "description": "Optional origin POI uid."
+          },
+          "destination_uid": {
+            "type": "string",
+            "description": "Optional destination POI uid."
+          },
+          "waypoints": {
+            "type": "string",
+            "description": "Comma separated intermediate waypoints."
+          },
+          "tactics": {
+            "type": "integer",
+            "description": "The routing preference (0 default, 1 toll free, 2 distance first, 3 expressway first, 4 highway avoid, ...)."
+          },
+          "tactics_in_city": {
+            "type": "integer",
+            "description": "Urban routing preference (0 default, 1 main road first, 2 time first, 3 distance first, 4 avoid congestion)."
+          },
+          "alternatives": {
+            "type": "integer",
+            "description": "0 to return only the best route; 3 to return up to 3 alternatives."
+          },
+          "departure_time": {
+            "type": "string",
+            "description": "Departure time in ISO 8601 (used only with future-traffic tactics)."
+          },
+          "plate_number": {
+            "type": "string",
+            "description": "License plate for restriction-aware routing."
+          },
+          "traffic_policy": {
+            "type": "integer",
+            "description": "Real-time traffic policy."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of origin/destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "destination"
+        ],
+        "description": "Input parameters for driving routing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "origin": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The origin as a { lng, lat } object."
+              },
+              "destination": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The destination as a { lng, lat } object."
+              },
+              "routes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One driving route alternative."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "origin",
+              "destination",
+              "routes"
+            ],
+            "description": "The driving route result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The driving route response."
+      }
+    },
+    {
+      "id": "baidu_maps.route_transit",
+      "service": "baidu_maps",
+      "name": "route_transit",
+      "description": "Plan a Baidu Maps transit route.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin coordinate formatted as latitude,longitude."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination coordinate formatted as latitude,longitude."
+          },
+          "departure_time": {
+            "type": "string",
+            "description": "Optional ISO 8601 departure time, default now."
+          },
+          "tactics_in_city": {
+            "type": "integer",
+            "description": "Transit tactic when origin/destination are inside the same city."
+          },
+          "tactics_inter_city": {
+            "type": "integer",
+            "description": "Transit tactic when traveling between cities."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of origin/destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "destination"
+        ],
+        "description": "Input parameters for transit routing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "origin": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The origin as a { lng, lat } object."
+              },
+              "destination": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The destination as a { lng, lat } object."
+              },
+              "routes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One transit route alternative."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "origin",
+              "destination",
+              "routes"
+            ],
+            "description": "The transit route result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The transit route response."
+      }
+    },
+    {
+      "id": "baidu_maps.route_walking",
+      "service": "baidu_maps",
+      "name": "route_walking",
+      "description": "Plan a Baidu Maps walking route.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin coordinate formatted as latitude,longitude."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination coordinate formatted as latitude,longitude."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of origin/destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "origin",
+          "destination"
+        ],
+        "description": "Input parameters for walking routing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "origin": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The origin as a { lng, lat } object."
+              },
+              "destination": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The destination as a { lng, lat } object."
+              },
+              "routes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One walking route alternative."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "origin",
+              "destination",
+              "routes"
+            ],
+            "description": "The walking route result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The walking route response."
+      }
+    },
+    {
+      "id": "baidu_maps.search_places",
+      "service": "baidu_maps",
+      "name": "search_places",
+      "description": "Search Baidu Maps places in a region or city.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword used to search places."
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The region name to scope the search, for example '北京'."
+          },
+          "city_limit": {
+            "type": "integer",
+            "description": "Whether to restrict results to the supplied region (1) or extend to nearby regions (0)."
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "1",
+                  "2"
+                ]
+              },
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2
+                ],
+                "description": "The integer-form scope (1 or 2)."
+              }
+            ],
+            "description": "The result scope. Baidu accepts either the string or the integer form."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Pipe separated industry filtering tags."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of returned locations."
+          },
+          "ret_coordtype": {
+            "type": "string",
+            "description": "Alias for coord_type used by some Baidu endpoints."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size, 0 to 20."
+          },
+          "page_num": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page index."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching places."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching places."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Baidu Maps point of interest identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The point of interest name."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The formatted address."
+                },
+                "location": {
+                  "description": "The coordinate; Baidu returns a { lng, lat } object for place search."
+                },
+                "province": {
+                  "type": "string",
+                  "description": "The province."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city."
+                },
+                "district": {
+                  "type": "string",
+                  "description": "The district (Baidu field 'area')."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The point of interest category (when scope=2)."
+                },
+                "detail": {
+                  "type": "integer",
+                  "description": "The detail level flag returned by Baidu Maps."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the search center in meters (circular search only)."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baidu Maps point of interest record. Fields are passed through from Baidu and vary by endpoint."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "total",
+          "results"
+        ],
+        "description": "The place search response."
+      }
+    },
+    {
+      "id": "baidu_maps.search_places_around",
+      "service": "baidu_maps",
+      "name": "search_places_around",
+      "description": "Search Baidu Maps places within a radius around a coordinate.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword used to search places."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search center formatted as latitude,longitude."
+          },
+          "radius": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The search radius in meters (default 1000, max 50000)."
+          },
+          "radius_limit": {
+            "type": "integer",
+            "description": "Whether to strictly observe the radius (1) or relax it (0)."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Pipe separated industry filtering tags."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of returned locations."
+          },
+          "ret_coordtype": {
+            "type": "string",
+            "description": "Alias for coord_type used by some Baidu endpoints."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size, 0 to 20."
+          },
+          "page_num": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page index."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "location"
+        ],
+        "description": "Input parameters for circular place search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching places."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Baidu Maps point of interest identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The point of interest name."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The formatted address."
+                },
+                "location": {
+                  "description": "The coordinate; Baidu returns a { lng, lat } object for place search."
+                },
+                "province": {
+                  "type": "string",
+                  "description": "The province."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city."
+                },
+                "district": {
+                  "type": "string",
+                  "description": "The district (Baidu field 'area')."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The point of interest category (when scope=2)."
+                },
+                "detail": {
+                  "type": "integer",
+                  "description": "The detail level flag returned by Baidu Maps."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the search center in meters (circular search only)."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baidu Maps point of interest record. Fields are passed through from Baidu and vary by endpoint."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "total",
+          "results"
+        ],
+        "description": "The circular place search response."
+      }
+    },
+    {
+      "id": "baidu_maps.search_places_polygon",
+      "service": "baidu_maps",
+      "name": "search_places_polygon",
+      "description": "Search Baidu Maps places inside a polygon (rectangle).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword used to search places."
+          },
+          "bounds": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Rectangle bounds 'bottomLeftLat,bottomLeftLng,topRightLat,topRightLng' — latitude first, all comma separated (e.g. '39.915,116.404,39.975,116.414'). When supplied, region is ignored."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Pipe separated industry filtering tags."
+          },
+          "coord_type": {
+            "type": "string",
+            "description": "The coordinate system of returned locations."
+          },
+          "ret_coordtype": {
+            "type": "string",
+            "description": "Alias for coord_type used by some Baidu endpoints."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size, 0 to 20."
+          },
+          "page_num": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page index."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "bounds"
+        ],
+        "description": "Input parameters for rectangular place search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching places."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "type": "string",
+                  "description": "The Baidu Maps point of interest identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The point of interest name."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The formatted address."
+                },
+                "location": {
+                  "description": "The coordinate; Baidu returns a { lng, lat } object for place search."
+                },
+                "province": {
+                  "type": "string",
+                  "description": "The province."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city."
+                },
+                "district": {
+                  "type": "string",
+                  "description": "The district (Baidu field 'area')."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The point of interest category (when scope=2)."
+                },
+                "detail": {
+                  "type": "integer",
+                  "description": "The detail level flag returned by Baidu Maps."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the search center in meters (circular search only)."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baidu Maps point of interest record. Fields are passed through from Baidu and vary by endpoint."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "total",
+          "results"
+        ],
+        "description": "The rectangular place search response."
+      }
+    },
+    {
+      "id": "baidu_maps.weather",
+      "service": "baidu_maps",
+      "name": "weather",
+      "description": "Fetch weather observations and forecasts for a coordinate.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "now",
+              "fc",
+              "index",
+              "alert",
+              "fc_hour",
+              "all"
+            ],
+            "description": "The data sections to include (default 'all')."
+          },
+          "coordtype": {
+            "type": "string",
+            "description": "The coordinate system of the input location (weather uses 'coordtype', default wgs84)."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coordinate as longitude,latitude — NOTE weather is lng,lat (opposite of other endpoints). Provide this or district_id."
+          },
+          "district_id": {
+            "type": "string",
+            "description": "The administrative division code (adcode). Provide this or location; takes priority."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for the weather API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The Baidu Maps status code (0 means success)."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "description": "The country."
+                  },
+                  "province": {
+                    "type": "string",
+                    "description": "The province."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The region name."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "The region code."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "country",
+                  "province",
+                  "city",
+                  "name",
+                  "id"
+                ],
+                "description": "The resolved location."
+              },
+              "now": {
+                "description": "The current weather observation (data_type includes 'now' or 'all')."
+              },
+              "forecasts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One day of the daily forecast (data_type includes 'fc' or 'all')."
+                }
+              },
+              "forecast_hours": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One hour of the hourly forecast (data_type includes 'fc_hour' or 'all')."
+                }
+              },
+              "alerts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One weather alert/warning (request data_type 'alert' or 'all'; response key is 'alerts')."
+                }
+              },
+              "indexes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One life index (data_type includes 'index' or 'all')."
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "location"
+            ],
+            "description": "The structured weather result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "message",
+          "result"
+        ],
+        "description": "The weather response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1061 @@
+{
+  "service": "google_search_console",
+  "displayName": "Google Search Console",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2",
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly",
+        "https://www.googleapis.com/auth/webmasters",
+        "openid",
+        "email",
+        "profile"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    },
+    {
+      "type": "custom_credential",
+      "label": "Service Account",
+      "description": "Connect with a Google Cloud service account key instead of a user account, optionally impersonating a Workspace user through domain-wide delegation.",
+      "fields": [
+        {
+          "key": "serviceAccountJson",
+          "label": "Service Account JSON",
+          "inputType": "textarea",
+          "required": true,
+          "secret": true,
+          "placeholder": "{\"type\": \"service_account\", \"project_id\": \"...\", ...}",
+          "description": "The complete service account key JSON from Google Cloud Console (IAM & Admin > Service Accounts > Keys). Enable the Search Console API for its project and verify the service account for the sites, or use domain-wide delegation below to act as a verified user."
+        },
+        {
+          "key": "subject",
+          "label": "Subject Email (optional)",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "user@your-domain.com",
+          "description": "Optional Workspace user to impersonate through domain-wide delegation. In the Workspace Admin console (Security > Access and data control > API Controls > Domain-wide Delegation), grant the service account client ID the Search Console scopes this provider requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://search.google.com/search-console",
+  "actions": [
+    {
+      "id": "google_search_console.add_site",
+      "service": "google_search_console",
+      "name": "add_site",
+      "description": "Add a property to the connected account's Search Console site set.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl"
+        ],
+        "description": "Input parameters for adding a Search Console property."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a successful Search Console write operation."
+      }
+    },
+    {
+      "id": "google_search_console.delete_site",
+      "service": "google_search_console",
+      "name": "delete_site",
+      "description": "Remove a property from the connected account's Search Console site set.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl"
+        ],
+        "description": "Input parameters for deleting a Search Console property."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a successful Search Console write operation."
+      }
+    },
+    {
+      "id": "google_search_console.delete_sitemap",
+      "service": "google_search_console",
+      "name": "delete_sitemap",
+      "description": "Delete a sitemap from a Search Console property.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "feedpath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full sitemap URL to inspect, submit, or delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl",
+          "feedpath"
+        ],
+        "description": "Input parameters for deleting a Search Console sitemap."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a successful Search Console write operation."
+      }
+    },
+    {
+      "id": "google_search_console.get_site",
+      "service": "google_search_console",
+      "name": "get_site",
+      "description": "Fetch one Search Console property and the current account permission level.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl"
+        ],
+        "description": "Input parameters for fetching one Search Console property."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "site": {
+            "type": "object",
+            "properties": {
+              "siteUrl": {
+                "type": "string",
+                "description": "The Search Console property URL."
+              },
+              "permissionLevel": {
+                "type": "string",
+                "description": "The current account's permission level for this property."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "siteUrl",
+              "permissionLevel"
+            ],
+            "description": "A Search Console property entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "description": "A Search Console property result."
+      }
+    },
+    {
+      "id": "google_search_console.get_sitemap",
+      "service": "google_search_console",
+      "name": "get_sitemap",
+      "description": "Fetch one Search Console sitemap by property URL and sitemap URL.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "feedpath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full sitemap URL to inspect, submit, or delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl",
+          "feedpath"
+        ],
+        "description": "Input parameters for fetching one Search Console sitemap."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sitemap": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "The full sitemap URL."
+              },
+              "lastSubmitted": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When this sitemap was last submitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When this sitemap was last submitted."
+              },
+              "isPending": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this sitemap is pending processing."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this sitemap is pending processing."
+              },
+              "isSitemapsIndex": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this sitemap is a sitemap index."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this sitemap is a sitemap index."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The sitemap type reported by Search Console."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The sitemap type reported by Search Console."
+              },
+              "lastDownloaded": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Google last downloaded this sitemap."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Google last downloaded this sitemap."
+              },
+              "warnings": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Warning count reported for this sitemap."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Warning count reported for this sitemap."
+              },
+              "errors": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Error count reported for this sitemap."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Error count reported for this sitemap."
+              },
+              "contents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The sitemap content type."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The sitemap content type."
+                    },
+                    "submitted": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The number of submitted URLs for this content type."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The number of submitted URLs for this content type."
+                    },
+                    "indexed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The number of indexed URLs for this content type."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The number of indexed URLs for this content type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "submitted",
+                    "indexed"
+                  ],
+                  "description": "Indexed URL counts for a content type in a sitemap."
+                },
+                "description": "Content counts reported for this sitemap."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "lastSubmitted",
+              "isPending",
+              "isSitemapsIndex",
+              "type",
+              "lastDownloaded",
+              "warnings",
+              "errors",
+              "contents"
+            ],
+            "description": "A Search Console sitemap resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sitemap"
+        ],
+        "description": "A Search Console sitemap result."
+      }
+    },
+    {
+      "id": "google_search_console.inspect_url",
+      "service": "google_search_console",
+      "name": "inspect_url",
+      "description": "Inspect the indexed status of a URL under a Search Console property using Google's URL Inspection API.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "inspectionUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The fully qualified URL to inspect. It must be under the property specified by siteUrl."
+          },
+          "languageCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional IETF BCP-47 language code for translated issue messages, such as en-US or de-CH."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl",
+          "inspectionUrl"
+        ],
+        "description": "Input parameters for inspecting a URL in Google's index."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inspectionResult": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The URL inspection result returned by Google, including index status, AMP, mobile usability, and rich results fields when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inspectionResult"
+        ],
+        "description": "URL Inspection API result."
+      }
+    },
+    {
+      "id": "google_search_console.list_sitemaps",
+      "service": "google_search_console",
+      "name": "list_sitemaps",
+      "description": "List sitemaps submitted for a Search Console property.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "sitemapIndex": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restrict results to a sitemap index URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl"
+        ],
+        "description": "Input parameters for listing Search Console sitemaps."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sitemaps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "The full sitemap URL."
+                },
+                "lastSubmitted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When this sitemap was last submitted."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When this sitemap was last submitted."
+                },
+                "isPending": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether this sitemap is pending processing."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether this sitemap is pending processing."
+                },
+                "isSitemapsIndex": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether this sitemap is a sitemap index."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether this sitemap is a sitemap index."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The sitemap type reported by Search Console."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The sitemap type reported by Search Console."
+                },
+                "lastDownloaded": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Google last downloaded this sitemap."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Google last downloaded this sitemap."
+                },
+                "warnings": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Warning count reported for this sitemap."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Warning count reported for this sitemap."
+                },
+                "errors": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Error count reported for this sitemap."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Error count reported for this sitemap."
+                },
+                "contents": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The sitemap content type."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The sitemap content type."
+                      },
+                      "submitted": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The number of submitted URLs for this content type."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of submitted URLs for this content type."
+                      },
+                      "indexed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The number of indexed URLs for this content type."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of indexed URLs for this content type."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "submitted",
+                      "indexed"
+                    ],
+                    "description": "Indexed URL counts for a content type in a sitemap."
+                  },
+                  "description": "Content counts reported for this sitemap."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "lastSubmitted",
+                "isPending",
+                "isSitemapsIndex",
+                "type",
+                "lastDownloaded",
+                "warnings",
+                "errors",
+                "contents"
+              ],
+              "description": "A Search Console sitemap resource."
+            },
+            "description": "Sitemaps returned by Search Console."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sitemaps"
+        ],
+        "description": "Sitemaps returned for a Search Console property."
+      }
+    },
+    {
+      "id": "google_search_console.list_sites",
+      "service": "google_search_console",
+      "name": "list_sites",
+      "description": "List Search Console properties visible to the connected Google account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Search Console properties."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "siteUrl": {
+                  "type": "string",
+                  "description": "The Search Console property URL."
+                },
+                "permissionLevel": {
+                  "type": "string",
+                  "description": "The current account's permission level for this property."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "siteUrl",
+                "permissionLevel"
+              ],
+              "description": "A Search Console property entry."
+            },
+            "description": "Search Console properties returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sites"
+        ],
+        "description": "Search Console properties visible to the connected account."
+      }
+    },
+    {
+      "id": "google_search_console.query_search_analytics",
+      "service": "google_search_console",
+      "name": "query_search_analytics",
+      "description": "Query Search Console performance data for a property across dates, dimensions, filters, and search types.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters.readonly"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive start date for the query in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive end date for the query in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "date",
+                "hour",
+                "query",
+                "page",
+                "country",
+                "device",
+                "searchAppearance"
+              ],
+              "description": "A Search Analytics dimension to group rows by."
+            },
+            "description": "Dimensions used to group result rows."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "web",
+              "image",
+              "video",
+              "news",
+              "discover",
+              "googleNews"
+            ],
+            "description": "The Google search type to query."
+          },
+          "dimensionFilterGroups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "groupType": {
+                  "type": "string",
+                  "enum": [
+                    "and"
+                  ],
+                  "description": "How filters in the group are combined."
+                },
+                "filters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dimension": {
+                        "type": "string",
+                        "enum": [
+                          "date",
+                          "hour",
+                          "query",
+                          "page",
+                          "country",
+                          "device",
+                          "searchAppearance"
+                        ],
+                        "description": "A Search Analytics dimension to filter by."
+                      },
+                      "operator": {
+                        "type": "string",
+                        "enum": [
+                          "contains",
+                          "equals",
+                          "notContains",
+                          "notEquals",
+                          "includingRegex",
+                          "excludingRegex"
+                        ],
+                        "description": "The filter operator to apply to the dimension."
+                      },
+                      "expression": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The expression to match against the selected dimension."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "dimension",
+                      "operator",
+                      "expression"
+                    ],
+                    "description": "A Search Analytics dimension filter."
+                  },
+                  "description": "Filters applied within this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filters"
+              ],
+              "description": "A group of Search Analytics dimension filters."
+            },
+            "description": "Dimension filter groups applied to the query."
+          },
+          "aggregationType": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "byNewsShowcasePanel",
+              "byPage",
+              "byProperty"
+            ],
+            "description": "How Search Console aggregates query results."
+          },
+          "rowLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25000,
+            "description": "Maximum rows to return. Search Console accepts up to 25,000."
+          },
+          "startRow": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based first row offset for pagination."
+          },
+          "dataState": {
+            "type": "string",
+            "enum": [
+              "final",
+              "all",
+              "hourly_all"
+            ],
+            "description": "Whether to include fresh or final-only data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for Search Analytics query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A dimension value."
+                  },
+                  "description": "Dimension values for this row, in the same order as the requested dimensions."
+                },
+                "clicks": {
+                  "type": "number",
+                  "description": "Click count for this row."
+                },
+                "impressions": {
+                  "type": "number",
+                  "description": "Impression count for this row."
+                },
+                "ctr": {
+                  "type": "number",
+                  "description": "Click-through rate for this row."
+                },
+                "position": {
+                  "type": "number",
+                  "description": "Average position for this row."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "keys",
+                "clicks",
+                "impressions",
+                "ctr",
+                "position"
+              ],
+              "description": "A Search Analytics result row."
+            },
+            "description": "Rows returned by Search Console."
+          },
+          "responseAggregationType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The aggregation type used in the response when Search Console returns one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The aggregation type used in the response when Search Console returns one."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "firstIncompleteDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The first date with incomplete data when Search Console reports one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The first date with incomplete data when Search Console reports one."
+              },
+              "firstIncompleteHour": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The first hour with incomplete hourly data when Search Console reports one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The first hour with incomplete hourly data when Search Console reports one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "firstIncompleteDate",
+              "firstIncompleteHour"
+            ],
+            "description": "Metadata returned with Search Analytics data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows",
+          "responseAggregationType",
+          "metadata"
+        ],
+        "description": "Search Analytics query result."
+      }
+    },
+    {
+      "id": "google_search_console.submit_sitemap",
+      "service": "google_search_console",
+      "name": "submit_sitemap",
+      "description": "Submit a sitemap URL for a Search Console property.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/webmasters"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "siteUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The site URL exactly as Search Console stores it, such as https://www.example.com/ or sc-domain:example.com."
+          },
+          "feedpath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full sitemap URL to inspect, submit, or delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "siteUrl",
+          "feedpath"
+        ],
+        "description": "Input parameters for submitting a Search Console sitemap."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The result of a successful Search Console write operation."
+      }
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "service": "fixer",
+  "displayName": "Fixer",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FIXER_API_KEY",
+      "description": "Fixer API key used as the access_key query parameter. Get it from your Fixer dashboard: https://fixer.io/dashboard."
+    }
+  ],
+  "homepageUrl": "https://fixer.io",
+  "actions": [
+    {
+      "id": "fixer.get_historical_rates",
+      "service": "fixer",
+      "name": "get_historical_rates",
+      "description": "Retrieve historical Fixer exchange rates for a specific date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Historical date to request from Fixer in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "base": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "Three-letter base currency code for the returned rates.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "description": "A three-letter ISO currency code used to limit the response.",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "description": "List of target currency codes to include in the Fixer response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Input parameters for fetching historical Fixer exchange rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Fixer request completed successfully."
+          },
+          "historical": {
+            "type": "boolean",
+            "description": "Whether the returned rates represent a historical snapshot."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp when the rates snapshot was generated."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency used for the returned rates."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date of the returned exchange rates in YYYY-MM-DD format."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "Exchange rate value."
+            },
+            "description": "Mapping of currency codes to exchange rates for the selected base currency."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "historical",
+          "timestamp",
+          "base",
+          "date",
+          "rates"
+        ],
+        "description": "Fixer historical rates response."
+      }
+    },
+    {
+      "id": "fixer.get_latest_rates",
+      "service": "fixer",
+      "name": "get_latest_rates",
+      "description": "Retrieve the latest Fixer exchange rates for all or selected currencies.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "Three-letter base currency code for the returned rates.",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 3,
+              "description": "A three-letter ISO currency code used to limit the response.",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "description": "List of target currency codes to include in the Fixer response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching the latest Fixer exchange rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Fixer request completed successfully."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp when the rates snapshot was generated."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency used for the returned rates."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date of the returned exchange rates in YYYY-MM-DD format."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "Exchange rate value."
+            },
+            "description": "Mapping of currency codes to exchange rates for the selected base currency."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "timestamp",
+          "base",
+          "date",
+          "rates"
+        ],
+        "description": "Fixer latest rates response."
+      }
+    },
+    {
+      "id": "fixer.get_supported_symbols",
+      "service": "fixer",
+      "name": "get_supported_symbols",
+      "description": "Retrieve all supported Fixer currency symbols and their full names.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving all supported Fixer currency symbols."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Fixer request completed successfully."
+          },
+          "symbols": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Currency name."
+            },
+            "description": "Mapping of ISO currency codes to full currency names."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "symbols"
+        ],
+        "description": "Supported Fixer currency symbols."
+      }
+    }
+  ]
+}

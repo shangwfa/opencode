@@ -1,0 +1,981 @@
+{
+  "service": "ayrshare",
+  "displayName": "Ayrshare",
+  "categories": [
+    "Social",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "AYRSHARE_API_KEY",
+      "description": "Ayrshare Primary Profile API key sent as Authorization: Bearer API_KEY. Find it in the Ayrshare dashboard API Key page: https://app.ayrshare.com/api-key.",
+      "extraFields": [
+        {
+          "key": "profileKey",
+          "label": "Profile Key",
+          "inputType": "password",
+          "placeholder": "AYRSHARE_PROFILE_KEY",
+          "description": "Optional Ayrshare User Profile key sent as the Profile-Key header for Business and Enterprise profile requests. Find it from the Ayrshare dashboard user profile management page: https://app.ayrshare.com/profiles.",
+          "required": false,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.ayrshare.com/",
+  "actions": [
+    {
+      "id": "ayrshare.check_post_length",
+      "service": "ayrshare",
+      "name": "check_post_length",
+      "description": "Check weighted social post length and platform validity using Ayrshare's post length validator.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "description": "The post text to measure."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for checking Ayrshare post length."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "maxCharLimits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "description": "A character limit."
+            },
+            "description": "Maximum character limits keyed by platform."
+          },
+          "validByPlatform": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean",
+              "description": "A validity flag."
+            },
+            "description": "Whether the post is valid for each platform."
+          },
+          "weightedLengthByPlatform": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "description": "A weighted character length."
+            },
+            "description": "Weighted post lengths keyed by platform."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare post length result."
+      }
+    },
+    {
+      "id": "ayrshare.delete_post",
+      "service": "ayrshare",
+      "name": "delete_post",
+      "description": "Delete one or more Ayrshare posts, delete all pending scheduled posts, or mark a post as manually deleted.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The top-level Ayrshare post ID returned by publish_post."
+          },
+          "bulk": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The top-level Ayrshare post ID returned by publish_post."
+            },
+            "description": "Ayrshare post IDs to bulk delete.",
+            "minItems": 1
+          },
+          "deleteAllScheduled": {
+            "type": "boolean",
+            "description": "Whether to delete all pending scheduled posts for the profile."
+          },
+          "markManualDeleted": {
+            "type": "boolean",
+            "description": "Whether to mark the Ayrshare post as deleted without deleting it from the social networks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting Ayrshare posts. Provide id, bulk, or deleteAllScheduled."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Ayrshare post ID when returned for a single delete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Ayrshare post ID when returned for a single delete."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Per-platform or per-post delete results returned by Ayrshare."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Delete errors returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare delete-post result."
+      }
+    },
+    {
+      "id": "ayrshare.get_post",
+      "service": "ayrshare",
+      "name": "get_post",
+      "description": "Get one Ayrshare post by top-level Ayrshare post ID, including status and per-platform results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The top-level Ayrshare post ID returned by publish_post."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one Ayrshare post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "The status returned by Ayrshare."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The top-level Ayrshare post ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The top-level Ayrshare post ID when returned."
+              },
+              "postIds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw response object returned by Ayrshare."
+                },
+                "description": "Per-platform post results returned by Ayrshare."
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw response object returned by Ayrshare."
+                },
+                "description": "Per-platform errors returned by Ayrshare."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw response object returned by Ayrshare."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Ayrshare post result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare get-post result."
+      }
+    },
+    {
+      "id": "ayrshare.get_post_analytics",
+      "service": "ayrshare",
+      "name": "get_post_analytics",
+      "description": "Get real-time analytics for an Ayrshare post, optionally limited to selected social platforms.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The top-level Ayrshare post ID returned by publish_post."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bluesky",
+                "facebook",
+                "gmb",
+                "instagram",
+                "linkedin",
+                "pinterest",
+                "reddit",
+                "snapchat",
+                "telegram",
+                "threads",
+                "tiktok",
+                "twitter",
+                "youtube"
+              ],
+              "description": "The social network platform name accepted by Ayrshare."
+            },
+            "description": "Optional social platforms to include in the Ayrshare request.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for retrieving Ayrshare post analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The top-level Ayrshare post ID when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The top-level Ayrshare post ID when returned."
+          },
+          "postIds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Per-platform analytics results returned by Ayrshare."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Per-platform analytics errors returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare post analytics result."
+      }
+    },
+    {
+      "id": "ayrshare.get_user_profile",
+      "service": "ayrshare",
+      "name": "get_user_profile",
+      "description": "Get Ayrshare account or user profile details, including linked social accounts and usage metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instagramDetails": {
+            "type": "boolean",
+            "description": "Whether Ayrshare should include slower additional Instagram details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Ayrshare user or profile details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activeSocialAccounts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bluesky",
+                "facebook",
+                "gmb",
+                "instagram",
+                "linkedin",
+                "pinterest",
+                "reddit",
+                "snapchat",
+                "telegram",
+                "threads",
+                "tiktok",
+                "twitter",
+                "youtube"
+              ],
+              "description": "The social network platform name accepted by Ayrshare."
+            },
+            "description": "The linked social network accounts currently active for the profile."
+          },
+          "displayNames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "The social account display records returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare user profile details."
+      }
+    },
+    {
+      "id": "ayrshare.list_post_history",
+      "service": "ayrshare",
+      "name": "list_post_history",
+      "description": "List Ayrshare post history with optional filters for date range, status, type, and social platforms.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of history records to return."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bluesky",
+                "facebook",
+                "gmb",
+                "instagram",
+                "linkedin",
+                "pinterest",
+                "reddit",
+                "snapchat",
+                "telegram",
+                "threads",
+                "tiktok",
+                "twitter",
+                "youtube"
+              ],
+              "description": "The social network platform name accepted by Ayrshare."
+            },
+            "description": "The social platforms to include in the history filter."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive ISO 8601 start date for history results."
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive ISO 8601 end date for history results."
+          },
+          "lastDays": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of previous days to include, or 0 for all history."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error",
+              "processing",
+              "pending",
+              "paused",
+              "deleted",
+              "awaiting approval"
+            ],
+            "description": "The Ayrshare post status to filter by."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "immediate",
+              "scheduled"
+            ],
+            "description": "Whether to return immediate or scheduled posts."
+          },
+          "autoRepostId": {
+            "type": "string",
+            "description": "The auto repost ID to filter by, or all for every auto repost."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Ayrshare post history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "The post history records returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare post history result."
+      }
+    },
+    {
+      "id": "ayrshare.publish_post",
+      "service": "ayrshare",
+      "name": "publish_post",
+      "description": "Publish or schedule a social media post through Ayrshare using a JSON-friendly first-pass field set.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "description": "The post text to send to the selected social platforms."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "bluesky",
+                    "facebook",
+                    "gmb",
+                    "instagram",
+                    "linkedin",
+                    "pinterest",
+                    "reddit",
+                    "snapchat",
+                    "telegram",
+                    "threads",
+                    "tiktok",
+                    "twitter",
+                    "youtube"
+                  ],
+                  "description": "The social network platform name accepted by Ayrshare."
+                },
+                {
+                  "const": "all",
+                  "type": "string",
+                  "description": "The all-platform shortcut accepted by Ayrshare."
+                }
+              ],
+              "description": "An Ayrshare social platform or the all shortcut."
+            },
+            "description": "The social platforms to publish to, or all to publish to every linked platform.",
+            "minItems": 1
+          },
+          "mediaUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An HTTPS media URL Ayrshare can retrieve."
+            },
+            "description": "HTTPS image or video URLs to include in the post."
+          },
+          "isVideo": {
+            "type": "boolean",
+            "description": "Whether the media URLs should be treated as video media."
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "The UTC ISO 8601 datetime when Ayrshare should publish the post."
+          },
+          "validateScheduled": {
+            "type": "boolean",
+            "description": "Whether Ayrshare should validate a scheduled post before accepting it."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "A unique idempotency key used to reject duplicate post submissions."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Internal notes stored with the post and retrievable from history."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post",
+          "platforms"
+        ],
+        "description": "The input payload for publishing or scheduling a post with Ayrshare."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Ayrshare post ID when returned at the top level."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Ayrshare post ID when returned at the top level."
+          },
+          "postIds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Per-platform publish results returned by Ayrshare."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Per-platform errors returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare publish post result."
+      }
+    },
+    {
+      "id": "ayrshare.retry_post",
+      "service": "ayrshare",
+      "name": "retry_post",
+      "description": "Retry an Ayrshare post whose previous publish attempt failed, returning the new pending post status.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The top-level Ayrshare post ID returned by publish_post."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrying an Ayrshare post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Ayrshare post ID returned for the retry."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Ayrshare post ID returned for the retry."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare retry-post result."
+      }
+    },
+    {
+      "id": "ayrshare.update_post",
+      "service": "ayrshare",
+      "name": "update_post",
+      "description": "Update mutable Ayrshare post metadata such as scheduleDate, approval status, notes, pause state, comments, or YouTube visibility.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The top-level Ayrshare post ID returned by publish_post."
+          },
+          "approved": {
+            "type": "boolean",
+            "description": "Whether to approve a post awaiting approval."
+          },
+          "disableComments": {
+            "type": "boolean",
+            "description": "Whether to disable comments on supported social platforms."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Reference notes stored with the Ayrshare post."
+          },
+          "scheduleDate": {
+            "type": "string",
+            "description": "The UTC datetime when Ayrshare should publish the scheduled post.",
+            "format": "date-time"
+          },
+          "scheduledPause": {
+            "type": "boolean",
+            "description": "Whether to pause or unpause a scheduled Ayrshare post."
+          },
+          "youTubeOptions": {
+            "type": "object",
+            "properties": {
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "unlisted",
+                  "private",
+                  "public"
+                ],
+                "description": "The visibility to set on a posted YouTube video."
+              },
+              "title": {
+                "type": "string",
+                "description": "The YouTube video title to update."
+              },
+              "description": {
+                "type": "string",
+                "description": "The YouTube video description to update."
+              },
+              "categoryId": {
+                "type": "integer",
+                "description": "The YouTube category ID to update."
+              }
+            },
+            "additionalProperties": false,
+            "description": "YouTube metadata to update on a posted video."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for updating an Ayrshare post. Provide at least one update field in addition to id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Ayrshare post ID when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Ayrshare post ID when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare update-post result."
+      }
+    },
+    {
+      "id": "ayrshare.validate_post",
+      "service": "ayrshare",
+      "name": "validate_post",
+      "description": "Validate an Ayrshare post payload before publishing, including platform and media URL checks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "string",
+            "description": "The post text to validate."
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "bluesky",
+                "facebook",
+                "gmb",
+                "instagram",
+                "linkedin",
+                "pinterest",
+                "reddit",
+                "snapchat",
+                "telegram",
+                "threads",
+                "tiktok",
+                "twitter",
+                "youtube"
+              ],
+              "description": "The social network platform name accepted by Ayrshare."
+            },
+            "description": "The social platforms to validate the post against.",
+            "minItems": 1
+          },
+          "mediaUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An HTTPS media URL Ayrshare can retrieve.",
+              "format": "uri"
+            },
+            "description": "HTTPS image or video URLs to validate with the post."
+          },
+          "isVideo": {
+            "type": "boolean",
+            "description": "Whether the media URLs should be treated as video media."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post",
+          "platforms"
+        ],
+        "description": "The input payload for validating an Ayrshare post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "valid": {
+            "type": "boolean",
+            "description": "Whether Ayrshare accepted the post payload as valid."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw response object returned by Ayrshare."
+            },
+            "description": "Validation errors returned by Ayrshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare validate-post result."
+      }
+    },
+    {
+      "id": "ayrshare.verify_media_url",
+      "service": "ayrshare",
+      "name": "verify_media_url",
+      "description": "Verify that a media URL exists and is accessible to Ayrshare.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "description": "The media URL Ayrshare should verify.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for verifying an Ayrshare media URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status returned by Ayrshare."
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The upstream HTTP status code for the media URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream HTTP status code for the media URL."
+          },
+          "statusText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream HTTP status text for the media URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream HTTP status text for the media URL."
+          },
+          "contentType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The media content type returned by Ayrshare."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The media content type returned by Ayrshare."
+          },
+          "exists": {
+            "type": "boolean",
+            "description": "Whether Ayrshare reported the media URL as reachable."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw response object returned by Ayrshare."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Ayrshare media URL verification result."
+      }
+    }
+  ]
+}

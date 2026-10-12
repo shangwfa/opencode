@@ -1,0 +1,1515 @@
+{
+  "service": "twilio",
+  "displayName": "Twilio",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "accountSid",
+          "label": "Account SID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "AC...",
+          "description": "Twilio Account SID used as the account identifier in API paths. Find it in the Account Info section of https://www.twilio.com/console."
+        },
+        {
+          "key": "authToken",
+          "label": "Auth Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "your_auth_token",
+          "description": "Twilio Auth Token used with the Authorization Basic header. Find or rotate it in the Account Info section of https://www.twilio.com/console."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.twilio.com",
+  "actions": [
+    {
+      "id": "twilio.create_call",
+      "service": "twilio",
+      "name": "create_call",
+      "description": "Create an outbound Twilio voice call using a TwiML URL or inline TwiML.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number, SIP address, or client identifier to call."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Twilio phone number or client identifier to use as caller ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The absolute URL that returns TwiML instructions for the call.",
+            "format": "uri"
+          },
+          "twiml": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inline TwiML instructions for the call.",
+            "pattern": "\\S"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The HTTP method Twilio should use."
+          },
+          "fallbackUrl": {
+            "type": "string",
+            "description": "The fallback URL to request when the primary TwiML URL fails.",
+            "format": "uri"
+          },
+          "fallbackMethod": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The HTTP method Twilio should use."
+          },
+          "statusCallback": {
+            "type": "string",
+            "description": "The URL that receives asynchronous call status callbacks.",
+            "format": "uri"
+          },
+          "statusCallbackEvent": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "initiated",
+                "ringing",
+                "answered",
+                "completed"
+              ],
+              "description": "One Twilio call progress event."
+            },
+            "description": "Call progress events to send to the status callback."
+          },
+          "statusCallbackMethod": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The HTTP method Twilio should use."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "from"
+        ],
+        "description": "The input payload for creating a Twilio call.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "twiml"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "callSid": {
+            "type": "string",
+            "description": "The Twilio call SID."
+          },
+          "accountSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Twilio account SID that owns the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio account SID that owns the call."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current or final call status."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current or final call status."
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The direction of the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The direction of the call."
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The called phone number, SIP address, or client identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The called phone number, SIP address, or client identifier."
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The caller phone number or client identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller phone number or client identifier."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The call duration in seconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The call duration in seconds."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The price charged for the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The price charged for the call."
+          },
+          "priceUnit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The currency used for the call price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The currency used for the call price."
+          },
+          "startTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call started."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call started."
+          },
+          "endTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call ended."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call ended."
+          },
+          "dateCreated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call resource was created."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call resource was created."
+          },
+          "dateUpdated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call resource was last updated."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call resource was last updated."
+          },
+          "phoneNumberSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The SID of the Twilio phone number used for the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SID of the Twilio phone number used for the call."
+          },
+          "parentCallSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent call SID when this is a child call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent call SID when this is a child call."
+          },
+          "queueTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The estimated queue time in milliseconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The estimated queue time in milliseconds."
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The relative URI of the Twilio call resource."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The relative URI of the Twilio call resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Twilio call payload."
+      }
+    },
+    {
+      "id": "twilio.get_account",
+      "service": "twilio",
+      "name": "get_account",
+      "description": "Fetch the current Twilio account profile for the connected credential.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountSid": {
+            "type": "string",
+            "description": "The Twilio account SID."
+          },
+          "friendlyName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The friendly name of the Twilio account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The friendly name of the Twilio account."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current status of the Twilio account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current status of the Twilio account."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Twilio account type."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio account type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountSid",
+          "friendlyName",
+          "status",
+          "type"
+        ],
+        "description": "The normalized Twilio account payload."
+      }
+    },
+    {
+      "id": "twilio.get_call",
+      "service": "twilio",
+      "name": "get_call",
+      "description": "Fetch one Twilio voice call by call SID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "callSid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Twilio call SID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "callSid"
+        ],
+        "description": "The input payload for fetching one Twilio call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "callSid": {
+            "type": "string",
+            "description": "The Twilio call SID."
+          },
+          "accountSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Twilio account SID that owns the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio account SID that owns the call."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current or final call status."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current or final call status."
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The direction of the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The direction of the call."
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The called phone number, SIP address, or client identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The called phone number, SIP address, or client identifier."
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The caller phone number or client identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller phone number or client identifier."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The call duration in seconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The call duration in seconds."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The price charged for the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The price charged for the call."
+          },
+          "priceUnit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The currency used for the call price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The currency used for the call price."
+          },
+          "startTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call started."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call started."
+          },
+          "endTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call ended."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call ended."
+          },
+          "dateCreated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call resource was created."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call resource was created."
+          },
+          "dateUpdated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The time when the call resource was last updated."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The time when the call resource was last updated."
+          },
+          "phoneNumberSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The SID of the Twilio phone number used for the call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The SID of the Twilio phone number used for the call."
+          },
+          "parentCallSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent call SID when this is a child call."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent call SID when this is a child call."
+          },
+          "queueTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The estimated queue time in milliseconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The estimated queue time in milliseconds."
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The relative URI of the Twilio call resource."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The relative URI of the Twilio call resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Twilio call payload."
+      }
+    },
+    {
+      "id": "twilio.get_message",
+      "service": "twilio",
+      "name": "get_message",
+      "description": "Fetch one Twilio message by message SID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageSid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Twilio message SID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messageSid"
+        ],
+        "description": "The input payload for fetching one Twilio message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messageSid": {
+            "type": "string",
+            "description": "The Twilio message SID."
+          },
+          "accountSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Twilio account SID that owns the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio account SID that owns the message."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The delivery status of the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The delivery status of the message."
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The destination phone number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The destination phone number."
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The sender phone number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sender phone number."
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The text body of the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The text body of the message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Twilio message payload."
+      }
+    },
+    {
+      "id": "twilio.list_calls",
+      "service": "twilio",
+      "name": "list_calls",
+      "description": "List Twilio voice calls with optional recipient, status, date, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Only include calls made to this phone number, SIP address, or client identifier."
+          },
+          "from": {
+            "type": "string",
+            "description": "Only include calls made from this phone number, SIP address, or client identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "ringing",
+              "in-progress",
+              "canceled",
+              "completed",
+              "busy",
+              "no-answer",
+              "failed"
+            ],
+            "description": "The Twilio call status to filter by."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Only include calls that started on or after this date.",
+            "format": "date"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "Only include calls that started before this date.",
+            "format": "date"
+          },
+          "parentCallSid": {
+            "type": "string",
+            "description": "Only include child calls of this parent call SID."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return in one page."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The Twilio page token used to continue a previous listing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Twilio calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callSid": {
+                  "type": "string",
+                  "description": "The Twilio call SID."
+                },
+                "accountSid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Twilio account SID that owns the call."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Twilio account SID that owns the call."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current or final call status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current or final call status."
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The direction of the call."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The direction of the call."
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The called phone number, SIP address, or client identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The called phone number, SIP address, or client identifier."
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The caller phone number or client identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The caller phone number or client identifier."
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The call duration in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The call duration in seconds."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The price charged for the call."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The price charged for the call."
+                },
+                "priceUnit": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The currency used for the call price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The currency used for the call price."
+                },
+                "startTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time when the call started."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time when the call started."
+                },
+                "endTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time when the call ended."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time when the call ended."
+                },
+                "dateCreated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time when the call resource was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time when the call resource was created."
+                },
+                "dateUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time when the call resource was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time when the call resource was last updated."
+                },
+                "phoneNumberSid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The SID of the Twilio phone number used for the call."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The SID of the Twilio phone number used for the call."
+                },
+                "parentCallSid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent call SID when this is a child call."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent call SID when this is a child call."
+                },
+                "queueTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The estimated queue time in milliseconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated queue time in milliseconds."
+                },
+                "uri": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The relative URI of the Twilio call resource."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The relative URI of the Twilio call resource."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The normalized Twilio call payload."
+            },
+            "description": "The normalized Twilio calls."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current Twilio result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current Twilio result page."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Twilio page size for this result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio page size for this result."
+          },
+          "nextPageUri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URI returned by Twilio, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URI returned by Twilio, if any."
+          },
+          "previousPageUri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URI returned by Twilio, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URI returned by Twilio, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calls",
+          "page",
+          "pageSize",
+          "nextPageUri",
+          "previousPageUri"
+        ],
+        "description": "The output payload for listing Twilio calls."
+      }
+    },
+    {
+      "id": "twilio.list_messages",
+      "service": "twilio",
+      "name": "list_messages",
+      "description": "List SMS or MMS messages for the connected Twilio account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Only include messages sent to this phone number."
+          },
+          "from": {
+            "type": "string",
+            "description": "Only include messages sent from this phone number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return in one page."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The Twilio page token used to continue a previous listing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Twilio messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "messageSid": {
+                  "type": "string",
+                  "description": "The Twilio message SID."
+                },
+                "accountSid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Twilio account SID that owns the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Twilio account SID that owns the message."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The delivery status of the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The delivery status of the message."
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The destination phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The destination phone number."
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The sender phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The sender phone number."
+                },
+                "body": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The text body of the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The text body of the message."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The normalized Twilio message payload."
+            },
+            "description": "The normalized Twilio messages."
+          },
+          "nextPageUri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URI returned by Twilio, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URI returned by Twilio, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "nextPageUri"
+        ],
+        "description": "The output payload for listing Twilio messages."
+      }
+    },
+    {
+      "id": "twilio.list_usage_records",
+      "service": "twilio",
+      "name": "list_usage_records",
+      "description": "List Twilio usage records for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "The Twilio usage category to filter by."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Twilio usage records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "usageRecords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "accountSid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Twilio account SID that owns the usage."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Twilio account SID that owns the usage."
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Twilio usage category."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Twilio usage category."
+                },
+                "count": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The number of units consumed in the record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of units consumed in the record."
+                },
+                "countUnit": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unit for the usage count."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unit for the usage count."
+                },
+                "usage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The aggregated usage amount."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The aggregated usage amount."
+                },
+                "usageUnit": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unit for the aggregated usage amount."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unit for the aggregated usage amount."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The billed price for the usage record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The billed price for the usage record."
+                },
+                "priceUnit": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The currency unit for the billed price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The currency unit for the billed price."
+                },
+                "startDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The inclusive start date of the usage record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The inclusive start date of the usage record."
+                },
+                "endDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The inclusive end date of the usage record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The inclusive end date of the usage record."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Twilio usage record."
+            },
+            "description": "The normalized usage records returned by Twilio."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current Twilio result page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current Twilio result page."
+          },
+          "pageSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Twilio page size for this result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio page size for this result."
+          },
+          "nextPageUri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URI returned by Twilio, if any."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URI returned by Twilio, if any."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "usageRecords",
+          "page",
+          "pageSize",
+          "nextPageUri"
+        ],
+        "description": "The output payload for listing Twilio usage records."
+      }
+    },
+    {
+      "id": "twilio.send_message",
+      "service": "twilio",
+      "name": "send_message",
+      "description": "Send an outbound SMS or MMS message with Twilio.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination phone number in E.164 format."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Twilio phone number sending the message."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text body of the outbound message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "from",
+          "body"
+        ],
+        "description": "The input payload for sending a Twilio message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messageSid": {
+            "type": "string",
+            "description": "The Twilio message SID."
+          },
+          "accountSid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Twilio account SID that owns the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Twilio account SID that owns the message."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The delivery status of the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The delivery status of the message."
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The destination phone number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The destination phone number."
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The sender phone number."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sender phone number."
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The text body of the message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The text body of the message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Twilio message payload."
+      }
+    }
+  ]
+}

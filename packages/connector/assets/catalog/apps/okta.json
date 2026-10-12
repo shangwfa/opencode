@@ -1,0 +1,1809 @@
+{
+  "service": "okta",
+  "displayName": "Okta",
+  "description": "Manage Okta directory users, groups, memberships, and user lifecycle operations.",
+  "categories": [
+    "Security"
+  ],
+  "authTypes": [
+    "oauth2",
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://{subdomain}.okta.com/oauth2/v1/authorize",
+      "tokenUrl": "https://{subdomain}.okta.com/oauth2/v1/token",
+      "scopes": [
+        "openid",
+        "offline_access",
+        "okta.users.read",
+        "okta.users.manage",
+        "okta.groups.read",
+        "okta.groups.manage"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "response_mode": "query"
+      },
+      "clientConfigFields": [
+        {
+          "key": "subdomain",
+          "label": "Okta subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "dev-12345678",
+          "description": "The subdomain from your Okta organization URL. For https://dev-12345678.okta.com, enter dev-12345678."
+        }
+      ]
+    },
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "orgUrl",
+          "label": "Org URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://example.okta.com",
+          "description": "The HTTPS base URL for your Okta organization, such as https://example.okta.com or your configured Okta custom domain."
+        },
+        {
+          "key": "apiToken",
+          "label": "API Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "OKTA_API_TOKEN",
+          "description": "Okta API token sent with the Authorization: SSWS header. Create it in the Admin Console under Security > API > Tokens: https://developer.okta.com/docs/guides/create-an-api-token/main/."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_users",
+        "input": {
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.okta.com/",
+  "actions": [
+    {
+      "id": "okta.add_user_to_group",
+      "service": "okta",
+      "name": "add_user_to_group",
+      "description": "Assign an Okta user to an Okta-managed group.",
+      "operationType": "write",
+      "requiredScopes": [
+        "okta.groups.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group membership to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "description": "The Okta group ID."
+          },
+          "userId": {
+            "type": "string",
+            "description": "The Okta user ID."
+          },
+          "added": {
+            "type": "boolean",
+            "description": "Whether Okta accepted the membership assignment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group membership assignment result."
+      }
+    },
+    {
+      "id": "okta.create_group",
+      "service": "okta",
+      "name": "create_group",
+      "description": "Create an Okta-managed group.",
+      "operationType": "write",
+      "requiredScopes": [
+        "okta.groups.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Okta group name.",
+                "pattern": "\\S"
+              },
+              "description": {
+                "type": "string",
+                "description": "The Okta group description."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name"
+            ],
+            "description": "The Okta group profile."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group creation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta group type, such as OKTA_GROUP."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta group type, such as OKTA_GROUP."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the group."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group was last updated."
+              },
+              "lastMembershipUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group membership last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group membership last changed."
+              },
+              "objectClass": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One object class value."
+                },
+                "description": "The Okta group object classes."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta group profile."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta group object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta group object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta group response."
+      }
+    },
+    {
+      "id": "okta.create_user",
+      "service": "okta",
+      "name": "create_user",
+      "description": "Create an Okta user with profile, credentials, group assignments, and activation options.",
+      "operationType": "write",
+      "requiredScopes": [
+        "okta.users.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Okta user profile fields, including required attributes and custom profile properties."
+          },
+          "credentials": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Okta user credentials, such as password, recovery question, or authentication provider fields."
+          },
+          "groupIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Okta group ID.",
+              "pattern": "\\S"
+            },
+            "description": "Okta group IDs assigned during creation."
+          },
+          "activate": {
+            "type": "boolean",
+            "description": "Whether Okta should activate the user after creation.",
+            "default": true
+          },
+          "provider": {
+            "type": "boolean",
+            "description": "Whether the credentials specify an authentication provider for the user.",
+            "default": false
+          },
+          "nextLogin": {
+            "type": "string",
+            "enum": [
+              "changePassword"
+            ],
+            "description": "The password behavior for the user's next login."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ],
+        "description": "The Okta user creation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta user ID."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the user."
+              },
+              "activated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta activated the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta activated the user."
+              },
+              "statusChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user status last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user status last changed."
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user last signed in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user last signed in."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user was last updated."
+              },
+              "passwordChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user password last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user password last changed."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta user profile, including custom attributes."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta user object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta user."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta user response."
+      }
+    },
+    {
+      "id": "okta.delete_group",
+      "service": "okta",
+      "name": "delete_group",
+      "description": "Delete an Okta-managed group by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "okta.groups.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The group to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "description": "The deleted Okta group ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Okta accepted the group deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group deletion result."
+      }
+    },
+    {
+      "id": "okta.delete_user",
+      "service": "okta",
+      "name": "delete_user",
+      "description": "Deactivate an active Okta user, or permanently delete a user that is already deactivated.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "okta.users.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          },
+          "sendEmail": {
+            "type": "boolean",
+            "description": "Whether Okta should send a deactivation email to the admin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The Okta user deletion request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The requested Okta user ID or login."
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "deactivated",
+              "deleted"
+            ],
+            "description": "Whether the request deactivated or permanently deleted the user."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the user was permanently deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of the Okta user deletion request."
+      }
+    },
+    {
+      "id": "okta.get_group",
+      "service": "okta",
+      "name": "get_group",
+      "description": "Get one Okta group by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.groups.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The group to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta group type, such as OKTA_GROUP."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta group type, such as OKTA_GROUP."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the group."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group was last updated."
+              },
+              "lastMembershipUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group membership last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group membership last changed."
+              },
+              "objectClass": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One object class value."
+                },
+                "description": "The Okta group object classes."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta group profile."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta group object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta group object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta group response."
+      }
+    },
+    {
+      "id": "okta.get_user",
+      "service": "okta",
+      "name": "get_user",
+      "description": "Get one Okta user by ID, login, or login shortname.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.users.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The user to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta user ID."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the user."
+              },
+              "activated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta activated the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta activated the user."
+              },
+              "statusChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user status last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user status last changed."
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user last signed in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user last signed in."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user was last updated."
+              },
+              "passwordChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user password last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user password last changed."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta user profile, including custom attributes."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta user object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta user."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta user response."
+      }
+    },
+    {
+      "id": "okta.lifecycle_user",
+      "service": "okta",
+      "name": "lifecycle_user",
+      "description": "Activate, reactivate, deactivate, suspend, unsuspend, unlock, or expire an Okta user's password.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.users.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "activate",
+              "reactivate",
+              "deactivate",
+              "suspend",
+              "unsuspend",
+              "unlock",
+              "expire_password"
+            ],
+            "description": "The lifecycle operation to perform."
+          },
+          "sendEmail": {
+            "type": "boolean",
+            "description": "Whether supported activation or deactivation operations should send email."
+          },
+          "tempPassword": {
+            "type": "boolean",
+            "description": "For expire_password, whether Okta should expire the password and return a temporary password."
+          },
+          "revokeSessions": {
+            "type": "boolean",
+            "description": "When returning a temporary password, whether Okta should revoke the user's existing sessions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "operation"
+        ],
+        "description": "The Okta user lifecycle request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The requested Okta user ID or login."
+          },
+          "operation": {
+            "type": "string",
+            "description": "The completed lifecycle operation."
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta lifecycle response body, or null for an empty response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Okta lifecycle response body, or null for an empty response."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta lifecycle response body, or null for an empty response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Okta lifecycle response body, or null for an empty response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta user lifecycle response."
+      }
+    },
+    {
+      "id": "okta.list_group_users",
+      "service": "okta",
+      "name": "list_group_users",
+      "description": "List the users that are members of an Okta group.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.groups.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of group members to return.",
+            "default": 1000
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Okta pagination cursor from a previous response.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groupId"
+        ],
+        "description": "Options for listing Okta group members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Okta user ID."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Okta created the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Okta created the user."
+                },
+                "activated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Okta activated the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Okta activated the user."
+                },
+                "statusChanged": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user status last changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user status last changed."
+                },
+                "lastLogin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user last signed in."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user last signed in."
+                },
+                "lastUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user was last updated."
+                },
+                "passwordChanged": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user password last changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user password last changed."
+                },
+                "profile": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The Okta user profile, including custom attributes."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Okta user object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Okta user."
+            },
+            "description": "The returned Okta users."
+          },
+          "nextAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next Okta after cursor, or null for the final page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Okta after cursor, or null for the final page."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw Okta user object."
+            },
+            "description": "The raw Okta user objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Okta users."
+      }
+    },
+    {
+      "id": "okta.list_groups",
+      "service": "okta",
+      "name": "list_groups",
+      "description": "List Okta groups with search, filtering, sorting, expansion, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.groups.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum number of groups to return."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Okta pagination cursor from a previous response.",
+            "pattern": "\\S"
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Okta Groups API search expression.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Okta Groups API filter expression.",
+            "pattern": "\\S"
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A simple query that matches the Okta group name.",
+            "pattern": "\\S"
+          },
+          "expand": {
+            "type": "string",
+            "enum": [
+              "stats",
+              "app"
+            ],
+            "description": "Additional group metadata to include."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The group property used to sort search results.",
+            "pattern": "\\S"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for an Okta search query.",
+            "default": "asc"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for listing Okta groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Okta group ID."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Okta group type, such as OKTA_GROUP."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Okta group type, such as OKTA_GROUP."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Okta created the group."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Okta created the group."
+                },
+                "lastUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the group was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the group was last updated."
+                },
+                "lastMembershipUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the group membership last changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the group membership last changed."
+                },
+                "objectClass": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One object class value."
+                  },
+                  "description": "The Okta group object classes."
+                },
+                "profile": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The Okta group profile."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Okta group object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Okta group."
+            },
+            "description": "The returned Okta groups."
+          },
+          "nextAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next Okta after cursor, or null for the final page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Okta after cursor, or null for the final page."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw Okta group object."
+            },
+            "description": "The raw Okta group objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Okta groups."
+      }
+    },
+    {
+      "id": "okta.list_users",
+      "service": "okta",
+      "name": "list_users",
+      "description": "List Okta users with search, filtering, sorting, field projection, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "okta.users.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of users to return.",
+            "default": 200
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Okta pagination cursor from a previous response.",
+            "pattern": "\\S"
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Okta Users API search expression.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Okta Users API filter expression.",
+            "pattern": "\\S"
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A simple prefix query for user first name, last name, or email.",
+            "pattern": "\\S"
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user property used to sort search results.",
+            "pattern": "\\S"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for an Okta search query.",
+            "default": "asc"
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated projection of user properties to return.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for listing Okta users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Okta user ID."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Okta created the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Okta created the user."
+                },
+                "activated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Okta activated the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Okta activated the user."
+                },
+                "statusChanged": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user status last changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user status last changed."
+                },
+                "lastLogin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user last signed in."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user last signed in."
+                },
+                "lastUpdated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user was last updated."
+                },
+                "passwordChanged": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the user password last changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the user password last changed."
+                },
+                "profile": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The Okta user profile, including custom attributes."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Okta user object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Okta user."
+            },
+            "description": "The returned Okta users."
+          },
+          "nextAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next Okta after cursor, or null for the final page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next Okta after cursor, or null for the final page."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One raw Okta user object."
+            },
+            "description": "The raw Okta user objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Okta users."
+      }
+    },
+    {
+      "id": "okta.remove_user_from_group",
+      "service": "okta",
+      "name": "remove_user_from_group",
+      "description": "Unassign an Okta user from an Okta-managed group.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "okta.groups.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group membership to remove."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "description": "The Okta group ID."
+          },
+          "userId": {
+            "type": "string",
+            "description": "The Okta user ID."
+          },
+          "removed": {
+            "type": "boolean",
+            "description": "Whether Okta accepted the membership removal."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group membership removal result."
+      }
+    },
+    {
+      "id": "okta.update_group",
+      "service": "okta",
+      "name": "update_group",
+      "description": "Replace an Okta-managed group's profile.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "okta.groups.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta group ID.",
+            "pattern": "\\S"
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Okta group name.",
+                "pattern": "\\S"
+              },
+              "description": {
+                "type": "string",
+                "description": "The Okta group description."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "name"
+            ],
+            "description": "The Okta group profile."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Okta group replacement request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta group ID."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta group type, such as OKTA_GROUP."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta group type, such as OKTA_GROUP."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the group."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group was last updated."
+              },
+              "lastMembershipUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the group membership last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the group membership last changed."
+              },
+              "objectClass": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One object class value."
+                },
+                "description": "The Okta group object classes."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta group profile."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta group object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta group."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta group object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta group response."
+      }
+    },
+    {
+      "id": "okta.update_user",
+      "service": "okta",
+      "name": "update_user",
+      "description": "Partially update an Okta user's profile or credentials.",
+      "operationType": "write",
+      "requiredScopes": [
+        "okta.users.manage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Okta user ID, login, or login shortname accepted by the Users API.",
+            "pattern": "\\S"
+          },
+          "profile": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Okta user profile fields, including required attributes and custom profile properties."
+          },
+          "credentials": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Okta user credentials, such as password, recovery question, or authentication provider fields."
+          },
+          "strict": {
+            "type": "boolean",
+            "description": "Whether Okta should enforce password age and history policies."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The Okta user partial update request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Okta user ID."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Okta user status, such as ACTIVE or SUSPENDED."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta created the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta created the user."
+              },
+              "activated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Okta activated the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Okta activated the user."
+              },
+              "statusChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user status last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user status last changed."
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user last signed in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user last signed in."
+              },
+              "lastUpdated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user was last updated."
+              },
+              "passwordChanged": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user password last changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user password last changed."
+              },
+              "profile": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The Okta user profile, including custom attributes."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Okta user object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Okta user."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Okta user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Okta user response."
+      }
+    }
+  ]
+}

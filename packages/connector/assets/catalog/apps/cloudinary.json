@@ -1,0 +1,820 @@
+{
+  "service": "cloudinary",
+  "displayName": "Cloudinary",
+  "categories": [
+    "Design & Media",
+    "Storage"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "cloudinary_api_key",
+      "description": "Cloudinary API key used with HTTP Basic authentication for Upload API and Admin API requests. Find it in Cloudinary Console Settings > API Keys: https://console.cloudinary.com/app/settings/api-keys .",
+      "extraFields": [
+        {
+          "key": "cloudName",
+          "label": "Cloud Name",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "my-cloud",
+          "description": "Cloudinary cloud name used in every API path. Find it on the same API Keys page or in the Cloudinary onboarding guide: https://cloudinary.com/documentation/dev_kickstart_acct_setup ."
+        },
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "cloudinary_api_secret",
+          "description": "Cloudinary API secret paired with the API key for HTTP Basic authentication. Find it on Cloudinary Console Settings > API Keys: https://console.cloudinary.com/app/settings/api-keys ."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://cloudinary.com",
+  "actions": [
+    {
+      "id": "cloudinary.get_asset",
+      "service": "cloudinary",
+      "name": "get_asset",
+      "description": "Fetch one Cloudinary asset by immutable asset ID and return the normalized asset record.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The immutable Cloudinary asset ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "assetId"
+        ],
+        "description": "The input payload for fetching one Cloudinary asset by asset ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "description": "The immutable Cloudinary asset ID."
+              },
+              "publicId": {
+                "type": "string",
+                "description": "The Cloudinary public ID."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The Cloudinary asset version."
+              },
+              "versionId": {
+                "type": "string",
+                "description": "The Cloudinary version ID."
+              },
+              "signature": {
+                "type": "string",
+                "description": "The Cloudinary response signature."
+              },
+              "format": {
+                "type": "string",
+                "description": "The asset format returned by Cloudinary."
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "The Cloudinary resource type."
+              },
+              "deliveryType": {
+                "type": "string",
+                "description": "The Cloudinary delivery type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The asset creation timestamp returned by Cloudinary."
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "The asset size in bytes."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The asset width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The asset height in pixels."
+              },
+              "assetFolder": {
+                "type": "string",
+                "description": "The Cloudinary asset folder."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Cloudinary display name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The tags assigned to the asset."
+              },
+              "context": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A context value."
+                },
+                "description": "The context object returned by Cloudinary."
+              },
+              "url": {
+                "type": "string",
+                "description": "The non-secure delivery URL returned by Cloudinary."
+              },
+              "secureUrl": {
+                "type": "string",
+                "description": "The secure delivery URL returned by Cloudinary."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "publicId",
+              "resourceType",
+              "deliveryType",
+              "createdAt"
+            ],
+            "description": "A normalized Cloudinary asset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for fetching one Cloudinary asset."
+      }
+    },
+    {
+      "id": "cloudinary.list_assets",
+      "service": "cloudinary",
+      "name": "list_assets",
+      "description": "List uploaded Cloudinary assets of one resource type with optional prefix filtering and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "raw"
+            ],
+            "description": "The Cloudinary resource type for the asset."
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only list uploaded assets whose public IDs start with this prefix."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of uploaded assets to return."
+          },
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous list request."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The created_at sort direction for uploaded assets."
+          },
+          "includeTags": {
+            "type": "boolean",
+            "description": "Whether to include tags in the list response."
+          },
+          "includeContext": {
+            "type": "boolean",
+            "description": "Whether to include context metadata in the list response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing uploaded Cloudinary assets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "description": "The immutable Cloudinary asset ID."
+                },
+                "publicId": {
+                  "type": "string",
+                  "description": "The Cloudinary public ID."
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The Cloudinary asset version."
+                },
+                "versionId": {
+                  "type": "string",
+                  "description": "The Cloudinary version ID."
+                },
+                "signature": {
+                  "type": "string",
+                  "description": "The Cloudinary response signature."
+                },
+                "format": {
+                  "type": "string",
+                  "description": "The asset format returned by Cloudinary."
+                },
+                "resourceType": {
+                  "type": "string",
+                  "description": "The Cloudinary resource type."
+                },
+                "deliveryType": {
+                  "type": "string",
+                  "description": "The Cloudinary delivery type."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The asset creation timestamp returned by Cloudinary."
+                },
+                "bytes": {
+                  "type": "integer",
+                  "description": "The asset size in bytes."
+                },
+                "width": {
+                  "type": "integer",
+                  "description": "The asset width in pixels."
+                },
+                "height": {
+                  "type": "integer",
+                  "description": "The asset height in pixels."
+                },
+                "assetFolder": {
+                  "type": "string",
+                  "description": "The Cloudinary asset folder."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The Cloudinary display name."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The tags assigned to the asset."
+                },
+                "context": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A context value."
+                  },
+                  "description": "The context object returned by Cloudinary."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The non-secure delivery URL returned by Cloudinary."
+                },
+                "secureUrl": {
+                  "type": "string",
+                  "description": "The secure delivery URL returned by Cloudinary."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "assetId",
+                "publicId",
+                "resourceType",
+                "deliveryType",
+                "createdAt"
+              ],
+              "description": "A normalized Cloudinary asset."
+            },
+            "description": "The normalized uploaded Cloudinary assets."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing uploaded Cloudinary assets."
+      }
+    },
+    {
+      "id": "cloudinary.rename_asset",
+      "service": "cloudinary",
+      "name": "rename_asset",
+      "description": "Rename one uploaded Cloudinary asset by changing its public ID and return the normalized asset record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "raw"
+            ],
+            "description": "The Cloudinary resource type for the asset."
+          },
+          "fromPublicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current public ID of the uploaded asset."
+          },
+          "toPublicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement public ID for the uploaded asset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromPublicId",
+          "toPublicId"
+        ],
+        "description": "The input payload for renaming one uploaded Cloudinary asset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "description": "The immutable Cloudinary asset ID."
+              },
+              "publicId": {
+                "type": "string",
+                "description": "The Cloudinary public ID."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The Cloudinary asset version."
+              },
+              "versionId": {
+                "type": "string",
+                "description": "The Cloudinary version ID."
+              },
+              "signature": {
+                "type": "string",
+                "description": "The Cloudinary response signature."
+              },
+              "format": {
+                "type": "string",
+                "description": "The asset format returned by Cloudinary."
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "The Cloudinary resource type."
+              },
+              "deliveryType": {
+                "type": "string",
+                "description": "The Cloudinary delivery type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The asset creation timestamp returned by Cloudinary."
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "The asset size in bytes."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The asset width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The asset height in pixels."
+              },
+              "assetFolder": {
+                "type": "string",
+                "description": "The Cloudinary asset folder."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Cloudinary display name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The tags assigned to the asset."
+              },
+              "context": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A context value."
+                },
+                "description": "The context object returned by Cloudinary."
+              },
+              "url": {
+                "type": "string",
+                "description": "The non-secure delivery URL returned by Cloudinary."
+              },
+              "secureUrl": {
+                "type": "string",
+                "description": "The secure delivery URL returned by Cloudinary."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "publicId",
+              "resourceType",
+              "deliveryType",
+              "createdAt"
+            ],
+            "description": "A normalized Cloudinary asset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for renaming one uploaded Cloudinary asset."
+      }
+    },
+    {
+      "id": "cloudinary.update_asset",
+      "service": "cloudinary",
+      "name": "update_asset",
+      "description": "Update selected mutable fields of one uploaded Cloudinary asset by public ID using the explicit API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "raw"
+            ],
+            "description": "The Cloudinary resource type for the asset."
+          },
+          "publicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public ID of the uploaded asset to update."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement display name for the uploaded asset."
+          },
+          "assetFolder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement asset folder for the uploaded asset."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag to send to Cloudinary."
+            },
+            "description": "The list of tags to send to Cloudinary.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicId"
+        ],
+        "description": "The input payload for updating one uploaded Cloudinary asset.",
+        "anyOf": [
+          {
+            "required": [
+              "displayName"
+            ]
+          },
+          {
+            "required": [
+              "assetFolder"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "description": "The immutable Cloudinary asset ID."
+              },
+              "publicId": {
+                "type": "string",
+                "description": "The Cloudinary public ID."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The Cloudinary asset version."
+              },
+              "versionId": {
+                "type": "string",
+                "description": "The Cloudinary version ID."
+              },
+              "signature": {
+                "type": "string",
+                "description": "The Cloudinary response signature."
+              },
+              "format": {
+                "type": "string",
+                "description": "The asset format returned by Cloudinary."
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "The Cloudinary resource type."
+              },
+              "deliveryType": {
+                "type": "string",
+                "description": "The Cloudinary delivery type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The asset creation timestamp returned by Cloudinary."
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "The asset size in bytes."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The asset width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The asset height in pixels."
+              },
+              "assetFolder": {
+                "type": "string",
+                "description": "The Cloudinary asset folder."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Cloudinary display name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The tags assigned to the asset."
+              },
+              "context": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A context value."
+                },
+                "description": "The context object returned by Cloudinary."
+              },
+              "url": {
+                "type": "string",
+                "description": "The non-secure delivery URL returned by Cloudinary."
+              },
+              "secureUrl": {
+                "type": "string",
+                "description": "The secure delivery URL returned by Cloudinary."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "publicId",
+              "resourceType",
+              "deliveryType",
+              "createdAt"
+            ],
+            "description": "A normalized Cloudinary asset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for updating one uploaded Cloudinary asset."
+      }
+    },
+    {
+      "id": "cloudinary.upload_asset",
+      "service": "cloudinary",
+      "name": "upload_asset",
+      "description": "Upload one asset to Cloudinary from a remote URL or Data URI and return the normalized uploaded asset record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "raw"
+            ],
+            "description": "The Cloudinary resource type for the asset."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The remote HTTP or HTTPS file URL to upload.",
+            "format": "uri"
+          },
+          "fileDataUri": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Data URI content to upload to Cloudinary."
+          },
+          "publicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public ID to assign to the uploaded asset."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user-friendly display name to assign to the asset."
+          },
+          "assetFolder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudinary asset folder where the uploaded asset should be placed."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag to send to Cloudinary."
+            },
+            "description": "The list of tags to send to Cloudinary.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for uploading one asset to Cloudinary.",
+        "oneOf": [
+          {
+            "required": [
+              "fileUrl"
+            ]
+          },
+          {
+            "required": [
+              "fileDataUri"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "description": "The immutable Cloudinary asset ID."
+              },
+              "publicId": {
+                "type": "string",
+                "description": "The Cloudinary public ID."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The Cloudinary asset version."
+              },
+              "versionId": {
+                "type": "string",
+                "description": "The Cloudinary version ID."
+              },
+              "signature": {
+                "type": "string",
+                "description": "The Cloudinary response signature."
+              },
+              "format": {
+                "type": "string",
+                "description": "The asset format returned by Cloudinary."
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "The Cloudinary resource type."
+              },
+              "deliveryType": {
+                "type": "string",
+                "description": "The Cloudinary delivery type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The asset creation timestamp returned by Cloudinary."
+              },
+              "bytes": {
+                "type": "integer",
+                "description": "The asset size in bytes."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The asset width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The asset height in pixels."
+              },
+              "assetFolder": {
+                "type": "string",
+                "description": "The Cloudinary asset folder."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Cloudinary display name."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The tags assigned to the asset."
+              },
+              "context": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A context value."
+                },
+                "description": "The context object returned by Cloudinary."
+              },
+              "url": {
+                "type": "string",
+                "description": "The non-secure delivery URL returned by Cloudinary."
+              },
+              "secureUrl": {
+                "type": "string",
+                "description": "The secure delivery URL returned by Cloudinary."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "assetId",
+              "publicId",
+              "resourceType",
+              "deliveryType",
+              "createdAt"
+            ],
+            "description": "A normalized Cloudinary asset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for uploading one asset to Cloudinary."
+      }
+    }
+  ]
+}

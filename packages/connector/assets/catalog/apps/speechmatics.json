@@ -1,0 +1,631 @@
+{
+  "service": "speechmatics",
+  "displayName": "Speechmatics",
+  "description": "Submit URL-based Batch transcriptions, poll job status, retrieve transcripts, and inspect Speechmatics capabilities and deployments.",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SPEECHMATICS_API_KEY",
+      "description": "Project-scoped Speechmatics API key used for Speech to Text requests. Create one in the active project: https://portal.speechmatics.com/settings/api-keys.",
+      "extraFields": [
+        {
+          "key": "defaultRegion",
+          "label": "Default Batch Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "eu1",
+          "description": "Default Speechmatics Batch SaaS region. Supported values are eu1, eu2, us1, us2, and au1; actions may override it."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.speechmatics.com/",
+  "actions": [
+    {
+      "id": "speechmatics.get_service_capabilities",
+      "service": "speechmatics",
+      "name": "get_service_capabilities",
+      "description": "Query the Speechmatics Discovery API for current Batch transcription, translation, language identification, and language metadata capabilities in a cloud region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu1",
+              "eu2",
+              "us1",
+              "us2",
+              "au1"
+            ],
+            "description": "The Batch SaaS region whose Discovery API should be queried.",
+            "default": "eu1"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying Speechmatics service capabilities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu1",
+              "eu2",
+              "us1",
+              "us2",
+              "au1"
+            ],
+            "description": "The queried Speechmatics Batch SaaS region."
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "The Discovery API endpoint that was queried.",
+            "format": "uri"
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "language_pack_info": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Metadata for one language pack."
+                    },
+                    "description": "Language pack metadata keyed by Speechmatics language code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Language metadata returned by Speechmatics."
+              },
+              "batch": {
+                "type": "object",
+                "properties": {
+                  "transcription": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string",
+                          "description": "The capability version."
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": "Supported transcription language codes."
+                        },
+                        "locales": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Supported values."
+                          },
+                          "description": "A map from a language or capability name to its supported values."
+                        },
+                        "domains": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Supported values."
+                          },
+                          "description": "A map from a language or capability name to its supported values."
+                        },
+                        "domains_availability": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Supported values."
+                          },
+                          "description": "A map from a language or capability name to its supported values."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "version",
+                        "languages"
+                      ],
+                      "description": "Speechmatics Batch transcription capabilities for one API version."
+                    },
+                    "description": "Batch transcription capabilities."
+                  },
+                  "translation": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string",
+                          "description": "The capability version."
+                        },
+                        "languages": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Supported values."
+                          },
+                          "description": "A map from a language or capability name to its supported values."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "version",
+                        "languages"
+                      ],
+                      "description": "Speechmatics Batch translation capabilities for one API version."
+                    },
+                    "description": "Batch translation capabilities."
+                  },
+                  "languageid": {
+                    "type": "object",
+                    "properties": {
+                      "languages": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": "Languages supported by language identification."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Batch language identification capabilities."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Capabilities exposed by the Speechmatics Batch API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Speechmatics Discovery API capability document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Speechmatics service capabilities for a cloud region."
+      }
+    },
+    {
+      "id": "speechmatics.get_transcript",
+      "service": "speechmatics",
+      "name": "get_transcript",
+      "description": "Retrieve a completed Speechmatics transcript as JSON, plain text, or SRT subtitles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The completed transcription job identifier."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu1",
+              "eu2",
+              "us1",
+              "us2",
+              "au1"
+            ],
+            "description": "The same Batch SaaS region used to submit the job. Defaults to the connection region, then eu1."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json-v2",
+              "txt",
+              "srt"
+            ],
+            "description": "The requested transcript format. Defaults to json-v2."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "A Speechmatics transcript retrieval request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "json-v2",
+              "txt",
+              "srt"
+            ],
+            "description": "The transcript format."
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Speechmatics JSON transcript document."
+              },
+              {
+                "type": "string",
+                "description": "A plain text or SRT transcript."
+              }
+            ],
+            "description": "The JSON transcript document or text transcript."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved Speechmatics transcript."
+      }
+    },
+    {
+      "id": "speechmatics.get_transcription_job",
+      "service": "speechmatics",
+      "name": "get_transcription_job",
+      "description": "Get the current status, metadata, and errors for a Speechmatics Batch job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The transcription job identifier."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu1",
+              "eu2",
+              "us1",
+              "us2",
+              "au1"
+            ],
+            "description": "The same Batch SaaS region used to submit the job. Defaults to the connection region, then eu1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "A Speechmatics Batch job status request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The transcription job identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "done",
+                  "rejected",
+                  "deleted",
+                  "expired"
+                ],
+                "description": "The current transcription job status."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the job was created.",
+                "format": "date-time"
+              },
+              "data_name": {
+                "type": "string",
+                "description": "The submitted media name."
+              },
+              "duration": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The media duration in seconds."
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Speechmatics job error."
+                },
+                "description": "Errors reported while processing the job."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "A Speechmatics Batch transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Speechmatics Batch job response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "speechmatics.submit_transcription",
+        "statusActionId": "speechmatics.get_transcription_job"
+      }
+    },
+    {
+      "id": "speechmatics.list_deployments",
+      "service": "speechmatics",
+      "name": "list_deployments",
+      "description": "List the Speechmatics Batch and Realtime SaaS production deployments documented for general and enterprise customers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "batch",
+              "realtime"
+            ],
+            "description": "Only return deployments for this processing mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Speechmatics cloud deployments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "batch",
+                    "realtime"
+                  ],
+                  "description": "The processing mode served by this deployment."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "The Speechmatics region code."
+                },
+                "location": {
+                  "type": "string",
+                  "description": "The geographic location of the deployment."
+                },
+                "customerType": {
+                  "type": "string",
+                  "enum": [
+                    "all",
+                    "enterprise"
+                  ],
+                  "description": "Which customers can use the deployment."
+                },
+                "endpoint": {
+                  "type": "string",
+                  "description": "The production API hostname."
+                },
+                "protocol": {
+                  "type": "string",
+                  "enum": [
+                    "https",
+                    "wss"
+                  ],
+                  "description": "The protocol used to connect to the deployment."
+                },
+                "apiVersion": {
+                  "type": "string",
+                  "description": "The API version path used by the deployment."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A documented Speechmatics cloud API deployment."
+            },
+            "description": "Speechmatics cloud API deployments."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Documented Speechmatics cloud deployments."
+      }
+    },
+    {
+      "id": "speechmatics.submit_transcription",
+      "service": "speechmatics",
+      "name": "submit_transcription",
+      "description": "Submit media by URL to the Speechmatics Batch API and return a job ID for status polling and transcript retrieval.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "description": "A publicly reachable or presigned media URL that Speechmatics should fetch.",
+            "format": "uri"
+          },
+          "language": {
+            "type": "string",
+            "description": "The transcription language, normally an ISO language code or auto for language identification."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu1",
+              "eu2",
+              "us1",
+              "us2",
+              "au1"
+            ],
+            "description": "The Batch SaaS region. Defaults to the connection region, then eu1."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "enhanced",
+              "melia-1"
+            ],
+            "description": "The Speechmatics transcription model."
+          },
+          "domain": {
+            "type": "string",
+            "description": "A specialized transcription domain such as finance or medical."
+          },
+          "outputLocale": {
+            "type": "string",
+            "description": "The locale used to format transcription output."
+          },
+          "diarization": {
+            "type": "string",
+            "enum": [
+              "none",
+              "speaker",
+              "channel"
+            ],
+            "description": "How speakers or channels should be labelled."
+          },
+          "enableEntities": {
+            "type": "boolean",
+            "description": "Whether entity objects should be included in the transcript."
+          },
+          "additionalVocabulary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The custom word or phrase."
+                },
+                "soundsLike": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Alternative pronunciations that can help Speechmatics recognize the content."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "description": "A custom word or phrase that should be recognized."
+            },
+            "description": "Custom words or phrases that should be recognized."
+          },
+          "mediaAuthHeaders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Headers Speechmatics should send when fetching the media URL, in Name: Value form."
+          },
+          "tracking": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "The job title."
+              },
+              "reference": {
+                "type": "string",
+                "description": "An external system reference."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Tags associated with the job."
+              },
+              "details": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Customer-defined JSON metadata."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Customer-defined metadata retained with the transcription job."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaUrl",
+          "language"
+        ],
+        "description": "A URL-first Speechmatics Batch transcription request. For local files, upload the file to a publicly reachable or presigned URL first."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The job identifier used for status and transcript requests."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "The submitted Speechmatics transcription job."
+      },
+      "followUpActions": [
+        "speechmatics.get_transcription_job",
+        "speechmatics.get_transcript"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "speechmatics.submit_transcription",
+        "statusActionId": "speechmatics.get_transcription_job"
+      }
+    }
+  ]
+}

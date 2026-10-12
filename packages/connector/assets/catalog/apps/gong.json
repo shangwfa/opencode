@@ -1,0 +1,589 @@
+{
+  "service": "gong",
+  "displayName": "Gong",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://api.gong.io",
+          "description": "Gong API base URL for your company. Check it in Gong under Admin center > Settings > Ecosystem > API as described at https://help.gong.io/docs/receive-access-to-the-api."
+        },
+        {
+          "key": "accessKey",
+          "label": "Access Key",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "GONG_ACCESS_KEY",
+          "description": "Gong Access Key used as the Basic Auth username. Generate it in Gong under Admin center > Settings > Ecosystem > API: https://help.gong.io/docs/receive-access-to-the-api."
+        },
+        {
+          "key": "accessKeySecret",
+          "label": "Access Key Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "GONG_ACCESS_KEY_SECRET",
+          "description": "Gong Access Key Secret used as the Basic Auth password. Copy it when generating the key in Gong under Admin center > Settings > Ecosystem > API: https://help.gong.io/docs/receive-access-to-the-api."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_users",
+        "input": {
+          "includeAvatars": false
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.gong.io/",
+  "actions": [
+    {
+      "id": "gong.get_call",
+      "service": "gong",
+      "name": "get_call",
+      "description": "Get one Gong call by Gong call ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "callId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Gong's unique numeric identifier for the call."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Gong call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "call": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Gong's unique numeric identifier for the call."
+              },
+              "url": {
+                "type": "string",
+                "description": "The URL to the call page in Gong."
+              },
+              "title": {
+                "type": "string",
+                "description": "The title of the call."
+              },
+              "scheduled": {
+                "type": "string",
+                "description": "The scheduled date and time of the call."
+              },
+              "started": {
+                "type": "string",
+                "description": "The recorded start date and time of the call."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "The duration of the call in seconds."
+              },
+              "primaryUserId": {
+                "type": "string",
+                "description": "The primary user ID of the team member who hosted the call."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Gong call object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong call response."
+      }
+    },
+    {
+      "id": "gong.get_call_transcripts",
+      "service": "gong",
+      "name": "get_call_transcripts",
+      "description": "Get Gong call transcript JSON for calls within a specified date-time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromDateTime": {
+            "type": "string",
+            "description": "Start date-time for the call range, inclusive, in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "toDateTime": {
+            "type": "string",
+            "description": "End date-time for the call range, exclusive, in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "callIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Gong call identifier."
+            },
+            "description": "Optional Gong call IDs to retrieve transcripts for within the date range.",
+            "minItems": 1
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gong cursor value returned by the previous page response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromDateTime",
+          "toDateTime"
+        ],
+        "description": "Filter parameters for retrieving Gong call transcripts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "records": {
+            "type": "object",
+            "properties": {
+              "totalRecords": {
+                "type": "integer",
+                "description": "The total number of records matching the request."
+              },
+              "currentPageSize": {
+                "type": "integer",
+                "description": "The number of records returned in the current page."
+              },
+              "currentPageNumber": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "cursor": {
+                "type": "string",
+                "description": "The cursor to retrieve the next page, when Gong returned one."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Gong transcript pagination metadata."
+          },
+          "callTranscripts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Gong's unique numeric identifier for the call."
+                },
+                "transcript": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "speakerId": {
+                        "type": "string",
+                        "description": "The Gong speaker identifier."
+                      },
+                      "topic": {
+                        "type": "string",
+                        "description": "The topic assigned by Gong when available."
+                      },
+                      "sentences": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "description": "The transcript sentence text."
+                            },
+                            "start": {
+                              "type": "integer",
+                              "description": "The sentence start offset returned by Gong."
+                            },
+                            "end": {
+                              "type": "integer",
+                              "description": "The sentence end offset returned by Gong."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "One Gong transcript sentence."
+                        },
+                        "description": "Sentences in this transcript monologue."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One Gong transcript monologue."
+                  },
+                  "description": "Transcript monologues for this call."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Gong call transcript entry."
+            },
+            "description": "Gong call transcript entries returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong call transcripts response."
+      }
+    },
+    {
+      "id": "gong.get_user",
+      "service": "gong",
+      "name": "get_user",
+      "description": "Get one Gong user by Gong user ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Gong's unique numeric identifier for the user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Gong user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Gong's unique numeric identifier for the user."
+              },
+              "emailAddress": {
+                "type": "string",
+                "description": "The email address of the Gong user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the Gong user is active."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The first name of the Gong user."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The last name of the Gong user."
+              },
+              "title": {
+                "type": "string",
+                "description": "The job title of the Gong user."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Gong user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong user response."
+      }
+    },
+    {
+      "id": "gong.list_call_outcomes",
+      "service": "gong",
+      "name": "list_call_outcomes",
+      "description": "List Gong call outcomes configured for the company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this Gong action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "callOutcome": {
+                  "type": "string",
+                  "description": "The call outcome name."
+                },
+                "displayOrder": {
+                  "type": "integer",
+                  "description": "The display order for this call outcome."
+                },
+                "connectStatus": {
+                  "type": "string",
+                  "description": "Whether the outcome is connected or not connected."
+                },
+                "sentiment": {
+                  "type": "string",
+                  "description": "The sentiment associated with this outcome."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The outcome category."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gong call outcome."
+            },
+            "description": "Gong call outcomes returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong call outcomes response."
+      }
+    },
+    {
+      "id": "gong.list_calls",
+      "service": "gong",
+      "name": "list_calls",
+      "description": "List Gong calls that started within a specified date-time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromDateTime": {
+            "type": "string",
+            "description": "Start date-time for the call range, inclusive, in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "toDateTime": {
+            "type": "string",
+            "description": "End date-time for the call range, exclusive, in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gong cursor value returned by the previous page response."
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Gong workspace identifier used to filter calls."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromDateTime",
+          "toDateTime"
+        ],
+        "description": "Query parameters for listing Gong calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "records": {
+            "type": "object",
+            "properties": {
+              "totalRecords": {
+                "type": "integer",
+                "description": "The total number of records matching the request."
+              },
+              "currentPageSize": {
+                "type": "integer",
+                "description": "The number of records returned in the current page."
+              },
+              "currentPageNumber": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "cursor": {
+                "type": "string",
+                "description": "The cursor to retrieve the next page, when Gong returned one."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Gong calls pagination metadata."
+          },
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Gong's unique numeric identifier for the call."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL to the call page in Gong."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The title of the call."
+                },
+                "scheduled": {
+                  "type": "string",
+                  "description": "The scheduled date and time of the call."
+                },
+                "started": {
+                  "type": "string",
+                  "description": "The recorded start date and time of the call."
+                },
+                "duration": {
+                  "type": "integer",
+                  "description": "The duration of the call in seconds."
+                },
+                "primaryUserId": {
+                  "type": "string",
+                  "description": "The primary user ID of the team member who hosted the call."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gong call object."
+            },
+            "description": "Gong calls returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong calls response."
+      }
+    },
+    {
+      "id": "gong.list_users",
+      "service": "gong",
+      "name": "list_users",
+      "description": "List Gong users with optional cursor pagination and avatar inclusion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gong cursor value returned by the previous page response."
+          },
+          "includeAvatars": {
+            "type": "boolean",
+            "description": "Whether to include Gong employee avatar users in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Gong users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The Gong request reference ID."
+          },
+          "records": {
+            "type": "object",
+            "properties": {
+              "totalRecords": {
+                "type": "integer",
+                "description": "The total number of records matching the request."
+              },
+              "currentPageSize": {
+                "type": "integer",
+                "description": "The number of records returned in the current page."
+              },
+              "currentPageNumber": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "cursor": {
+                "type": "string",
+                "description": "The cursor to retrieve the next page, when Gong returned one."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Gong users pagination metadata."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Gong's unique numeric identifier for the user."
+                },
+                "emailAddress": {
+                  "type": "string",
+                  "description": "The email address of the Gong user."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the Gong user is active."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The first name of the Gong user."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The last name of the Gong user."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The job title of the Gong user."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gong user object."
+            },
+            "description": "Gong users returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Gong users response."
+      }
+    }
+  ]
+}

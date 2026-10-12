@@ -1,0 +1,833 @@
+{
+  "service": "fillout",
+  "displayName": "Fillout",
+  "categories": [
+    "Productivity",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "fillout_api_key",
+      "description": "Fillout API key used with the Authorization Bearer header. Create it from Account Settings > Developer settings in Fillout: https://build.fillout.com/settings/developer."
+    }
+  ],
+  "homepageUrl": "https://www.fillout.com/",
+  "actions": [
+    {
+      "id": "fillout.create_submissions",
+      "service": "fillout",
+      "name": "create_submissions",
+      "description": "Create one or more submissions for a Fillout form.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout form ID."
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One submission object accepted by Fillout."
+            },
+            "description": "The submissions to create in Fillout.",
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "submissions"
+        ],
+        "description": "Input payload for creating Fillout submissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "submissionId": {
+                  "type": "string",
+                  "description": "The Fillout submission ID."
+                },
+                "submissionTime": {
+                  "type": "string",
+                  "description": "The timestamp when the submission was received."
+                },
+                "lastUpdatedAt": {
+                  "type": "string",
+                  "description": "The timestamp when the submission was last updated."
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string",
+                        "description": "The Fillout question ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The question label or name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ShortAnswer",
+                          "LongAnswer",
+                          "EmailInput",
+                          "MultipleChoice",
+                          "Checkboxes",
+                          "Dropdown",
+                          "FileUpload",
+                          "DatePicker",
+                          "NumberInput",
+                          "PhoneNumber",
+                          "CurrencyInput",
+                          "Payment",
+                          "Signature",
+                          "Address",
+                          "Slider",
+                          "Rating",
+                          "OpinionScale",
+                          "Switch",
+                          "Password",
+                          "HiddenField",
+                          "Table",
+                          "Matrix",
+                          "Captcha",
+                          "ImagePicker",
+                          "ColorPicker"
+                        ],
+                        "description": "The Fillout question type."
+                      },
+                      "value": {
+                        "description": "The answer value returned by Fillout for this question type."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One answer returned for a Fillout submission."
+                  },
+                  "description": "The answers returned for this submission."
+                },
+                "calculations": {
+                  "type": "array",
+                  "items": {
+                    "description": "One calculation entry."
+                  },
+                  "description": "The calculated values returned for this submission."
+                },
+                "urlParameters": {
+                  "description": "URL parameters captured with the submission."
+                },
+                "quiz": {
+                  "description": "The quiz result payload when Fillout includes it."
+                },
+                "documents": {
+                  "type": "array",
+                  "items": {
+                    "description": "One document payload."
+                  },
+                  "description": "The generated documents attached to the submission."
+                },
+                "scheduling": {
+                  "description": "The scheduling payload when Fillout includes it."
+                },
+                "payments": {
+                  "type": "array",
+                  "items": {
+                    "description": "One payment payload."
+                  },
+                  "description": "The payment payloads attached to the submission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Fillout form submission."
+            },
+            "description": "The submissions created by Fillout."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A raw Fillout response value."
+            },
+            "description": "The raw response object returned by Fillout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "submissions",
+          "raw"
+        ],
+        "description": "The normalized Fillout create-submissions response."
+      }
+    },
+    {
+      "id": "fillout.delete_submission",
+      "service": "fillout",
+      "name": "delete_submission",
+      "description": "Delete one Fillout form submission by submission ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout form ID."
+          },
+          "submissionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout submission ID."
+          },
+          "includeEditLink": {
+            "type": "boolean",
+            "description": "Whether Fillout should include an edit link in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "submissionId"
+        ],
+        "description": "Input payload for a Fillout submission endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request completed successfully."
+          },
+          "submissionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The deleted submission ID when Fillout returns it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The deleted submission ID when Fillout returns it."
+          },
+          "raw": {
+            "description": "The raw response returned by Fillout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "submissionId",
+          "raw"
+        ],
+        "description": "The normalized Fillout delete-submission response."
+      }
+    },
+    {
+      "id": "fillout.get_form_metadata",
+      "service": "fillout",
+      "name": "get_form_metadata",
+      "description": "Get metadata and configured questions for one Fillout form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout form ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Input payload for a Fillout form endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {
+              "formId": {
+                "type": "string",
+                "description": "The Fillout form ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Fillout form name."
+              },
+              "questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The stable Fillout question ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The question label or name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "ShortAnswer",
+                        "LongAnswer",
+                        "EmailInput",
+                        "MultipleChoice",
+                        "Checkboxes",
+                        "Dropdown",
+                        "FileUpload",
+                        "DatePicker",
+                        "NumberInput",
+                        "PhoneNumber",
+                        "CurrencyInput",
+                        "Payment",
+                        "Signature",
+                        "Address",
+                        "Slider",
+                        "Rating",
+                        "OpinionScale",
+                        "Switch",
+                        "Password",
+                        "HiddenField",
+                        "Table",
+                        "Matrix",
+                        "Captcha",
+                        "ImagePicker",
+                        "ColorPicker"
+                      ],
+                      "description": "The Fillout question type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One question configured on a Fillout form."
+                },
+                "description": "The questions configured on the form."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public Fillout form URL.",
+                "format": "uri"
+              },
+              "status": {
+                "type": "string",
+                "description": "The Fillout form status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the form was created."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The timestamp when the form was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Fillout form."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form"
+        ],
+        "description": "The normalized Fillout form metadata response."
+      }
+    },
+    {
+      "id": "fillout.get_submission",
+      "service": "fillout",
+      "name": "get_submission",
+      "description": "Get one Fillout form submission by submission ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout form ID."
+          },
+          "submissionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout submission ID."
+          },
+          "includeEditLink": {
+            "type": "boolean",
+            "description": "Whether Fillout should include an edit link in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "submissionId"
+        ],
+        "description": "Input payload for a Fillout submission endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submission": {
+            "type": "object",
+            "properties": {
+              "submissionId": {
+                "type": "string",
+                "description": "The Fillout submission ID."
+              },
+              "submissionTime": {
+                "type": "string",
+                "description": "The timestamp when the submission was received."
+              },
+              "lastUpdatedAt": {
+                "type": "string",
+                "description": "The timestamp when the submission was last updated."
+              },
+              "questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "questionId": {
+                      "type": "string",
+                      "description": "The Fillout question ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The question label or name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "ShortAnswer",
+                        "LongAnswer",
+                        "EmailInput",
+                        "MultipleChoice",
+                        "Checkboxes",
+                        "Dropdown",
+                        "FileUpload",
+                        "DatePicker",
+                        "NumberInput",
+                        "PhoneNumber",
+                        "CurrencyInput",
+                        "Payment",
+                        "Signature",
+                        "Address",
+                        "Slider",
+                        "Rating",
+                        "OpinionScale",
+                        "Switch",
+                        "Password",
+                        "HiddenField",
+                        "Table",
+                        "Matrix",
+                        "Captcha",
+                        "ImagePicker",
+                        "ColorPicker"
+                      ],
+                      "description": "The Fillout question type."
+                    },
+                    "value": {
+                      "description": "The answer value returned by Fillout for this question type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One answer returned for a Fillout submission."
+                },
+                "description": "The answers returned for this submission."
+              },
+              "calculations": {
+                "type": "array",
+                "items": {
+                  "description": "One calculation entry."
+                },
+                "description": "The calculated values returned for this submission."
+              },
+              "urlParameters": {
+                "description": "URL parameters captured with the submission."
+              },
+              "quiz": {
+                "description": "The quiz result payload when Fillout includes it."
+              },
+              "documents": {
+                "type": "array",
+                "items": {
+                  "description": "One document payload."
+                },
+                "description": "The generated documents attached to the submission."
+              },
+              "scheduling": {
+                "description": "The scheduling payload when Fillout includes it."
+              },
+              "payments": {
+                "type": "array",
+                "items": {
+                  "description": "One payment payload."
+                },
+                "description": "The payment payloads attached to the submission."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Fillout form submission."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "submission"
+        ],
+        "description": "The normalized Fillout single-submission response."
+      }
+    },
+    {
+      "id": "fillout.list_forms",
+      "service": "fillout",
+      "name": "list_forms",
+      "description": "List forms available to the authenticated Fillout account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "formId": {
+                  "type": "string",
+                  "description": "The Fillout form ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Fillout form name."
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The stable Fillout question ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The question label or name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ShortAnswer",
+                          "LongAnswer",
+                          "EmailInput",
+                          "MultipleChoice",
+                          "Checkboxes",
+                          "Dropdown",
+                          "FileUpload",
+                          "DatePicker",
+                          "NumberInput",
+                          "PhoneNumber",
+                          "CurrencyInput",
+                          "Payment",
+                          "Signature",
+                          "Address",
+                          "Slider",
+                          "Rating",
+                          "OpinionScale",
+                          "Switch",
+                          "Password",
+                          "HiddenField",
+                          "Table",
+                          "Matrix",
+                          "Captcha",
+                          "ImagePicker",
+                          "ColorPicker"
+                        ],
+                        "description": "The Fillout question type."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One question configured on a Fillout form."
+                  },
+                  "description": "The questions configured on the form."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public Fillout form URL.",
+                  "format": "uri"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The Fillout form status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the form was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The timestamp when the form was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Fillout form."
+            },
+            "description": "The forms returned by Fillout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "forms"
+        ],
+        "description": "The normalized Fillout form-list response."
+      }
+    },
+    {
+      "id": "fillout.list_submissions",
+      "service": "fillout",
+      "name": "list_submissions",
+      "description": "List submissions for one Fillout form with documented pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Fillout form ID whose submissions should be listed."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "The maximum number of submissions to return."
+          },
+          "afterDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return submissions received after this ISO timestamp or date."
+          },
+          "beforeDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return submissions received before this ISO timestamp or date."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset for paginating submissions."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "finished"
+            ],
+            "description": "The submission status filter."
+          },
+          "includeEditLink": {
+            "type": "boolean",
+            "description": "Whether Fillout should include edit links in the response."
+          },
+          "includePreview": {
+            "type": "boolean",
+            "description": "Whether Fillout should include preview submissions."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort order for returned submissions."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search text passed through to Fillout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Input payload for listing Fillout submissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "submissionId": {
+                  "type": "string",
+                  "description": "The Fillout submission ID."
+                },
+                "submissionTime": {
+                  "type": "string",
+                  "description": "The timestamp when the submission was received."
+                },
+                "lastUpdatedAt": {
+                  "type": "string",
+                  "description": "The timestamp when the submission was last updated."
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string",
+                        "description": "The Fillout question ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The question label or name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ShortAnswer",
+                          "LongAnswer",
+                          "EmailInput",
+                          "MultipleChoice",
+                          "Checkboxes",
+                          "Dropdown",
+                          "FileUpload",
+                          "DatePicker",
+                          "NumberInput",
+                          "PhoneNumber",
+                          "CurrencyInput",
+                          "Payment",
+                          "Signature",
+                          "Address",
+                          "Slider",
+                          "Rating",
+                          "OpinionScale",
+                          "Switch",
+                          "Password",
+                          "HiddenField",
+                          "Table",
+                          "Matrix",
+                          "Captcha",
+                          "ImagePicker",
+                          "ColorPicker"
+                        ],
+                        "description": "The Fillout question type."
+                      },
+                      "value": {
+                        "description": "The answer value returned by Fillout for this question type."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One answer returned for a Fillout submission."
+                  },
+                  "description": "The answers returned for this submission."
+                },
+                "calculations": {
+                  "type": "array",
+                  "items": {
+                    "description": "One calculation entry."
+                  },
+                  "description": "The calculated values returned for this submission."
+                },
+                "urlParameters": {
+                  "description": "URL parameters captured with the submission."
+                },
+                "quiz": {
+                  "description": "The quiz result payload when Fillout includes it."
+                },
+                "documents": {
+                  "type": "array",
+                  "items": {
+                    "description": "One document payload."
+                  },
+                  "description": "The generated documents attached to the submission."
+                },
+                "scheduling": {
+                  "description": "The scheduling payload when Fillout includes it."
+                },
+                "payments": {
+                  "type": "array",
+                  "items": {
+                    "description": "One payment payload."
+                  },
+                  "description": "The payment payloads attached to the submission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Fillout form submission."
+            },
+            "description": "The submissions returned by Fillout."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalResponses": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of submissions matching the query."
+              },
+              "pageCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of available pages."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalResponses",
+              "pageCount"
+            ],
+            "description": "Pagination metadata returned by Fillout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "submissions",
+          "pagination"
+        ],
+        "description": "The normalized Fillout submission-list response."
+      }
+    }
+  ]
+}

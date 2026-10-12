@@ -1,0 +1,357 @@
+{
+  "service": "freshdesk",
+  "displayName": "Freshdesk",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FRESHDESK_API_KEY",
+      "description": "Freshdesk API key used as the Basic Auth username. Find it in Profile Settings > View API key: https://support.freshdesk.com/support/solutions/articles/215517-how-to-find-your-api-key.",
+      "extraFields": [
+        {
+          "key": "domain",
+          "label": "Domain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-helpdesk",
+          "description": "Freshdesk account domain used to build https://<domain>.freshdesk.com requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.freshworks.com/freshdesk/",
+  "actions": [
+    {
+      "id": "freshdesk.get_account",
+      "service": "freshdesk",
+      "name": "get_account",
+      "description": "Get Freshdesk account details for the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for reading Freshdesk account details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Freshdesk account details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Freshdesk account response wrapper."
+      }
+    },
+    {
+      "id": "freshdesk.get_ticket",
+      "service": "freshdesk",
+      "name": "get_ticket",
+      "description": "Get a single Freshdesk ticket by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshdesk ticket identifier."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "requester",
+                "company",
+                "stats",
+                "description"
+              ],
+              "description": "Freshdesk include token to expand related records in a ticket response."
+            },
+            "description": "Freshdesk include tokens to expand related records in ticket responses.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input parameters for reading a single Freshdesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Freshdesk ticket details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "Freshdesk single ticket response wrapper."
+      }
+    },
+    {
+      "id": "freshdesk.list_ticket_conversations",
+      "service": "freshdesk",
+      "name": "list_ticket_conversations",
+      "description": "List conversations attached to a Freshdesk ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshdesk ticket identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for the Freshdesk list request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return per Freshdesk page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input parameters for listing Freshdesk ticket conversations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Freshdesk ticket conversation payload."
+            },
+            "description": "Freshdesk conversations associated with the requested ticket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversations"
+        ],
+        "description": "Freshdesk ticket conversation list response wrapper."
+      }
+    },
+    {
+      "id": "freshdesk.list_tickets",
+      "service": "freshdesk",
+      "name": "list_tickets",
+      "description": "List Freshdesk tickets with optional filters and include expansions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Freshdesk predefined ticket filter to apply."
+          },
+          "requesterId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshdesk requester identifier to filter tickets by."
+          },
+          "email": {
+            "type": "string",
+            "description": "Requester email address used to filter Freshdesk tickets.",
+            "format": "email"
+          },
+          "companyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Freshdesk company identifier used to filter tickets by."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "ISO 8601 timestamp used as the updated_since Freshdesk filter.",
+            "format": "date-time"
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Freshdesk ticket field used for ordering results."
+          },
+          "orderType": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Freshdesk ticket list ordering direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number for the Freshdesk list request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return per Freshdesk page."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "requester",
+                "company",
+                "stats",
+                "description"
+              ],
+              "description": "Freshdesk include token to expand related records in a ticket response."
+            },
+            "description": "Freshdesk include tokens to expand related records in ticket responses.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Freshdesk tickets.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "filter",
+                "requesterId"
+              ]
+            },
+            {
+              "required": [
+                "filter",
+                "email"
+              ]
+            },
+            {
+              "required": [
+                "filter",
+                "companyId"
+              ]
+            },
+            {
+              "required": [
+                "filter",
+                "updatedSince"
+              ]
+            },
+            {
+              "required": [
+                "requesterId",
+                "email"
+              ]
+            },
+            {
+              "required": [
+                "requesterId",
+                "companyId"
+              ]
+            },
+            {
+              "required": [
+                "requesterId",
+                "updatedSince"
+              ]
+            },
+            {
+              "required": [
+                "email",
+                "companyId"
+              ]
+            },
+            {
+              "required": [
+                "email",
+                "updatedSince"
+              ]
+            },
+            {
+              "required": [
+                "companyId",
+                "updatedSince"
+              ]
+            }
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Freshdesk ticket payload."
+            },
+            "description": "Freshdesk tickets returned for the current page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another Freshdesk page is likely available."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Next Freshdesk page number when another page is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next Freshdesk page number when another page is available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tickets",
+          "hasMore",
+          "nextPage"
+        ],
+        "description": "Freshdesk ticket list response wrapper."
+      }
+    }
+  ]
+}

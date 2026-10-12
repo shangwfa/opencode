@@ -1,0 +1,1435 @@
+{
+  "service": "fast_note_sync",
+  "displayName": "Fast Note Sync",
+  "categories": [
+    "Productivity",
+    "Storage"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "FNS_API_TOKEN",
+      "description": "FNS API token sent as a Bearer credential. Copy it from the API configuration in your FNS WebGUI.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Server Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://fns.example.com",
+          "description": "The HTTP or HTTPS URL of your FNS server. Private targets require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://github.com/haierkeys/fast-note-sync-service",
+  "actions": [
+    {
+      "id": "fast_note_sync.delete_attachment",
+      "service": "fast_note_sync",
+      "name": "delete_attachment",
+      "description": "Permanently delete one FNS attachment by path and path hash.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment path."
+          },
+          "pathHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment path hash returned by FNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path",
+          "pathHash"
+        ],
+        "description": "Input parameters for deleting one attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether FNS accepted the attachment deletion."
+          },
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The attachment id."
+              },
+              "path": {
+                "type": "string",
+                "description": "The attachment path."
+              },
+              "pathHash": {
+                "type": "string",
+                "description": "The hash of the attachment path."
+              },
+              "contentHash": {
+                "type": "string",
+                "description": "The hash of the attachment content."
+              },
+              "rename": {
+                "type": "integer",
+                "description": "The attachment rename flag."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "The attachment creation timestamp."
+              },
+              "mtime": {
+                "type": "integer",
+                "description": "The attachment modification timestamp."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The attachment size in bytes."
+              },
+              "lastTime": {
+                "type": "integer",
+                "description": "The attachment record update timestamp."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The attachment record creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The attachment record update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "FNS attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "attachment"
+        ],
+        "description": "The attachment deletion result."
+      }
+    },
+    {
+      "id": "fast_note_sync.delete_note",
+      "service": "fast_note_sync",
+      "name": "delete_note",
+      "description": "Move one FNS note to the recycle bin.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path"
+        ],
+        "description": "Input parameters for deleting one note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether FNS accepted the note deletion."
+          },
+          "note": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The note id when returned by the endpoint."
+              },
+              "path": {
+                "type": "string",
+                "description": "The note path."
+              },
+              "pathHash": {
+                "type": "string",
+                "description": "The hash of the note path."
+              },
+              "content": {
+                "type": "string",
+                "description": "The Markdown note content."
+              },
+              "contentHash": {
+                "type": "string",
+                "description": "The hash of the note content."
+              },
+              "fileLinks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "The resolved attachment path."
+                },
+                "description": "Attachment links found in the note, keyed by the source link."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The note version."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "The note creation timestamp."
+              },
+              "mtime": {
+                "type": "integer",
+                "description": "The note modification timestamp."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The note size in bytes when returned by the endpoint."
+              },
+              "lastTime": {
+                "type": "integer",
+                "description": "The note record update timestamp."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The note record creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The note record update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An FNS note with content and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "note"
+        ],
+        "description": "The note deletion result."
+      }
+    },
+    {
+      "id": "fast_note_sync.delete_vault",
+      "service": "fast_note_sync",
+      "name": "delete_vault",
+      "description": "Permanently delete an FNS vault and all notes and attachments it contains.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The vault id to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for deleting one vault."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether FNS accepted the vault deletion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The vault deletion result."
+      }
+    },
+    {
+      "id": "fast_note_sync.download_attachment",
+      "service": "fast_note_sync",
+      "name": "download_attachment",
+      "description": "Download an FNS attachment into connector file transit and return its transit URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment path."
+          },
+          "isRecycle": {
+            "type": "boolean",
+            "description": "Whether to download the attachment from the recycle bin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path"
+        ],
+        "description": "Input parameters for downloading one attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The attachment file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The local transit file size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "mimeType",
+              "fileId",
+              "downloadUrl",
+              "sizeBytes"
+            ],
+            "description": "The downloaded attachment in connector file transit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The downloadable connector transit file."
+      }
+    },
+    {
+      "id": "fast_note_sync.get_current_user",
+      "service": "fast_note_sync",
+      "name": "get_current_user",
+      "description": "Get the user associated with the connected FNS API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "uid": {
+                "type": "integer",
+                "description": "The FNS user id."
+              },
+              "username": {
+                "type": "string",
+                "description": "The FNS username."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address."
+              },
+              "avatar": {
+                "type": "string",
+                "description": "The user's avatar URL or handle."
+              },
+              "tokenId": {
+                "type": "integer",
+                "description": "The active authentication token id."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The account creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The account update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An authenticated FNS user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The authenticated FNS user response."
+      }
+    },
+    {
+      "id": "fast_note_sync.get_note",
+      "service": "fast_note_sync",
+      "name": "get_note",
+      "description": "Get one FNS note's Markdown content and metadata by path.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note path."
+          },
+          "isRecycle": {
+            "type": "boolean",
+            "description": "Whether to read the note from the recycle bin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path"
+        ],
+        "description": "Input parameters for retrieving one note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The note id when returned by the endpoint."
+              },
+              "path": {
+                "type": "string",
+                "description": "The note path."
+              },
+              "pathHash": {
+                "type": "string",
+                "description": "The hash of the note path."
+              },
+              "content": {
+                "type": "string",
+                "description": "The Markdown note content."
+              },
+              "contentHash": {
+                "type": "string",
+                "description": "The hash of the note content."
+              },
+              "fileLinks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "The resolved attachment path."
+                },
+                "description": "Attachment links found in the note, keyed by the source link."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The note version."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "The note creation timestamp."
+              },
+              "mtime": {
+                "type": "integer",
+                "description": "The note modification timestamp."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The note size in bytes when returned by the endpoint."
+              },
+              "lastTime": {
+                "type": "integer",
+                "description": "The note record update timestamp."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The note record creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The note record update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An FNS note with content and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note"
+        ],
+        "description": "The requested FNS note."
+      }
+    },
+    {
+      "id": "fast_note_sync.get_vault",
+      "service": "fast_note_sync",
+      "name": "get_vault",
+      "description": "Get one FNS vault by its numeric id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The vault id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one vault."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The vault id."
+              },
+              "vault": {
+                "type": "string",
+                "description": "The vault name."
+              },
+              "noteCount": {
+                "type": "integer",
+                "description": "The number of notes in the vault."
+              },
+              "noteSize": {
+                "type": "integer",
+                "description": "The total note size in bytes."
+              },
+              "fileCount": {
+                "type": "integer",
+                "description": "The number of attachments in the vault."
+              },
+              "fileSize": {
+                "type": "integer",
+                "description": "The total attachment size in bytes."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The total vault size in bytes."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The vault creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The vault update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An FNS note vault."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault"
+        ],
+        "description": "The requested FNS vault."
+      }
+    },
+    {
+      "id": "fast_note_sync.list_attachments",
+      "service": "fast_note_sync",
+      "name": "list_attachments",
+      "description": "List attachment metadata in an FNS vault with search, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page, up to 100."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword used to filter attachment paths."
+          },
+          "isRecycle": {
+            "type": "boolean",
+            "description": "Whether to return attachments from the recycle bin."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented FNS attachment field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault"
+        ],
+        "description": "Input parameters for listing attachments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The attachment id."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The attachment path."
+                },
+                "pathHash": {
+                  "type": "string",
+                  "description": "The hash of the attachment path."
+                },
+                "contentHash": {
+                  "type": "string",
+                  "description": "The hash of the attachment content."
+                },
+                "rename": {
+                  "type": "integer",
+                  "description": "The attachment rename flag."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "The attachment creation timestamp."
+                },
+                "mtime": {
+                  "type": "integer",
+                  "description": "The attachment modification timestamp."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The attachment size in bytes."
+                },
+                "lastTime": {
+                  "type": "integer",
+                  "description": "The attachment record update timestamp."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The attachment record creation time."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The attachment record update time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "FNS attachment metadata."
+            },
+            "description": "The attachment metadata returned by FNS."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The requested number of records per page."
+              },
+              "totalRows": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "pageSize",
+              "totalRows"
+            ],
+            "description": "Pagination information returned by FNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachments",
+          "pagination"
+        ],
+        "description": "A page of FNS attachment metadata."
+      }
+    },
+    {
+      "id": "fast_note_sync.list_notes",
+      "service": "fast_note_sync",
+      "name": "list_notes",
+      "description": "List note metadata in an FNS vault with pagination and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page, up to 100."
+          },
+          "isRecycle": {
+            "type": "boolean",
+            "description": "Whether to return notes from the recycle bin."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented FNS note field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault"
+        ],
+        "description": "Input parameters for listing notes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The note id."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The note path."
+                },
+                "pathHash": {
+                  "type": "string",
+                  "description": "The hash of the note path."
+                },
+                "contentHash": {
+                  "type": "string",
+                  "description": "The hash of the note content."
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The note version."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "The note creation timestamp."
+                },
+                "mtime": {
+                  "type": "integer",
+                  "description": "The note modification timestamp."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The note size in bytes."
+                },
+                "lastTime": {
+                  "type": "integer",
+                  "description": "The note record update timestamp."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The note record creation time."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The note record update time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "FNS note metadata without note content."
+            },
+            "description": "The note metadata returned by FNS."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The requested number of records per page."
+              },
+              "totalRows": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "pageSize",
+              "totalRows"
+            ],
+            "description": "Pagination information returned by FNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notes",
+          "pagination"
+        ],
+        "description": "A page of FNS note metadata."
+      }
+    },
+    {
+      "id": "fast_note_sync.list_vaults",
+      "service": "fast_note_sync",
+      "name": "list_vaults",
+      "description": "List every note vault owned by the authenticated FNS user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "vaults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The vault id."
+                },
+                "vault": {
+                  "type": "string",
+                  "description": "The vault name."
+                },
+                "noteCount": {
+                  "type": "integer",
+                  "description": "The number of notes in the vault."
+                },
+                "noteSize": {
+                  "type": "integer",
+                  "description": "The total note size in bytes."
+                },
+                "fileCount": {
+                  "type": "integer",
+                  "description": "The number of attachments in the vault."
+                },
+                "fileSize": {
+                  "type": "integer",
+                  "description": "The total attachment size in bytes."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The total vault size in bytes."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The vault creation time."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The vault update time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An FNS note vault."
+            },
+            "description": "The vaults returned by FNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vaults"
+        ],
+        "description": "The authenticated user's FNS vaults."
+      }
+    },
+    {
+      "id": "fast_note_sync.search_notes",
+      "service": "fast_note_sync",
+      "name": "search_notes",
+      "description": "Search note paths or note content in an FNS vault.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search text."
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "path",
+              "content"
+            ],
+            "description": "Whether to search note paths or note content."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page, up to 100."
+          },
+          "isRecycle": {
+            "type": "boolean",
+            "description": "Whether to return notes from the recycle bin."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented FNS note field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "query",
+          "field"
+        ],
+        "description": "Input parameters for searching notes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The note id."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The note path."
+                },
+                "pathHash": {
+                  "type": "string",
+                  "description": "The hash of the note path."
+                },
+                "contentHash": {
+                  "type": "string",
+                  "description": "The hash of the note content."
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The note version."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "The note creation timestamp."
+                },
+                "mtime": {
+                  "type": "integer",
+                  "description": "The note modification timestamp."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The note size in bytes."
+                },
+                "lastTime": {
+                  "type": "integer",
+                  "description": "The note record update timestamp."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The note record creation time."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The note record update time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "FNS note metadata without note content."
+            },
+            "description": "The note metadata matching the search."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The requested number of records per page."
+              },
+              "totalRows": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "pageSize",
+              "totalRows"
+            ],
+            "description": "Pagination information returned by FNS."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notes",
+          "pagination"
+        ],
+        "description": "A page of matching FNS note metadata."
+      }
+    },
+    {
+      "id": "fast_note_sync.upload_attachment",
+      "service": "fast_note_sync",
+      "name": "upload_attachment",
+      "description": "Download a public file URL and upload it as an attachment to an FNS vault.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment path inside the vault."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The public HTTP or HTTPS URL of the file to upload.",
+            "format": "uri"
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MIME type to send for the attachment."
+          },
+          "ctime": {
+            "type": "integer",
+            "description": "An optional creation timestamp in milliseconds."
+          },
+          "mtime": {
+            "type": "integer",
+            "description": "An optional modification timestamp in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path",
+          "fileUrl"
+        ],
+        "description": "Input parameters for uploading one attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The attachment id."
+              },
+              "path": {
+                "type": "string",
+                "description": "The attachment path."
+              },
+              "pathHash": {
+                "type": "string",
+                "description": "The hash of the attachment path."
+              },
+              "contentHash": {
+                "type": "string",
+                "description": "The hash of the attachment content."
+              },
+              "rename": {
+                "type": "integer",
+                "description": "The attachment rename flag."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "The attachment creation timestamp."
+              },
+              "mtime": {
+                "type": "integer",
+                "description": "The attachment modification timestamp."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The attachment size in bytes."
+              },
+              "lastTime": {
+                "type": "integer",
+                "description": "The attachment record update timestamp."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The attachment record creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The attachment record update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "FNS attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The uploaded FNS attachment metadata."
+      }
+    },
+    {
+      "id": "fast_note_sync.upsert_note",
+      "service": "fast_note_sync",
+      "name": "upsert_note",
+      "description": "Create an FNS note or replace the content of an existing note at the same path.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note path."
+          },
+          "content": {
+            "type": "string",
+            "description": "The Markdown note content."
+          },
+          "createOnly": {
+            "type": "boolean",
+            "description": "Whether the request must fail when the note already exists."
+          },
+          "ctime": {
+            "type": "integer",
+            "description": "An optional FNS creation timestamp."
+          },
+          "mtime": {
+            "type": "integer",
+            "description": "An optional FNS modification timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault",
+          "path"
+        ],
+        "description": "Input parameters for creating or updating a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The note id when returned by the endpoint."
+              },
+              "path": {
+                "type": "string",
+                "description": "The note path."
+              },
+              "pathHash": {
+                "type": "string",
+                "description": "The hash of the note path."
+              },
+              "content": {
+                "type": "string",
+                "description": "The Markdown note content."
+              },
+              "contentHash": {
+                "type": "string",
+                "description": "The hash of the note content."
+              },
+              "fileLinks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "The resolved attachment path."
+                },
+                "description": "Attachment links found in the note, keyed by the source link."
+              },
+              "version": {
+                "type": "integer",
+                "description": "The note version."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "The note creation timestamp."
+              },
+              "mtime": {
+                "type": "integer",
+                "description": "The note modification timestamp."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The note size in bytes when returned by the endpoint."
+              },
+              "lastTime": {
+                "type": "integer",
+                "description": "The note record update timestamp."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The note record creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The note record update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An FNS note with content and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note"
+        ],
+        "description": "The created or updated FNS note metadata."
+      }
+    },
+    {
+      "id": "fast_note_sync.upsert_vault",
+      "service": "fast_note_sync",
+      "name": "upsert_vault",
+      "description": "Create an FNS vault or update an existing vault when its id is provided.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The existing vault id to update."
+          },
+          "vault": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The vault name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault"
+        ],
+        "description": "Input parameters for creating or updating a vault."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "vault": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The vault id."
+              },
+              "vault": {
+                "type": "string",
+                "description": "The vault name."
+              },
+              "noteCount": {
+                "type": "integer",
+                "description": "The number of notes in the vault."
+              },
+              "noteSize": {
+                "type": "integer",
+                "description": "The total note size in bytes."
+              },
+              "fileCount": {
+                "type": "integer",
+                "description": "The number of attachments in the vault."
+              },
+              "fileSize": {
+                "type": "integer",
+                "description": "The total attachment size in bytes."
+              },
+              "size": {
+                "type": "integer",
+                "description": "The total vault size in bytes."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The vault creation time."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The vault update time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An FNS note vault."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vault"
+        ],
+        "description": "The created or updated FNS vault."
+      }
+    }
+  ]
+}

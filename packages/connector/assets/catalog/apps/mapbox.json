@@ -1,0 +1,721 @@
+{
+  "service": "mapbox",
+  "displayName": "Mapbox",
+  "categories": [
+    "Location",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "pk.ey...",
+      "description": "Mapbox access token used with the access_token query parameter. Create or copy it from your Mapbox Access Tokens page: https://console.mapbox.com/account/access-tokens/."
+    }
+  ],
+  "homepageUrl": "https://www.mapbox.com",
+  "actions": [
+    {
+      "id": "mapbox.batch_geocode",
+      "service": "mapbox",
+      "name": "batch_geocode",
+      "description": "Submit multiple forward or reverse geocoding queries in one Mapbox batch request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "forward",
+                      "type": "string",
+                      "description": "Use forward geocoding for this query."
+                    },
+                    "q": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The free-form text query to geocode."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "The maximum number of features to return for this query."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "q"
+                  ],
+                  "description": "One forward geocoding batch query."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "reverse",
+                      "type": "string",
+                      "description": "Use reverse geocoding for this query."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180,
+                      "description": "The longitude of the coordinate to reverse geocode."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90,
+                      "description": "The latitude of the coordinate to reverse geocode."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10,
+                      "description": "The maximum number of features to return for this query."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "longitude",
+                    "latitude"
+                  ],
+                  "description": "One reverse geocoding batch query."
+                }
+              ],
+              "description": "One batch geocoding query entry."
+            },
+            "description": "Batch geocoding queries submitted to Mapbox.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for Mapbox batch geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "batch": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The top-level GeoJSON type returned by Mapbox."
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "One Mapbox geocoding feature."
+                  },
+                  "description": "The geocoding features returned by Mapbox."
+                },
+                "attribution": {
+                  "type": "string",
+                  "description": "The Mapbox attribution string for the response."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Mapbox geocoding response."
+            },
+            "description": "Per-query geocoding results returned by Mapbox."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mapbox batch geocoding response."
+      }
+    },
+    {
+      "id": "mapbox.forward_geocode",
+      "service": "mapbox",
+      "name": "forward_geocode",
+      "description": "Convert free-form text into geographic features with Mapbox Geocoding v6.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The free-form text query to geocode."
+          },
+          "autocomplete": {
+            "type": "boolean",
+            "description": "Whether Mapbox should return autocomplete-style results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The maximum number of features to return."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IETF language tag used for localized feature names."
+          },
+          "country": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2,
+              "description": "ISO 3166-1 alpha-2 country code."
+            },
+            "description": "Country filters applied to the geocoding request.",
+            "minItems": 1
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Mapbox feature type filter value."
+            },
+            "description": "Feature types to include in the response.",
+            "minItems": 1
+          },
+          "bbox": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The minimum longitude of the bounding box."
+              },
+              {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The minimum latitude of the bounding box."
+              },
+              {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The maximum longitude of the bounding box."
+              },
+              {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The maximum latitude of the bounding box."
+              }
+            ],
+            "items": false,
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "The `[minLon, minLat, maxLon, maxLat]` bounding box."
+          },
+          "proximity": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude value in decimal degrees."
+              },
+              {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude value in decimal degrees."
+              }
+            ],
+            "items": false,
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "A `[longitude, latitude]` coordinate pair."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input payload for Mapbox forward geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The top-level GeoJSON type returned by Mapbox."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mapbox geocoding feature."
+            },
+            "description": "The geocoding features returned by Mapbox."
+          },
+          "attribution": {
+            "type": "string",
+            "description": "The Mapbox attribution string for the response."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mapbox geocoding response."
+      }
+    },
+    {
+      "id": "mapbox.get_directions",
+      "service": "mapbox",
+      "name": "get_directions",
+      "description": "Compute a route between multiple coordinates with the Mapbox Directions API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "mapbox/driving",
+              "mapbox/driving-traffic",
+              "mapbox/walking",
+              "mapbox/cycling"
+            ],
+            "description": "Routing profile used by the request."
+          },
+          "coordinates": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "The longitude value in decimal degrees."
+                },
+                {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "The latitude value in decimal degrees."
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "A `[longitude, latitude]` coordinate pair."
+            },
+            "description": "Route coordinates in travel order.",
+            "minItems": 2
+          },
+          "alternatives": {
+            "type": "boolean",
+            "description": "Whether to request alternative routes."
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string value."
+            },
+            "description": "Route annotations to include in the response.",
+            "minItems": 1
+          },
+          "continue_straight": {
+            "type": "boolean",
+            "description": "Whether the router should prefer continuing straight at waypoints."
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string value."
+            },
+            "description": "Route features to exclude.",
+            "minItems": 1
+          },
+          "geometries": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Geometry encoding used in the route response."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language used for route instructions."
+          },
+          "overview": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Route overview geometry detail level."
+          },
+          "roundabout_exits": {
+            "type": "boolean",
+            "description": "Whether roundabout maneuver exits should be included."
+          },
+          "steps": {
+            "type": "boolean",
+            "description": "Whether step-by-step route instructions should be included."
+          },
+          "voice_instructions": {
+            "type": "boolean",
+            "description": "Whether voice instructions should be included."
+          },
+          "banner_instructions": {
+            "type": "boolean",
+            "description": "Whether banner instructions should be included."
+          },
+          "avoid_maneuver_radius": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Radius in meters used to avoid immediate maneuvers."
+          },
+          "depart_at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Departure time used for time-aware routing."
+          },
+          "arrive_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Arrival time used for time-aware routing."
+          },
+          "waypoints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "One zero-based coordinate index."
+            },
+            "description": "Coordinate indexes that should be treated as waypoints.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "coordinates"
+        ],
+        "description": "Input payload for the Mapbox Directions API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mapbox route."
+            },
+            "description": "Directions routes returned by Mapbox."
+          },
+          "waypoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mapbox waypoint."
+            },
+            "description": "Waypoint metadata returned by Mapbox."
+          },
+          "code": {
+            "type": "string",
+            "description": "The response code returned by Mapbox."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "The response UUID returned by Mapbox."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mapbox directions response."
+      }
+    },
+    {
+      "id": "mapbox.get_matrix",
+      "service": "mapbox",
+      "name": "get_matrix",
+      "description": "Compute a travel time or distance matrix with the Mapbox Matrix API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "mapbox/driving",
+              "mapbox/driving-traffic",
+              "mapbox/walking",
+              "mapbox/cycling"
+            ],
+            "description": "Routing profile used by the request."
+          },
+          "coordinates": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "The longitude value in decimal degrees."
+                },
+                {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "The latitude value in decimal degrees."
+                }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "A `[longitude, latitude]` coordinate pair."
+            },
+            "description": "Coordinates included in the matrix calculation.",
+            "minItems": 2
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "duration",
+                "distance"
+              ],
+              "description": "One matrix annotation value."
+            },
+            "description": "Matrix annotations to include in the response.",
+            "minItems": 1
+          },
+          "approaches": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string value."
+            },
+            "description": "Curb approach constraints for the coordinates.",
+            "minItems": 1
+          },
+          "bearings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty string value."
+            },
+            "description": "Bearing filters applied to the coordinates.",
+            "minItems": 1
+          },
+          "fallback_speed": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Fallback speed in meters per second."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "One zero-based coordinate index."
+            },
+            "description": "Coordinates used as matrix sources.",
+            "minItems": 1
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "One zero-based coordinate index."
+            },
+            "description": "Coordinates used as matrix destinations.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile",
+          "coordinates"
+        ],
+        "description": "Input payload for the Mapbox Matrix API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The response code returned by Mapbox."
+          },
+          "durations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "One matrix duration value in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One matrix duration value in seconds."
+              },
+              "description": "One matrix duration row."
+            },
+            "description": "Travel duration matrix in seconds."
+          },
+          "distances": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "One matrix distance value in meters."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One matrix distance value in meters."
+              },
+              "description": "One matrix distance row."
+            },
+            "description": "Travel distance matrix in meters."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One source waypoint."
+            },
+            "description": "Source waypoint metadata."
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One destination waypoint."
+            },
+            "description": "Destination waypoint metadata."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mapbox matrix response."
+      }
+    },
+    {
+      "id": "mapbox.reverse_geocode",
+      "service": "mapbox",
+      "name": "reverse_geocode",
+      "description": "Convert a coordinate pair into place features with Mapbox Geocoding v6.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude of the coordinate to reverse geocode."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude of the coordinate to reverse geocode."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The maximum number of features to return."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IETF language tag used for localized feature names."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Mapbox feature type filter value."
+            },
+            "description": "Feature types to include in the response.",
+            "minItems": 1
+          },
+          "worldview": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The worldview applied to the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "longitude",
+          "latitude"
+        ],
+        "description": "Input payload for Mapbox reverse geocoding."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The top-level GeoJSON type returned by Mapbox."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Mapbox geocoding feature."
+            },
+            "description": "The geocoding features returned by Mapbox."
+          },
+          "attribution": {
+            "type": "string",
+            "description": "The Mapbox attribution string for the response."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Mapbox geocoding response."
+      }
+    }
+  ]
+}

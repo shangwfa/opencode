@@ -1,0 +1,442 @@
+{
+  "service": "unirateapi",
+  "displayName": "UniRateAPI",
+  "homepageUrl": "https://unirateapi.com/",
+  "categories": [
+    "Finance",
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Register at https://unirateapi.com/register and get your API key from your account dashboard. Requests send it in the api_key query parameter."
+    }
+  ],
+  "actions": [
+    {
+      "id": "unirateapi.convert",
+      "service": "unirateapi",
+      "name": "convert",
+      "description": "Convert an amount into a target currency using current exchange rates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code. Defaults to USD.",
+            "default": "USD"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency code, such as USD, EUR, or BTC."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to convert. Defaults to 1.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to"
+        ],
+        "description": "Currency conversion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The original amount."
+          },
+          "from": {
+            "type": "string",
+            "description": "The source currency."
+          },
+          "to": {
+            "type": "string",
+            "description": "The target currency."
+          },
+          "result": {
+            "type": "number",
+            "description": "The converted amount."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The converted amount."
+      }
+    },
+    {
+      "id": "unirateapi.get_historical_limits",
+      "service": "unirateapi",
+      "name": "get_historical_limits",
+      "description": "Discover the available historical date range for each currency.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Historical availability input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "earliest_date": {
+                  "type": "string",
+                  "description": "The earliest available date."
+                },
+                "latest_date": {
+                  "type": "string",
+                  "description": "The latest available date."
+                },
+                "total_days": {
+                  "type": "integer",
+                  "description": "Available day count."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Upstream availability explanation."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A currency's historical availability."
+            },
+            "description": "Availability indexed by currency code."
+          },
+          "total_currencies": {
+            "type": "integer",
+            "description": "Number of currencies with historical data."
+          },
+          "data_source": {
+            "type": "string",
+            "description": "The historical data source."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Historical availability by currency."
+      }
+    },
+    {
+      "id": "unirateapi.get_historical_rates",
+      "service": "unirateapi",
+      "name": "get_historical_rates",
+      "description": "Get exchange rates and converted amounts for a historical date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code. Defaults to USD.",
+            "default": "USD"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency code, such as USD, EUR, or BTC."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to convert. Defaults to 1.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Historical exchange rate input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "amount": {
+            "type": "number",
+            "description": "The amount requested."
+          },
+          "base": {
+            "type": "string",
+            "description": "The base currency code."
+          },
+          "to": {
+            "type": "string",
+            "description": "The target currency when requested."
+          },
+          "rate": {
+            "type": "number",
+            "description": "The exchange rate for a single target currency."
+          },
+          "result": {
+            "type": "number",
+            "description": "The converted amount for a single target currency."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The currency value."
+            },
+            "description": "Values indexed by currency code."
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The currency value."
+            },
+            "description": "Values indexed by currency code."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "date",
+          "amount",
+          "base"
+        ],
+        "description": "Historical rates; to selects rate/result, otherwise rates/results are returned."
+      }
+    },
+    {
+      "id": "unirateapi.get_rates",
+      "service": "unirateapi",
+      "name": "get_rates",
+      "description": "Get current exchange rates and converted amounts for one or all currencies.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code. Defaults to USD.",
+            "default": "USD"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Currency code, such as USD, EUR, or BTC."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to convert. Defaults to 1.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Current exchange rate input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "The amount requested."
+          },
+          "base": {
+            "type": "string",
+            "description": "The base currency code."
+          },
+          "to": {
+            "type": "string",
+            "description": "The target currency when requested."
+          },
+          "rate": {
+            "type": "number",
+            "description": "The exchange rate for a single target currency."
+          },
+          "result": {
+            "type": "number",
+            "description": "The converted amount for a single target currency."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The currency value."
+            },
+            "description": "Values indexed by currency code."
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The currency value."
+            },
+            "description": "Values indexed by currency code."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "amount",
+          "base"
+        ],
+        "description": "Current rates; to selects rate/result, otherwise rates/results are returned."
+      }
+    },
+    {
+      "id": "unirateapi.get_timeseries",
+      "service": "unirateapi",
+      "name": "get_timeseries",
+      "description": "Get daily historical currency values over a date range of at most five years. Values include the requested amount multiplier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code. Defaults to USD.",
+            "default": "USD"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount to convert. Defaults to 1.",
+            "default": 1
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Currency code, such as USD, EUR, or BTC."
+            },
+            "description": "Currency codes to retrieve; omit for all currencies.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start_date",
+          "end_date"
+        ],
+        "description": "Historical time series input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "base": {
+            "type": "string",
+            "description": "The base currency."
+          },
+          "amount": {
+            "type": "number",
+            "description": "The amount multiplier."
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A currency code."
+            },
+            "description": "Returned currencies."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "description": "The currency value."
+              },
+              "description": "Values indexed by currency code."
+            },
+            "description": "Daily values indexed by date."
+          },
+          "total_days": {
+            "type": "integer",
+            "description": "The number of returned days."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Daily currency values for the requested interval."
+      }
+    },
+    {
+      "id": "unirateapi.list_currencies",
+      "service": "unirateapi",
+      "name": "list_currencies",
+      "description": "List the currency codes available from UniRateAPI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Currency discovery input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A currency code."
+            },
+            "description": "Supported currency codes."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of currencies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Available currencies."
+      }
+    }
+  ]
+}

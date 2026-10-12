@@ -1,0 +1,891 @@
+{
+  "service": "cloudflare_email_routing",
+  "displayName": "Cloudflare Email Routing",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "email",
+          "label": "Cloudflare Account Email",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "you@example.com",
+          "description": "Email address for legacy Global API Key authentication. Leave blank when using a cfut_ User API Token with Email Routing permissions."
+        },
+        {
+          "key": "apiKey",
+          "label": "Cloudflare API Credential",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "cloudflare_global_api_key",
+          "description": "Use a cfut_ User API Token with Email Routing Rules/Addresses permissions, or a Global API Key (cfk_ or legacy format) with the account email. Cloudflare cfat_ Account API Tokens are not accepted by the Email Routing API: https://developers.cloudflare.com/fundamentals/api/reference/permissions/."
+        },
+        {
+          "key": "accountId",
+          "label": "Cloudflare Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "32-character Cloudflare account ID",
+          "description": "Default account ID for destination addresses and account rule listings. Action inputs may override it."
+        },
+        {
+          "key": "zoneId",
+          "label": "Cloudflare Zone ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "32-character Cloudflare zone ID",
+          "description": "Default zone ID for routing rule actions. Action inputs may override it."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.cloudflare.com",
+  "actions": [
+    {
+      "id": "cloudflare_email_routing.create_routing_rule",
+      "service": "cloudflare_email_routing",
+      "name": "create_routing_rule",
+      "description": "Create a Cloudflare Email Routing rule in a zone. Forward actions require verified destination addresses.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Email Routing Rules Write"
+      ],
+      "providerPermissions": [
+        "Email Routing Rules Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "drop",
+                    "forward",
+                    "worker"
+                  ],
+                  "description": "The action type."
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Destination email addresses or Worker names.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "An action applied to a matching email."
+            },
+            "description": "Actions applied to matching email.",
+            "minItems": 1
+          },
+          "matchers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "all",
+                    "literal"
+                  ],
+                  "description": "The matcher type."
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "to"
+                  ],
+                  "description": "The email field to match."
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 90,
+                  "description": "The literal email address to match."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "A condition matching an incoming email."
+            },
+            "description": "Conditions matching incoming email.",
+            "minItems": 1
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the rule is enabled."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The rule name."
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The rule priority."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "api",
+              "wrangler"
+            ],
+            "description": "Who manages the rule."
+          },
+          "ownerWorkerTag": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "The public script tag required when source is wrangler."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "actions",
+          "matchers"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The routing rule ID."
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "drop",
+                        "forward",
+                        "worker"
+                      ],
+                      "description": "The action type."
+                    },
+                    "value": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Destination email addresses or Worker names.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "An action applied to a matching email."
+                },
+                "description": "Actions applied to matching email."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the rule is enabled."
+              },
+              "matchers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "literal"
+                      ],
+                      "description": "The matcher type."
+                    },
+                    "field": {
+                      "type": "string",
+                      "enum": [
+                        "to"
+                      ],
+                      "description": "The email field to match."
+                    },
+                    "value": {
+                      "type": "string",
+                      "maxLength": 90,
+                      "description": "The literal email address to match."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A condition matching an incoming email."
+                },
+                "description": "Conditions matching incoming email."
+              },
+              "name": {
+                "type": "string",
+                "description": "The rule name."
+              },
+              "priority": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The rule priority."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "api",
+                  "wrangler"
+                ],
+                "description": "Who manages the rule."
+              },
+              "ownerWorkerTag": {
+                "type": "string",
+                "maxLength": 32,
+                "description": "The public script tag of the Worker that owns a Wrangler-managed rule."
+              },
+              "zone": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Zone information returned for account rule listings."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A Cloudflare Email Routing rule."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_email_routing.delete_routing_rule",
+      "service": "cloudflare_email_routing",
+      "name": "delete_routing_rule",
+      "description": "Delete a Cloudflare Email Routing rule from a zone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Email Routing Rules Write"
+      ],
+      "providerPermissions": [
+        "Email Routing Rules Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "ruleId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare routing rule ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ruleId"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare routing rule ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether deletion completed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_email_routing.list_destination_addresses",
+      "service": "cloudflare_email_routing",
+      "name": "list_destination_addresses",
+      "description": "List Cloudflare Email Routing destination addresses. Use addresses with a non-null verified timestamp for forward actions.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Email Routing Addresses Read"
+      ],
+      "providerPermissions": [
+        "Email Routing Addresses Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Filter by destination address verification status."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 50,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The destination address ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The destination email address.",
+                  "format": "email"
+                },
+                "created": {
+                  "type": "string",
+                  "description": "When the address was created.",
+                  "format": "date-time"
+                },
+                "modified": {
+                  "type": "string",
+                  "description": "When the address was last modified.",
+                  "format": "date-time"
+                },
+                "verified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the address was verified; null means not verified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the address was verified; null means not verified."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "email"
+              ],
+              "description": "A Cloudflare Email Routing destination address. Verified addresses may be used by forward actions."
+            },
+            "description": "Destination addresses, including verification status."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "addresses"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_email_routing.list_routing_rules",
+      "service": "cloudflare_email_routing",
+      "name": "list_routing_rules",
+      "description": "List Cloudflare Email Routing rules for a zone or account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Email Routing Rules Read"
+      ],
+      "providerPermissions": [
+        "Email Routing Rules Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Filter by enabled routing rules."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 50,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action. zoneId and accountId are mutually exclusive.",
+        "not": {
+          "required": [
+            "zoneId",
+            "accountId"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The routing rule ID."
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "drop",
+                          "forward",
+                          "worker"
+                        ],
+                        "description": "The action type."
+                      },
+                      "value": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": "Destination email addresses or Worker names.",
+                        "minItems": 1
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type"
+                    ],
+                    "description": "An action applied to a matching email."
+                  },
+                  "description": "Actions applied to matching email."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the rule is enabled."
+                },
+                "matchers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "all",
+                          "literal"
+                        ],
+                        "description": "The matcher type."
+                      },
+                      "field": {
+                        "type": "string",
+                        "enum": [
+                          "to"
+                        ],
+                        "description": "The email field to match."
+                      },
+                      "value": {
+                        "type": "string",
+                        "maxLength": 90,
+                        "description": "The literal email address to match."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "type"
+                    ],
+                    "description": "A condition matching an incoming email."
+                  },
+                  "description": "Conditions matching incoming email."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The rule name."
+                },
+                "priority": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "The rule priority."
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "api",
+                    "wrangler"
+                  ],
+                  "description": "Who manages the rule."
+                },
+                "ownerWorkerTag": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "description": "The public script tag of the Worker that owns a Wrangler-managed rule."
+                },
+                "zone": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Zone information returned for account rule listings."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Cloudflare Email Routing rule."
+            },
+            "description": "Routing rules."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rules"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_email_routing.update_routing_rule",
+      "service": "cloudflare_email_routing",
+      "name": "update_routing_rule",
+      "description": "Replace a Cloudflare Email Routing rule in a zone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Email Routing Rules Write"
+      ],
+      "providerPermissions": [
+        "Email Routing Rules Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID."
+          },
+          "ruleId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare routing rule ID."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "drop",
+                    "forward",
+                    "worker"
+                  ],
+                  "description": "The action type."
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Destination email addresses or Worker names.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "An action applied to a matching email."
+            },
+            "description": "Actions applied to matching email.",
+            "minItems": 1
+          },
+          "matchers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "all",
+                    "literal"
+                  ],
+                  "description": "The matcher type."
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "to"
+                  ],
+                  "description": "The email field to match."
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 90,
+                  "description": "The literal email address to match."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "A condition matching an incoming email."
+            },
+            "description": "Conditions matching incoming email.",
+            "minItems": 1
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the rule is enabled."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The rule name."
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The rule priority."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "api",
+              "wrangler"
+            ],
+            "description": "Who manages the rule."
+          },
+          "ownerWorkerTag": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "The public script tag required when source is wrangler."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ruleId",
+          "actions",
+          "matchers"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The routing rule ID."
+              },
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "drop",
+                        "forward",
+                        "worker"
+                      ],
+                      "description": "The action type."
+                    },
+                    "value": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Destination email addresses or Worker names.",
+                      "minItems": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "An action applied to a matching email."
+                },
+                "description": "Actions applied to matching email."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the rule is enabled."
+              },
+              "matchers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "literal"
+                      ],
+                      "description": "The matcher type."
+                    },
+                    "field": {
+                      "type": "string",
+                      "enum": [
+                        "to"
+                      ],
+                      "description": "The email field to match."
+                    },
+                    "value": {
+                      "type": "string",
+                      "maxLength": 90,
+                      "description": "The literal email address to match."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A condition matching an incoming email."
+                },
+                "description": "Conditions matching incoming email."
+              },
+              "name": {
+                "type": "string",
+                "description": "The rule name."
+              },
+              "priority": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The rule priority."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "api",
+                  "wrangler"
+                ],
+                "description": "Who manages the rule."
+              },
+              "ownerWorkerTag": {
+                "type": "string",
+                "maxLength": 32,
+                "description": "The public script tag of the Worker that owns a Wrangler-managed rule."
+              },
+              "zone": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Zone information returned for account rule listings."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A Cloudflare Email Routing rule."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

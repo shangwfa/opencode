@@ -1,0 +1,523 @@
+{
+  "service": "sumup",
+  "displayName": "SumUp",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret API Key",
+      "placeholder": "sk_live_...",
+      "description": "SumUp secret or restricted API key. Create and manage API keys at https://me.sumup.com/developers."
+    }
+  ],
+  "homepageUrl": "https://www.sumup.com",
+  "actions": [
+    {
+      "id": "sumup.create_checkout",
+      "service": "sumup",
+      "name": "create_checkout",
+      "description": "Create a SumUp checkout, optionally enabling the SumUp-hosted payment page.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90,
+            "description": "The merchant-defined checkout reference."
+          },
+          "amount": {
+            "type": "number",
+            "description": "The amount to charge in major currency units."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "BGN",
+              "BRL",
+              "CHF",
+              "CLP",
+              "COP",
+              "CZK",
+              "DKK",
+              "EUR",
+              "GBP",
+              "HRK",
+              "HUF",
+              "NOK",
+              "PLN",
+              "RON",
+              "SEK",
+              "USD"
+            ],
+            "description": "The three-letter ISO 4217 currency code."
+          },
+          "merchant_code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SumUp merchant code receiving the payment."
+          },
+          "description": {
+            "type": "string",
+            "description": "A short description of the checkout."
+          },
+          "return_url": {
+            "type": "string",
+            "description": "The backend callback URL for checkout processing updates.",
+            "format": "uri"
+          },
+          "redirect_url": {
+            "type": "string",
+            "description": "The payer redirect URL for SCA or alternative payment methods.",
+            "format": "uri"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "CHECKOUT",
+              "SETUP_RECURRING_PAYMENT"
+            ],
+            "description": "The business purpose of the checkout."
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional checkout expiration timestamp.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional checkout expiration timestamp."
+          },
+          "customer_id": {
+            "type": "string",
+            "description": "The saved SumUp customer identifier associated with the checkout."
+          },
+          "hosted_checkout": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether SumUp should create a hosted checkout URL."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Configuration for the SumUp-hosted checkout page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "checkout_reference",
+          "amount",
+          "currency",
+          "merchant_code"
+        ],
+        "description": "The input payload for creating a SumUp checkout."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The checkout resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp checkout response."
+      }
+    },
+    {
+      "id": "sumup.create_customer",
+      "service": "sumup",
+      "name": "create_customer",
+      "description": "Create a saved customer in SumUp for future payment workflows.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-defined unique customer identifier."
+          },
+          "personal_details": {
+            "type": "object",
+            "properties": {
+              "first_name": {
+                "type": "string",
+                "description": "The customer's first name."
+              },
+              "last_name": {
+                "type": "string",
+                "description": "The customer's last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The customer's email address."
+              },
+              "phone": {
+                "type": "string",
+                "description": "The customer's phone number."
+              },
+              "birth_date": {
+                "type": "string",
+                "description": "The customer's birth date in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "tax_id": {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The customer's tax identification number."
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city name."
+                  },
+                  "country": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "description": "The ISO 3166-1 alpha-2 country code."
+                  },
+                  "line_1": {
+                    "type": "string",
+                    "description": "The first address line."
+                  },
+                  "line_2": {
+                    "type": "string",
+                    "description": "The second address line."
+                  },
+                  "postal_code": {
+                    "type": "string",
+                    "description": "The postal code."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state or region name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A postal address associated with the SumUp customer."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Personal details stored for a SumUp customer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id"
+        ],
+        "description": "The input payload for creating a SumUp customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The customer resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp customer response."
+      }
+    },
+    {
+      "id": "sumup.deactivate_checkout",
+      "service": "sumup",
+      "name": "deactivate_checkout",
+      "description": "Deactivate a pending SumUp checkout so it can no longer be processed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique SumUp checkout identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deactivating a SumUp checkout."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The checkout resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp checkout response."
+      }
+    },
+    {
+      "id": "sumup.get_checkout",
+      "service": "sumup",
+      "name": "get_checkout",
+      "description": "Retrieve a SumUp checkout and its current payment status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique SumUp checkout identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a SumUp checkout."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The checkout resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp checkout response."
+      }
+    },
+    {
+      "id": "sumup.get_customer",
+      "service": "sumup",
+      "name": "get_customer",
+      "description": "Retrieve a saved SumUp customer by its merchant-scoped identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-scoped customer identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a SumUp customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The customer resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp customer response."
+      }
+    },
+    {
+      "id": "sumup.list_checkouts",
+      "service": "sumup",
+      "name": "list_checkouts",
+      "description": "List SumUp checkouts, optionally filtered by checkout reference.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkout_reference": {
+            "type": "string",
+            "description": "The checkout reference used to filter results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing SumUp checkouts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkouts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One SumUp checkout."
+            },
+            "description": "The matching SumUp checkouts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The checkout list returned by SumUp."
+      }
+    },
+    {
+      "id": "sumup.list_payment_instruments",
+      "service": "sumup",
+      "name": "list_payment_instruments",
+      "description": "List payment instruments saved for a SumUp customer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-scoped customer identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing a SumUp customer's payment instruments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "payment_instruments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One payment instrument returned by SumUp."
+            },
+            "description": "The customer's saved payment instruments."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The saved payment instruments returned by SumUp."
+      }
+    },
+    {
+      "id": "sumup.update_customer",
+      "service": "sumup",
+      "name": "update_customer",
+      "description": "Update the supplied personal details of a saved SumUp customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-scoped customer identifier."
+          },
+          "personal_details": {
+            "type": "object",
+            "properties": {
+              "first_name": {
+                "type": "string",
+                "description": "The customer's first name."
+              },
+              "last_name": {
+                "type": "string",
+                "description": "The customer's last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The customer's email address."
+              },
+              "phone": {
+                "type": "string",
+                "description": "The customer's phone number."
+              },
+              "birth_date": {
+                "type": "string",
+                "description": "The customer's birth date in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "tax_id": {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The customer's tax identification number."
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string",
+                    "description": "The city name."
+                  },
+                  "country": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "description": "The ISO 3166-1 alpha-2 country code."
+                  },
+                  "line_1": {
+                    "type": "string",
+                    "description": "The first address line."
+                  },
+                  "line_2": {
+                    "type": "string",
+                    "description": "The second address line."
+                  },
+                  "postal_code": {
+                    "type": "string",
+                    "description": "The postal code."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state or region name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A postal address associated with the SumUp customer."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Personal details stored for a SumUp customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for updating a SumUp customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The customer resource returned by SumUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SumUp customer response."
+      }
+    }
+  ]
+}

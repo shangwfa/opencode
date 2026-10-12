@@ -1,0 +1,1399 @@
+{
+  "service": "payhip",
+  "displayName": "Payhip",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "payhip_api_key",
+      "description": "Payhip API key sent in the payhip-api-key header for coupon endpoints. Find it in Payhip Dashboard > Settings > Advanced: https://payhip.com/support/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://payhip.com/",
+  "actions": [
+    {
+      "id": "payhip.create_coupon",
+      "service": "payhip",
+      "name": "create_coupon",
+      "description": "Create a Payhip coupon for a fixed amount or percentage discount.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coupon code customers enter at checkout."
+          },
+          "couponType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi",
+              "collection"
+            ],
+            "description": "How Payhip applies the coupon."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Administrative notes for the coupon. These notes are not visible to customers."
+          },
+          "amountOff": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The fixed discount amount in cents."
+          },
+          "percentOff": {
+            "type": "number",
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "description": "The percentage discount to apply."
+          },
+          "productKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Payhip product key for a single-product coupon."
+          },
+          "collectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Payhip collection ID."
+          },
+          "usageLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of times the coupon can be redeemed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "couponType"
+        ],
+        "description": "Payhip coupon fields used when creating or updating a coupon.",
+        "oneOf": [
+          {
+            "required": [
+              "amountOff"
+            ]
+          },
+          {
+            "required": [
+              "percentOff"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "couponType": {
+                  "const": "single"
+                }
+              },
+              "required": [
+                "couponType"
+              ]
+            },
+            "then": {
+              "required": [
+                "productKey"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "couponType": {
+                  "const": "collection"
+                }
+              },
+              "required": [
+                "couponType"
+              ]
+            },
+            "then": {
+              "required": [
+                "collectionId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coupon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The unique Payhip coupon ID."
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The coupon code customers enter at checkout."
+              },
+              "couponType": {
+                "type": "string",
+                "enum": [
+                  "single",
+                  "multi",
+                  "collection"
+                ],
+                "description": "How Payhip applies the coupon."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Administrative notes returned by Payhip."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Administrative notes returned by Payhip."
+              },
+              "amountOff": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The fixed discount amount in cents when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The fixed discount amount in cents when present."
+              },
+              "percentOff": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The percentage discount when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The percentage discount when present."
+              },
+              "productKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product key when the coupon targets one product."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product key when the coupon targets one product."
+              },
+              "collectionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The collection ID when the coupon targets one collection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The collection ID when the coupon targets one collection."
+              },
+              "usageLimit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum redemption count when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum redemption count when present."
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon becomes valid."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon becomes valid."
+              },
+              "endDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon expires."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon expires."
+              },
+              "minimumPurchaseAmount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The minimum purchase amount in cents when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The minimum purchase amount in cents when configured."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip coupon object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Payhip coupon object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after creating a Payhip coupon."
+      }
+    },
+    {
+      "id": "payhip.decrease_license_uses",
+      "service": "payhip",
+      "name": "decrease_license_uses",
+      "description": "Decrease the available uses for a Payhip license key.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productSecretKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip product secret key used to authenticate license key requests."
+          },
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip license key value to operate on."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for a Payhip license key operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "license": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "description": "Whether Payhip reported the license key as valid."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The message returned by Payhip when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The message returned by Payhip when present."
+              },
+              "check": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "uses": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The number of license uses reported by Payhip."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of license uses reported by Payhip."
+                      },
+                      "enabled": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the license key is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the license key is enabled."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw Payhip license check object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The Payhip license check object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Payhip license check object."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip license response payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Payhip license response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after decreasing Payhip license uses."
+      }
+    },
+    {
+      "id": "payhip.delete_coupon",
+      "service": "payhip",
+      "name": "delete_coupon",
+      "description": "Delete a Payhip coupon by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "couponId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Payhip coupon ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for retrieving a Payhip coupon."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the coupon delete request completed successfully."
+          },
+          "couponId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Payhip coupon ID."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Payhip delete response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting a Payhip coupon."
+      }
+    },
+    {
+      "id": "payhip.disable_license",
+      "service": "payhip",
+      "name": "disable_license",
+      "description": "Disable a Payhip license key using the product secret key.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productSecretKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip product secret key used to authenticate license key requests."
+          },
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip license key value to operate on."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for a Payhip license key operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "license": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "description": "Whether Payhip reported the license key as valid."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The message returned by Payhip when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The message returned by Payhip when present."
+              },
+              "check": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "uses": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The number of license uses reported by Payhip."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of license uses reported by Payhip."
+                      },
+                      "enabled": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the license key is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the license key is enabled."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw Payhip license check object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The Payhip license check object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Payhip license check object."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip license response payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Payhip license response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after disabling a Payhip license key."
+      }
+    },
+    {
+      "id": "payhip.enable_license",
+      "service": "payhip",
+      "name": "enable_license",
+      "description": "Enable a Payhip license key using the product secret key.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productSecretKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip product secret key used to authenticate license key requests."
+          },
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip license key value to operate on."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for a Payhip license key operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "license": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "description": "Whether Payhip reported the license key as valid."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The message returned by Payhip when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The message returned by Payhip when present."
+              },
+              "check": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "uses": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The number of license uses reported by Payhip."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of license uses reported by Payhip."
+                      },
+                      "enabled": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the license key is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the license key is enabled."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw Payhip license check object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The Payhip license check object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Payhip license check object."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip license response payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Payhip license response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after enabling a Payhip license key."
+      }
+    },
+    {
+      "id": "payhip.get_coupon",
+      "service": "payhip",
+      "name": "get_coupon",
+      "description": "Retrieve a Payhip coupon by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "couponId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Payhip coupon ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for retrieving a Payhip coupon."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coupon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The unique Payhip coupon ID."
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The coupon code customers enter at checkout."
+              },
+              "couponType": {
+                "type": "string",
+                "enum": [
+                  "single",
+                  "multi",
+                  "collection"
+                ],
+                "description": "How Payhip applies the coupon."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Administrative notes returned by Payhip."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Administrative notes returned by Payhip."
+              },
+              "amountOff": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The fixed discount amount in cents when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The fixed discount amount in cents when present."
+              },
+              "percentOff": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The percentage discount when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The percentage discount when present."
+              },
+              "productKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product key when the coupon targets one product."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product key when the coupon targets one product."
+              },
+              "collectionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The collection ID when the coupon targets one collection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The collection ID when the coupon targets one collection."
+              },
+              "usageLimit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum redemption count when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum redemption count when present."
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon becomes valid."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon becomes valid."
+              },
+              "endDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon expires."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon expires."
+              },
+              "minimumPurchaseAmount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The minimum purchase amount in cents when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The minimum purchase amount in cents when configured."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip coupon object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Payhip coupon object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Payhip coupon."
+      }
+    },
+    {
+      "id": "payhip.list_coupons",
+      "service": "payhip",
+      "name": "list_coupons",
+      "description": "List Payhip coupons, optionally starting from a specific results page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Payhip results page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for listing Payhip coupons."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coupons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The unique Payhip coupon ID."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The coupon code customers enter at checkout."
+                },
+                "couponType": {
+                  "type": "string",
+                  "enum": [
+                    "single",
+                    "multi",
+                    "collection"
+                  ],
+                  "description": "How Payhip applies the coupon."
+                },
+                "notes": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Administrative notes returned by Payhip."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Administrative notes returned by Payhip."
+                },
+                "amountOff": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The fixed discount amount in cents when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The fixed discount amount in cents when present."
+                },
+                "percentOff": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The percentage discount when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The percentage discount when present."
+                },
+                "productKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product key when the coupon targets one product."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product key when the coupon targets one product."
+                },
+                "collectionId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The collection ID when the coupon targets one collection."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The collection ID when the coupon targets one collection."
+                },
+                "usageLimit": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The maximum redemption count when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum redemption count when present."
+                },
+                "startDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date or datetime when the coupon becomes valid."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date or datetime when the coupon becomes valid."
+                },
+                "endDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date or datetime when the coupon expires."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date or datetime when the coupon expires."
+                },
+                "minimumPurchaseAmount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The minimum purchase amount in cents when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The minimum purchase amount in cents when configured."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Payhip coupon object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Payhip coupon object."
+            },
+            "description": "The Payhip coupons returned for the requested page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current Payhip results page when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current Payhip results page when present."
+          },
+          "perPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Payhip page size when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Payhip page size when present."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total coupon count when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total coupon count when present."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Payhip list response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Payhip coupons."
+      }
+    },
+    {
+      "id": "payhip.update_coupon",
+      "service": "payhip",
+      "name": "update_coupon",
+      "description": "Update a Payhip coupon using the same fields accepted by coupon creation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "couponId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Payhip coupon ID."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The coupon code customers enter at checkout."
+          },
+          "couponType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi",
+              "collection"
+            ],
+            "description": "How Payhip applies the coupon."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Administrative notes for the coupon. These notes are not visible to customers."
+          },
+          "amountOff": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The fixed discount amount in cents."
+          },
+          "percentOff": {
+            "type": "number",
+            "maximum": 100,
+            "exclusiveMinimum": 0,
+            "description": "The percentage discount to apply."
+          },
+          "productKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Payhip product key for a single-product coupon."
+          },
+          "collectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Payhip collection ID."
+          },
+          "usageLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of times the coupon can be redeemed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "couponId",
+          "code",
+          "couponType"
+        ],
+        "description": "Request parameters for updating a Payhip coupon.",
+        "oneOf": [
+          {
+            "required": [
+              "amountOff"
+            ]
+          },
+          {
+            "required": [
+              "percentOff"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "couponType": {
+                  "const": "single"
+                }
+              },
+              "required": [
+                "couponType"
+              ]
+            },
+            "then": {
+              "required": [
+                "productKey"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "couponType": {
+                  "const": "collection"
+                }
+              },
+              "required": [
+                "couponType"
+              ]
+            },
+            "then": {
+              "required": [
+                "collectionId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coupon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The unique Payhip coupon ID."
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The coupon code customers enter at checkout."
+              },
+              "couponType": {
+                "type": "string",
+                "enum": [
+                  "single",
+                  "multi",
+                  "collection"
+                ],
+                "description": "How Payhip applies the coupon."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Administrative notes returned by Payhip."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Administrative notes returned by Payhip."
+              },
+              "amountOff": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The fixed discount amount in cents when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The fixed discount amount in cents when present."
+              },
+              "percentOff": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The percentage discount when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The percentage discount when present."
+              },
+              "productKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product key when the coupon targets one product."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product key when the coupon targets one product."
+              },
+              "collectionId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The collection ID when the coupon targets one collection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The collection ID when the coupon targets one collection."
+              },
+              "usageLimit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum redemption count when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum redemption count when present."
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon becomes valid."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon becomes valid."
+              },
+              "endDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date or datetime when the coupon expires."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date or datetime when the coupon expires."
+              },
+              "minimumPurchaseAmount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The minimum purchase amount in cents when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The minimum purchase amount in cents when configured."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip coupon object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Payhip coupon object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after updating a Payhip coupon."
+      }
+    },
+    {
+      "id": "payhip.verify_license",
+      "service": "payhip",
+      "name": "verify_license",
+      "description": "Verify a Payhip license key using the product secret key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productSecretKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip product secret key used to authenticate license key requests."
+          },
+          "licenseKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Payhip license key value to operate on."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for a Payhip license key operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "license": {
+            "type": "object",
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "description": "Whether Payhip reported the license key as valid."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The message returned by Payhip when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The message returned by Payhip when present."
+              },
+              "check": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "uses": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The number of license uses reported by Payhip."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The number of license uses reported by Payhip."
+                      },
+                      "enabled": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the license key is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the license key is enabled."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw Payhip license check object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The Payhip license check object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Payhip license check object."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Payhip license response payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Payhip license response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when verifying a Payhip license key."
+      }
+    }
+  ]
+}

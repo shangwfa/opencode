@@ -1,0 +1,1792 @@
+{
+  "service": "listmonk",
+  "displayName": "Listmonk",
+  "description": "Newsletter and mailing list manager: subscribers, lists, templates, and campaigns (create, test, schedule, send) on a self-hosted listmonk instance.",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "LISTMONK_API_TOKEN",
+      "description": "The access token of a listmonk API user, created under Admin -> Users -> New with the user type API. The provider acts with that user's role and list permissions.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://listmonk.example.com",
+          "description": "The root URL of your listmonk instance, the same origin that serves the /admin dashboard. A trailing /api or /admin is stripped."
+        },
+        {
+          "key": "apiUser",
+          "label": "API Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "api-bot",
+          "description": "The username of the listmonk API user the token belongs to."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://listmonk.app",
+  "actions": [
+    {
+      "id": "listmonk.blocklist_subscribers",
+      "service": "listmonk",
+      "name": "blocklist_subscribers",
+      "description": "Blocklist one or more listmonk subscribers. Blocklisted subscribers are unsubscribed from every list and never receive campaigns.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:manage"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriberIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One subscriber ID."
+            },
+            "description": "The subscriber IDs to blocklist.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriberIds"
+        ],
+        "description": "Input parameters for blocklisting subscribers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blocklisted": {
+            "type": "boolean",
+            "description": "Whether the subscribers were blocklisted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blocklisted"
+        ],
+        "description": "The blocklist result."
+      }
+    },
+    {
+      "id": "listmonk.cancel_campaign",
+      "service": "listmonk",
+      "name": "cancel_campaign",
+      "description": "Cancel a running or paused campaign permanently. A cancelled campaign cannot be resumed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for cancelling one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The cancelled campaign."
+      }
+    },
+    {
+      "id": "listmonk.create_campaign",
+      "service": "listmonk",
+      "name": "create_campaign",
+      "description": "Create a listmonk campaign as a draft. Nothing is sent: use send_campaign_test to preview it by email, then schedule_campaign or start_campaign to send it. Setting sendAt here only stores the time; the campaign is not scheduled until schedule_campaign runs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The internal campaign name."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email subject. May contain listmonk template expressions."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "The list IDs to send the campaign to.",
+            "minItems": 1
+          },
+          "fromEmail": {
+            "type": "string",
+            "description": "The From header, for example \"Chicago Aggies <news@example.org>\". Defaults to the instance setting."
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "richtext",
+              "html",
+              "markdown",
+              "plain",
+              "visual"
+            ],
+            "description": "The campaign body format."
+          },
+          "body": {
+            "type": "string",
+            "description": "The campaign body in the chosen contentType."
+          },
+          "altbody": {
+            "type": "string",
+            "description": "An optional plain-text alternative body for HTML and richtext campaigns."
+          },
+          "templateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The campaign template ID. Defaults to the instance default template."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags for the campaign."
+          },
+          "sendAt": {
+            "type": "string",
+            "description": "When to send, as an ISO-8601 timestamp WITH a timezone offset, for example 2026-10-01T09:00:00+02:00 or 2026-10-01T07:00:00Z. Must be in the future. listmonk stores the absolute instant; the dashboard displays it in the listmonk server's timezone, so always state the offset explicitly.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})$"
+          },
+          "messenger": {
+            "type": "string",
+            "description": "The messenger to send through. Defaults to email."
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "description": "The header value."
+              },
+              "description": "One header."
+            },
+            "description": "Extra SMTP headers, each an object with one header name and value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "subject",
+          "listIds"
+        ],
+        "description": "Input parameters for creating one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The created draft campaign."
+      }
+    },
+    {
+      "id": "listmonk.create_list",
+      "service": "listmonk",
+      "name": "create_list",
+      "description": "Create a listmonk mailing list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "lists:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The list name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "description": "public lists appear on the public subscription form; private lists do not."
+          },
+          "optin": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "description": "single subscribes immediately; double sends a confirmation email."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "The list status. Defaults to active."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tags for the list."
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of the list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "optin"
+        ],
+        "description": "Input parameters for creating one list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk list with id, uuid, name, type, optin, status, tags, description, subscriber_count, and timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "The created list."
+      }
+    },
+    {
+      "id": "listmonk.create_subscriber",
+      "service": "listmonk",
+      "name": "create_subscriber",
+      "description": "Create a listmonk subscriber and optionally subscribe it to lists. Double opt-in lists send a confirmation email unless preconfirmSubscriptions is true.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:manage"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The subscriber email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subscriber name."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "blocklisted"
+            ],
+            "description": "The subscriber status. Defaults to enabled."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "List IDs to subscribe the subscriber to."
+          },
+          "attribs": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Arbitrary JSON attributes stored on the subscriber and available in templates, for example {\"city\": \"Bengaluru\"}."
+          },
+          "preconfirmSubscriptions": {
+            "type": "boolean",
+            "description": "Mark the subscriptions as confirmed so no opt-in email is sent for double opt-in lists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "name"
+        ],
+        "description": "Input parameters for creating one subscriber."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriber": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk subscriber with id, uuid, email, name, attribs, status, lists (with subscription_status), created_at, and updated_at."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriber"
+        ],
+        "description": "The created subscriber."
+      }
+    },
+    {
+      "id": "listmonk.delete_campaign",
+      "service": "listmonk",
+      "name": "delete_campaign",
+      "description": "Permanently delete one listmonk campaign.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for deleting one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the campaign was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "listmonk.delete_subscriber",
+      "service": "listmonk",
+      "name": "delete_subscriber",
+      "description": "Permanently delete one listmonk subscriber and its subscriptions.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:manage"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriberId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric subscriber ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriberId"
+        ],
+        "description": "Input parameters for deleting one subscriber."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the subscriber was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "listmonk.get_campaign",
+      "service": "listmonk",
+      "name": "get_campaign",
+      "description": "Fetch one listmonk campaign with its status, schedule, target lists, body, and delivery counters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          },
+          "noBody": {
+            "type": "boolean",
+            "description": "Omit the campaign body from the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for fetching one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The requested campaign."
+      }
+    },
+    {
+      "id": "listmonk.get_campaign_analytics",
+      "service": "listmonk",
+      "name": "get_campaign_analytics",
+      "description": "Fetch campaign analytics over a date range: daily view, click, or bounce counts, or per-link click counts (type links).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:get_analytics"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One campaign ID."
+            },
+            "description": "The campaign IDs to report on.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "views",
+              "clicks",
+              "bounces",
+              "links"
+            ],
+            "description": "The analytics type."
+          },
+          "from": {
+            "type": "string",
+            "description": "The range start, as YYYY-MM-DD or an ISO-8601 timestamp."
+          },
+          "to": {
+            "type": "string",
+            "description": "The range end, as YYYY-MM-DD or an ISO-8601 timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignIds",
+          "type",
+          "from",
+          "to"
+        ],
+        "description": "Input parameters for fetching campaign analytics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The analytics type that was requested."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One analytics row."
+            },
+            "description": "The analytics rows returned by listmonk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "results"
+        ],
+        "description": "The campaign analytics."
+      }
+    },
+    {
+      "id": "listmonk.get_campaign_preview",
+      "service": "listmonk",
+      "name": "get_campaign_preview",
+      "description": "Render the campaign body inside its template and return the HTML preview, exactly as recipients would see it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for previewing one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "The rendered campaign HTML."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "html"
+        ],
+        "description": "The campaign preview."
+      }
+    },
+    {
+      "id": "listmonk.get_list",
+      "service": "listmonk",
+      "name": "get_list",
+      "description": "Fetch one listmonk list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "lists:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "Input parameters for fetching one list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk list with id, uuid, name, type, optin, status, tags, description, subscriber_count, and timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "The requested list."
+      }
+    },
+    {
+      "id": "listmonk.get_profile",
+      "service": "listmonk",
+      "name": "get_profile",
+      "description": "Fetch the listmonk user profile of the connected API user, including its role and permissions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The listmonk user profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The API user profile."
+      }
+    },
+    {
+      "id": "listmonk.get_running_campaign_stats",
+      "service": "listmonk",
+      "name": "get_running_campaign_stats",
+      "description": "Fetch live delivery stats (sent, to_send, rate, started_at) for currently running campaigns, optionally narrowed to specific campaign IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One campaign ID."
+            },
+            "description": "Only return stats for these campaign IDs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching running campaign stats."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Stats for one running campaign."
+            },
+            "description": "One entry per running campaign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stats"
+        ],
+        "description": "The running campaign stats."
+      }
+    },
+    {
+      "id": "listmonk.get_subscriber",
+      "service": "listmonk",
+      "name": "get_subscriber",
+      "description": "Fetch one listmonk subscriber with attributes and list subscriptions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriberId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric subscriber ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriberId"
+        ],
+        "description": "Input parameters for fetching one subscriber."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriber": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk subscriber with id, uuid, email, name, attribs, status, lists (with subscription_status), created_at, and updated_at."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriber"
+        ],
+        "description": "The requested subscriber."
+      }
+    },
+    {
+      "id": "listmonk.get_template",
+      "service": "listmonk",
+      "name": "get_template",
+      "description": "Fetch one listmonk template including its body.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "templates:get"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric template ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "Input parameters for fetching one template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk template with id, name, type, subject, body, is_default, and timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template"
+        ],
+        "description": "The requested template."
+      }
+    },
+    {
+      "id": "listmonk.list_campaigns",
+      "service": "listmonk",
+      "name": "list_campaigns",
+      "description": "List listmonk campaigns, optionally filtered by a name/subject search, statuses, or tags, with paging.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Full-text and substring search over campaign name and subject."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "scheduled",
+                "running",
+                "paused",
+                "finished",
+                "cancelled"
+              ],
+              "description": "One campaign status."
+            },
+            "description": "Only campaigns in any of these statuses."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only campaigns carrying any of these tags."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "name",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "The field to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting at 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Results per page. Defaults to the listmonk default (20)."
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Return every matching record in one page (per_page=all). Overrides page and perPage."
+          },
+          "noBody": {
+            "type": "boolean",
+            "description": "Omit campaign bodies from the response. Defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing campaigns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+            },
+            "description": "The campaigns on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The page size used by listmonk (0 when all results were requested)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaigns",
+          "total",
+          "page",
+          "perPage"
+        ],
+        "description": "The matching listmonk campaigns."
+      }
+    },
+    {
+      "id": "listmonk.list_lists",
+      "service": "listmonk",
+      "name": "list_lists",
+      "description": "List listmonk mailing lists with subscriber counts, optionally filtered by name, status, or tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "lists:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search lists by name."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Only lists with this status."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only lists carrying any of these tags."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "name",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "The field to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting at 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Results per page. Defaults to the listmonk default (20)."
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Return every matching record in one page (per_page=all). Overrides page and perPage."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A listmonk list with id, uuid, name, type, optin, status, tags, description, subscriber_count, and timestamps."
+            },
+            "description": "The lists on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The page size used by listmonk (0 when all results were requested)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lists",
+          "total",
+          "page",
+          "perPage"
+        ],
+        "description": "The matching listmonk lists."
+      }
+    },
+    {
+      "id": "listmonk.list_subscribers",
+      "service": "listmonk",
+      "name": "list_subscribers",
+      "description": "Query listmonk subscribers, optionally filtered by list membership and an SQL expression over the subscribers table, with paging.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:get_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "An SQL WHERE expression over the subscribers table, for example subscribers.email LIKE '%@example.com' or subscribers.attribs->>'city' = 'Chicago'. The API user's role needs the subscribers:sql_query permission whenever this is set."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "Only subscribers in any of these list IDs."
+          },
+          "subscriptionStatus": {
+            "type": "string",
+            "enum": [
+              "unconfirmed",
+              "confirmed",
+              "unsubscribed"
+            ],
+            "description": "Filter by subscription status on the given listIds."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "name",
+              "status",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "The field to sort by."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number, starting at 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Results per page. Defaults to the listmonk default (20)."
+          },
+          "all": {
+            "type": "boolean",
+            "description": "Return every matching record in one page (per_page=all). Overrides page and perPage."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying subscribers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscribers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A listmonk subscriber with id, uuid, email, name, attribs, status, lists (with subscription_status), created_at, and updated_at."
+            },
+            "description": "The subscribers on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "description": "The page size used by listmonk (0 when all results were requested)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscribers",
+          "total",
+          "page",
+          "perPage"
+        ],
+        "description": "The matching listmonk subscribers."
+      }
+    },
+    {
+      "id": "listmonk.list_templates",
+      "service": "listmonk",
+      "name": "list_templates",
+      "description": "List listmonk templates (campaign, visual campaign, and transactional) to pick a templateId for campaigns.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "templates:get"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noBody": {
+            "type": "boolean",
+            "description": "Omit template bodies from the response. Defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A listmonk template with id, name, type, subject, body, is_default, and timestamps."
+            },
+            "description": "The listmonk templates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ],
+        "description": "The listmonk templates."
+      }
+    },
+    {
+      "id": "listmonk.manage_subscriber_lists",
+      "service": "listmonk",
+      "name": "manage_subscriber_lists",
+      "description": "Add subscribers to lists, remove them from lists, or mark their subscriptions as unsubscribed. status is required when action is add.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:manage"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriberIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One subscriber ID."
+            },
+            "description": "The subscriber IDs to modify.",
+            "minItems": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "unsubscribe"
+            ],
+            "description": "The membership change to apply."
+          },
+          "targetListIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "The list IDs to modify.",
+            "minItems": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "unconfirmed",
+              "unsubscribed"
+            ],
+            "description": "The subscription status to set when action is add."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriberIds",
+          "action",
+          "targetListIds"
+        ],
+        "description": "Input parameters for changing list memberships."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether listmonk applied the change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated"
+        ],
+        "description": "The update result."
+      }
+    },
+    {
+      "id": "listmonk.pause_campaign",
+      "service": "listmonk",
+      "name": "pause_campaign",
+      "description": "Pause a running campaign. It can be resumed later with start_campaign. Only running campaigns can be paused.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for pausing one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The paused campaign."
+      }
+    },
+    {
+      "id": "listmonk.schedule_campaign",
+      "service": "listmonk",
+      "name": "schedule_campaign",
+      "description": "Schedule a draft or paused campaign to be sent automatically at sendAt: stores sendAt on the campaign, then changes its status to scheduled. A campaign that is already scheduled is simply moved to the new time. SENDS EMAIL TO ALL SUBSCRIBERS OF THE TARGET LISTS - confirm with the user before executing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:manage_all",
+        "campaigns:send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          },
+          "sendAt": {
+            "type": "string",
+            "description": "When to send, as an ISO-8601 timestamp WITH a timezone offset, for example 2026-10-01T09:00:00+02:00 or 2026-10-01T07:00:00Z. Must be in the future. listmonk stores the absolute instant; the dashboard displays it in the listmonk server's timezone, so always state the offset explicitly.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId",
+          "sendAt"
+        ],
+        "description": "Input parameters for scheduling one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The scheduled campaign."
+      }
+    },
+    {
+      "id": "listmonk.send_campaign_test",
+      "service": "listmonk",
+      "name": "send_campaign_test",
+      "description": "Send the campaign as it is currently saved to specific test addresses only (not to the lists). Each address must already exist as a subscriber in listmonk.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One subscriber email.",
+              "format": "email"
+            },
+            "description": "The subscriber email addresses to send the test to.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId",
+          "emails"
+        ],
+        "description": "Input parameters for sending one test campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether listmonk queued the test messages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sent"
+        ],
+        "description": "The test result."
+      }
+    },
+    {
+      "id": "listmonk.start_campaign",
+      "service": "listmonk",
+      "name": "start_campaign",
+      "description": "Start sending a draft or paused campaign immediately (status running); a paused campaign resumes where it stopped. SENDS EMAIL TO ALL SUBSCRIBERS OF THE TARGET LISTS - confirm with the user before executing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for starting one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The running campaign."
+      }
+    },
+    {
+      "id": "listmonk.unschedule_campaign",
+      "service": "listmonk",
+      "name": "unschedule_campaign",
+      "description": "Unschedule a scheduled campaign by moving it back to draft, so it is not sent at its sendAt. The stored sendAt is kept; only scheduled campaigns can be unscheduled.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for unscheduling one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The campaign, now a draft."
+      }
+    },
+    {
+      "id": "listmonk.update_campaign",
+      "service": "listmonk",
+      "name": "update_campaign",
+      "description": "Update a draft, scheduled, or paused listmonk campaign. Only the provided fields change; target lists and attachments are preserved unless listIds is given. Pass sendAt null to clear a stored send time; listmonk rejects every update while the stored send time is in the past.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "campaigns:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric campaign ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The internal campaign name."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email subject."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "The complete set of target list IDs.",
+            "minItems": 1
+          },
+          "fromEmail": {
+            "type": "string",
+            "description": "The From header."
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "richtext",
+              "html",
+              "markdown",
+              "plain",
+              "visual"
+            ],
+            "description": "The campaign body format."
+          },
+          "body": {
+            "type": "string",
+            "description": "The campaign body."
+          },
+          "altbody": {
+            "type": "string",
+            "description": "The plain-text alternative body."
+          },
+          "templateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The campaign template ID."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The complete set of tags; replaces existing tags."
+          },
+          "sendAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When to send, as an ISO-8601 timestamp WITH a timezone offset, for example 2026-10-01T09:00:00+02:00 or 2026-10-01T07:00:00Z. Must be in the future. listmonk stores the absolute instant; the dashboard displays it in the listmonk server's timezone, so always state the offset explicitly.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A new send time as an ISO-8601 timestamp with a timezone offset, or null to clear the stored send time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for updating one campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk campaign with id, uuid, name, subject, from_email, status, type, content_type, body, send_at, lists, tags, template_id, and the sent/to_send/views/clicks/bounces counters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign"
+        ],
+        "description": "The updated campaign."
+      }
+    },
+    {
+      "id": "listmonk.update_list",
+      "service": "listmonk",
+      "name": "update_list",
+      "description": "Update one listmonk list. Only the provided fields change; the current name and tags are preserved when omitted.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "lists:manage_all"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric list ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new list name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "description": "The list type."
+          },
+          "optin": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "description": "The opt-in type."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "The list status."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The complete set of tags; replaces existing tags."
+          },
+          "description": {
+            "type": "string",
+            "description": "The new description."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "Input parameters for updating one list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk list with id, uuid, name, type, optin, status, tags, description, subscriber_count, and timestamps."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list"
+        ],
+        "description": "The updated list."
+      }
+    },
+    {
+      "id": "listmonk.update_subscriber",
+      "service": "listmonk",
+      "name": "update_subscriber",
+      "description": "Update one listmonk subscriber. Only the provided fields change: the current subscriber is read first and merged, so omitted fields and list subscriptions are preserved. Passing listIds replaces the subscriber's list subscriptions; attribs replaces all attributes. Unless preconfirmSubscriptions is true, an instance with opt-in confirmations enabled emails the subscriber again for every double opt-in list that is still unconfirmed.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "subscribers:manage"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriberId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric subscriber ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The new email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new name."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "blocklisted"
+            ],
+            "description": "The new subscriber status."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One list ID."
+            },
+            "description": "The complete set of list IDs the subscriber should belong to."
+          },
+          "attribs": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Arbitrary JSON attributes stored on the subscriber and available in templates, for example {\"city\": \"Bengaluru\"}."
+          },
+          "preconfirmSubscriptions": {
+            "type": "boolean",
+            "description": "Mark newly added subscriptions as confirmed without an opt-in email."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriberId"
+        ],
+        "description": "Input parameters for updating one subscriber."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriber": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A listmonk subscriber with id, uuid, email, name, attribs, status, lists (with subscription_status), created_at, and updated_at."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subscriber"
+        ],
+        "description": "The updated subscriber."
+      }
+    }
+  ]
+}

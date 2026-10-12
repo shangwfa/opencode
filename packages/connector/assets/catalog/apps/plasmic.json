@@ -1,0 +1,203 @@
+{
+  "service": "plasmic",
+  "displayName": "Plasmic",
+  "categories": [
+    "Design & Media",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "CMS Token",
+      "placeholder": "PLASMIC_CMS_PUBLIC_OR_SECRET_TOKEN",
+      "description": "Plasmic CMS token sent with the x-plasmic-api-cms-tokens header. Find the CMS ID, public token, and secret token on the CMS Settings tab: https://docs.plasmic.app/learn/plasmic-cms-api-reference/#find-your-cms-ids-public-token-and-secret-token.",
+      "extraFields": [
+        {
+          "key": "cmsId",
+          "label": "CMS ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "PLASMIC_CMS_ID",
+          "description": "The Plasmic CMS ID used as the first part of the x-plasmic-api-cms-tokens header. Copy it from the CMS Settings tab: https://docs.plasmic.app/learn/plasmic-cms-api-reference/#find-your-cms-ids-public-token-and-secret-token."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.plasmic.app",
+  "actions": [
+    {
+      "id": "plasmic.count_items",
+      "service": "plasmic",
+      "name": "count_items",
+      "description": "Count rows in a Plasmic CMS model using the same q query filters, draft mode, and locale selection as list_items.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Plasmic CMS model ID, such as testimonials, copied from the model schema page."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Plasmic CMS query object serialized into the q query parameter. Use official keys such as where, limit, and offset."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "Whether to pass draft=1 and load draft or unpublished rows. This requires a secret CMS token."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CMS locale tag used for localized fields, such as ar-JO."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId"
+        ],
+        "description": "Input parameters for reading rows from one Plasmic CMS model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows matching the requested Plasmic CMS query."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count"
+        ],
+        "description": "The row count returned by the Plasmic CMS count endpoint."
+      }
+    },
+    {
+      "id": "plasmic.list_items",
+      "service": "plasmic",
+      "name": "list_items",
+      "description": "List rows from a Plasmic CMS model with optional q query filters, draft mode, and locale selection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Plasmic CMS model ID, such as testimonials, copied from the model schema page."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Plasmic CMS query object serialized into the q query parameter. Use official keys such as where, limit, and offset."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "Whether to pass draft=1 and load draft or unpublished rows. This requires a secret CMS token."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CMS locale tag used for localized fields, such as ar-JO."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId"
+        ],
+        "description": "Input parameters for reading rows from one Plasmic CMS model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Plasmic CMS row ID."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The time Plasmic created the row.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The time Plasmic last updated the row.",
+                  "format": "date-time"
+                },
+                "identifier": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The row identifier configured for the model."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The row identifier configured for the model."
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "A model-defined Plasmic CMS field value."
+                      },
+                      "description": "Model-defined Plasmic CMS field values for a row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Model-defined Plasmic CMS field values for a row."
+                },
+                "draftData": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "A model-defined Plasmic CMS field value."
+                      },
+                      "description": "Model-defined Plasmic CMS field values for a row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Model-defined Plasmic CMS field values for a row."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Plasmic CMS row with stable system fields and model-defined data preserved."
+            },
+            "description": "Rows returned for the requested model query."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "rows"
+        ],
+        "description": "Rows returned by the Plasmic CMS query endpoint."
+      }
+    }
+  ]
+}

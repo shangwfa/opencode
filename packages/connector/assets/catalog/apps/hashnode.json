@@ -1,0 +1,2405 @@
+{
+  "service": "hashnode",
+  "displayName": "Hashnode",
+  "description": "Read and manage Hashnode publications, posts, and drafts through the Hashnode GraphQL API.",
+  "categories": [
+    "Developer Tools",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "hashnode_pat",
+      "description": "Hashnode Personal Access Token sent as a Bearer credential. Create or manage tokens in Hashnode Account Settings > Developer: https://hashnode.com/settings/developer"
+    }
+  ],
+  "homepageUrl": "https://hashnode.com",
+  "actions": [
+    {
+      "id": "hashnode.create_draft",
+      "service": "hashnode",
+      "name": "create_draft",
+      "description": "Create a draft in a Hashnode publication with an active Pro plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the target Hashnode publication."
+          },
+          "title": {
+            "type": "string",
+            "description": "The optional draft title."
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "The optional draft subtitle."
+          },
+          "contentMarkdown": {
+            "type": "string",
+            "description": "The optional draft content in Markdown format."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional custom slug for the resulting post."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tag slug used to find or create the tag."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tag display name; Hashnode defaults it to the slug."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "slug"
+              ],
+              "description": "A tag to attach to a Hashnode post or draft."
+            },
+            "description": "The tags to attach, up to Hashnode's limit of 15.",
+            "maxItems": 15
+          },
+          "seriesId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of a series in the target publication."
+          },
+          "disableComments": {
+            "type": "boolean",
+            "description": "Whether comments should be disabled on the resulting post."
+          },
+          "originalArticleURL": {
+            "type": "string",
+            "description": "The canonical URL when the resulting post was originally published elsewhere.",
+            "format": "uri"
+          },
+          "publishedAt": {
+            "type": "string",
+            "description": "The timestamp to use when backdating the resulting post.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId"
+        ],
+        "description": "Input for creating a Hashnode draft."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode draft ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft title when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft title when configured."
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft subtitle when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft subtitle when configured."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft slug when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft slug when configured."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string",
+                        "description": "The content in Markdown format."
+                      },
+                      "html": {
+                        "type": "string",
+                        "description": "The content rendered as HTML by Hashnode."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "markdown",
+                      "html"
+                    ],
+                    "description": "Hashnode post or draft content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Hashnode post or draft content."
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Hashnode user ID."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "The Hashnode username."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The user's display name."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "username",
+                  "name"
+                ],
+                "description": "A Hashnode user summary."
+              },
+              "publication": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Hashnode publication ID."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "The publication title."
+                      },
+                      "url": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The publication URL when configured."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The publication URL when configured."
+                      },
+                      "isTeam": {
+                        "type": "boolean",
+                        "description": "Whether the publication is a team publication."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "title",
+                      "url",
+                      "isTeam"
+                    ],
+                    "description": "A Hashnode publication summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Hashnode publication summary."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The Hashnode tag ID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The tag name."
+                        },
+                        "slug": {
+                          "type": "string",
+                          "description": "The tag slug."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "name",
+                        "slug"
+                      ],
+                      "description": "A Hashnode tag."
+                    },
+                    "description": "The tags attached to the draft."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tags attached to the draft."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The last draft update timestamp in ISO 8601 format."
+              },
+              "scheduledDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The scheduled publication timestamp when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The scheduled publication timestamp when configured."
+              },
+              "isSubmittedForReview": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the draft has been submitted for editorial review."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the draft has been submitted for editorial review."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "subtitle",
+              "slug",
+              "content",
+              "author",
+              "publication",
+              "tags",
+              "updatedAt",
+              "scheduledDate",
+              "isSubmittedForReview"
+            ],
+            "description": "A Hashnode draft."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draft"
+        ],
+        "description": "The draft created by Hashnode."
+      }
+    },
+    {
+      "id": "hashnode.delete_draft",
+      "service": "hashnode",
+      "name": "delete_draft",
+      "description": "Soft-delete an accessible Hashnode draft from a Pro publication.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Hashnode draft to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draftId"
+        ],
+        "description": "Input for deleting a Hashnode draft."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Hashnode draft ID."
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft title when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft title when configured."
+                  },
+                  "subtitle": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft subtitle when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft subtitle when configured."
+                  },
+                  "slug": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft slug when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft slug when configured."
+                  },
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "markdown": {
+                            "type": "string",
+                            "description": "The content in Markdown format."
+                          },
+                          "html": {
+                            "type": "string",
+                            "description": "The content rendered as HTML by Hashnode."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "markdown",
+                          "html"
+                        ],
+                        "description": "Hashnode post or draft content."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Hashnode post or draft content."
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Hashnode user ID."
+                      },
+                      "username": {
+                        "type": "string",
+                        "description": "The Hashnode username."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The user's display name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "username",
+                      "name"
+                    ],
+                    "description": "A Hashnode user summary."
+                  },
+                  "publication": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The Hashnode publication ID."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "The publication title."
+                          },
+                          "url": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The publication URL when configured."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The publication URL when configured."
+                          },
+                          "isTeam": {
+                            "type": "boolean",
+                            "description": "Whether the publication is a team publication."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "title",
+                          "url",
+                          "isTeam"
+                        ],
+                        "description": "A Hashnode publication summary."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A Hashnode publication summary."
+                  },
+                  "tags": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "The Hashnode tag ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The tag name."
+                            },
+                            "slug": {
+                              "type": "string",
+                              "description": "The tag slug."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "name",
+                            "slug"
+                          ],
+                          "description": "A Hashnode tag."
+                        },
+                        "description": "The tags attached to the draft."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The tags attached to the draft."
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "description": "The last draft update timestamp in ISO 8601 format."
+                  },
+                  "scheduledDate": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The scheduled publication timestamp when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The scheduled publication timestamp when configured."
+                  },
+                  "isSubmittedForReview": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether the draft has been submitted for editorial review."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether the draft has been submitted for editorial review."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "title",
+                  "subtitle",
+                  "slug",
+                  "content",
+                  "author",
+                  "publication",
+                  "tags",
+                  "updatedAt",
+                  "scheduledDate",
+                  "isSubmittedForReview"
+                ],
+                "description": "A Hashnode draft."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Hashnode draft."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draft"
+        ],
+        "description": "The deleted Hashnode draft when returned by the API."
+      }
+    },
+    {
+      "id": "hashnode.get_current_user",
+      "service": "hashnode",
+      "name": "get_current_user",
+      "description": "Get the profile for the user authenticated by the connected Hashnode PAT.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for fetching the authenticated Hashnode user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The authenticated user's Hashnode ID."
+              },
+              "username": {
+                "type": "string",
+                "description": "The authenticated user's Hashnode username."
+              },
+              "name": {
+                "type": "string",
+                "description": "The authenticated user's display name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The authenticated user's email address."
+              },
+              "profilePicture": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's profile picture URL when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's profile picture URL when configured."
+              },
+              "tagline": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's profile tagline when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's profile tagline when configured."
+              },
+              "location": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's profile location when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's profile location when configured."
+              },
+              "dateJoined": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's join timestamp in ISO 8601 format when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's join timestamp in ISO 8601 format when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "username",
+              "name",
+              "email",
+              "profilePicture",
+              "tagline",
+              "location",
+              "dateJoined"
+            ],
+            "description": "The authenticated Hashnode user's profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The authenticated Hashnode user."
+      }
+    },
+    {
+      "id": "hashnode.get_draft",
+      "service": "hashnode",
+      "name": "get_draft",
+      "description": "Get one accessible Hashnode draft by ID from a Pro publication.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hashnode draft ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for fetching a Hashnode draft."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Hashnode draft ID."
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft title when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft title when configured."
+                  },
+                  "subtitle": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft subtitle when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft subtitle when configured."
+                  },
+                  "slug": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The draft slug when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The draft slug when configured."
+                  },
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "markdown": {
+                            "type": "string",
+                            "description": "The content in Markdown format."
+                          },
+                          "html": {
+                            "type": "string",
+                            "description": "The content rendered as HTML by Hashnode."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "markdown",
+                          "html"
+                        ],
+                        "description": "Hashnode post or draft content."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Hashnode post or draft content."
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Hashnode user ID."
+                      },
+                      "username": {
+                        "type": "string",
+                        "description": "The Hashnode username."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The user's display name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "username",
+                      "name"
+                    ],
+                    "description": "A Hashnode user summary."
+                  },
+                  "publication": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The Hashnode publication ID."
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "The publication title."
+                          },
+                          "url": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The publication URL when configured."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The publication URL when configured."
+                          },
+                          "isTeam": {
+                            "type": "boolean",
+                            "description": "Whether the publication is a team publication."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "title",
+                          "url",
+                          "isTeam"
+                        ],
+                        "description": "A Hashnode publication summary."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A Hashnode publication summary."
+                  },
+                  "tags": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "The Hashnode tag ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The tag name."
+                            },
+                            "slug": {
+                              "type": "string",
+                              "description": "The tag slug."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "name",
+                            "slug"
+                          ],
+                          "description": "A Hashnode tag."
+                        },
+                        "description": "The tags attached to the draft."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The tags attached to the draft."
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "description": "The last draft update timestamp in ISO 8601 format."
+                  },
+                  "scheduledDate": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The scheduled publication timestamp when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The scheduled publication timestamp when configured."
+                  },
+                  "isSubmittedForReview": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether the draft has been submitted for editorial review."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether the draft has been submitted for editorial review."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "title",
+                  "subtitle",
+                  "slug",
+                  "content",
+                  "author",
+                  "publication",
+                  "tags",
+                  "updatedAt",
+                  "scheduledDate",
+                  "isSubmittedForReview"
+                ],
+                "description": "A Hashnode draft."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Hashnode draft."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draft"
+        ],
+        "description": "The Hashnode draft when it exists and is accessible."
+      }
+    },
+    {
+      "id": "hashnode.get_post",
+      "service": "hashnode",
+      "name": "get_post",
+      "description": "Get one published Hashnode post by ID, including Markdown and rendered HTML.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hashnode post ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for fetching a published Hashnode post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Hashnode post ID."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The post title."
+                  },
+                  "subtitle": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The post subtitle when configured."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The post subtitle when configured."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The post slug."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The published post URL."
+                  },
+                  "brief": {
+                    "type": "string",
+                    "description": "The post summary generated by Hashnode."
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "description": "The publication timestamp in ISO 8601 format."
+                  },
+                  "updatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The last update timestamp in ISO 8601 format."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The last update timestamp in ISO 8601 format."
+                  },
+                  "content": {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string",
+                        "description": "The content in Markdown format."
+                      },
+                      "html": {
+                        "type": "string",
+                        "description": "The content rendered as HTML by Hashnode."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "markdown",
+                      "html"
+                    ],
+                    "description": "Hashnode post or draft content."
+                  },
+                  "author": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Hashnode user ID."
+                      },
+                      "username": {
+                        "type": "string",
+                        "description": "The Hashnode username."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The user's display name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "username",
+                      "name"
+                    ],
+                    "description": "A Hashnode user summary."
+                  },
+                  "tags": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "The Hashnode tag ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The tag name."
+                            },
+                            "slug": {
+                              "type": "string",
+                              "description": "The tag slug."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "id",
+                            "name",
+                            "slug"
+                          ],
+                          "description": "A Hashnode tag."
+                        },
+                        "description": "The tags attached to the post."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The tags attached to the post."
+                  },
+                  "readTimeInMinutes": {
+                    "type": "integer",
+                    "description": "The estimated reading time in minutes."
+                  },
+                  "views": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The post view count when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The post view count when available."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "title",
+                  "subtitle",
+                  "slug",
+                  "url",
+                  "brief",
+                  "publishedAt",
+                  "updatedAt",
+                  "content",
+                  "author",
+                  "tags",
+                  "readTimeInMinutes",
+                  "views"
+                ],
+                "description": "A published Hashnode post."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A published Hashnode post."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post"
+        ],
+        "description": "The Hashnode post when it exists."
+      }
+    },
+    {
+      "id": "hashnode.list_my_publications",
+      "service": "hashnode",
+      "name": "list_my_publications",
+      "description": "List publications available to the authenticated Hashnode user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "first": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of publications to return, from 1 through 100.",
+            "default": 20
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing the authenticated user's Hashnode publications."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "publications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Hashnode publication ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The publication title."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication URL when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication URL when configured."
+                },
+                "isTeam": {
+                  "type": "boolean",
+                  "description": "Whether the publication is a team publication."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "url",
+                "isTeam"
+              ],
+              "description": "A Hashnode publication summary."
+            },
+            "description": "The publications on this page."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether another page exists after this page."
+              },
+              "endCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor to pass as after for the next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor to pass as after for the next page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasNextPage",
+              "endCursor"
+            ],
+            "description": "Hashnode cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publications",
+          "pageInfo"
+        ],
+        "description": "A page of the user's Hashnode publications."
+      }
+    },
+    {
+      "id": "hashnode.list_publication_posts",
+      "service": "hashnode",
+      "name": "list_publication_posts",
+      "description": "List posts from a Hashnode publication with cursor pagination; the publication must have an active Pro plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication ID; provide this or host, but not both."
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publication host; provide this or publicationId, but not both."
+          },
+          "first": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of posts to return, from 1 through 100.",
+            "default": 20
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing posts from one Hashnode publication.",
+        "oneOf": [
+          {
+            "required": [
+              "publicationId"
+            ]
+          },
+          {
+            "required": [
+              "host"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "publication": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode publication ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The publication title."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The publication URL when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The publication URL when configured."
+              },
+              "isTeam": {
+                "type": "boolean",
+                "description": "Whether the publication is a team publication."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "url",
+              "isTeam"
+            ],
+            "description": "A Hashnode publication summary."
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Hashnode post ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The post title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The post subtitle when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The post subtitle when configured."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The post slug."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The published post URL."
+                },
+                "brief": {
+                  "type": "string",
+                  "description": "The post summary generated by Hashnode."
+                },
+                "publishedAt": {
+                  "type": "string",
+                  "description": "The publication timestamp in ISO 8601 format."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The last update timestamp in ISO 8601 format."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last update timestamp in ISO 8601 format."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "subtitle",
+                "slug",
+                "url",
+                "brief",
+                "publishedAt",
+                "updatedAt"
+              ],
+              "description": "A Hashnode post summary."
+            },
+            "description": "The posts on this page."
+          },
+          "pageInfo": {
+            "type": "object",
+            "properties": {
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether another page exists after this page."
+              },
+              "endCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor to pass as after for the next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor to pass as after for the next page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "hasNextPage",
+              "endCursor"
+            ],
+            "description": "Hashnode cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publication",
+          "posts",
+          "pageInfo"
+        ],
+        "description": "A page of posts from the requested Hashnode publication."
+      }
+    },
+    {
+      "id": "hashnode.publish_draft",
+      "service": "hashnode",
+      "name": "publish_draft",
+      "description": "Publish an existing Hashnode draft from a Pro publication.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Hashnode draft to publish."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draftId"
+        ],
+        "description": "Input for publishing a Hashnode draft."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode post ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The post title."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The post slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The published post URL."
+              },
+              "publishedAt": {
+                "type": "string",
+                "description": "The publication timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last update timestamp in ISO 8601 format."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last update timestamp in ISO 8601 format."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "slug",
+              "url",
+              "publishedAt",
+              "updatedAt"
+            ],
+            "description": "A post returned by a Hashnode write mutation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post"
+        ],
+        "description": "The post created from the Hashnode draft."
+      }
+    },
+    {
+      "id": "hashnode.publish_post",
+      "service": "hashnode",
+      "name": "publish_post",
+      "description": "Publish a Markdown post to a Hashnode publication with an active Pro plan.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the target Hashnode publication."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The post title."
+          },
+          "contentMarkdown": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The post content in Markdown format."
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "The optional post subtitle."
+          },
+          "coverImage": {
+            "type": "string",
+            "description": "The public URL of the post cover image.",
+            "format": "uri"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom post slug; Hashnode generates one when omitted."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tag slug used to find or create the tag."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tag display name; Hashnode defaults it to the slug."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "slug"
+              ],
+              "description": "A tag to attach to a Hashnode post or draft."
+            },
+            "description": "The tags to attach, up to Hashnode's limit of 15.",
+            "maxItems": 15
+          },
+          "originalArticleURL": {
+            "type": "string",
+            "description": "The canonical URL when this post was originally published elsewhere.",
+            "format": "uri"
+          },
+          "metaTitle": {
+            "type": "string",
+            "description": "The optional SEO title override."
+          },
+          "metaDescription": {
+            "type": "string",
+            "description": "The optional SEO description override."
+          },
+          "ogImage": {
+            "type": "string",
+            "description": "The public URL of the Open Graph image override.",
+            "format": "uri"
+          },
+          "disableComments": {
+            "type": "boolean",
+            "description": "Whether comments should be disabled on the post."
+          },
+          "isDelisted": {
+            "type": "boolean",
+            "description": "Whether the post should be excluded from feeds."
+          },
+          "enableToc": {
+            "type": "boolean",
+            "description": "Whether Hashnode should expose a table of contents for the post."
+          },
+          "seriesId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of a series in the target publication."
+          },
+          "publishedAt": {
+            "type": "string",
+            "description": "The timestamp to use when backdating the post.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId",
+          "title",
+          "contentMarkdown"
+        ],
+        "description": "Input for publishing a Hashnode post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode post ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The post title."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The post slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The published post URL."
+              },
+              "publishedAt": {
+                "type": "string",
+                "description": "The publication timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last update timestamp in ISO 8601 format."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last update timestamp in ISO 8601 format."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "slug",
+              "url",
+              "publishedAt",
+              "updatedAt"
+            ],
+            "description": "A post returned by a Hashnode write mutation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post"
+        ],
+        "description": "The post published by Hashnode."
+      }
+    },
+    {
+      "id": "hashnode.update_draft",
+      "service": "hashnode",
+      "name": "update_draft",
+      "description": "Update fields on an existing Hashnode draft in a Pro publication.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Hashnode draft to update."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated draft title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated draft title."
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated draft subtitle."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated draft subtitle."
+          },
+          "contentMarkdown": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated draft content in Markdown format."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated draft content in Markdown format."
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The updated custom slug for the resulting post."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated custom slug for the resulting post."
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The tag slug used to find or create the tag."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The tag display name; Hashnode defaults it to the slug."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "slug"
+                  ],
+                  "description": "A tag to attach to a Hashnode post or draft."
+                },
+                "description": "The tags to attach, up to Hashnode's limit of 15.",
+                "maxItems": 15
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tags to attach, up to Hashnode's limit of 15."
+          },
+          "seriesId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The updated series ID, or null to remove the draft from a series."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated series ID, or null to remove the draft from a series."
+          },
+          "disableComments": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether comments should be disabled on the resulting post."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether comments should be disabled on the resulting post."
+          },
+          "originalArticleURL": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated canonical URL for the resulting post.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated canonical URL for the resulting post."
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated backdated timestamp for the resulting post.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated backdated timestamp for the resulting post."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draftId"
+        ],
+        "description": "Input for updating a Hashnode draft."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode draft ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft title when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft title when configured."
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft subtitle when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft subtitle when configured."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The draft slug when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The draft slug when configured."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string",
+                        "description": "The content in Markdown format."
+                      },
+                      "html": {
+                        "type": "string",
+                        "description": "The content rendered as HTML by Hashnode."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "markdown",
+                      "html"
+                    ],
+                    "description": "Hashnode post or draft content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Hashnode post or draft content."
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Hashnode user ID."
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "The Hashnode username."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The user's display name."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "username",
+                  "name"
+                ],
+                "description": "A Hashnode user summary."
+              },
+              "publication": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Hashnode publication ID."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "The publication title."
+                      },
+                      "url": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The publication URL when configured."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The publication URL when configured."
+                      },
+                      "isTeam": {
+                        "type": "boolean",
+                        "description": "Whether the publication is a team publication."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "title",
+                      "url",
+                      "isTeam"
+                    ],
+                    "description": "A Hashnode publication summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Hashnode publication summary."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The Hashnode tag ID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The tag name."
+                        },
+                        "slug": {
+                          "type": "string",
+                          "description": "The tag slug."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "name",
+                        "slug"
+                      ],
+                      "description": "A Hashnode tag."
+                    },
+                    "description": "The tags attached to the draft."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tags attached to the draft."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The last draft update timestamp in ISO 8601 format."
+              },
+              "scheduledDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The scheduled publication timestamp when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The scheduled publication timestamp when configured."
+              },
+              "isSubmittedForReview": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the draft has been submitted for editorial review."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the draft has been submitted for editorial review."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "subtitle",
+              "slug",
+              "content",
+              "author",
+              "publication",
+              "tags",
+              "updatedAt",
+              "scheduledDate",
+              "isSubmittedForReview"
+            ],
+            "description": "A Hashnode draft."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "draft"
+        ],
+        "description": "The draft updated by Hashnode."
+      }
+    },
+    {
+      "id": "hashnode.update_post",
+      "service": "hashnode",
+      "name": "update_post",
+      "description": "Update fields on an existing Hashnode post in a Pro publication.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Hashnode post to update."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated post title."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated post title."
+          },
+          "contentMarkdown": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated post content in Markdown format."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated post content in Markdown format."
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated post subtitle."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated post subtitle."
+          },
+          "coverImage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated public URL of the post cover image.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated public URL of the post cover image."
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The updated post slug."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated post slug."
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The tag slug used to find or create the tag."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The tag display name; Hashnode defaults it to the slug."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "slug"
+                  ],
+                  "description": "A tag to attach to a Hashnode post or draft."
+                },
+                "description": "The tags to attach, up to Hashnode's limit of 15.",
+                "maxItems": 15
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tags to attach, up to Hashnode's limit of 15."
+          },
+          "originalArticleURL": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated canonical URL when this post was originally published elsewhere.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated canonical URL when this post was originally published elsewhere."
+          },
+          "metaTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated SEO title override."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated SEO title override."
+          },
+          "metaDescription": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated SEO description override."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated SEO description override."
+          },
+          "ogImage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated public URL of the Open Graph image override.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated public URL of the Open Graph image override."
+          },
+          "disableComments": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether comments should be disabled on the post."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether comments should be disabled on the post."
+          },
+          "isDelisted": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the post should be excluded from feeds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the post should be excluded from feeds."
+          },
+          "enableToc": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Hashnode should expose a table of contents for the post."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Hashnode should expose a table of contents for the post."
+          },
+          "seriesId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The updated series ID, or null to remove the series."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated series ID, or null to remove the series."
+          },
+          "publishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated backdated publication timestamp.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated backdated publication timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for updating a Hashnode post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Hashnode post ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The post title."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The post slug."
+              },
+              "url": {
+                "type": "string",
+                "description": "The published post URL."
+              },
+              "publishedAt": {
+                "type": "string",
+                "description": "The publication timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last update timestamp in ISO 8601 format."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last update timestamp in ISO 8601 format."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "slug",
+              "url",
+              "publishedAt",
+              "updatedAt"
+            ],
+            "description": "A post returned by a Hashnode write mutation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "post"
+        ],
+        "description": "The post updated by Hashnode."
+      }
+    }
+  ]
+}

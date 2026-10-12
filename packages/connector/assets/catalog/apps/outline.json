@@ -1,0 +1,1668 @@
+{
+  "service": "outline",
+  "displayName": "Outline",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ol_api_...",
+      "description": "Outline API key used with the Authorization Bearer header. Create or manage keys in your Outline workspace under Settings -> API Keys: https://docs.getoutline.com/s/guide/doc/api-1rEIXDfLF6.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://app.getoutline.com/api",
+          "description": "Optional Outline API base URL. Use the cloud default, or your self-hosted Outline URL ending in /api."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.getoutline.com",
+  "actions": [
+    {
+      "id": "outline.get_collection",
+      "service": "outline",
+      "name": "get_collection",
+      "description": "Retrieve one Outline collection by its UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier for the collection.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Outline collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier for the collection.",
+                "format": "uuid"
+              },
+              "urlId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The short collection URL identifier."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The collection name."
+              },
+              "description": {
+                "type": "string",
+                "description": "The collection description, which may contain markdown."
+              },
+              "sort": {
+                "type": "object",
+                "properties": {
+                  "field": {
+                    "type": "string",
+                    "description": "The collection sort field."
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "description": "The collection sort direction returned by Outline."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "field",
+                  "direction"
+                ],
+                "description": "The collection sort metadata returned by Outline."
+              },
+              "index": {
+                "type": "string",
+                "description": "The sidebar index for the collection."
+              },
+              "color": {
+                "type": "string",
+                "description": "The HEX color associated with the collection."
+              },
+              "icon": {
+                "type": "string",
+                "description": "The icon or emoji associated with the collection."
+              },
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "read_write"
+                ],
+                "description": "The collection permission returned by Outline."
+              },
+              "sharing": {
+                "type": "boolean",
+                "description": "Whether sharing is enabled for the collection."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the collection was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the collection was last updated.",
+                "format": "date-time"
+              },
+              "archivedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the collection was archived, or null when active.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the collection was archived, or null when active."
+              },
+              "deletedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the collection was deleted, or null when active.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the collection was deleted, or null when active."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw collection object returned by Outline."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "createdAt",
+              "updatedAt"
+            ],
+            "description": "One Outline collection returned by collection endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection"
+        ],
+        "description": "The single Outline collection response."
+      }
+    },
+    {
+      "id": "outline.get_document",
+      "service": "outline",
+      "name": "get_document",
+      "description": "Retrieve one Outline document by UUID or urlId, or by shareId when reading through a share link context.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document UUID or short urlId accepted by Outline."
+          },
+          "shareId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The share UUID used to resolve a shared document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Outline document.",
+        "anyOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "shareId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique identifier for the document.",
+                "format": "uuid"
+              },
+              "collectionId": {
+                "type": "string",
+                "description": "The unique identifier for the associated collection.",
+                "format": "uuid"
+              },
+              "parentDocumentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique identifier for the parent document, or null when the document is at the root level.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique identifier for the parent document, or null when the document is at the root level."
+              },
+              "title": {
+                "type": "string",
+                "description": "The document title."
+              },
+              "fullWidth": {
+                "type": "boolean",
+                "description": "Whether the document is displayed in full width."
+              },
+              "emoji": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The emoji associated with the document, or null when not set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The emoji associated with the document, or null when not set."
+              },
+              "text": {
+                "type": "string",
+                "description": "The markdown document body returned by Outline."
+              },
+              "urlId": {
+                "type": "string",
+                "description": "The short document URL identifier returned by Outline."
+              },
+              "pinned": {
+                "type": "boolean",
+                "description": "Whether the document is pinned."
+              },
+              "templateId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The template identifier when the document was created from a template, or null when not set.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The template identifier when the document was created from a template, or null when not set."
+              },
+              "revision": {
+                "type": "number",
+                "description": "The current document revision number."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the document was created.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The unique identifier for the user.",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The display name of the user."
+                  },
+                  "avatarUrl": {
+                    "type": "string",
+                    "description": "The avatar URL for the user.",
+                    "format": "uri"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address for the user.",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "member",
+                      "viewer",
+                      "guest"
+                    ],
+                    "description": "The Outline user role."
+                  },
+                  "isSuspended": {
+                    "type": "boolean",
+                    "description": "Whether the user is suspended."
+                  },
+                  "lastActiveAt": {
+                    "type": "string",
+                    "description": "The ISO timestamp when the user was last active.",
+                    "format": "date-time"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "description": "The ISO timestamp when the user was created.",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "description": "One Outline user returned inside auth or document metadata."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the document was last updated.",
+                "format": "date-time"
+              },
+              "updatedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The unique identifier for the user.",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The display name of the user."
+                  },
+                  "avatarUrl": {
+                    "type": "string",
+                    "description": "The avatar URL for the user.",
+                    "format": "uri"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address for the user.",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "member",
+                      "viewer",
+                      "guest"
+                    ],
+                    "description": "The Outline user role."
+                  },
+                  "isSuspended": {
+                    "type": "boolean",
+                    "description": "Whether the user is suspended."
+                  },
+                  "lastActiveAt": {
+                    "type": "string",
+                    "description": "The ISO timestamp when the user was last active.",
+                    "format": "date-time"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "description": "The ISO timestamp when the user was created.",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "description": "One Outline user returned inside auth or document metadata."
+              },
+              "publishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the document was published, or null when it is a draft.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the document was published, or null when it is a draft."
+              },
+              "dataAttributes": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "dataAttributeId": {
+                          "type": "string",
+                          "description": "The unique identifier for the associated data attribute.",
+                          "format": "uuid"
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "A string data attribute value."
+                            },
+                            {
+                              "type": "boolean",
+                              "description": "A boolean data attribute value."
+                            },
+                            {
+                              "type": "number",
+                              "description": "A numeric data attribute value."
+                            }
+                          ],
+                          "description": "A data attribute value returned by Outline, which may be string, boolean, or number."
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "description": "The ISO timestamp when this data attribute value was last updated.",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "dataAttributeId",
+                        "value",
+                        "updatedAt"
+                      ],
+                      "description": "One document data attribute returned by Outline."
+                    },
+                    "description": "The data attributes attached to the document."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The data attributes attached to the document."
+              },
+              "archivedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the document was archived, or null when active.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the document was archived, or null when active."
+              },
+              "deletedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the document was deleted, or null when active.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the document was deleted, or null when active."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw document object returned by Outline."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title"
+            ],
+            "description": "One Outline document returned by document endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The single Outline document response."
+      }
+    },
+    {
+      "id": "outline.list_collection_documents",
+      "service": "outline",
+      "name": "list_collection_documents",
+      "description": "Retrieve the document tree for one Outline collection by UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier for the collection.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Outline collection document tree."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tree": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier for the document.",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The document title."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The document URL path returned by Outline."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One child navigation node."
+                  },
+                  "description": "The child nodes nested under this document."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "url",
+                "children"
+              ],
+              "description": "One node in the Outline collection document tree."
+            },
+            "description": "The document tree returned for the collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tree"
+        ],
+        "description": "The Outline collection document tree response."
+      }
+    },
+    {
+      "id": "outline.list_collections",
+      "service": "outline",
+      "name": "list_collections",
+      "description": "List Outline collections the authenticated user can access, with optional search, status filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of results to request."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field used to sort collection list results."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction applied by Outline."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional collection name query filter."
+          },
+          "statusFilter": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "archived"
+              ],
+              "description": "One collection status filter accepted by Outline."
+            },
+            "description": "Optional collection statuses to include in the results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Outline collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier for the collection.",
+                  "format": "uuid"
+                },
+                "urlId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The short collection URL identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The collection name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The collection description, which may contain markdown."
+                },
+                "sort": {
+                  "type": "object",
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "description": "The collection sort field."
+                    },
+                    "direction": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "The collection sort direction returned by Outline."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "direction"
+                  ],
+                  "description": "The collection sort metadata returned by Outline."
+                },
+                "index": {
+                  "type": "string",
+                  "description": "The sidebar index for the collection."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The HEX color associated with the collection."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The icon or emoji associated with the collection."
+                },
+                "permission": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "read_write"
+                  ],
+                  "description": "The collection permission returned by Outline."
+                },
+                "sharing": {
+                  "type": "boolean",
+                  "description": "Whether sharing is enabled for the collection."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the collection was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the collection was last updated.",
+                  "format": "date-time"
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the collection was archived, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the collection was archived, or null when active."
+                },
+                "deletedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the collection was deleted, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the collection was deleted, or null when active."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw collection object returned by Outline."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "createdAt",
+                "updatedAt"
+              ],
+              "description": "One Outline collection returned by collection endpoints."
+            },
+            "description": "The collections returned by Outline."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based result offset."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of results requested."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "offset",
+              "limit"
+            ],
+            "description": "The pagination object returned by Outline list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collections",
+          "pagination"
+        ],
+        "description": "The paginated Outline collection list response."
+      }
+    },
+    {
+      "id": "outline.list_documents",
+      "service": "outline",
+      "name": "list_documents",
+      "description": "List Outline documents visible to the authenticated user with optional collection, user, parent, status, pagination, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of results to request."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field used to sort document list results."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction applied by Outline."
+          },
+          "collectionId": {
+            "type": "string",
+            "description": "Optional collection UUID used to restrict the document list.",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Optional user UUID used to restrict the document list.",
+            "format": "uuid"
+          },
+          "backlinkDocumentId": {
+            "type": "string",
+            "description": "Optional document UUID used to filter documents that backlink to the specified document.",
+            "format": "uuid"
+          },
+          "parentDocumentId": {
+            "type": "string",
+            "description": "Optional parent document UUID used to list direct child documents.",
+            "format": "uuid"
+          },
+          "statusFilter": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "archived",
+                "published"
+              ],
+              "description": "One document status filter accepted by Outline."
+            },
+            "description": "Optional document statuses to include in the results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Outline documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier for the document.",
+                  "format": "uuid"
+                },
+                "collectionId": {
+                  "type": "string",
+                  "description": "The unique identifier for the associated collection.",
+                  "format": "uuid"
+                },
+                "parentDocumentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique identifier for the parent document, or null when the document is at the root level.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique identifier for the parent document, or null when the document is at the root level."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The document title."
+                },
+                "fullWidth": {
+                  "type": "boolean",
+                  "description": "Whether the document is displayed in full width."
+                },
+                "emoji": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The emoji associated with the document, or null when not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The emoji associated with the document, or null when not set."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The markdown document body returned by Outline."
+                },
+                "urlId": {
+                  "type": "string",
+                  "description": "The short document URL identifier returned by Outline."
+                },
+                "pinned": {
+                  "type": "boolean",
+                  "description": "Whether the document is pinned."
+                },
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template identifier when the document was created from a template, or null when not set.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template identifier when the document was created from a template, or null when not set."
+                },
+                "revision": {
+                  "type": "number",
+                  "description": "The current document revision number."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the document was created.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The unique identifier for the user.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The display name of the user."
+                    },
+                    "avatarUrl": {
+                      "type": "string",
+                      "description": "The avatar URL for the user.",
+                      "format": "uri"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address for the user.",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member",
+                        "viewer",
+                        "guest"
+                      ],
+                      "description": "The Outline user role."
+                    },
+                    "isSuspended": {
+                      "type": "boolean",
+                      "description": "Whether the user is suspended."
+                    },
+                    "lastActiveAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was last active.",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "One Outline user returned inside auth or document metadata."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the document was last updated.",
+                  "format": "date-time"
+                },
+                "updatedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The unique identifier for the user.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The display name of the user."
+                    },
+                    "avatarUrl": {
+                      "type": "string",
+                      "description": "The avatar URL for the user.",
+                      "format": "uri"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address for the user.",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member",
+                        "viewer",
+                        "guest"
+                      ],
+                      "description": "The Outline user role."
+                    },
+                    "isSuspended": {
+                      "type": "boolean",
+                      "description": "Whether the user is suspended."
+                    },
+                    "lastActiveAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was last active.",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "One Outline user returned inside auth or document metadata."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was published, or null when it is a draft.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was published, or null when it is a draft."
+                },
+                "dataAttributes": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dataAttributeId": {
+                            "type": "string",
+                            "description": "The unique identifier for the associated data attribute.",
+                            "format": "uuid"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "A string data attribute value."
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "A boolean data attribute value."
+                              },
+                              {
+                                "type": "number",
+                                "description": "A numeric data attribute value."
+                              }
+                            ],
+                            "description": "A data attribute value returned by Outline, which may be string, boolean, or number."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "description": "The ISO timestamp when this data attribute value was last updated.",
+                            "format": "date-time"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "dataAttributeId",
+                          "value",
+                          "updatedAt"
+                        ],
+                        "description": "One document data attribute returned by Outline."
+                      },
+                      "description": "The data attributes attached to the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The data attributes attached to the document."
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was archived, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was archived, or null when active."
+                },
+                "deletedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was deleted, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was deleted, or null when active."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw document object returned by Outline."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "One Outline document returned by document endpoints."
+            },
+            "description": "The documents returned by Outline."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based result offset."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of results requested."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "offset",
+              "limit"
+            ],
+            "description": "The pagination object returned by Outline list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents",
+          "pagination"
+        ],
+        "description": "The paginated Outline document list response."
+      }
+    },
+    {
+      "id": "outline.search_documents",
+      "service": "outline",
+      "name": "search_documents",
+      "description": "Search Outline documents by keyword with optional scope, recency, snippet, pagination, and sorting controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of results to request."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword query used to search documents."
+          },
+          "userId": {
+            "type": "string",
+            "description": "Optional user UUID used to filter by editor.",
+            "format": "uuid"
+          },
+          "collectionId": {
+            "type": "string",
+            "description": "Optional collection UUID used to restrict search scope.",
+            "format": "uuid"
+          },
+          "documentId": {
+            "type": "string",
+            "description": "Optional document UUID used to search within a document subtree.",
+            "format": "uuid"
+          },
+          "statusFilter": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "archived",
+                "published"
+              ],
+              "description": "One document status filter accepted by Outline."
+            },
+            "description": "Optional document statuses to include in the search results."
+          },
+          "dateFilter": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "description": "The recency filter applied by Outline search."
+          },
+          "shareId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional share identifier used to restrict search to a shared collection or document."
+          },
+          "snippetMinWords": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum number of words to include in result snippets."
+          },
+          "snippetMaxWords": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of words to include in result snippets."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "createdAt",
+              "updatedAt",
+              "title"
+            ],
+            "description": "The sorting mode applied by Outline document search."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction applied by Outline."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Outline documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier for the document.",
+                  "format": "uuid"
+                },
+                "collectionId": {
+                  "type": "string",
+                  "description": "The unique identifier for the associated collection.",
+                  "format": "uuid"
+                },
+                "parentDocumentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique identifier for the parent document, or null when the document is at the root level.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique identifier for the parent document, or null when the document is at the root level."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The document title."
+                },
+                "fullWidth": {
+                  "type": "boolean",
+                  "description": "Whether the document is displayed in full width."
+                },
+                "emoji": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The emoji associated with the document, or null when not set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The emoji associated with the document, or null when not set."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The markdown document body returned by Outline."
+                },
+                "urlId": {
+                  "type": "string",
+                  "description": "The short document URL identifier returned by Outline."
+                },
+                "pinned": {
+                  "type": "boolean",
+                  "description": "Whether the document is pinned."
+                },
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template identifier when the document was created from a template, or null when not set.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template identifier when the document was created from a template, or null when not set."
+                },
+                "revision": {
+                  "type": "number",
+                  "description": "The current document revision number."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the document was created.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The unique identifier for the user.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The display name of the user."
+                    },
+                    "avatarUrl": {
+                      "type": "string",
+                      "description": "The avatar URL for the user.",
+                      "format": "uri"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address for the user.",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member",
+                        "viewer",
+                        "guest"
+                      ],
+                      "description": "The Outline user role."
+                    },
+                    "isSuspended": {
+                      "type": "boolean",
+                      "description": "Whether the user is suspended."
+                    },
+                    "lastActiveAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was last active.",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "One Outline user returned inside auth or document metadata."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the document was last updated.",
+                  "format": "date-time"
+                },
+                "updatedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The unique identifier for the user.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The display name of the user."
+                    },
+                    "avatarUrl": {
+                      "type": "string",
+                      "description": "The avatar URL for the user.",
+                      "format": "uri"
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address for the user.",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "admin",
+                        "member",
+                        "viewer",
+                        "guest"
+                      ],
+                      "description": "The Outline user role."
+                    },
+                    "isSuspended": {
+                      "type": "boolean",
+                      "description": "Whether the user is suspended."
+                    },
+                    "lastActiveAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was last active.",
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the user was created.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "One Outline user returned inside auth or document metadata."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was published, or null when it is a draft.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was published, or null when it is a draft."
+                },
+                "dataAttributes": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dataAttributeId": {
+                            "type": "string",
+                            "description": "The unique identifier for the associated data attribute.",
+                            "format": "uuid"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "A string data attribute value."
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "A boolean data attribute value."
+                              },
+                              {
+                                "type": "number",
+                                "description": "A numeric data attribute value."
+                              }
+                            ],
+                            "description": "A data attribute value returned by Outline, which may be string, boolean, or number."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "description": "The ISO timestamp when this data attribute value was last updated.",
+                            "format": "date-time"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "dataAttributeId",
+                          "value",
+                          "updatedAt"
+                        ],
+                        "description": "One document data attribute returned by Outline."
+                      },
+                      "description": "The data attributes attached to the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The data attributes attached to the document."
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was archived, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was archived, or null when active."
+                },
+                "deletedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the document was deleted, or null when active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the document was deleted, or null when active."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw document object returned by Outline."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "One Outline document returned by document endpoints."
+            },
+            "description": "The matching documents returned by Outline search."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The zero-based result offset."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of results requested."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "offset",
+              "limit"
+            ],
+            "description": "The pagination object returned by Outline list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents",
+          "pagination"
+        ],
+        "description": "The paginated Outline document search response."
+      }
+    }
+  ]
+}

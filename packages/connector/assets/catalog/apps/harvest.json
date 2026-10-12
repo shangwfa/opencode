@@ -1,0 +1,3158 @@
+{
+  "service": "harvest",
+  "displayName": "Harvest",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://id.getharvest.com/oauth2/authorize",
+      "tokenUrl": "https://id.getharvest.com/api/v2/oauth2/token",
+      "scopes": [
+        "harvest:all"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    },
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "harvest_pat_xxx",
+      "description": "Harvest personal access token used with the Authorization Bearer header. Create it in the Developers section of Harvest ID, where Harvest also shows your account IDs: https://help.getharvest.com/api-v2/authentication-api/authentication/authentication/",
+      "extraFields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "123456",
+          "description": "Harvest account ID sent with the Harvest-Account-Id header. Harvest shows the available account IDs after you create a personal access token in Harvest ID."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.getharvest.com",
+  "actions": [
+    {
+      "id": "harvest.create_time_entry",
+      "service": "harvest",
+      "name": "create_time_entry",
+      "description": "Create a new Harvest time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest user ID."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest project ID."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest task ID."
+          },
+          "spentDate": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The number of decimal hours to record when tracking by duration."
+          },
+          "startedTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time string accepted by Harvest, for example 8:00am or 5:30pm."
+          },
+          "endedTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time string accepted by Harvest, for example 8:00am or 5:30pm."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Notes attached to the time entry."
+          },
+          "externalReference": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The external reference object attached to the time entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "taskId",
+          "spentDate"
+        ],
+        "description": "Input parameters for creating a Harvest time entry.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "hours",
+                "startedTime"
+              ]
+            },
+            {
+              "required": [
+                "hours",
+                "endedTime"
+              ]
+            }
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest time entry ID."
+              },
+              "spent_date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest user ID."
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "description": "The first name of the user."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "The last name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest user record."
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The Harvest client ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The client name."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "The currency code associated with the client."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A compact Harvest client record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A compact Harvest client record."
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest project ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The project name."
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The project code."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The project code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest project record."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The task name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest task record."
+              },
+              "user_assignment": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The user assignment summary associated with the time entry."
+              },
+              "external_reference": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The external reference attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external reference attached to the time entry."
+              },
+              "invoice": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The invoice summary attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice summary attached to the time entry."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of decimal hours tracked in the time entry."
+              },
+              "rounded_hours": {
+                "type": "number",
+                "description": "The rounded number of hours used for billing."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Notes attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Notes attached to the time entry."
+              },
+              "is_locked": {
+                "type": "boolean",
+                "description": "Whether the time entry is locked."
+              },
+              "is_closed": {
+                "type": "boolean",
+                "description": "Whether the time entry is closed."
+              },
+              "is_billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "timer_started_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the running timer was started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the running timer was started."
+              },
+              "started_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The start time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The start time stored on the time entry."
+              },
+              "ended_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The end time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The end time stored on the time entry."
+              },
+              "is_running": {
+                "type": "boolean",
+                "description": "Whether the time entry is currently running."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest time entry record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entry"
+        ],
+        "description": "A single Harvest time entry response."
+      },
+      "followUpActions": [
+        "harvest.stop_time_entry",
+        "harvest.update_time_entry"
+      ]
+    },
+    {
+      "id": "harvest.delete_time_entry",
+      "service": "harvest",
+      "name": "delete_time_entry",
+      "description": "Delete a Harvest time entry by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "Input parameters for mutating a Harvest time entry by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Harvest deleted the requested time entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The Harvest time entry deletion result."
+      }
+    },
+    {
+      "id": "harvest.get_client",
+      "service": "harvest",
+      "name": "get_client",
+      "description": "Get a single Harvest client by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest client ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clientId"
+        ],
+        "description": "Input parameters for retrieving a client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest client ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The client name."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the client is active."
+              },
+              "address": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The address configured for the client."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The address configured for the client."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The currency code associated with the client."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest client record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "client"
+        ],
+        "description": "A single Harvest client response."
+      },
+      "followUpActions": [
+        "harvest.list_projects"
+      ]
+    },
+    {
+      "id": "harvest.get_current_user",
+      "service": "harvest",
+      "name": "get_current_user",
+      "description": "Get the current authenticated Harvest user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest user ID."
+              },
+              "first_name": {
+                "type": "string",
+                "description": "The first name of the user."
+              },
+              "last_name": {
+                "type": "string",
+                "description": "The last name of the user."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address of the user."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "The timezone configured for the user."
+              },
+              "is_admin": {
+                "type": "boolean",
+                "description": "Whether the user is an administrator."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the user is active."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest user record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The authenticated Harvest user response."
+      },
+      "followUpActions": [
+        "harvest.list_projects"
+      ]
+    },
+    {
+      "id": "harvest.get_project",
+      "service": "harvest",
+      "name": "get_project",
+      "description": "Get a single Harvest project by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest project ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Input parameters for retrieving a project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest project ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The project name."
+              },
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project code."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the project is active."
+              },
+              "is_billable": {
+                "type": "boolean",
+                "description": "Whether the project is billable."
+              },
+              "budget": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The project budget when budgeting by time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project budget when budgeting by time."
+              },
+              "client": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest client ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The client name."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "The currency code associated with the client."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest client record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest project record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "A single Harvest project response."
+      },
+      "followUpActions": [
+        "harvest.list_project_task_assignments"
+      ]
+    },
+    {
+      "id": "harvest.get_task",
+      "service": "harvest",
+      "name": "get_task",
+      "description": "Get a single Harvest task by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input parameters for retrieving a task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest task ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The task name."
+              },
+              "billable_by_default": {
+                "type": "boolean",
+                "description": "Whether the task is billable by default."
+              },
+              "default_hourly_rate": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The default hourly rate used when the task is added to a project."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The default hourly rate used when the task is added to a project."
+              },
+              "is_default": {
+                "type": "boolean",
+                "description": "Whether the task is added to future projects by default."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the task is active."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest task record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "A single Harvest task response."
+      }
+    },
+    {
+      "id": "harvest.get_time_entry",
+      "service": "harvest",
+      "name": "get_time_entry",
+      "description": "Get a single Harvest time entry by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "Input parameters for mutating a Harvest time entry by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest time entry ID."
+              },
+              "spent_date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest user ID."
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "description": "The first name of the user."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "The last name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest user record."
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The Harvest client ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The client name."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "The currency code associated with the client."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A compact Harvest client record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A compact Harvest client record."
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest project ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The project name."
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The project code."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The project code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest project record."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The task name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest task record."
+              },
+              "user_assignment": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The user assignment summary associated with the time entry."
+              },
+              "external_reference": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The external reference attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external reference attached to the time entry."
+              },
+              "invoice": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The invoice summary attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice summary attached to the time entry."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of decimal hours tracked in the time entry."
+              },
+              "rounded_hours": {
+                "type": "number",
+                "description": "The rounded number of hours used for billing."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Notes attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Notes attached to the time entry."
+              },
+              "is_locked": {
+                "type": "boolean",
+                "description": "Whether the time entry is locked."
+              },
+              "is_closed": {
+                "type": "boolean",
+                "description": "Whether the time entry is closed."
+              },
+              "is_billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "timer_started_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the running timer was started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the running timer was started."
+              },
+              "started_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The start time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The start time stored on the time entry."
+              },
+              "ended_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The end time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The end time stored on the time entry."
+              },
+              "is_running": {
+                "type": "boolean",
+                "description": "Whether the time entry is currently running."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest time entry record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entry"
+        ],
+        "description": "A single Harvest time entry response."
+      },
+      "followUpActions": [
+        "harvest.update_time_entry"
+      ]
+    },
+    {
+      "id": "harvest.list_clients",
+      "service": "harvest",
+      "name": "list_clients",
+      "description": "List clients available in the connected Harvest account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether to return only active or only inactive clients."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "description": "The maximum number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Harvest clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Harvest client ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The client name."
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "description": "Whether the client is active."
+                },
+                "address": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The address configured for the client."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The address configured for the client."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "The currency code associated with the client."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Harvest client record."
+            },
+            "description": "The clients returned by Harvest."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of records returned per page."
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The total number of pages available."
+              },
+              "total_entries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The next page number when another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number when another page is available."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The previous page number when a prior page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number when a prior page is available."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current page number."
+              },
+              "links": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the first page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the first page of results."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the next page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the next page of results."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the previous page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the previous page of results."
+                  },
+                  "last": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the last page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the last page of results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination links returned by Harvest."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "per_page",
+              "total_pages",
+              "total_entries",
+              "next_page",
+              "previous_page",
+              "page"
+            ],
+            "description": "Pagination metadata returned by Harvest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients",
+          "pagination"
+        ],
+        "description": "A paginated Harvest client list."
+      },
+      "followUpActions": [
+        "harvest.get_client",
+        "harvest.list_projects"
+      ]
+    },
+    {
+      "id": "harvest.list_project_task_assignments",
+      "service": "harvest",
+      "name": "list_project_task_assignments",
+      "description": "List task assignments for a specific Harvest project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest project ID."
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether to return only active or only inactive task assignments for the project."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "description": "The maximum number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "Input parameters for listing Harvest task assignments for a project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Harvest task assignment ID."
+                },
+                "billable": {
+                  "type": "boolean",
+                  "description": "Whether the task assignment is billable."
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "description": "Whether the task assignment is active."
+                },
+                "hourly_rate": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The hourly rate used when the project bills by task."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The hourly rate used when the project bills by task."
+                },
+                "budget": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The budget used when the project budgets by task."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The budget used when the project budgets by task."
+                },
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest project ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The project name."
+                    },
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The project code."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The project code."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest project record."
+                },
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest task ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The task name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest task record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Harvest project task assignment record."
+            },
+            "description": "The project task assignments returned by Harvest."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of records returned per page."
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The total number of pages available."
+              },
+              "total_entries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The next page number when another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number when another page is available."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The previous page number when a prior page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number when a prior page is available."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current page number."
+              },
+              "links": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the first page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the first page of results."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the next page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the next page of results."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the previous page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the previous page of results."
+                  },
+                  "last": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the last page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the last page of results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination links returned by Harvest."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "per_page",
+              "total_pages",
+              "total_entries",
+              "next_page",
+              "previous_page",
+              "page"
+            ],
+            "description": "Pagination metadata returned by Harvest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_assignments",
+          "pagination"
+        ],
+        "description": "A paginated Harvest project task assignment list."
+      },
+      "followUpActions": [
+        "harvest.create_time_entry"
+      ]
+    },
+    {
+      "id": "harvest.list_projects",
+      "service": "harvest",
+      "name": "list_projects",
+      "description": "List projects available in the connected Harvest account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether to return only active or only inactive projects."
+          },
+          "clientId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest client ID."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "description": "The maximum number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Harvest projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Harvest project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project name."
+                },
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project code."
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "description": "Whether the project is active."
+                },
+                "is_billable": {
+                  "type": "boolean",
+                  "description": "Whether the project is billable."
+                },
+                "budget": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The project budget when budgeting by time."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project budget when budgeting by time."
+                },
+                "client": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest client ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The client name."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "The currency code associated with the client."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest client record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Harvest project record."
+            },
+            "description": "The projects returned by Harvest."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of records returned per page."
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The total number of pages available."
+              },
+              "total_entries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The next page number when another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number when another page is available."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The previous page number when a prior page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number when a prior page is available."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current page number."
+              },
+              "links": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the first page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the first page of results."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the next page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the next page of results."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the previous page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the previous page of results."
+                  },
+                  "last": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the last page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the last page of results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination links returned by Harvest."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "per_page",
+              "total_pages",
+              "total_entries",
+              "next_page",
+              "previous_page",
+              "page"
+            ],
+            "description": "Pagination metadata returned by Harvest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projects",
+          "pagination"
+        ],
+        "description": "A paginated Harvest project list."
+      },
+      "followUpActions": [
+        "harvest.get_project",
+        "harvest.list_project_task_assignments"
+      ]
+    },
+    {
+      "id": "harvest.list_tasks",
+      "service": "harvest",
+      "name": "list_tasks",
+      "description": "List tasks available in the connected Harvest account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether to return only active or only inactive tasks."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "description": "The maximum number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Harvest tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Harvest task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "billable_by_default": {
+                  "type": "boolean",
+                  "description": "Whether the task is billable by default."
+                },
+                "default_hourly_rate": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The default hourly rate used when the task is added to a project."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The default hourly rate used when the task is added to a project."
+                },
+                "is_default": {
+                  "type": "boolean",
+                  "description": "Whether the task is added to future projects by default."
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "description": "Whether the task is active."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Harvest task record."
+            },
+            "description": "The tasks returned by Harvest."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of records returned per page."
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The total number of pages available."
+              },
+              "total_entries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The next page number when another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number when another page is available."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The previous page number when a prior page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number when a prior page is available."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current page number."
+              },
+              "links": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the first page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the first page of results."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the next page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the next page of results."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the previous page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the previous page of results."
+                  },
+                  "last": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the last page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the last page of results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination links returned by Harvest."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "per_page",
+              "total_pages",
+              "total_entries",
+              "next_page",
+              "previous_page",
+              "page"
+            ],
+            "description": "Pagination metadata returned by Harvest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks",
+          "pagination"
+        ],
+        "description": "A paginated Harvest task list."
+      },
+      "followUpActions": [
+        "harvest.get_task",
+        "harvest.list_time_entries"
+      ]
+    },
+    {
+      "id": "harvest.list_time_entries",
+      "service": "harvest",
+      "name": "list_time_entries",
+      "description": "List Harvest time entries with optional resource and date filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest user ID."
+          },
+          "clientId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest client ID."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest project ID."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest task ID."
+          },
+          "from": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "isRunning": {
+            "type": "boolean",
+            "description": "Whether to return only running or stopped time entries."
+          },
+          "updatedSince": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "description": "The maximum number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Harvest time entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Harvest time entry ID."
+                },
+                "spent_date": {
+                  "type": "string",
+                  "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest user ID."
+                    },
+                    "first_name": {
+                      "type": "string",
+                      "description": "The first name of the user."
+                    },
+                    "last_name": {
+                      "type": "string",
+                      "description": "The last name of the user."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The email address of the user."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest user record."
+                },
+                "client": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "The Harvest client ID."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The client name."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "The currency code associated with the client."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A compact Harvest client record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A compact Harvest client record."
+                },
+                "project": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest project ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The project name."
+                    },
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The project code."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The project code."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest project record."
+                },
+                "task": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The Harvest task ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The task name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A compact Harvest task record."
+                },
+                "user_assignment": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The user assignment summary associated with the time entry."
+                },
+                "external_reference": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The external reference attached to the time entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The external reference attached to the time entry."
+                },
+                "invoice": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The invoice summary attached to the time entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The invoice summary attached to the time entry."
+                },
+                "hours": {
+                  "type": "number",
+                  "description": "The number of decimal hours tracked in the time entry."
+                },
+                "rounded_hours": {
+                  "type": "number",
+                  "description": "The rounded number of hours used for billing."
+                },
+                "notes": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Notes attached to the time entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Notes attached to the time entry."
+                },
+                "is_locked": {
+                  "type": "boolean",
+                  "description": "Whether the time entry is locked."
+                },
+                "is_closed": {
+                  "type": "boolean",
+                  "description": "Whether the time entry is closed."
+                },
+                "is_billed": {
+                  "type": "boolean",
+                  "description": "Whether the time entry has been billed."
+                },
+                "timer_started_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the running timer was started."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the running timer was started."
+                },
+                "started_time": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The start time stored on the time entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The start time stored on the time entry."
+                },
+                "ended_time": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The end time stored on the time entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The end time stored on the time entry."
+                },
+                "is_running": {
+                  "type": "boolean",
+                  "description": "Whether the time entry is currently running."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Harvest time entry record."
+            },
+            "description": "The time entries returned by Harvest."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of records returned per page."
+              },
+              "total_pages": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The total number of pages available."
+              },
+              "total_entries": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The next page number when another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number when another page is available."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The previous page number when a prior page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page number when a prior page is available."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current page number."
+              },
+              "links": {
+                "type": "object",
+                "properties": {
+                  "first": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the first page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the first page of results."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the next page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the next page of results."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the previous page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the previous page of results."
+                  },
+                  "last": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The URL for the last page of results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The URL for the last page of results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination links returned by Harvest."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "per_page",
+              "total_pages",
+              "total_entries",
+              "next_page",
+              "previous_page",
+              "page"
+            ],
+            "description": "Pagination metadata returned by Harvest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entries",
+          "pagination"
+        ],
+        "description": "A paginated Harvest time entry list."
+      },
+      "followUpActions": [
+        "harvest.get_time_entry",
+        "harvest.create_time_entry"
+      ]
+    },
+    {
+      "id": "harvest.restart_time_entry",
+      "service": "harvest",
+      "name": "restart_time_entry",
+      "description": "Restart a stopped Harvest time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "Input parameters for mutating a Harvest time entry by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest time entry ID."
+              },
+              "spent_date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest user ID."
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "description": "The first name of the user."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "The last name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest user record."
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The Harvest client ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The client name."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "The currency code associated with the client."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A compact Harvest client record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A compact Harvest client record."
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest project ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The project name."
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The project code."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The project code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest project record."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The task name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest task record."
+              },
+              "user_assignment": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The user assignment summary associated with the time entry."
+              },
+              "external_reference": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The external reference attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external reference attached to the time entry."
+              },
+              "invoice": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The invoice summary attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice summary attached to the time entry."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of decimal hours tracked in the time entry."
+              },
+              "rounded_hours": {
+                "type": "number",
+                "description": "The rounded number of hours used for billing."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Notes attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Notes attached to the time entry."
+              },
+              "is_locked": {
+                "type": "boolean",
+                "description": "Whether the time entry is locked."
+              },
+              "is_closed": {
+                "type": "boolean",
+                "description": "Whether the time entry is closed."
+              },
+              "is_billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "timer_started_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the running timer was started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the running timer was started."
+              },
+              "started_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The start time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The start time stored on the time entry."
+              },
+              "ended_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The end time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The end time stored on the time entry."
+              },
+              "is_running": {
+                "type": "boolean",
+                "description": "Whether the time entry is currently running."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest time entry record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entry"
+        ],
+        "description": "A single Harvest time entry response."
+      },
+      "followUpActions": [
+        "harvest.stop_time_entry"
+      ]
+    },
+    {
+      "id": "harvest.stop_time_entry",
+      "service": "harvest",
+      "name": "stop_time_entry",
+      "description": "Stop a running Harvest time entry.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "Input parameters for mutating a Harvest time entry by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest time entry ID."
+              },
+              "spent_date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest user ID."
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "description": "The first name of the user."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "The last name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest user record."
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The Harvest client ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The client name."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "The currency code associated with the client."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A compact Harvest client record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A compact Harvest client record."
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest project ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The project name."
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The project code."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The project code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest project record."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The task name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest task record."
+              },
+              "user_assignment": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The user assignment summary associated with the time entry."
+              },
+              "external_reference": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The external reference attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external reference attached to the time entry."
+              },
+              "invoice": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The invoice summary attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice summary attached to the time entry."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of decimal hours tracked in the time entry."
+              },
+              "rounded_hours": {
+                "type": "number",
+                "description": "The rounded number of hours used for billing."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Notes attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Notes attached to the time entry."
+              },
+              "is_locked": {
+                "type": "boolean",
+                "description": "Whether the time entry is locked."
+              },
+              "is_closed": {
+                "type": "boolean",
+                "description": "Whether the time entry is closed."
+              },
+              "is_billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "timer_started_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the running timer was started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the running timer was started."
+              },
+              "started_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The start time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The start time stored on the time entry."
+              },
+              "ended_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The end time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The end time stored on the time entry."
+              },
+              "is_running": {
+                "type": "boolean",
+                "description": "Whether the time entry is currently running."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest time entry record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entry"
+        ],
+        "description": "A single Harvest time entry response."
+      }
+    },
+    {
+      "id": "harvest.update_time_entry",
+      "service": "harvest",
+      "name": "update_time_entry",
+      "description": "Update an existing Harvest time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest time entry ID."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest project ID."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Harvest task ID."
+          },
+          "spentDate": {
+            "type": "string",
+            "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The number of decimal hours tracked in the time entry."
+          },
+          "startedTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time string accepted by Harvest, for example 8:00am or 5:30pm."
+          },
+          "endedTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A time string accepted by Harvest, for example 8:00am or 5:30pm."
+          },
+          "notes": {
+            "type": "string",
+            "description": "The updated notes for the time entry."
+          },
+          "externalReference": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The external reference object attached to the time entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "Input parameters for updating a Harvest time entry.",
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "hours",
+                "startedTime"
+              ]
+            },
+            {
+              "required": [
+                "hours",
+                "endedTime"
+              ]
+            }
+          ]
+        },
+        "anyOf": [
+          {
+            "required": [
+              "projectId"
+            ]
+          },
+          {
+            "required": [
+              "taskId"
+            ]
+          },
+          {
+            "required": [
+              "spentDate"
+            ]
+          },
+          {
+            "required": [
+              "hours"
+            ]
+          },
+          {
+            "required": [
+              "startedTime"
+            ]
+          },
+          {
+            "required": [
+              "endedTime"
+            ]
+          },
+          {
+            "required": [
+              "notes"
+            ]
+          },
+          {
+            "required": [
+              "externalReference"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Harvest time entry ID."
+              },
+              "spent_date": {
+                "type": "string",
+                "description": "An ISO 8601 date string in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest user ID."
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "description": "The first name of the user."
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "description": "The last name of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The email address of the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest user record."
+              },
+              "client": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The Harvest client ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The client name."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "The currency code associated with the client."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A compact Harvest client record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A compact Harvest client record."
+              },
+              "project": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest project ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The project name."
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The project code."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The project code."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest project record."
+              },
+              "task": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The Harvest task ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The task name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A compact Harvest task record."
+              },
+              "user_assignment": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The user assignment summary associated with the time entry."
+              },
+              "external_reference": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The external reference attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external reference attached to the time entry."
+              },
+              "invoice": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "The invoice summary attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice summary attached to the time entry."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of decimal hours tracked in the time entry."
+              },
+              "rounded_hours": {
+                "type": "number",
+                "description": "The rounded number of hours used for billing."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Notes attached to the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Notes attached to the time entry."
+              },
+              "is_locked": {
+                "type": "boolean",
+                "description": "Whether the time entry is locked."
+              },
+              "is_closed": {
+                "type": "boolean",
+                "description": "Whether the time entry is closed."
+              },
+              "is_billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "timer_started_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the running timer was started."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the running timer was started."
+              },
+              "started_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The start time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The start time stored on the time entry."
+              },
+              "ended_time": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The end time stored on the time entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The end time stored on the time entry."
+              },
+              "is_running": {
+                "type": "boolean",
+                "description": "Whether the time entry is currently running."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Harvest time entry record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "time_entry"
+        ],
+        "description": "A single Harvest time entry response."
+      },
+      "followUpActions": [
+        "harvest.stop_time_entry"
+      ]
+    }
+  ]
+}

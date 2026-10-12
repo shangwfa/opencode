@@ -1,0 +1,304 @@
+{
+  "service": "apiflash",
+  "displayName": "ApiFlash",
+  "categories": [
+    "Developer Tools",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Key",
+      "placeholder": "af_live_xxx",
+      "description": "ApiFlash access key passed as the access_key query parameter. Create or copy it from your dashboard: https://apiflash.com/dashboard/access_keys"
+    }
+  ],
+  "homepageUrl": "https://apiflash.com",
+  "actions": [
+    {
+      "id": "apiflash.capture_website_screenshot",
+      "service": "apiflash",
+      "name": "capture_website_screenshot",
+      "description": "Capture a website screenshot with ApiFlash and return the generated screenshot URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The complete website URL to capture, including the protocol.",
+            "format": "uri"
+          },
+          "fresh": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should bypass the cache and capture a fresh screenshot."
+          },
+          "ttl": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2592000,
+            "description": "The screenshot cache lifetime in seconds, from 0 to 2592000."
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Whether to capture the entire scrollable page instead of only the viewport."
+          },
+          "scroll_page": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should scroll the page before capture to trigger lazy-loaded content."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport height in pixels. This is ignored when `full_page` is true."
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "The delay in seconds to wait after load before capturing the screenshot."
+          },
+          "wait_for": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A CSS selector that must match an element before the screenshot is captured."
+          },
+          "wait_until": {
+            "type": "string",
+            "enum": [
+              "dom_loaded",
+              "page_loaded",
+              "network_idle"
+            ],
+            "description": "The page load condition ApiFlash should wait for before capturing."
+          },
+          "element": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A CSS selector for capturing only the first matching element."
+          },
+          "element_overlap": {
+            "type": "boolean",
+            "description": "Whether to keep overlapping elements when capturing a targeted element."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "description": "The screenshot image format."
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The screenshot quality between 0 and 100 for jpeg or webp output."
+          },
+          "transparent": {
+            "type": "boolean",
+            "description": "Whether to capture the screenshot with transparency enabled when using png output."
+          },
+          "extract_html": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should also return a URL for the extracted HTML."
+          },
+          "extract_text": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should also return a URL for the extracted plain text."
+          },
+          "accept_language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Accept-Language header value used when rendering the target page."
+          },
+          "user_agent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The User-Agent string used when rendering the target page."
+          },
+          "headers": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A semicolon-separated header list such as `Header1=value1;Header2=value2`."
+          },
+          "cookies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A semicolon-separated cookie list such as `name1=value1;name2=value2`."
+          },
+          "fail_on_status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list or range of HTTP status codes that should fail the capture."
+          },
+          "no_ads": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should block popular ad networks during capture."
+          },
+          "no_tracking": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should block common tracking scripts during capture."
+          },
+          "no_cookie_banners": {
+            "type": "boolean",
+            "description": "Whether ApiFlash should hide cookie banners and popups during capture."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for capturing a website screenshot with ApiFlash."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL of the captured screenshot image.",
+            "format": "uri"
+          },
+          "extracted_html": {
+            "type": "string",
+            "description": "The URL of the extracted HTML file when `extract_html` is enabled.",
+            "format": "uri"
+          },
+          "extracted_text": {
+            "type": "string",
+            "description": "The URL of the extracted text file when `extract_text` is enabled.",
+            "format": "uri"
+          },
+          "quota": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "The maximum number of screenshots allowed in the billing period."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "The number of screenshots still available in the current billing period."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "The UTC epoch second when the screenshot quota resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Quota information returned by ApiFlash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The output payload for capturing a website screenshot."
+      }
+    },
+    {
+      "id": "apiflash.get_quota_information",
+      "service": "apiflash",
+      "name": "get_quota_information",
+      "description": "Retrieve the current ApiFlash screenshot quota and reset time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the current ApiFlash quota."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of screenshots allowed in the billing period."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "The number of screenshots still available in the current billing period."
+          },
+          "reset": {
+            "type": "integer",
+            "description": "The UTC epoch second when the screenshot quota resets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current ApiFlash quota snapshot."
+      }
+    },
+    {
+      "id": "apiflash.get_screenshot_metadata",
+      "service": "apiflash",
+      "name": "get_screenshot_metadata",
+      "description": "Read HTTP metadata for a screenshot URL previously returned by ApiFlash.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The screenshot URL returned by `capture_website_screenshot` for metadata lookup.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for reading screenshot metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The screenshot URL that was inspected.",
+            "format": "uri"
+          },
+          "content_type": {
+            "type": "string",
+            "description": "The Content-Type header returned by the screenshot URL."
+          },
+          "content_length": {
+            "type": "integer",
+            "description": "The Content-Length header returned by the screenshot URL, in bytes."
+          },
+          "etag": {
+            "type": "string",
+            "description": "The ETag header returned by the screenshot URL."
+          },
+          "last_modified": {
+            "type": "string",
+            "description": "The Last-Modified header returned by the screenshot URL."
+          },
+          "cache_control": {
+            "type": "string",
+            "description": "The Cache-Control header returned by the screenshot URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Metadata read from a previously generated ApiFlash screenshot URL."
+      }
+    }
+  ]
+}

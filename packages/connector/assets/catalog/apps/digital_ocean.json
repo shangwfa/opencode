@@ -1,0 +1,743 @@
+{
+  "service": "digital_ocean",
+  "displayName": "DigitalOcean",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "dop_v1_...",
+      "description": "DigitalOcean personal access token used with the Authorization Bearer header. Create one from the DigitalOcean API Tokens page.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.digitalocean.com",
+  "actions": [
+    {
+      "id": "digital_ocean.get_account",
+      "service": "digital_ocean",
+      "name": "get_account",
+      "description": "Retrieve the current DigitalOcean account profile and team context for the connected token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "account:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Unique identifier of the account."
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address of the current account.",
+                "format": "email"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the current account, when present."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "warning",
+                  "locked"
+                ],
+                "description": "Current account status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "DigitalOcean account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Current DigitalOcean account."
+      }
+    },
+    {
+      "id": "digital_ocean.get_droplet",
+      "service": "digital_ocean",
+      "name": "get_droplet",
+      "description": "Retrieve one DigitalOcean Droplet by numeric droplet ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "droplet:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dropletId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric identifier of the Droplet."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dropletId"
+        ],
+        "description": "Input for retrieving a DigitalOcean Droplet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "droplet": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Numeric identifier of the Droplet."
+              },
+              "name": {
+                "type": "string",
+                "description": "Droplet name."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current Droplet status."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "Timestamp when the Droplet was created.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "DigitalOcean Droplet."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "droplet"
+        ],
+        "description": "Single DigitalOcean Droplet."
+      }
+    },
+    {
+      "id": "digital_ocean.list_apps",
+      "service": "digital_ocean",
+      "name": "list_apps",
+      "description": "List DigitalOcean App Platform apps with pagination and optional project enrichment.",
+      "operationType": "read",
+      "requiredScopes": [
+        "app:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          },
+          "withProjects": {
+            "type": "boolean",
+            "description": "Include project IDs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing DigitalOcean apps."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Apps returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apps"
+        ],
+        "description": "Paginated DigitalOcean apps list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_databases",
+      "service": "digital_ocean",
+      "name": "list_databases",
+      "description": "List DigitalOcean managed database clusters, optionally filtered by tag.",
+      "operationType": "read",
+      "requiredScopes": [
+        "database:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tagName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return resources assigned to this exact tag."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Database list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "databases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Database clusters returned by DigitalOcean."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databases"
+        ],
+        "description": "DigitalOcean database cluster list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_domain_records",
+      "service": "digital_ocean",
+      "name": "list_domain_records",
+      "description": "List DNS records for one DigitalOcean domain, optionally filtered by record name or type.",
+      "operationType": "read",
+      "requiredScopes": [
+        "domain:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact domain name whose DNS records should be listed."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records whose fully qualified name exactly matches this value."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CAA",
+              "CNAME",
+              "MX",
+              "NS",
+              "TXT",
+              "SRV",
+              "SOA"
+            ],
+            "description": "Only return DNS records of this record type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domainName"
+        ],
+        "description": "Input for listing DigitalOcean domain records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domainRecords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Domain records returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domainRecords"
+        ],
+        "description": "Paginated DigitalOcean domainRecords list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_domains",
+      "service": "digital_ocean",
+      "name": "list_domains",
+      "description": "List DigitalOcean DNS domains with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "domain:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for a DigitalOcean list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Domains returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "Paginated DigitalOcean domains list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_droplets",
+      "service": "digital_ocean",
+      "name": "list_droplets",
+      "description": "List DigitalOcean Droplets with pagination and optional filtering by tag, name, or droplet type.",
+      "operationType": "read",
+      "requiredScopes": [
+        "droplet:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          },
+          "tagName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return resources assigned to this exact tag."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return Droplets whose name exactly matches this value, case-insensitively."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "droplets",
+              "gpus"
+            ],
+            "description": "Return standard Droplets or only GPU Droplets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing DigitalOcean Droplets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "droplets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Numeric identifier of the Droplet."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Droplet name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current Droplet status."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Timestamp when the Droplet was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "DigitalOcean Droplet."
+            },
+            "description": "Droplets returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "droplets"
+        ],
+        "description": "Paginated DigitalOcean Droplet list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_firewalls",
+      "service": "digital_ocean",
+      "name": "list_firewalls",
+      "description": "List DigitalOcean cloud firewalls with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "firewall:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for a DigitalOcean list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "firewalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Firewalls returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "firewalls"
+        ],
+        "description": "Paginated DigitalOcean firewalls list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_load_balancers",
+      "service": "digital_ocean",
+      "name": "list_load_balancers",
+      "description": "List DigitalOcean load balancers with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "load_balancer:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for a DigitalOcean list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "loadBalancers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "Load balancers returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "loadBalancers"
+        ],
+        "description": "Paginated DigitalOcean loadBalancers list."
+      }
+    },
+    {
+      "id": "digital_ocean.list_vpcs",
+      "service": "digital_ocean",
+      "name": "list_vpcs",
+      "description": "List DigitalOcean VPC networks with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "vpc:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination parameters for a DigitalOcean list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "vpcs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw DigitalOcean object."
+            },
+            "description": "VPC networks returned for the current page."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by DigitalOcean, when present."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by DigitalOcean, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vpcs"
+        ],
+        "description": "Paginated DigitalOcean vpcs list."
+      }
+    },
+    {
+      "id": "digital_ocean.manage_droplet_lifecycle",
+      "service": "digital_ocean",
+      "name": "manage_droplet_lifecycle",
+      "description": "Initiate a basic DigitalOcean Droplet lifecycle action such as reboot, shutdown, or power cycle.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "droplet:update"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dropletId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric identifier of the Droplet."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "reboot",
+              "power_cycle",
+              "shutdown",
+              "power_on",
+              "power_off"
+            ],
+            "description": "Lifecycle action to initiate for the Droplet."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dropletId",
+          "type"
+        ],
+        "description": "Input for initiating a DigitalOcean Droplet lifecycle action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Numeric identifier of the Droplet action."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current action status."
+              },
+              "type": {
+                "type": "string",
+                "description": "Action type accepted by the Droplet actions API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "DigitalOcean Droplet action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action"
+        ],
+        "description": "DigitalOcean Droplet action acknowledgement."
+      }
+    }
+  ]
+}

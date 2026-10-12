@@ -1,0 +1,2174 @@
+{
+  "service": "clinicaltrials_gov",
+  "displayName": "ClinicalTrials.gov",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    }
+  ],
+  "homepageUrl": "https://clinicaltrials.gov/",
+  "actions": [
+    {
+      "id": "clinicaltrials_gov.get_api_version",
+      "service": "clinicaltrials_gov",
+      "name": "get_api_version",
+      "description": "Get the current ClinicalTrials.gov API version and daily data refresh timestamp.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "The current API semantic version."
+          },
+          "dataTimestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The UTC timestamp of the current study data snapshot when provided."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The UTC timestamp of the current study data snapshot when provided."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current ClinicalTrials.gov API and data versions."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_field_value_statistics",
+      "service": "clinicaltrials_gov",
+      "name": "get_field_value_statistics",
+      "description": "Get value statistics for selected ClinicalTrials.gov leaf fields or field data types.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ENUM",
+                "STRING",
+                "DATE",
+                "INTEGER",
+                "NUMBER",
+                "BOOLEAN"
+              ],
+              "description": "An official field statistics type."
+            },
+            "description": "The field data types to include.",
+            "minItems": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ClinicalTrials.gov piece name or field path.",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9. -]*$"
+            },
+            "description": "The piece names or full leaf field paths to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting field value statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ENUM",
+                    "STRING",
+                    "DATE",
+                    "INTEGER",
+                    "NUMBER",
+                    "BOOLEAN"
+                  ],
+                  "description": "An official field statistics type."
+                },
+                "piece": {
+                  "type": "string",
+                  "description": "The official piece name."
+                },
+                "field": {
+                  "type": "string",
+                  "description": "The full field path."
+                },
+                "missingStudiesCount": {
+                  "type": "integer",
+                  "description": "The number of studies missing this field value."
+                },
+                "uniqueValuesCount": {
+                  "type": "integer",
+                  "description": "The number of unique field values."
+                },
+                "min": {
+                  "description": "The minimum field value when applicable."
+                },
+                "max": {
+                  "description": "The maximum field value when applicable."
+                },
+                "avg": {
+                  "type": "number",
+                  "description": "The average numeric value when applicable."
+                },
+                "topValues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "The field value."
+                      },
+                      "studiesCount": {
+                        "type": "integer",
+                        "description": "The number of studies containing the value."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One field value count."
+                  },
+                  "description": "The most common field values."
+                },
+                "longest": {
+                  "type": "object",
+                  "properties": {
+                    "length": {
+                      "type": "integer",
+                      "description": "The string length."
+                    },
+                    "nctId": {
+                      "type": "string",
+                      "description": "The canonical NCT identifier containing the value."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The longest observed string value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The longest observed string value and its source study."
+                },
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One observed date format."
+                  },
+                  "description": "The date formats observed for this field."
+                },
+                "trueCount": {
+                  "type": "integer",
+                  "description": "The number of studies whose field value is true."
+                },
+                "falseCount": {
+                  "type": "integer",
+                  "description": "The number of studies whose field value is false."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "piece",
+                "field"
+              ],
+              "description": "Statistics for one ClinicalTrials.gov leaf field."
+            },
+            "description": "The field value statistics."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of field statistics returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested ClinicalTrials.gov field value statistics."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_list_field_size_statistics",
+      "service": "clinicaltrials_gov",
+      "name": "get_list_field_size_statistics",
+      "description": "Get observed list-size statistics for selected ClinicalTrials.gov array fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ClinicalTrials.gov piece name or field path.",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9. -]*$"
+            },
+            "description": "The piece names or full list field paths to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting list field size statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "piece": {
+                  "type": "string",
+                  "description": "The official piece name."
+                },
+                "field": {
+                  "type": "string",
+                  "description": "The full field path."
+                },
+                "uniqueSizesCount": {
+                  "type": "integer",
+                  "description": "The number of unique list sizes."
+                },
+                "minSize": {
+                  "type": "integer",
+                  "description": "The minimum observed list size."
+                },
+                "maxSize": {
+                  "type": "integer",
+                  "description": "The maximum observed list size."
+                },
+                "topSizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "size": {
+                        "type": "integer",
+                        "description": "The observed list size."
+                      },
+                      "studiesCount": {
+                        "type": "integer",
+                        "description": "The number of studies with this list size."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One list-size distribution entry."
+                  },
+                  "description": "The most common list sizes."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "piece",
+                "field",
+                "uniqueSizesCount"
+              ],
+              "description": "List-size statistics for one ClinicalTrials.gov field."
+            },
+            "description": "The list field size statistics."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of list field statistics returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested ClinicalTrials.gov list field size statistics."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_registry_size_statistics",
+      "service": "clinicaltrials_gov",
+      "name": "get_registry_size_statistics",
+      "description": "Get ClinicalTrials.gov registry counts and the distribution of study JSON record sizes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalStudies": {
+            "type": "integer",
+            "description": "The total number of studies in the registry."
+          },
+          "averageSizeBytes": {
+            "type": "integer",
+            "description": "The average uncompressed study JSON size in bytes."
+          },
+          "percentiles": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The size in bytes at this percentile."
+            },
+            "description": "Study JSON size percentiles keyed by percentile label."
+          },
+          "ranges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sizeRange": {
+                  "type": "string",
+                  "description": "The human-readable size range."
+                },
+                "studiesCount": {
+                  "type": "integer",
+                  "description": "The number of studies in this size range."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One study JSON size range."
+            },
+            "description": "The study JSON size distribution ranges."
+          },
+          "largestStudies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The NCT identifier."
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "description": "The study JSON size in bytes."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One large study record."
+            },
+            "description": "The largest study records reported by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "ClinicalTrials.gov study JSON size statistics."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_studies_by_nct_ids",
+      "service": "clinicaltrials_gov",
+      "name": "get_studies_by_nct_ids",
+      "description": "Get multiple ClinicalTrials.gov studies by NCT identifier and report identifiers that were not found.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+              "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+            },
+            "description": "The NCT identifiers to retrieve.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ClinicalTrials.gov piece name, field name, area name, field path, or @query special field.",
+              "pattern": "^([a-zA-Z][a-zA-Z0-9. -]*|@query)$"
+            },
+            "description": "Additional official fields to return alongside the fields required for the normalized study summary.",
+            "minItems": 1
+          },
+          "markupFormat": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "legacy"
+            ],
+            "description": "The format used for fields whose official data type is markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nctIds"
+        ],
+        "description": "Input parameters for getting multiple ClinicalTrials.gov studies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "studies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nctId": {
+                  "type": "string",
+                  "description": "The canonical NCT identifier."
+                },
+                "briefTitle": {
+                  "type": "string",
+                  "description": "The study brief title."
+                },
+                "officialTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The study official title when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study official title when provided."
+                },
+                "overallStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The study recruitment or availability status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study recruitment or availability status."
+                },
+                "studyType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official study type when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official study type when provided."
+                },
+                "phases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One study phase."
+                  },
+                  "description": "The official study phases."
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One condition or disease."
+                  },
+                  "description": "The conditions or diseases studied."
+                },
+                "interventions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The intervention name."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The official intervention type when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The official intervention type when provided."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized intervention attached to a study."
+                  },
+                  "description": "The normalized study interventions."
+                },
+                "leadSponsor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The lead sponsor name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The lead sponsor name when provided."
+                },
+                "hasResults": {
+                  "type": "boolean",
+                  "description": "Whether ClinicalTrials.gov reports posted study results."
+                },
+                "studyUrl": {
+                  "type": "string",
+                  "description": "The canonical public ClinicalTrials.gov study URL.",
+                  "format": "uri"
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ClinicalTrials.gov study with its raw record."
+            },
+            "description": "The found studies in input identifier order."
+          },
+          "foundNctIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One NCT ID."
+            },
+            "description": "The canonical identifiers that were found."
+          },
+          "notFoundNctIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One NCT ID."
+            },
+            "description": "The canonical identifiers that were not found."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of studies found."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The batch ClinicalTrials.gov study lookup result."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study",
+      "service": "clinicaltrials_gov",
+      "name": "get_study",
+      "description": "Get one ClinicalTrials.gov study by NCT identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctId": {
+            "type": "string",
+            "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+            "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ClinicalTrials.gov piece name, field name, area name, or field path.",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9. -]*$"
+            },
+            "description": "Additional official fields to return alongside the fields required for the normalized study summary.",
+            "minItems": 1
+          },
+          "markupFormat": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "legacy"
+            ],
+            "description": "The format used for fields whose official data type is markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nctId"
+        ],
+        "description": "Input parameters for getting one ClinicalTrials.gov study."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether the requested study was found."
+          },
+          "study": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "nctId": {
+                    "type": "string",
+                    "description": "The canonical NCT identifier."
+                  },
+                  "briefTitle": {
+                    "type": "string",
+                    "description": "The study brief title."
+                  },
+                  "officialTitle": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The study official title when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The study official title when provided."
+                  },
+                  "overallStatus": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The study recruitment or availability status."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The study recruitment or availability status."
+                  },
+                  "studyType": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The official study type when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The official study type when provided."
+                  },
+                  "phases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One study phase."
+                    },
+                    "description": "The official study phases."
+                  },
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One condition or disease."
+                    },
+                    "description": "The conditions or diseases studied."
+                  },
+                  "interventions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The intervention name."
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The official intervention type when provided."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The official intervention type when provided."
+                        },
+                        "raw": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A normalized intervention attached to a study."
+                    },
+                    "description": "The normalized study interventions."
+                  },
+                  "leadSponsor": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The lead sponsor name when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The lead sponsor name when provided."
+                  },
+                  "hasResults": {
+                    "type": "boolean",
+                    "description": "Whether ClinicalTrials.gov reports posted study results."
+                  },
+                  "studyUrl": {
+                    "type": "string",
+                    "description": "The canonical public ClinicalTrials.gov study URL.",
+                    "format": "uri"
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The requested study when found."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The requested study when found."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of getting one ClinicalTrials.gov study."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study_documents",
+      "service": "clinicaltrials_gov",
+      "name": "get_study_documents",
+      "description": "List uploaded study protocols, statistical analysis plans, and informed consent forms with their official metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctId": {
+            "type": "string",
+            "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+            "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing uploaded study documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether the requested study was found."
+          },
+          "nctId": {
+            "type": "string",
+            "description": "The canonical requested NCT identifier."
+          },
+          "briefTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study brief title when found."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study brief title when found."
+          },
+          "noStatisticalAnalysisPlan": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the sponsor indicated that no statistical analysis plan exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the sponsor indicated that no statistical analysis plan exists."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official abbreviated document type when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official abbreviated document type when provided."
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document label when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document label when provided."
+                },
+                "documentDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The document date when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document date when provided."
+                },
+                "uploadDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date and time the document was uploaded when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date and time the document was uploaded when provided."
+                },
+                "filename": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The provider-supplied document filename when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The provider-supplied document filename when provided."
+                },
+                "sizeBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The document size in bytes when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The document size in bytes when provided."
+                },
+                "hasProtocol": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the document includes a study protocol."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the document includes a study protocol."
+                },
+                "hasStatisticalAnalysisPlan": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the document includes a statistical analysis plan."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the document includes a statistical analysis plan."
+                },
+                "hasInformedConsentForm": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the document includes an informed consent form."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the document includes an informed consent form."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One uploaded ClinicalTrials.gov study document."
+            },
+            "description": "The uploaded study documents."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The uploaded documents for one ClinicalTrials.gov study."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study_eligibility",
+      "service": "clinicaltrials_gov",
+      "name": "get_study_eligibility",
+      "description": "Get patient-facing eligibility criteria, age and sex requirements, and study population details for one ClinicalTrials.gov study.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctId": {
+            "type": "string",
+            "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+            "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+          },
+          "markupFormat": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "legacy"
+            ],
+            "description": "The format used for fields whose official data type is markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nctId"
+        ],
+        "description": "Input parameters for getting study eligibility."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether the requested study was found."
+          },
+          "nctId": {
+            "type": "string",
+            "description": "The canonical requested NCT identifier."
+          },
+          "briefTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study brief title when found."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study brief title when found."
+          },
+          "overallStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study status when found and provided."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study status when found and provided."
+          },
+          "eligibility": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "criteria": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The inclusion and exclusion criteria in the requested markup format."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The inclusion and exclusion criteria in the requested markup format."
+                  },
+                  "healthyVolunteers": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether the study accepts healthy volunteers when specified."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether the study accepts healthy volunteers when specified."
+                  },
+                  "sex": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The official eligible sex value when specified."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The official eligible sex value when specified."
+                  },
+                  "genderBased": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether eligibility is based on self-identified gender when specified."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether eligibility is based on self-identified gender when specified."
+                  },
+                  "genderDescription": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The gender-based eligibility description when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The gender-based eligibility description when provided."
+                  },
+                  "minimumAge": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The minimum eligible age when specified."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The minimum eligible age when specified."
+                  },
+                  "maximumAge": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The maximum eligible age when specified."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The maximum eligible age when specified."
+                  },
+                  "standardAges": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One official standard age group."
+                    },
+                    "description": "The official broad age groups accepted by the study."
+                  },
+                  "studyPopulation": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The observational study population description when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The observational study population description when provided."
+                  },
+                  "samplingMethod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The observational study sampling method when provided."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The observational study sampling method when provided."
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The study eligibility module when provided."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study eligibility module when provided."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The eligibility details for one ClinicalTrials.gov study."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study_locations",
+      "service": "clinicaltrials_gov",
+      "name": "get_study_locations",
+      "description": "Get study sites, geographic coordinates, central contacts, local contacts, and study officials for one ClinicalTrials.gov study.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctId": {
+            "type": "string",
+            "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+            "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting study locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether the requested study was found."
+          },
+          "nctId": {
+            "type": "string",
+            "description": "The canonical requested NCT identifier."
+          },
+          "briefTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study brief title when found."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study brief title when found."
+          },
+          "overallStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study status when found and provided."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study status when found and provided."
+          },
+          "centralContacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact name when provided."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official contact role when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official contact role when provided."
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact phone number when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact phone number when provided."
+                },
+                "phoneExtension": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact phone extension when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact phone extension when provided."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact email address when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact email address when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized study contact."
+            },
+            "description": "The study-wide central contacts."
+          },
+          "overallOfficials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official's name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official's name when provided."
+                },
+                "affiliation": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official's organization when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official's organization when provided."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official's study role when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official's study role when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized study official."
+            },
+            "description": "The study officials."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "facility": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The study facility name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study facility name when provided."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The facility's official recruitment status when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The facility's official recruitment status when provided."
+                },
+                "city": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The facility city when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The facility city when provided."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The facility state or region when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The facility state or region when provided."
+                },
+                "postalCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The facility postal code when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The facility postal code when provided."
+                },
+                "country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The facility country when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The facility country when provided."
+                },
+                "contacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contact name when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contact name when provided."
+                      },
+                      "role": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The official contact role when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The official contact role when provided."
+                      },
+                      "phone": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contact phone number when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contact phone number when provided."
+                      },
+                      "phoneExtension": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contact phone extension when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contact phone extension when provided."
+                      },
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contact email address when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contact email address when provided."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized study contact."
+                  },
+                  "description": "The contacts for this study site."
+                },
+                "geoPoint": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "latitude": {
+                          "type": "number",
+                          "description": "The latitude in decimal degrees."
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "description": "The longitude in decimal degrees."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A study location coordinate."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A study location coordinate."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized study site and its local contacts."
+            },
+            "description": "The participating study sites."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The contact and location details for one ClinicalTrials.gov study."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study_metadata",
+      "service": "clinicaltrials_gov",
+      "name": "get_study_metadata",
+      "description": "Get the official ClinicalTrials.gov study data model and field definitions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeIndexedOnly": {
+            "type": "boolean",
+            "description": "Whether to include fields that are indexed for search but not returned in study records."
+          },
+          "includeHistoricOnly": {
+            "type": "boolean",
+            "description": "Whether to include fields available only in historic study data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting the study data model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+            },
+            "description": "The top-level field metadata nodes."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of top-level field metadata nodes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The official ClinicalTrials.gov study field metadata."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.get_study_results",
+      "service": "clinicaltrials_gov",
+      "name": "get_study_results",
+      "description": "Get posted participant flow, baseline characteristics, outcome measures, adverse events, and result notes for one ClinicalTrials.gov study.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nctId": {
+            "type": "string",
+            "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+            "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+          },
+          "markupFormat": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "legacy"
+            ],
+            "description": "The format used for fields whose official data type is markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nctId"
+        ],
+        "description": "Input parameters for getting posted study results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether the requested study was found."
+          },
+          "nctId": {
+            "type": "string",
+            "description": "The canonical requested NCT identifier."
+          },
+          "briefTitle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The study brief title when found."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The study brief title when found."
+          },
+          "hasResults": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether ClinicalTrials.gov reports posted results for the found study."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether ClinicalTrials.gov reports posted results for the found study."
+          },
+          "results": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw official ResultsSection, or null when the study has no posted results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw official ResultsSection, or null when the study has no posted results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The posted results for one ClinicalTrials.gov study."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.list_enums",
+      "service": "clinicaltrials_gov",
+      "name": "list_enums",
+      "description": "List official ClinicalTrials.gov enumeration types, values, legacy values, and field usages.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enums": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The enumeration type name."
+                },
+                "pieces": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One piece name."
+                  },
+                  "description": "The pieces using this enumeration."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "The current API value."
+                      },
+                      "legacyValue": {
+                        "type": "string",
+                        "description": "The legacy API value."
+                      },
+                      "exceptions": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Piece-specific legacy value exceptions."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "value",
+                      "legacyValue"
+                    ],
+                    "description": "One enumeration value and its legacy representation."
+                  },
+                  "description": "The allowed enumeration values."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClinicalTrials.gov enumeration definition."
+            },
+            "description": "The enumeration definitions."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of enumeration definitions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The official ClinicalTrials.gov enumeration definitions."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.list_search_areas",
+      "service": "clinicaltrials_gov",
+      "name": "list_search_areas",
+      "description": "List the official ClinicalTrials.gov search documents, areas, parameters, and indexed pieces.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+            },
+            "description": "The search area documents."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of search area documents."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The official ClinicalTrials.gov search area documents."
+      }
+    },
+    {
+      "id": "clinicaltrials_gov.search_studies",
+      "service": "clinicaltrials_gov",
+      "name": "search_studies",
+      "description": "Search ClinicalTrials.gov studies with official Essie queries, filters, field selection, sorting, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conditionQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Conditions or disease query in official Essie expression syntax."
+          },
+          "termQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Other terms query in official Essie expression syntax."
+          },
+          "locationQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Location terms query in official Essie expression syntax."
+          },
+          "titleQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Title or acronym query in official Essie expression syntax."
+          },
+          "interventionQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Intervention or treatment query in official Essie expression syntax."
+          },
+          "outcomeQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Outcome measure query in official Essie expression syntax."
+          },
+          "sponsorQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Sponsor or collaborator query in official Essie expression syntax."
+          },
+          "leadSponsorQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A LeadSponsorName query in official Essie expression syntax."
+          },
+          "idQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Study IDs query in official Essie expression syntax. Use nctIds instead when combining identifiers with filters."
+          },
+          "patientQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A patient-friendly eligibility query using the official PatientSearch area."
+          },
+          "overallStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACTIVE_NOT_RECRUITING",
+                "COMPLETED",
+                "ENROLLING_BY_INVITATION",
+                "NOT_YET_RECRUITING",
+                "RECRUITING",
+                "SUSPENDED",
+                "TERMINATED",
+                "WITHDRAWN",
+                "AVAILABLE",
+                "NO_LONGER_AVAILABLE",
+                "TEMPORARILY_NOT_AVAILABLE",
+                "APPROVED_FOR_MARKETING",
+                "WITHHELD",
+                "UNKNOWN"
+              ],
+              "description": "An official ClinicalTrials.gov study status."
+            },
+            "description": "The official study statuses to include.",
+            "minItems": 1
+          },
+          "nctIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The ClinicalTrials.gov identifier, such as NCT04280705.",
+              "pattern": "^[Nn][Cc][Tt]0*[1-9][0-9]{0,7}$"
+            },
+            "description": "The NCT identifiers to include. Large identifier lists may exceed the upstream URL limit; use get_studies_by_nct_ids for batch retrieval.",
+            "minItems": 1,
+            "maxItems": 400
+          },
+          "advancedFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An advanced filter in official Essie expression syntax."
+          },
+          "geo": {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The center latitude in decimal degrees."
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The center longitude in decimal degrees."
+              },
+              "distance": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "The search radius in the selected unit."
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "km",
+                  "mi"
+                ],
+                "description": "The search radius unit."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "latitude",
+              "longitude",
+              "distance"
+            ],
+            "description": "A distance filter centered on one geographic coordinate."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ClinicalTrials.gov piece name, field name, area name, field path, or @query special field.",
+              "pattern": "^([a-zA-Z][a-zA-Z0-9. -]*|@query)$"
+            },
+            "description": "Additional official fields to return alongside the fields required for the normalized study summary.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sortable date or numeric piece or field name, or @relevance for query relevance.",
+                  "pattern": "^([a-zA-Z][a-zA-Z0-9. -]*|@relevance)$"
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The optional sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "description": "One official ClinicalTrials.gov study sort option."
+            },
+            "description": "The study sort options, in priority order.",
+            "minItems": 1,
+            "maxItems": 2
+          },
+          "countTotal": {
+            "type": "boolean",
+            "description": "Whether the first page should include the total number of matching studies."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of studies to return in this page."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The nextPageToken returned by the preceding page with otherwise identical query parameters."
+          },
+          "markupFormat": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "legacy"
+            ],
+            "description": "The format used for fields whose official data type is markup."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching ClinicalTrials.gov studies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "studies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "nctId": {
+                  "type": "string",
+                  "description": "The canonical NCT identifier."
+                },
+                "briefTitle": {
+                  "type": "string",
+                  "description": "The study brief title."
+                },
+                "officialTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The study official title when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study official title when provided."
+                },
+                "overallStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The study recruitment or availability status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study recruitment or availability status."
+                },
+                "studyType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official study type when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official study type when provided."
+                },
+                "phases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One study phase."
+                  },
+                  "description": "The official study phases."
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One condition or disease."
+                  },
+                  "description": "The conditions or diseases studied."
+                },
+                "interventions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The intervention name."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The official intervention type when provided."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The official intervention type when provided."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized intervention attached to a study."
+                  },
+                  "description": "The normalized study interventions."
+                },
+                "leadSponsor": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The lead sponsor name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The lead sponsor name when provided."
+                },
+                "hasResults": {
+                  "type": "boolean",
+                  "description": "Whether ClinicalTrials.gov reports posted study results."
+                },
+                "studyUrl": {
+                  "type": "string",
+                  "description": "The canonical public ClinicalTrials.gov study URL.",
+                  "format": "uri"
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw JSON object returned by the ClinicalTrials.gov API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ClinicalTrials.gov study with its raw record."
+            },
+            "description": "The studies returned in this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of studies returned in this page."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching studies when requested on the first page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching studies when requested on the first page."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token for the next page, or null when this is the last page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token for the next page, or null when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of normalized ClinicalTrials.gov search results."
+      }
+    }
+  ]
+}

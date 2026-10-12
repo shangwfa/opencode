@@ -1,0 +1,957 @@
+{
+  "service": "globalping",
+  "displayName": "Globalping",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Dashboard Token",
+      "placeholder": "gp_...",
+      "description": "Globalping Dashboard token used with the Authorization Bearer header. Generate it from the dashboard Tokens page: https://blog.globalping.io/globalping-dashboard-adopt-probes-earn-credits/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://globalping.io",
+  "actions": [
+    {
+      "id": "globalping.create_measurement",
+      "service": "globalping",
+      "name": "create_measurement",
+      "description": "Create a Globalping measurement and return the accepted measurement ID and headers.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "traceroute",
+              "dns",
+              "mtr",
+              "http"
+            ],
+            "description": "The Globalping measurement type."
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A publicly reachable measurement target such as a hostname or an IP address."
+          },
+          "in_progress_updates": {
+            "type": "boolean",
+            "description": "Whether Globalping should include partial in-progress updates while the measurement runs."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "continent": {
+                  "type": "string",
+                  "enum": [
+                    "AF",
+                    "AN",
+                    "AS",
+                    "EU",
+                    "NA",
+                    "OC",
+                    "SA"
+                  ],
+                  "description": "A continent code used to select probes."
+                },
+                "region": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A UN M49 region name used to select probes."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 2,
+                  "description": "An ISO 3166-1 alpha-2 country code used to select probes."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A state identifier used to select probes when available."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A city name used to select probes."
+                },
+                "asn": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "An autonomous system number used to select probes."
+                },
+                "network": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A network or ISP name used to select probes."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Globalping tag used to narrow probe selection."
+                  },
+                  "description": "Additional Globalping tags used to select probes.",
+                  "minItems": 1
+                },
+                "magic": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A fuzzy Globalping location string such as `Berlin+Germany` or `aws-us-east-1`."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 200,
+                  "description": "The maximum number of probes to pick for this location filter."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Globalping probe selection filter. Include at least one selector such as country, city, ASN, tags, or magic."
+            },
+            "description": "The location filters used to pick probes."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of probes to use for the measurement."
+          },
+          "measurement_options": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "packets": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16,
+                    "description": "The number of packets to send."
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "ICMP",
+                      "TCP"
+                    ],
+                    "description": "The transport protocol used by the ping test."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "The destination port used when the ping protocol is TCP."
+                  },
+                  "ip_version": {
+                    "anyOf": [
+                      {
+                        "const": 4,
+                        "type": "number",
+                        "description": "IPv4."
+                      },
+                      {
+                        "const": 6,
+                        "type": "number",
+                        "description": "IPv6."
+                      }
+                    ],
+                    "description": "The IP version used by the measurement."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping ping measurement options."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "ICMP",
+                      "TCP",
+                      "UDP"
+                    ],
+                    "description": "The transport protocol used by the traceroute test."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "The destination port used when the traceroute protocol is TCP."
+                  },
+                  "ip_version": {
+                    "anyOf": [
+                      {
+                        "const": 4,
+                        "type": "number",
+                        "description": "IPv4."
+                      },
+                      {
+                        "const": 6,
+                        "type": "number",
+                        "description": "IPv6."
+                      }
+                    ],
+                    "description": "The IP version used by the measurement."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping traceroute measurement options."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "A",
+                          "AAAA",
+                          "ANY",
+                          "CNAME",
+                          "DNSKEY",
+                          "DS",
+                          "HTTPS",
+                          "MX",
+                          "NS",
+                          "NSEC",
+                          "PTR",
+                          "RRSIG",
+                          "SOA",
+                          "TXT",
+                          "SRV",
+                          "SVCB"
+                        ],
+                        "description": "The DNS record type requested by the measurement."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The DNS query configuration."
+                  },
+                  "resolver": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The DNS resolver hostname or IP address used for the measurement."
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "TCP",
+                      "UDP"
+                    ],
+                    "description": "The transport protocol used by the DNS test."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "The port number used by the DNS test."
+                  },
+                  "ip_version": {
+                    "anyOf": [
+                      {
+                        "const": 4,
+                        "type": "number",
+                        "description": "IPv4."
+                      },
+                      {
+                        "const": 6,
+                        "type": "number",
+                        "description": "IPv6."
+                      }
+                    ],
+                    "description": "The IP version used by the measurement."
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Whether Globalping should trace the DNS delegation path from the root servers."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping DNS measurement options."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "packets": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 16,
+                    "description": "The number of packets to send to each hop."
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "ICMP",
+                      "TCP",
+                      "UDP"
+                    ],
+                    "description": "The transport protocol used by the MTR test."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "The destination port used when the MTR protocol is TCP or UDP."
+                  },
+                  "ip_version": {
+                    "anyOf": [
+                      {
+                        "const": 4,
+                        "type": "number",
+                        "description": "IPv4."
+                      },
+                      {
+                        "const": 6,
+                        "type": "number",
+                        "description": "IPv6."
+                      }
+                    ],
+                    "description": "The IP version used by the measurement."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping MTR measurement options."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "object",
+                    "properties": {
+                      "host": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "An optional override for the HTTP Host header."
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The HTTP request path."
+                      },
+                      "query": {
+                        "type": "string",
+                        "description": "The HTTP request query string."
+                      },
+                      "method": {
+                        "type": "string",
+                        "enum": [
+                          "HEAD",
+                          "GET",
+                          "OPTIONS"
+                        ],
+                        "description": "The HTTP request method."
+                      },
+                      "headers": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "One HTTP header value."
+                        },
+                        "description": "Additional HTTP request headers except Host and User-Agent."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The HTTP request configuration."
+                  },
+                  "resolver": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The DNS resolver hostname or IP address used for the HTTP test."
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "HTTP",
+                      "HTTPS",
+                      "HTTP2"
+                    ],
+                    "description": "The HTTP transport protocol."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "The port used for the HTTP request."
+                  },
+                  "ip_version": {
+                    "anyOf": [
+                      {
+                        "const": 4,
+                        "type": "number",
+                        "description": "IPv4."
+                      },
+                      {
+                        "const": 6,
+                        "type": "number",
+                        "description": "IPv6."
+                      }
+                    ],
+                    "description": "The IP version used by the measurement."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping HTTP measurement options."
+              }
+            ],
+            "description": "The type-specific Globalping measurement options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "target"
+        ],
+        "description": "The input payload for creating a Globalping measurement."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "measurement": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The accepted Globalping measurement identifier."
+              },
+              "probesCount": {
+                "type": "integer",
+                "description": "The number of probes accepted for the measurement."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The accepted Globalping measurement payload."
+          },
+          "location": {
+            "type": "string",
+            "description": "The absolute measurement URL returned by the Globalping Location response header.",
+            "format": "uri"
+          },
+          "rate_limit": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "The accepted request rate limit quota."
+              },
+              "consumed": {
+                "type": "integer",
+                "description": "The rate limit points consumed by this request."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "The rate limit points remaining after this request."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "The seconds until the rate limit resets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The rate limit headers returned by the accepted measurement request."
+          },
+          "credits": {
+            "type": "object",
+            "properties": {
+              "consumed": {
+                "type": "integer",
+                "description": "The user credits consumed by this request."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "The user credits remaining after this request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The credit headers returned by the accepted measurement request."
+          },
+          "request_cost": {
+            "type": "integer",
+            "description": "The request cost reported by Globalping."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "measurement",
+          "location"
+        ],
+        "description": "The output payload for creating a Globalping measurement."
+      },
+      "followUpActions": [
+        "globalping.get_measurement"
+      ]
+    },
+    {
+      "id": "globalping.get_limits",
+      "service": "globalping",
+      "name": "get_limits",
+      "description": "Get the current Globalping authenticated rate limits and remaining user credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Globalping limits."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "limits": {
+            "type": "object",
+            "properties": {
+              "rateLimit": {
+                "type": "object",
+                "properties": {
+                  "measurements": {
+                    "type": "object",
+                    "properties": {
+                      "create": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "ip",
+                              "user"
+                            ],
+                            "description": "The rate limit bucket type returned by Globalping."
+                          },
+                          "limit": {
+                            "type": "integer",
+                            "description": "The number of limit points available in the current window."
+                          },
+                          "remaining": {
+                            "type": "integer",
+                            "description": "The number of limit points remaining in the current window."
+                          },
+                          "reset": {
+                            "type": "integer",
+                            "description": "The number of seconds until the rate limit resets."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The rate limit details for creating measurements."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The measurement rate limit groups returned by Globalping."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The rate limit groups returned by Globalping."
+              },
+              "credits": {
+                "type": "object",
+                "properties": {
+                  "remaining": {
+                    "type": "integer",
+                    "description": "The remaining Globalping user credits."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Globalping credits information for authenticated requests."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "rateLimit"
+            ],
+            "description": "The Globalping limits response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "limits"
+        ],
+        "description": "The Globalping limits action output."
+      }
+    },
+    {
+      "id": "globalping.get_measurement",
+      "service": "globalping",
+      "name": "get_measurement",
+      "description": "Get the current status and results of a Globalping measurement by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "measurement_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Globalping measurement identifier to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a Globalping measurement."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "measurement": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Globalping measurement identifier."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ping",
+                  "traceroute",
+                  "dns",
+                  "mtr",
+                  "http"
+                ],
+                "description": "The Globalping measurement type."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Globalping measurement status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the measurement was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the measurement was last updated.",
+                "format": "date-time"
+              },
+              "target": {
+                "type": "string",
+                "description": "The measurement target."
+              },
+              "probesCount": {
+                "type": "integer",
+                "description": "The number of probes that ran the measurement."
+              },
+              "locations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "continent": {
+                      "type": "string",
+                      "enum": [
+                        "AF",
+                        "AN",
+                        "AS",
+                        "EU",
+                        "NA",
+                        "OC",
+                        "SA"
+                      ],
+                      "description": "A continent code used to select probes."
+                    },
+                    "region": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A UN M49 region name used to select probes."
+                    },
+                    "country": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 2,
+                      "description": "An ISO 3166-1 alpha-2 country code used to select probes."
+                    },
+                    "state": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A state identifier used to select probes when available."
+                    },
+                    "city": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A city name used to select probes."
+                    },
+                    "asn": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "An autonomous system number used to select probes."
+                    },
+                    "network": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A network or ISP name used to select probes."
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A Globalping tag used to narrow probe selection."
+                      },
+                      "description": "Additional Globalping tags used to select probes.",
+                      "minItems": 1
+                    },
+                    "magic": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A fuzzy Globalping location string such as `Berlin+Germany` or `aws-us-east-1`."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 200,
+                      "description": "The maximum number of probes to pick for this location filter."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Globalping probe selection filter. Include at least one selector such as country, city, ASN, tags, or magic."
+                },
+                "description": "The effective probe filters attached to the measurement."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The effective probe limit for the measurement."
+              },
+              "measurementOptions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The type-specific Globalping measurement options attached to the measurement."
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "probe": {
+                      "type": "object",
+                      "properties": {
+                        "continent": {
+                          "type": "string",
+                          "description": "The probe continent code."
+                        },
+                        "country": {
+                          "type": "string",
+                          "description": "The probe country code."
+                        },
+                        "region": {
+                          "type": "string",
+                          "description": "The probe region name when available."
+                        },
+                        "state": {
+                          "type": "string",
+                          "description": "The probe state identifier when available."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "The probe city name when available."
+                        },
+                        "network": {
+                          "type": "string",
+                          "description": "The probe network name when available."
+                        },
+                        "asn": {
+                          "type": "integer",
+                          "description": "The probe autonomous system number when available."
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "description": "The probe latitude when available."
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "description": "The probe longitude when available."
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Globalping probe tag."
+                          },
+                          "description": "The probe tags."
+                        },
+                        "resolvers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A DNS resolver used by the probe."
+                          },
+                          "description": "The probe resolvers."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "continent",
+                        "country"
+                      ],
+                      "description": "The probe metadata returned for a Globalping measurement result."
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "description": "The current test status for this measurement result."
+                        },
+                        "rawOutput": {
+                          "type": "string",
+                          "description": "The raw output returned by the finished measurement result."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "The type-specific Globalping result payload."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A single Globalping measurement result item."
+                },
+                "description": "The results returned by Globalping for the measurement."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "type",
+              "status",
+              "createdAt",
+              "updatedAt",
+              "target",
+              "probesCount",
+              "results"
+            ],
+            "description": "The Globalping measurement response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "measurement"
+        ],
+        "description": "The output payload for retrieving a Globalping measurement."
+      }
+    },
+    {
+      "id": "globalping.list_probes",
+      "service": "globalping",
+      "name": "list_probes",
+      "description": "List the Globalping probes that are currently online with their location metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing online Globalping probes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "probes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "description": "The Globalping probe software version."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "continent": {
+                      "type": "string",
+                      "description": "The probe continent code."
+                    },
+                    "region": {
+                      "type": "string",
+                      "description": "The probe region name."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The probe country code."
+                    },
+                    "state": {
+                      "type": "string",
+                      "description": "The probe state identifier when available."
+                    },
+                    "city": {
+                      "type": "string",
+                      "description": "The probe city name when available."
+                    },
+                    "network": {
+                      "type": "string",
+                      "description": "The probe network name when available."
+                    },
+                    "asn": {
+                      "type": "integer",
+                      "description": "The probe autonomous system number when available."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "The probe latitude when available."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "The probe longitude when available."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "continent",
+                    "region",
+                    "country"
+                  ],
+                  "description": "The location metadata attached to an online Globalping probe."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Globalping probe tag."
+                  },
+                  "description": "The probe tags."
+                },
+                "resolvers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A DNS resolver configured for the probe."
+                  },
+                  "description": "The probe resolvers."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An online Globalping probe."
+            },
+            "description": "The currently online Globalping probes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "probes"
+        ],
+        "description": "The Globalping list probes action output."
+      }
+    }
+  ]
+}

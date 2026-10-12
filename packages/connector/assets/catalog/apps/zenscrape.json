@@ -1,0 +1,236 @@
+{
+  "service": "zenscrape",
+  "displayName": "Zenscrape",
+  "description": "Fetch web pages through Zenscrape proxies with optional browser rendering.",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ZENSCRAPE_API_KEY",
+      "description": "Zenscrape API key passed as the apikey query parameter. Register or view your key in the Zenscrape app: https://app.zenscrape.com/register"
+    }
+  ],
+  "homepageUrl": "https://zenscrape.com",
+  "actions": [
+    {
+      "id": "zenscrape.fetch_url",
+      "service": "zenscrape",
+      "name": "fetch_url",
+      "description": "Fetch one public URL through Zenscrape with optional rendering, proxy, header, and wait controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2083,
+            "description": "The public target URL Zenscrape should request.",
+            "format": "uri"
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Zenscrape should render JavaScript before returning the page."
+          },
+          "premium": {
+            "type": "boolean",
+            "description": "Whether Zenscrape should use premium proxies for the request."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zenscrape proxy location code, such as na, eu, or a premium country code."
+          },
+          "deviceType": {
+            "type": "string",
+            "enum": [
+              "mobile"
+            ],
+            "description": "The device type Zenscrape should emulate."
+          },
+          "waitFor": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How long Zenscrape should wait before returning the page response."
+          },
+          "waitForCss": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CSS selector Zenscrape should wait for before returning the page response."
+          },
+          "blockAds": {
+            "type": "boolean",
+            "description": "Whether Zenscrape should block ads while loading the page."
+          },
+          "javascriptSnippet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The JavaScript snippet Zenscrape should execute before returning the page response."
+          },
+          "blockResources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "document",
+                "stylesheet",
+                "image",
+                "media",
+                "font",
+                "script",
+                "texttrack",
+                "xhr",
+                "fetch",
+                "eventsource",
+                "websocket",
+                "manifest",
+                "other"
+              ],
+              "description": "A resource type Zenscrape should block while loading the page."
+            },
+            "description": "The resource types Zenscrape should block while loading the page.",
+            "minItems": 1
+          },
+          "keepHeaders": {
+            "type": "boolean",
+            "description": "Whether Zenscrape should forward provided custom headers to the target URL."
+          },
+          "customHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers Zenscrape should forward to the target URL when keepHeaders is true."
+          },
+          "cookies": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cookie header value Zenscrape should forward to the target URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for fetching one URL with Zenscrape.",
+        "allOf": [
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "required": [
+                    "waitForCss"
+                  ]
+                },
+                {
+                  "required": [
+                    "javascriptSnippet"
+                  ]
+                }
+              ]
+            },
+            "then": {
+              "properties": {
+                "render": {
+                  "const": true
+                }
+              },
+              "required": [
+                "render"
+              ]
+            }
+          },
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "required": [
+                    "customHeaders"
+                  ]
+                },
+                {
+                  "required": [
+                    "cookies"
+                  ]
+                }
+              ]
+            },
+            "then": {
+              "not": {
+                "properties": {
+                  "keepHeaders": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "keepHeaders"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The response body returned by Zenscrape."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "statusCode": {
+                "type": "integer",
+                "description": "The HTTP status code returned by Zenscrape."
+              },
+              "contentType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The response content type returned by Zenscrape."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The response content type returned by Zenscrape."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "statusCode",
+              "contentType"
+            ],
+            "description": "Metadata collected from the Zenscrape response."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One response header value."
+            },
+            "description": "Response headers returned by Zenscrape or the target website."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "metadata",
+          "headers"
+        ],
+        "description": "The response returned when fetching a URL with Zenscrape."
+      }
+    }
+  ]
+}

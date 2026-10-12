@@ -1,0 +1,203 @@
+{
+  "service": "api_route",
+  "displayName": "API Route",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sk-...",
+      "description": "Create an API key at https://www.api-route.com/api-keys. Requests use Bearer authentication; inference requires account credit.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.api-route.com",
+  "actions": [
+    {
+      "id": "api_route.create_chat_completion",
+      "service": "api_route",
+      "name": "create_chat_completion",
+      "description": "Generate an API Route chat completion. This is a billed, non-streaming inference request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A model ID returned by list_models; do not add a provider prefix."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An OpenAI-format message with a role and content, or tool call fields. Image content requires a vision-capable model."
+            },
+            "description": "Conversation messages in order.",
+            "minItems": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum output token count, when supported by the model."
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum completion token count for models that use this field."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Sampling temperature, when supported by the model."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Nucleus sampling probability, when supported by the model."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Only false or omitted is supported by this JSON action."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A tool definition."
+            },
+            "description": "OpenAI-format tool definitions."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Tool selection mode."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A named tool selection."
+              }
+            ],
+            "description": "Tool selection policy."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Model-supported response format configuration."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "OpenAI-compatible chat completion parameters. Supported options depend on the selected model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "Response object type."
+          },
+          "created": {
+            "type": "integer",
+            "description": "Creation time as a Unix timestamp."
+          },
+          "model": {
+            "type": "string",
+            "description": "Model used for generation."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A choice with a message and finish reason."
+            },
+            "description": "Generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Token usage reported by the model."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "choices"
+        ],
+        "description": "An OpenAI-compatible chat completion."
+      }
+    },
+    {
+      "id": "api_route.list_models",
+      "service": "api_route",
+      "name": "list_models",
+      "description": "List model IDs available to the configured API Route key without running inference.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No additional parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model ID to pass unchanged in inference requests."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A model available to this API key. Additional model metadata varies by model."
+            },
+            "description": "Available models."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "The authenticated model list."
+      }
+    }
+  ]
+}

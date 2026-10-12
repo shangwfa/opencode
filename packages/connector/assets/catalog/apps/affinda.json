@@ -1,0 +1,453 @@
+{
+  "service": "affinda",
+  "displayName": "Affinda",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "AFFINDA_API_KEY",
+      "description": "Affinda API key sent as a Bearer token. Create and rotate keys from your Affinda user settings: https://docs.affinda.com/reference/authentication.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.affinda.com",
+          "description": "Official Affinda API base URL for your account region. Use https://api.affinda.com, https://api.us1.affinda.com, or https://api.eu1.affinda.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.affinda.com",
+  "actions": [
+    {
+      "id": "affinda.create_document_from_url",
+      "service": "affinda",
+      "name": "create_document_from_url",
+      "description": "Upload a document to Affinda from a URL and optionally wait for parsing results.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publicly reachable document URL for Affinda to download and parse.",
+            "format": "uri"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Affinda workspace identifier to upload the document to."
+          },
+          "documentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Affinda document type identifier when the document type is already known."
+          },
+          "wait": {
+            "type": "boolean",
+            "description": "Whether Affinda should wait for parsing to complete before responding."
+          },
+          "customIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional user-defined identifier for tracking the document in Affinda."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The filename Affinda should associate with this document."
+          },
+          "expiryTime": {
+            "type": "string",
+            "description": "The ISO 8601 time when Affinda should automatically delete the document.",
+            "format": "date-time"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document language code to send to Affinda."
+          },
+          "rejectDuplicates": {
+            "type": "boolean",
+            "description": "Whether Affinda should reject duplicate documents without consuming credits."
+          },
+          "lowPriority": {
+            "type": "boolean",
+            "description": "Whether Affinda should process this document as low priority."
+          },
+          "compact": {
+            "type": "boolean",
+            "description": "Whether Affinda should return a compact parse result when wait is true."
+          },
+          "deleteAfterParse": {
+            "type": "boolean",
+            "description": "Whether Affinda should delete stored data after parsing. Only use with wait true."
+          },
+          "enableValidationTool": {
+            "type": "boolean",
+            "description": "Whether the document should be viewable in the Affinda Validation Tool."
+          },
+          "useOcr": {
+            "type": "boolean",
+            "description": "Whether Affinda should force OCR for this document."
+          },
+          "llmHint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional hint inserted into Affinda's LLM prompt."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "workspace"
+        ],
+        "description": "Input parameters for uploading a document to Affinda from a URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Affinda document payload, including meta data and extracted data when returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda document response."
+      }
+    },
+    {
+      "id": "affinda.get_document",
+      "service": "affinda",
+      "name": "get_document",
+      "description": "Get one Affinda document by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Affinda document identifier."
+          },
+          "compact": {
+            "type": "boolean",
+            "description": "Whether Affinda should return compact parsed data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Input parameters for retrieving one Affinda document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Affinda document payload, including meta data and extracted data when returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda document response."
+      }
+    },
+    {
+      "id": "affinda.list_document_types",
+      "service": "affinda",
+      "name": "list_document_types",
+      "description": "List Affinda document types available to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter document types by Affinda organization identifier."
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter document types by Affinda workspace identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Affinda document types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "string",
+                  "description": "The Affinda document type identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Affinda document type name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Affinda document type."
+            },
+            "description": "Document types returned by Affinda."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda document type list response."
+      }
+    },
+    {
+      "id": "affinda.list_documents",
+      "service": "affinda",
+      "name": "list_documents",
+      "description": "List Affinda documents with optional workflow and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of documents to skip before collecting results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of documents to return."
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by Affinda workspace identifier."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "uploaded",
+              "review",
+              "validated",
+              "archived",
+              "rejected"
+            ],
+            "description": "Filter by the Affinda document state."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "An Affinda tag ID."
+            },
+            "description": "Filter by Affinda tag IDs.",
+            "minItems": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Match document file names or tag names case-insensitively."
+          },
+          "includeData": {
+            "type": "boolean",
+            "description": "Whether Affinda should include parsed data summaries in the list."
+          },
+          "failed": {
+            "type": "boolean",
+            "description": "Filter by failed processing status."
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "Filter by ready processing status."
+          },
+          "validatable": {
+            "type": "boolean",
+            "description": "Filter to documents that can be validated."
+          },
+          "customIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter documents by the custom identifier set at upload."
+          },
+          "compact": {
+            "type": "boolean",
+            "description": "Whether Affinda should return compact parsed data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination controls for listing Affinda documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The Affinda document payload, including meta data and extracted data when returned."
+            },
+            "description": "Documents returned by Affinda."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of documents in the Affinda result set."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A URL for another page of Affinda results, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A URL for another page of Affinda results, or null when absent."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A URL for another page of Affinda results, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A URL for another page of Affinda results, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda document page response."
+      }
+    },
+    {
+      "id": "affinda.list_organizations",
+      "service": "affinda",
+      "name": "list_organizations",
+      "description": "List Affinda organizations available to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty input payload for this Affinda action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "string",
+                  "description": "The Affinda organization identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Affinda organization name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Affinda organization."
+            },
+            "description": "Organizations returned by Affinda."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda organization list response."
+      }
+    },
+    {
+      "id": "affinda.list_workspaces",
+      "service": "affinda",
+      "name": "list_workspaces",
+      "description": "List Affinda workspaces in an organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Affinda organization identifier to list workspaces for."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return workspaces whose name matches this value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organization"
+        ],
+        "description": "Filters for listing Affinda workspaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "string",
+                  "description": "The Affinda workspace identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Affinda workspace name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Affinda workspace."
+            },
+            "description": "Workspaces returned by Affinda."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Affinda workspace list response."
+      }
+    }
+  ]
+}

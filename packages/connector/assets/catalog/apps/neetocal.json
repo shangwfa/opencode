@@ -1,0 +1,487 @@
+{
+  "service": "neetocal",
+  "displayName": "NeetoCal",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NEETOCAL_API_KEY",
+      "description": "NeetoCal workspace API key sent with the X-Api-Key header. Create it in Admin panel > API Keys: https://help.neetocal.com/articles/api-keys.",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Workspace subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-workspace",
+          "description": "The workspace name from https://{your-workspace}.neetocal.com. Enter only the subdomain."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.neeto.com/neetocal",
+  "actions": [
+    {
+      "id": "neetocal.get_booking",
+      "service": "neetocal",
+      "name": "get_booking",
+      "description": "Get one NeetoCal booking by SID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bookingSid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NeetoCal record identifier or SID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a NeetoCal booking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique booking identifier."
+          },
+          "sid": {
+            "type": "string",
+            "description": "The short booking identifier used by API paths."
+          },
+          "name": {
+            "type": "string",
+            "description": "The booking client name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The booking client email address."
+          },
+          "starts_at": {
+            "type": "string",
+            "description": "The booking start timestamp."
+          },
+          "ends_at": {
+            "type": "string",
+            "description": "The booking end timestamp."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current booking lifecycle status."
+          },
+          "meeting_id": {
+            "type": "string",
+            "description": "The related scheduling-link identifier."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A NeetoCal booking."
+      }
+    },
+    {
+      "id": "neetocal.get_scheduling_link",
+      "service": "neetocal",
+      "name": "get_scheduling_link",
+      "description": "Get one NeetoCal scheduling link by SID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schedulingLinkSid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NeetoCal record identifier or SID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a NeetoCal scheduling link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique scheduling-link identifier."
+          },
+          "sid": {
+            "type": "string",
+            "description": "The short scheduling-link identifier used by API paths."
+          },
+          "name": {
+            "type": "string",
+            "description": "The scheduling-link display name."
+          },
+          "slug": {
+            "type": "string",
+            "description": "The scheduling-link URL slug."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The scheduling-link meeting kind."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Whether the scheduling link is disabled."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A NeetoCal scheduling link."
+      }
+    },
+    {
+      "id": "neetocal.list_available_slots",
+      "service": "neetocal",
+      "name": "list_available_slots",
+      "description": "List available NeetoCal slots for a scheduling link and calendar month.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schedulingLinkSid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NeetoCal record identifier or SID.",
+            "pattern": "\\S"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The IANA time zone used to calculate available slots.",
+            "pattern": "\\S"
+          },
+          "year": {
+            "type": "integer",
+            "description": "The calendar year to query."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "The calendar month to query."
+          },
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "The optional day of month used to narrow slot results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schedulingLinkSid",
+          "timeZone",
+          "year",
+          "month"
+        ],
+        "description": "The input for listing available NeetoCal slots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "slots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "description": "The calendar date for the slot group."
+                },
+                "day": {
+                  "type": "integer",
+                  "description": "The day of month for the slot group."
+                },
+                "slots": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by NeetoCal."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Available NeetoCal slots for one date."
+            },
+            "description": "Available slot groups returned by NeetoCal."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The NeetoCal available-slot response."
+      }
+    },
+    {
+      "id": "neetocal.list_bookings",
+      "service": "neetocal",
+      "name": "list_bookings",
+      "description": "List NeetoCal bookings with optional type, email, parent, sorting, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "past",
+              "cancelled",
+              "incomplete"
+            ],
+            "description": "The booking time or lifecycle group to return."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to fetch."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "hostEmail": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email address used to filter results.",
+            "format": "email"
+          },
+          "clientEmail": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email address used to filter results.",
+            "format": "email"
+          },
+          "parentBookingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NeetoCal record identifier or SID.",
+            "pattern": "\\S"
+          },
+          "sortingOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The booking creation-time sorting direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing NeetoCal bookings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bookings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique booking identifier."
+                },
+                "sid": {
+                  "type": "string",
+                  "description": "The short booking identifier used by API paths."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The booking client name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The booking client email address."
+                },
+                "starts_at": {
+                  "type": "string",
+                  "description": "The booking start timestamp."
+                },
+                "ends_at": {
+                  "type": "string",
+                  "description": "The booking end timestamp."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current booking lifecycle status."
+                },
+                "meeting_id": {
+                  "type": "string",
+                  "description": "The related scheduling-link identifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A NeetoCal booking."
+            },
+            "description": "The bookings returned by NeetoCal."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total_records": {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  "total_pages": {
+                    "type": "integer",
+                    "description": "The total number of result pages."
+                  },
+                  "current_page_number": {
+                    "type": "integer",
+                    "description": "The current 1-based page number."
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "description": "The configured result page size."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "NeetoCal pagination metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NeetoCal pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The NeetoCal booking list response."
+      }
+    },
+    {
+      "id": "neetocal.list_scheduling_links",
+      "service": "neetocal",
+      "name": "list_scheduling_links",
+      "description": "List NeetoCal scheduling links with optional host, search, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to fetch."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "hostEmails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The email address used to filter results.",
+              "format": "email"
+            },
+            "description": "The host email addresses used to filter scheduling links.",
+            "minItems": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The case-insensitive meeting name or slug search term.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing NeetoCal scheduling links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique scheduling-link identifier."
+                },
+                "sid": {
+                  "type": "string",
+                  "description": "The short scheduling-link identifier used by API paths."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The scheduling-link display name."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The scheduling-link URL slug."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "The scheduling-link meeting kind."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the scheduling link is disabled."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A NeetoCal scheduling link."
+            },
+            "description": "The scheduling links returned by NeetoCal."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total_records": {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  "total_pages": {
+                    "type": "integer",
+                    "description": "The total number of result pages."
+                  },
+                  "current_page_number": {
+                    "type": "integer",
+                    "description": "The current 1-based page number."
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "description": "The configured result page size."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "NeetoCal pagination metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NeetoCal pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The NeetoCal scheduling-link list response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,2785 @@
+{
+  "service": "clickmeeting",
+  "displayName": "ClickMeeting",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CLICKMEETING_API_KEY",
+      "description": "ClickMeeting API key sent in the X-Api-Key header. Generate or view it in ClickMeeting account settings: https://account-panel.clickmeeting.com/account/details#api."
+    }
+  ],
+  "homepageUrl": "https://clickmeeting.com/",
+  "actions": [
+    {
+      "id": "clickmeeting.create_conference",
+      "service": "clickmeeting",
+      "name": "create_conference",
+      "description": "Create a ClickMeeting meeting or webinar room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The room name visible to ClickMeeting attendees."
+          },
+          "roomType": {
+            "type": "string",
+            "enum": [
+              "meeting",
+              "webinar"
+            ],
+            "description": "The ClickMeeting room type."
+          },
+          "permanentRoom": {
+            "type": "boolean",
+            "description": "Whether to create a permanent room instead of a one-time scheduled room."
+          },
+          "accessType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The ClickMeeting room access type: 1 for open access, 2 for password access, or 3 for token access."
+          },
+          "customRoomUrlName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom room URL slug to use instead of one derived from name."
+          },
+          "lobbyDescription": {
+            "type": "string",
+            "description": "The UTF-8 lobby description shown before the room starts."
+          },
+          "lobbyEnabled": {
+            "type": "boolean",
+            "description": "Whether the room lobby is enabled."
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "The room start date, either YYYY-MM-DD HH:mm:ss or ISO 8601."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The duration string accepted by ClickMeeting."
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "description": "The duration value accepted by ClickMeeting."
+              }
+            ],
+            "description": "The room duration in ClickMeeting format, such as 1:20 or 0:20."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The time zone name for the room start date, such as America/New_York."
+          },
+          "skinId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting skin identifier."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The room password used when accessType is 2."
+          },
+          "registration": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether registration is enabled for the room."
+              },
+              "template": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "description": "The ClickMeeting registration template identifier, from 1 to 3."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The ClickMeeting registration settings for a room."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "showOnPersonalPage": {
+                "type": "boolean",
+                "description": "Whether the room is shown on the personal page."
+              },
+              "thankYouEmailsEnabled": {
+                "type": "boolean",
+                "description": "Whether ClickMeeting sends thank-you emails."
+              },
+              "connectionTesterEnabled": {
+                "type": "boolean",
+                "description": "Whether the connection tester is enabled."
+              },
+              "phonegatewayEnabled": {
+                "type": "boolean",
+                "description": "Whether the phone gateway is enabled."
+              },
+              "recorderAutostartEnabled": {
+                "type": "boolean",
+                "description": "Whether recording starts automatically."
+              },
+              "roomInviteButtonEnabled": {
+                "type": "boolean",
+                "description": "Whether the invite button is enabled in the room."
+              },
+              "socialMediaSharingEnabled": {
+                "type": "boolean",
+                "description": "Whether social media sharing is enabled."
+              },
+              "connectionStatusEnabled": {
+                "type": "boolean",
+                "description": "Whether connection status is enabled."
+              },
+              "thankYouPageUrl": {
+                "type": "string",
+                "description": "The thank-you page URL configured for the room."
+              },
+              "encryptionEnabled": {
+                "type": "boolean",
+                "description": "Whether end-to-end encryption is enabled for the room."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The ClickMeeting advanced room settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "roomType",
+          "permanentRoom",
+          "accessType"
+        ],
+        "description": "The input payload for creating a ClickMeeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conference": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ClickMeeting room identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ClickMeeting room identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room status."
+              },
+              "roomType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room type."
+              },
+              "accessType": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The room access type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room access type."
+              },
+              "permanentRoom": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the room is permanent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the room is permanent."
+              },
+              "roomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The attendee room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The attendee room URL."
+              },
+              "embedRoomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The embeddable room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The embeddable room URL."
+              },
+              "startsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room start date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room start date when provided."
+              },
+              "endsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room end date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room end date when provided."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room creation date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room creation date."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room update date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room update date."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room time zone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room time zone."
+              },
+              "registrationEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether room registration is enabled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether room registration is enabled."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw ClickMeeting room object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "raw"
+            ],
+            "description": "A normalized ClickMeeting room with the original response preserved in raw."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after creating a ClickMeeting room."
+      }
+    },
+    {
+      "id": "clickmeeting.delete_conference",
+      "service": "clickmeeting",
+      "name": "delete_conference",
+      "description": "Delete a ClickMeeting room.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting a ClickMeeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "The delete result returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting a ClickMeeting room."
+      }
+    },
+    {
+      "id": "clickmeeting.generate_access_tokens",
+      "service": "clickmeeting",
+      "name": "generate_access_tokens",
+      "description": "Generate access tokens for a token-protected ClickMeeting room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "howMany": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of access tokens to generate, up to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for generating ClickMeeting access tokens."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accessTokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The access token value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The access token value."
+                },
+                "sentToEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address the token was sent to when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address the token was sent to when available."
+                },
+                "firstUseDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The first token use date when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The first token use date when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting access token object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting access token."
+            },
+            "description": "The generated access tokens."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after generating ClickMeeting access tokens."
+      }
+    },
+    {
+      "id": "clickmeeting.get_conference",
+      "service": "clickmeeting",
+      "name": "get_conference",
+      "description": "Get details for a ClickMeeting room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting a ClickMeeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conference": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ClickMeeting room identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ClickMeeting room identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room status."
+              },
+              "roomType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room type."
+              },
+              "accessType": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The room access type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room access type."
+              },
+              "permanentRoom": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the room is permanent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the room is permanent."
+              },
+              "roomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The attendee room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The attendee room URL."
+              },
+              "embedRoomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The embeddable room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The embeddable room URL."
+              },
+              "startsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room start date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room start date when provided."
+              },
+              "endsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room end date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room end date when provided."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room creation date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room creation date."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room update date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room update date."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room time zone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room time zone."
+              },
+              "registrationEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether room registration is enabled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether room registration is enabled."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw ClickMeeting room object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "raw"
+            ],
+            "description": "A normalized ClickMeeting room with the original response preserved in raw."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting a ClickMeeting room."
+      }
+    },
+    {
+      "id": "clickmeeting.get_session",
+      "service": "clickmeeting",
+      "name": "get_session",
+      "description": "Get details for a ClickMeeting room session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting a ClickMeeting room session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ClickMeeting session identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ClickMeeting session identifier."
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The session start date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The session start date."
+              },
+              "endDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The session end date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The session end date."
+              },
+              "maxVisitors": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The maximum visitor count during the session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum visitor count during the session."
+              },
+              "totalVisitors": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total visitor count during the session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total visitor count during the session."
+              },
+              "attendees": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "uid": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee UID returned by ClickMeeting."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee UID returned by ClickMeeting."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee email address."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee email address."
+                    },
+                    "nickname": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee nickname."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee nickname."
+                    },
+                    "role": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee role."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee role."
+                    },
+                    "rating": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee rating when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee rating when available."
+                    },
+                    "ratingComment": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attendee rating comment when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attendee rating comment when available."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw ClickMeeting attendee object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "raw"
+                  ],
+                  "description": "A normalized ClickMeeting session attendee."
+                },
+                "description": "The attendees embedded in a session detail response."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw ClickMeeting session object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "raw"
+            ],
+            "description": "A normalized ClickMeeting room session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting a ClickMeeting room session."
+      }
+    },
+    {
+      "id": "clickmeeting.list_access_tokens",
+      "service": "clickmeeting",
+      "name": "list_access_tokens",
+      "description": "List generated access tokens for a ClickMeeting room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting access tokens."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accessTokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "token": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The access token value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The access token value."
+                },
+                "sentToEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address the token was sent to when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address the token was sent to when available."
+                },
+                "firstUseDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The first token use date when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The first token use date when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting access token object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting access token."
+            },
+            "description": "The generated access tokens."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting access tokens."
+      }
+    },
+    {
+      "id": "clickmeeting.list_all_recordings",
+      "service": "clickmeeting",
+      "name": "list_all_recordings",
+      "description": "List all ClickMeeting recordings for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing all ClickMeeting recordings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The recording identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording identifier."
+                },
+                "recordingUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording download URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording download URL."
+                },
+                "recordingDuration": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The recording duration in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording duration in seconds."
+                },
+                "conferenceId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The room identifier associated with the recording."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room identifier associated with the recording."
+                },
+                "recorderStarted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording start date returned by ClickMeeting."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording start date returned by ClickMeeting."
+                },
+                "recorderStartDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO recording start date when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO recording start date when provided."
+                },
+                "recordingFileSize": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording file size returned by ClickMeeting."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording file size returned by ClickMeeting."
+                },
+                "recordingName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording name when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting recording object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting recording."
+            },
+            "description": "The recordings returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing all ClickMeeting recordings."
+      }
+    },
+    {
+      "id": "clickmeeting.list_chats",
+      "service": "clickmeeting",
+      "name": "list_chats",
+      "description": "List ClickMeeting chat archives available for download.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting chat archives."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The chat session identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The chat session identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room name associated with the chat."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room name associated with the chat."
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The chat date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The chat date."
+                },
+                "time": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The chat time."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The chat time."
+                },
+                "timezone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The chat time zone."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The chat time zone."
+                },
+                "downloadLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The URL that can be used to download the chat archive."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The URL that can be used to download the chat archive."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting chat object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting chat export listing."
+            },
+            "description": "The chat archive listings returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting chat archives."
+      }
+    },
+    {
+      "id": "clickmeeting.list_conference_recordings",
+      "service": "clickmeeting",
+      "name": "list_conference_recordings",
+      "description": "List recordings for a ClickMeeting room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting room recordings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The recording identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording identifier."
+                },
+                "recordingUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording download URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording download URL."
+                },
+                "recordingDuration": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The recording duration in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording duration in seconds."
+                },
+                "conferenceId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The room identifier associated with the recording."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room identifier associated with the recording."
+                },
+                "recorderStarted": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording start date returned by ClickMeeting."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording start date returned by ClickMeeting."
+                },
+                "recorderStartDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO recording start date when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO recording start date when provided."
+                },
+                "recordingFileSize": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording file size returned by ClickMeeting."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording file size returned by ClickMeeting."
+                },
+                "recordingName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The recording name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The recording name when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting recording object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting recording."
+            },
+            "description": "The recordings returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting room recordings."
+      }
+    },
+    {
+      "id": "clickmeeting.list_conferences",
+      "service": "clickmeeting",
+      "name": "list_conferences",
+      "description": "List active or inactive ClickMeeting rooms.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The ClickMeeting room status."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number for inactive room listings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The input payload for listing ClickMeeting rooms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conferences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The ClickMeeting room identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ClickMeeting room identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room name."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room status."
+                },
+                "roomType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room type."
+                },
+                "accessType": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The room access type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room access type."
+                },
+                "permanentRoom": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the room is permanent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the room is permanent."
+                },
+                "roomUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee room URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee room URL."
+                },
+                "embedRoomUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The embeddable room URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The embeddable room URL."
+                },
+                "startsAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room start date when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room start date when provided."
+                },
+                "endsAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room end date when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room end date when provided."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room creation date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room creation date."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room update date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room update date."
+                },
+                "timezone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The room time zone."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The room time zone."
+                },
+                "registrationEnabled": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether room registration is enabled."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether room registration is enabled."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting room object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting room with the original response preserved in raw."
+            },
+            "description": "The rooms returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting rooms."
+      }
+    },
+    {
+      "id": "clickmeeting.list_phone_gateways",
+      "service": "clickmeeting",
+      "name": "list_phone_gateways",
+      "description": "List ClickMeeting phone gateway numbers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting phone gateways."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "phoneGateways": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The country code for the phone gateway."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The country code for the phone gateway."
+                },
+                "location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The phone gateway location."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The phone gateway location."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The phone number value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The phone number value."
+                },
+                "geo": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The geographic metadata returned by ClickMeeting."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting phone gateway object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting phone gateway number."
+            },
+            "description": "The phone gateways returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting phone gateways."
+      }
+    },
+    {
+      "id": "clickmeeting.list_registrations",
+      "service": "clickmeeting",
+      "name": "list_registrations",
+      "description": "List registrations for a ClickMeeting room by registration status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "all",
+              "active"
+            ],
+            "description": "The ClickMeeting registration status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting room registrations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "registrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The registration identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration identifier."
+                },
+                "sessionId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The session identifier associated with the registration."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session identifier associated with the registration."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registered participant email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registered participant email address."
+                },
+                "visitorNickname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registered participant nickname."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registered participant nickname."
+                },
+                "registrationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registration date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration date."
+                },
+                "registrationConfirmed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registration confirmation value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration confirmation value."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The registration form fields returned by ClickMeeting."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting registration object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting registration."
+            },
+            "description": "The registrations returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting registrations."
+      }
+    },
+    {
+      "id": "clickmeeting.list_session_attendees",
+      "service": "clickmeeting",
+      "name": "list_session_attendees",
+      "description": "List attendees for a ClickMeeting room session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting session attendees."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee UID returned by ClickMeeting."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee UID returned by ClickMeeting."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee email address."
+                },
+                "nickname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee nickname."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee nickname."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee role."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee role."
+                },
+                "rating": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee rating when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee rating when available."
+                },
+                "ratingComment": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attendee rating comment when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attendee rating comment when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting attendee object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting session attendee."
+            },
+            "description": "The attendees returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting session attendees."
+      }
+    },
+    {
+      "id": "clickmeeting.list_session_registrations",
+      "service": "clickmeeting",
+      "name": "list_session_registrations",
+      "description": "List registrations for a specific ClickMeeting room session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "sessionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting session registrations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "registrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The registration identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration identifier."
+                },
+                "sessionId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The session identifier associated with the registration."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session identifier associated with the registration."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registered participant email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registered participant email address."
+                },
+                "visitorNickname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registered participant nickname."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registered participant nickname."
+                },
+                "registrationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registration date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration date."
+                },
+                "registrationConfirmed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The registration confirmation value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The registration confirmation value."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The registration form fields returned by ClickMeeting."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting registration object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting registration."
+            },
+            "description": "The registrations returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting session registrations."
+      }
+    },
+    {
+      "id": "clickmeeting.list_sessions",
+      "service": "clickmeeting",
+      "name": "list_sessions",
+      "description": "List sessions for a ClickMeeting room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting room sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The ClickMeeting session identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ClickMeeting session identifier."
+                },
+                "startDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The session start date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session start date."
+                },
+                "endDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The session end date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The session end date."
+                },
+                "maxVisitors": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The maximum visitor count during the session."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum visitor count during the session."
+                },
+                "totalVisitors": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total visitor count during the session."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total visitor count during the session."
+                },
+                "attendees": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "uid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee UID returned by ClickMeeting."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee UID returned by ClickMeeting."
+                      },
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee email address."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee email address."
+                      },
+                      "nickname": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee nickname."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee nickname."
+                      },
+                      "role": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee role."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee role."
+                      },
+                      "rating": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee rating when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee rating when available."
+                      },
+                      "ratingComment": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The attendee rating comment when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The attendee rating comment when available."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw ClickMeeting attendee object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "raw"
+                    ],
+                    "description": "A normalized ClickMeeting session attendee."
+                  },
+                  "description": "The attendees embedded in a session detail response."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickMeeting session object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A normalized ClickMeeting room session."
+            },
+            "description": "The sessions returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting room sessions."
+      }
+    },
+    {
+      "id": "clickmeeting.list_time_zones",
+      "service": "clickmeeting",
+      "name": "list_time_zones",
+      "description": "List ClickMeeting time zones, optionally filtered by country code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 3166-1 alpha-2 country code to filter time zones."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickMeeting time zones."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeZones": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A ClickMeeting time zone name."
+            },
+            "description": "The time zone names returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ClickMeeting time zones."
+      }
+    },
+    {
+      "id": "clickmeeting.ping",
+      "service": "clickmeeting",
+      "name": "ping",
+      "description": "Check ClickMeeting API availability for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for checking ClickMeeting API status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ping": {
+            "type": "string",
+            "description": "The ping response value returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickMeeting ping response."
+      }
+    },
+    {
+      "id": "clickmeeting.register_participant",
+      "service": "clickmeeting",
+      "name": "register_participant",
+      "description": "Register a participant for a ClickMeeting room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The participant last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The participant email address.",
+            "format": "email"
+          },
+          "company": {
+            "type": "string",
+            "description": "The participant company name."
+          },
+          "confirmationEmail": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether ClickMeeting should send a confirmation email."
+              },
+              "lang": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The confirmation email language code."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The optional ClickMeeting confirmation email settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roomId",
+          "firstName",
+          "lastName",
+          "email"
+        ],
+        "description": "The input payload for registering a ClickMeeting participant."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The registration status returned by ClickMeeting."
+          },
+          "url": {
+            "type": "string",
+            "description": "The participant room URL returned by ClickMeeting."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The response returned after registering a ClickMeeting participant."
+      }
+    },
+    {
+      "id": "clickmeeting.update_conference",
+      "service": "clickmeeting",
+      "name": "update_conference",
+      "description": "Update a ClickMeeting room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting room identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The room name visible to ClickMeeting attendees."
+          },
+          "roomType": {
+            "type": "string",
+            "enum": [
+              "meeting",
+              "webinar"
+            ],
+            "description": "The ClickMeeting room type."
+          },
+          "permanentRoom": {
+            "type": "boolean",
+            "description": "Whether to create a permanent room instead of a one-time scheduled room."
+          },
+          "accessType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The ClickMeeting room access type: 1 for open access, 2 for password access, or 3 for token access."
+          },
+          "customRoomUrlName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom room URL slug to use instead of one derived from name."
+          },
+          "lobbyDescription": {
+            "type": "string",
+            "description": "The UTF-8 lobby description shown before the room starts."
+          },
+          "lobbyEnabled": {
+            "type": "boolean",
+            "description": "Whether the room lobby is enabled."
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "The room start date, either YYYY-MM-DD HH:mm:ss or ISO 8601."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The duration string accepted by ClickMeeting."
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "description": "The duration value accepted by ClickMeeting."
+              }
+            ],
+            "description": "The room duration in ClickMeeting format, such as 1:20 or 0:20."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The time zone name for the room start date, such as America/New_York."
+          },
+          "skinId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickMeeting skin identifier."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The room password used when accessType is 2."
+          },
+          "registration": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether registration is enabled for the room."
+              },
+              "template": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "description": "The ClickMeeting registration template identifier, from 1 to 3."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The ClickMeeting registration settings for a room."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "showOnPersonalPage": {
+                "type": "boolean",
+                "description": "Whether the room is shown on the personal page."
+              },
+              "thankYouEmailsEnabled": {
+                "type": "boolean",
+                "description": "Whether ClickMeeting sends thank-you emails."
+              },
+              "connectionTesterEnabled": {
+                "type": "boolean",
+                "description": "Whether the connection tester is enabled."
+              },
+              "phonegatewayEnabled": {
+                "type": "boolean",
+                "description": "Whether the phone gateway is enabled."
+              },
+              "recorderAutostartEnabled": {
+                "type": "boolean",
+                "description": "Whether recording starts automatically."
+              },
+              "roomInviteButtonEnabled": {
+                "type": "boolean",
+                "description": "Whether the invite button is enabled in the room."
+              },
+              "socialMediaSharingEnabled": {
+                "type": "boolean",
+                "description": "Whether social media sharing is enabled."
+              },
+              "connectionStatusEnabled": {
+                "type": "boolean",
+                "description": "Whether connection status is enabled."
+              },
+              "thankYouPageUrl": {
+                "type": "string",
+                "description": "The thank-you page URL configured for the room."
+              },
+              "encryptionEnabled": {
+                "type": "boolean",
+                "description": "Whether end-to-end encryption is enabled for the room."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The ClickMeeting advanced room settings."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The ClickMeeting room status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roomId"
+        ],
+        "description": "The input payload for updating a ClickMeeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conference": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ClickMeeting room identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ClickMeeting room identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room status."
+              },
+              "roomType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room type."
+              },
+              "accessType": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The room access type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room access type."
+              },
+              "permanentRoom": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the room is permanent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the room is permanent."
+              },
+              "roomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The attendee room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The attendee room URL."
+              },
+              "embedRoomUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The embeddable room URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The embeddable room URL."
+              },
+              "startsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room start date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room start date when provided."
+              },
+              "endsAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room end date when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room end date when provided."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room creation date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room creation date."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room update date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room update date."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The room time zone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The room time zone."
+              },
+              "registrationEnabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether room registration is enabled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether room registration is enabled."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw ClickMeeting room object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "raw"
+            ],
+            "description": "A normalized ClickMeeting room with the original response preserved in raw."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after updating a ClickMeeting room."
+      }
+    }
+  ]
+}

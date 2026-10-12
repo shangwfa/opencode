@@ -1,0 +1,582 @@
+{
+  "service": "surveymethods",
+  "displayName": "SurveyMethods",
+  "categories": [
+    "Productivity",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_API_KEY",
+      "description": "SurveyMethods API key from My Account > API Key Management: https://app.surveymethods.com/.",
+      "extraFields": [
+        {
+          "key": "loginId",
+          "label": "Login ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@example.com",
+          "description": "The SurveyMethods account email paired with the API key."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://surveymethods.com/",
+  "actions": [
+    {
+      "id": "surveymethods.add_email_list_contact",
+      "service": "surveymethods",
+      "name": "add_email_list_contact",
+      "description": "Add one contact to a Basic or Advanced SurveyMethods email list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMethods email list code."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "customFieldValues": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A custom field value."
+            },
+            "description": "Up to five custom field values for an Advanced email list, in field order.",
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListCode",
+          "email"
+        ],
+        "description": "The input payload for adding a SurveyMethods email list contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of adding the SurveyMethods email list contact."
+      }
+    },
+    {
+      "id": "surveymethods.create_email_list",
+      "service": "surveymethods",
+      "name": "create_email_list",
+      "description": "Create a Basic or Advanced email list in SurveyMethods.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListType": {
+            "type": "string",
+            "enum": [
+              "Basic",
+              "Advanced"
+            ],
+            "description": "The email list type."
+          },
+          "emailListName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The email list name, up to 50 characters."
+          },
+          "customFieldLabels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A custom field label."
+            },
+            "description": "The custom field labels for an Advanced list, in their API order.",
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "emailListType",
+          "emailListName"
+        ],
+        "description": "The input payload for creating a SurveyMethods email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "emailList": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The SurveyMethods email list code."
+              },
+              "name": {
+                "type": "string",
+                "description": "The created email list name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The created email list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created SurveyMethods email list response."
+      }
+    },
+    {
+      "id": "surveymethods.get_account",
+      "service": "surveymethods",
+      "name": "get_account",
+      "description": "Get subscription and license information for the authenticated SurveyMethods account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the SurveyMethods account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "accountType": {
+                "type": "string",
+                "description": "The account package type."
+              },
+              "memberSince": {
+                "type": "string",
+                "description": "The account membership start date in MM/DD/YYYY format."
+              },
+              "expiresOn": {
+                "type": "string",
+                "description": "The account expiration date in MM/DD/YYYY format."
+              },
+              "subscriptionStatus": {
+                "type": "string",
+                "description": "The subscription status."
+              },
+              "license": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "licenseExpiresOn": {
+                        "type": "string",
+                        "description": "The license expiration date in MM/DD/YYYY format."
+                      },
+                      "totalLicenses": {
+                        "type": "integer",
+                        "description": "The total number of licenses."
+                      },
+                      "usedLicenses": {
+                        "type": "integer",
+                        "description": "The number of used licenses."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Enterprise license information when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Enterprise license information when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The SurveyMethods account information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated SurveyMethods account response."
+      }
+    },
+    {
+      "id": "surveymethods.get_survey",
+      "service": "surveymethods",
+      "name": "get_survey",
+      "description": "Get detailed metadata for one SurveyMethods survey.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "surveyCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMethods survey code."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting a SurveyMethods survey."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "survey": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The SurveyMethods survey code."
+              },
+              "title": {
+                "type": "string",
+                "description": "The survey title."
+              },
+              "folderName": {
+                "type": "string",
+                "description": "The folder containing the survey."
+              },
+              "pageCount": {
+                "type": "integer",
+                "description": "The number of survey pages."
+              },
+              "questionCount": {
+                "type": "integer",
+                "description": "The number of survey questions."
+              },
+              "status": {
+                "type": "string",
+                "description": "The survey deployment status."
+              },
+              "ssl": {
+                "type": "object",
+                "properties": {
+                  "surveyLink": {
+                    "type": "string",
+                    "description": "Whether SSL is enabled for the survey link."
+                  },
+                  "publishedReports": {
+                    "type": "string",
+                    "description": "Whether SSL is enabled for published reports."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The survey SSL settings."
+              },
+              "anonymous": {
+                "type": "string",
+                "description": "Whether the survey is anonymous."
+              },
+              "attempts": {
+                "type": "string",
+                "description": "The survey attempts setting."
+              },
+              "width": {
+                "type": "string",
+                "description": "The survey width setting."
+              },
+              "collaborated": {
+                "type": "string",
+                "description": "Whether the survey is collaborated."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The survey creation date and time in US Central time."
+              },
+              "latestLaunchDate": {
+                "type": "string",
+                "description": "The latest survey launch date and time, or an empty string."
+              },
+              "closedDate": {
+                "type": "string",
+                "description": "The survey close date and time, or an empty string."
+              },
+              "webLaunchUrl": {
+                "type": "string",
+                "description": "The public web launch URL, or an empty string."
+              },
+              "defaultPublishUrl": {
+                "type": "string",
+                "description": "The default published report URL, or an empty string."
+              },
+              "responseCount": {
+                "type": "integer",
+                "description": "The number of survey responses."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The detailed SurveyMethods survey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMethods survey detail response."
+      }
+    },
+    {
+      "id": "surveymethods.list_email_list_contacts",
+      "service": "surveymethods",
+      "name": "list_email_list_contacts",
+      "description": "List contacts and custom field values from a SurveyMethods email list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emailListCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SurveyMethods email list code."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing SurveyMethods email list contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "The number of contacts returned."
+          },
+          "listType": {
+            "type": "string",
+            "enum": [
+              "Basic",
+              "Advanced"
+            ],
+            "description": "The email list type."
+          },
+          "customFieldLabels": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom field label."
+                },
+                "description": "The Advanced email list custom field labels keyed by their API positions."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Advanced email list custom field labels keyed by their API positions."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The contact email address."
+                },
+                "customFieldValues": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "A custom field value."
+                      },
+                      "description": "The contact custom field values keyed by their API positions."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact custom field values keyed by their API positions."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SurveyMethods email list contact."
+            },
+            "description": "The contacts returned by SurveyMethods."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMethods email list contacts response."
+      }
+    },
+    {
+      "id": "surveymethods.list_email_lists",
+      "service": "surveymethods",
+      "name": "list_email_lists",
+      "description": "List email lists in the authenticated SurveyMethods account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing SurveyMethods email lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "The number of email lists returned."
+          },
+          "emailLists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SurveyMethods email list code."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The email list name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Basic",
+                    "Advanced"
+                  ],
+                  "description": "The email list type."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SurveyMethods email list summary."
+            },
+            "description": "The email lists returned by SurveyMethods."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SurveyMethods email list response."
+      }
+    },
+    {
+      "id": "surveymethods.list_surveys",
+      "service": "surveymethods",
+      "name": "list_surveys",
+      "description": "List surveys and their deployment metadata from the SurveyMethods account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordsPerPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive number of surveys to return per page."
+          },
+          "startPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive page number to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing SurveyMethods surveys."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status message returned by SurveyMethods."
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "The total number of matching surveys."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "description": "The returned page number."
+          },
+          "surveys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SurveyMethods survey code."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The survey title."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The survey deployment status."
+                },
+                "createdDate": {
+                  "type": "string",
+                  "description": "The survey creation date and time in US Central time."
+                },
+                "latestLaunchDate": {
+                  "type": "string",
+                  "description": "The latest survey launch date and time, or an empty string."
+                },
+                "closedDate": {
+                  "type": "string",
+                  "description": "The survey close date and time, or an empty string."
+                },
+                "webLaunchUrl": {
+                  "type": "string",
+                  "description": "The public web launch URL, or an empty string."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A SurveyMethods survey summary."
+            },
+            "description": "The surveys on the returned page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated SurveyMethods survey response."
+      }
+    }
+  ]
+}

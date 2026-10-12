@@ -1,0 +1,672 @@
+{
+  "service": "dataforb2b",
+  "displayName": "DataForB2B",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DATAFORB2B_API_KEY",
+      "description": "DataForB2B API key sent with the api_key header. Generate it under Settings > API Keys after signing in at https://app.dataforb2b.ai."
+    }
+  ],
+  "homepageUrl": "https://dataforb2b.ai",
+  "actions": [
+    {
+      "id": "dataforb2b.count_results",
+      "service": "dataforb2b",
+      "name": "count_results",
+      "description": "Count matching people or companies without retrieving result records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "people",
+              "company"
+            ],
+            "description": "Record category to count."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "and",
+                  "or"
+                ],
+                "description": "Logical operator used to combine filter conditions."
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "column": {
+                      "type": "string",
+                      "description": "DataForB2B column name to filter on."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "=",
+                        ">",
+                        ">=",
+                        "<",
+                        "<=",
+                        "between",
+                        "in",
+                        "like"
+                      ],
+                      "description": "Comparison operator for this condition."
+                    },
+                    "value": {
+                      "description": "A JSON value used by a DataForB2B filter condition."
+                    },
+                    "value2": {
+                      "description": "Second filter value used by the between operator."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "and",
+                        "or"
+                      ],
+                      "description": "Logical operator for a nested filter group."
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A nested DataForB2B filter condition or group."
+                      },
+                      "description": "Conditions contained in a nested filter group."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One DataForB2B filter condition or nested filter group."
+                },
+                "description": "Filter conditions or nested groups.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "conditions"
+            ],
+            "description": "Filters used to select DataForB2B records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "filters"
+        ],
+        "description": "Input for counting DataForB2B search matches."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total_results": {
+            "type": "integer",
+            "description": "Number of matching records, capped at 10,000."
+          },
+          "total_results_is_capped": {
+            "type": "boolean",
+            "description": "Whether the real count exceeds the returned cap."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total_results",
+          "total_results_is_capped"
+        ],
+        "description": "DataForB2B search count result."
+      }
+    },
+    {
+      "id": "dataforb2b.enrich_company",
+      "service": "dataforb2b",
+      "name": "enrich_company",
+      "description": "Enrich a company with firmographic, funding, location, and growth data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company slug, LinkedIn or X URL, handle, or encoded DataForB2B company ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_identifier"
+        ],
+        "description": "Input for enriching a DataForB2B company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Enrichment data and credit usage returned by DataForB2B."
+      }
+    },
+    {
+      "id": "dataforb2b.enrich_profile",
+      "service": "dataforb2b",
+      "name": "enrich_profile",
+      "description": "Enrich a person profile and optionally retrieve contact or GitHub data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile_identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "LinkedIn or X URL, public handle, or encoded DataForB2B profile ID.",
+            "pattern": "\\S"
+          },
+          "enrich_profile": {
+            "type": "boolean",
+            "description": "Whether to retrieve full profile information."
+          },
+          "enrich_work_email": {
+            "type": "boolean",
+            "description": "Whether to retrieve a professional email address."
+          },
+          "enrich_personal_email": {
+            "type": "boolean",
+            "description": "Whether to retrieve a personal email address."
+          },
+          "enrich_phone": {
+            "type": "boolean",
+            "description": "Whether to retrieve a phone number."
+          },
+          "enrich_github": {
+            "type": "boolean",
+            "description": "Whether to retrieve linked GitHub profile data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile_identifier"
+        ],
+        "description": "Input for enriching a DataForB2B profile.",
+        "anyOf": [
+          {
+            "required": [
+              "enrich_profile"
+            ],
+            "properties": {
+              "enrich_profile": {
+                "const": true
+              }
+            }
+          },
+          {
+            "required": [
+              "enrich_work_email"
+            ],
+            "properties": {
+              "enrich_work_email": {
+                "const": true
+              }
+            }
+          },
+          {
+            "required": [
+              "enrich_personal_email"
+            ],
+            "properties": {
+              "enrich_personal_email": {
+                "const": true
+              }
+            }
+          },
+          {
+            "required": [
+              "enrich_phone"
+            ],
+            "properties": {
+              "enrich_phone": {
+                "const": true
+              }
+            }
+          },
+          {
+            "required": [
+              "enrich_github"
+            ],
+            "properties": {
+              "enrich_github": {
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Enrichment data and credit usage returned by DataForB2B."
+      }
+    },
+    {
+      "id": "dataforb2b.get_account",
+      "service": "dataforb2b",
+      "name": "get_account",
+      "description": "Get the connected DataForB2B account status and remaining credit balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving DataForB2B account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the connected API key is valid."
+          },
+          "credits": {
+            "type": "number",
+            "description": "Remaining credits on the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "valid",
+          "credits"
+        ],
+        "description": "DataForB2B account information."
+      }
+    },
+    {
+      "id": "dataforb2b.search_companies",
+      "service": "dataforb2b",
+      "name": "search_companies",
+      "description": "Search companies with DataForB2B filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "and",
+                  "or"
+                ],
+                "description": "Logical operator used to combine filter conditions."
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "column": {
+                      "type": "string",
+                      "description": "DataForB2B column name to filter on."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "=",
+                        ">",
+                        ">=",
+                        "<",
+                        "<=",
+                        "between",
+                        "in",
+                        "like"
+                      ],
+                      "description": "Comparison operator for this condition."
+                    },
+                    "value": {
+                      "description": "A JSON value used by a DataForB2B filter condition."
+                    },
+                    "value2": {
+                      "description": "Second filter value used by the between operator."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "and",
+                        "or"
+                      ],
+                      "description": "Logical operator for a nested filter group."
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A nested DataForB2B filter condition or group."
+                      },
+                      "description": "Conditions contained in a nested filter group."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One DataForB2B filter condition or nested filter group."
+                },
+                "description": "Filter conditions or nested groups.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "conditions"
+            ],
+            "description": "Filters used to select DataForB2B records."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching records to skip."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of records to return."
+          },
+          "enrich_live": {
+            "type": "boolean",
+            "description": "Whether to retrieve live enriched data at the higher credit cost."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching DataForB2B companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching records."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset returned for this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of records requested or returned."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One matching record."
+            },
+            "description": "Matching records returned by DataForB2B."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "total",
+          "offset",
+          "count",
+          "results"
+        ],
+        "description": "A paginated DataForB2B search result."
+      }
+    },
+    {
+      "id": "dataforb2b.search_people",
+      "service": "dataforb2b",
+      "name": "search_people",
+      "description": "Search professional profiles with DataForB2B filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "and",
+                  "or"
+                ],
+                "description": "Logical operator used to combine filter conditions."
+              },
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "column": {
+                      "type": "string",
+                      "description": "DataForB2B column name to filter on."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "=",
+                        ">",
+                        ">=",
+                        "<",
+                        "<=",
+                        "between",
+                        "in",
+                        "like"
+                      ],
+                      "description": "Comparison operator for this condition."
+                    },
+                    "value": {
+                      "description": "A JSON value used by a DataForB2B filter condition."
+                    },
+                    "value2": {
+                      "description": "Second filter value used by the between operator."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "and",
+                        "or"
+                      ],
+                      "description": "Logical operator for a nested filter group."
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A nested DataForB2B filter condition or group."
+                      },
+                      "description": "Conditions contained in a nested filter group."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One DataForB2B filter condition or nested filter group."
+                },
+                "description": "Filter conditions or nested groups.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "conditions"
+            ],
+            "description": "Filters used to select DataForB2B records."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching records to skip."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of records to return."
+          },
+          "enrich_live": {
+            "type": "boolean",
+            "description": "Whether to retrieve live enriched data at the higher credit cost."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching DataForB2B people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching records."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Offset returned for this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of records requested or returned."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One matching record."
+            },
+            "description": "Matching records returned by DataForB2B."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "total",
+          "offset",
+          "count",
+          "results"
+        ],
+        "description": "A paginated DataForB2B search result."
+      }
+    },
+    {
+      "id": "dataforb2b.typeahead",
+      "service": "dataforb2b",
+      "name": "typeahead",
+      "description": "Autocomplete values for DataForB2B people and company search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "company",
+              "people_industry",
+              "company_industry",
+              "category",
+              "location",
+              "city",
+              "region",
+              "school",
+              "title",
+              "skill",
+              "investor"
+            ],
+            "description": "Category of filter values to autocomplete."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Search query for matching filter values."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Maximum number of results to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "q"
+        ],
+        "description": "Input for DataForB2B typeahead."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Typeahead category returned by DataForB2B."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of autocomplete results returned."
+          },
+          "credits_used": {
+            "type": "number",
+            "description": "Credits charged for the request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One typeahead result, including its value and optional metadata."
+            },
+            "description": "Matching filter values."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "type",
+          "count",
+          "credits_used",
+          "results"
+        ],
+        "description": "DataForB2B typeahead result."
+      }
+    }
+  ]
+}

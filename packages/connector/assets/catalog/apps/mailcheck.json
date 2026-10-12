@@ -1,0 +1,583 @@
+{
+  "service": "mailcheck",
+  "displayName": "Mailcheck",
+  "categories": [
+    "Communication",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "USERCHECK_API_KEY",
+      "description": "UserCheck API key used with the Authorization Bearer header. Generate it in the API Keys section of your dashboard: https://www.usercheck.com/docs/api/authentication."
+    }
+  ],
+  "homepageUrl": "https://www.usercheck.com",
+  "actions": [
+    {
+      "id": "mailcheck.get_status",
+      "service": "mailcheck",
+      "name": "get_status",
+      "description": "Retrieve UserCheck account information, plan details, and current API usage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input payload for retrieving UserCheck account status and usage."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "The top-level status string returned by the status endpoint."
+              },
+              "account": {
+                "type": "object",
+                "properties": {
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the current UserCheck plan."
+                      },
+                      "credits": {
+                        "type": "integer",
+                        "description": "The total credits included in the current plan."
+                      },
+                      "rate_limit": {
+                        "type": "integer",
+                        "description": "The maximum number of requests per second allowed by the current plan."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "credits",
+                      "rate_limit"
+                    ],
+                    "description": "The current UserCheck plan information."
+                  },
+                  "user": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The name of the UserCheck account owner."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The email address of the UserCheck account owner.",
+                        "format": "email"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "email"
+                    ],
+                    "description": "The current UserCheck account owner information."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "plan",
+                  "user"
+                ],
+                "description": "The account block returned by the UserCheck status endpoint."
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "description": "The total usage limit for the current billing period."
+                  },
+                  "current": {
+                    "type": "integer",
+                    "description": "The number of credits already used in the current billing period."
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "description": "The number of credits remaining in the current billing period."
+                  },
+                  "reset_at": {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the current billing period resets."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "limit",
+                  "current",
+                  "remaining",
+                  "reset_at"
+                ],
+                "description": "The usage block returned by the UserCheck status endpoint."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "account",
+              "usage"
+            ],
+            "description": "The payload returned by the UserCheck status endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The connector response for the UserCheck status endpoint."
+      }
+    },
+    {
+      "id": "mailcheck.validate_domain",
+      "service": "mailcheck",
+      "name": "validate_domain",
+      "description": "Validate a domain and return UserCheck domain-level risk and MX signals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain to validate with UserCheck."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Input payload for validating a domain with UserCheck."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "The HTTP-style status code returned by the domain endpoint."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The normalized domain returned by UserCheck."
+              },
+              "domain_authority": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional 0 to 100 domain authority score returned by UserCheck."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional 0 to 100 domain authority score returned by UserCheck."
+              },
+              "tld_trust": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional TLD trust score returned by UserCheck."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional TLD trust score returned by UserCheck."
+              },
+              "domain_age_in_days": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional number of days since the domain was registered."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional number of days since the domain was registered."
+              },
+              "mx": {
+                "type": "boolean",
+                "description": "Whether the domain has valid MX records."
+              },
+              "mx_records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "hostname": {
+                      "type": "string",
+                      "description": "The hostname of the MX server."
+                    },
+                    "priority": {
+                      "type": "integer",
+                      "description": "The priority assigned to the MX record."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "hostname",
+                    "priority"
+                  ],
+                  "description": "One MX record returned by UserCheck."
+                },
+                "description": "The MX records returned for the validated domain."
+              },
+              "mx_providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "The stable provider identifier returned by UserCheck."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mailbox",
+                        "hosting",
+                        "email_api",
+                        "security_gateway",
+                        "forwarding"
+                      ],
+                      "description": "The provider category assigned to the detected MX provider."
+                    },
+                    "grade": {
+                      "type": "string",
+                      "enum": [
+                        "enterprise",
+                        "professional",
+                        "standard",
+                        "basic"
+                      ],
+                      "description": "The onboarding or commitment grade assigned to the detected MX provider."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "slug",
+                    "type",
+                    "grade"
+                  ],
+                  "description": "One recognized MX provider returned by UserCheck."
+                },
+                "description": "The recognized MX providers returned for the validated domain."
+              },
+              "disposable": {
+                "type": "boolean",
+                "description": "Whether the domain belongs to a disposable email provider."
+              },
+              "public_domain": {
+                "type": "boolean",
+                "description": "Whether the domain is a public email service."
+              },
+              "relay_domain": {
+                "type": "boolean",
+                "description": "Whether the domain is used for email forwarding."
+              },
+              "spam": {
+                "type": "boolean",
+                "description": "Whether the domain is associated with spam activity."
+              },
+              "did_you_mean": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The typo correction suggestion returned by UserCheck, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The typo correction suggestion returned by UserCheck, if any."
+              },
+              "blocklisted": {
+                "type": "boolean",
+                "description": "Whether the domain appears on the account blocklist."
+              },
+              "disposable_provider": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The disposable provider domain returned by UserCheck when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The disposable provider domain returned by UserCheck when available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "status",
+              "domain",
+              "mx",
+              "mx_records",
+              "mx_providers",
+              "disposable",
+              "public_domain",
+              "relay_domain",
+              "spam"
+            ],
+            "description": "The payload returned by the UserCheck domain validation endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The connector response for the UserCheck domain validation endpoint."
+      }
+    },
+    {
+      "id": "mailcheck.verify_email",
+      "service": "mailcheck",
+      "name": "verify_email",
+      "description": "Validate a single email address and return UserCheck deliverability and risk signals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to validate with UserCheck.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input payload for validating a single email address with UserCheck."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "The HTTP-style status code returned by the email endpoint."
+              },
+              "email": {
+                "type": "string",
+                "description": "The normalized email address returned by UserCheck."
+              },
+              "normalized_email": {
+                "type": "string",
+                "description": "The normalized email address returned after alias or typo normalization."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The domain extracted from the validated email address."
+              },
+              "domain_authority": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional 0 to 100 domain authority score returned by UserCheck."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional 0 to 100 domain authority score returned by UserCheck."
+              },
+              "tld_trust": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional TLD trust score returned by UserCheck."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional TLD trust score returned by UserCheck."
+              },
+              "domain_age_in_days": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The optional number of days since the domain was registered."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional number of days since the domain was registered."
+              },
+              "mx": {
+                "type": "boolean",
+                "description": "Whether the email domain has valid MX records."
+              },
+              "mx_records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "hostname": {
+                      "type": "string",
+                      "description": "The hostname of the MX server."
+                    },
+                    "priority": {
+                      "type": "integer",
+                      "description": "The priority assigned to the MX record."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "hostname",
+                    "priority"
+                  ],
+                  "description": "One MX record returned by UserCheck."
+                },
+                "description": "The MX records returned for the email domain."
+              },
+              "mx_providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "The stable provider identifier returned by UserCheck."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "mailbox",
+                        "hosting",
+                        "email_api",
+                        "security_gateway",
+                        "forwarding"
+                      ],
+                      "description": "The provider category assigned to the detected MX provider."
+                    },
+                    "grade": {
+                      "type": "string",
+                      "enum": [
+                        "enterprise",
+                        "professional",
+                        "standard",
+                        "basic"
+                      ],
+                      "description": "The onboarding or commitment grade assigned to the detected MX provider."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "slug",
+                    "type",
+                    "grade"
+                  ],
+                  "description": "One recognized MX provider returned by UserCheck."
+                },
+                "description": "The recognized MX providers returned for the email domain."
+              },
+              "disposable": {
+                "type": "boolean",
+                "description": "Whether the email is disposable."
+              },
+              "public_domain": {
+                "type": "boolean",
+                "description": "Whether the email uses a public mailbox domain."
+              },
+              "relay_domain": {
+                "type": "boolean",
+                "description": "Whether the email uses a forwarding or relay domain."
+              },
+              "alias": {
+                "type": "boolean",
+                "description": "Whether the original email included an alias component according to UserCheck."
+              },
+              "role_account": {
+                "type": "boolean",
+                "description": "Whether the email is a role account."
+              },
+              "spam": {
+                "type": "boolean",
+                "description": "Whether the email domain is associated with spam activity."
+              },
+              "did_you_mean": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The typo correction suggestion returned by UserCheck, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The typo correction suggestion returned by UserCheck, if any."
+              },
+              "blocklisted": {
+                "type": "boolean",
+                "description": "Whether the email domain appears on the account blocklist."
+              },
+              "disposable_provider": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The disposable provider domain returned by UserCheck when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The disposable provider domain returned by UserCheck when available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "status",
+              "email",
+              "normalized_email",
+              "domain",
+              "mx",
+              "mx_records",
+              "mx_providers",
+              "disposable",
+              "public_domain",
+              "relay_domain",
+              "alias",
+              "role_account",
+              "spam"
+            ],
+            "description": "The payload returned by the UserCheck email validation endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The connector response for the UserCheck email validation endpoint."
+      }
+    }
+  ]
+}

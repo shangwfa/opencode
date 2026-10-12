@@ -1,0 +1,1022 @@
+{
+  "service": "npm",
+  "displayName": "npm",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "Granular Access Token",
+      "placeholder": "npm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "description": "Optional for public actions and required for get_current_user or private package access. Create a granular access token by following npm's official guide: https://docs.npmjs.com/creating-and-viewing-access-tokens/."
+    }
+  ],
+  "homepageUrl": "https://www.npmjs.com/",
+  "actions": [
+    {
+      "id": "npm.audit_package_versions",
+      "service": "npm",
+      "name": "audit_package_versions",
+      "description": "Get npm security advisories for requested exact package versions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packages": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "An exact published package version."
+              },
+              "description": "Exact published versions to audit for this package.",
+              "minItems": 1
+            },
+            "description": "Package names mapped to exact published versions to audit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packages"
+        ],
+        "description": "Input for checking exact package versions against npm security advisories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "packageCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of packages checked."
+              },
+              "affectedPackageCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of packages with advisories."
+              },
+              "advisoryCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of returned advisories."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "packageCount",
+              "affectedPackageCount",
+              "advisoryCount"
+            ],
+            "description": "Aggregate advisory counts for the audit request."
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "packageName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The npm package name, including its scope when present."
+                },
+                "requestedVersions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One requested exact version."
+                  },
+                  "description": "The exact published versions supplied for this package."
+                },
+                "advisories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The numeric npm advisory identifier."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "The canonical advisory URL.",
+                        "format": "uri"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The advisory title."
+                      },
+                      "severity": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The severity reported by npm."
+                      },
+                      "vulnerableVersions": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The affected version range reported by npm."
+                      },
+                      "cwe": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One CWE identifier."
+                        },
+                        "description": "CWE identifiers associated with the advisory."
+                      },
+                      "cvss": {
+                        "type": "object",
+                        "properties": {
+                          "score": {
+                            "type": "number",
+                            "description": "The advisory CVSS score."
+                          },
+                          "vectorString": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The advisory CVSS vector string, or null when npm has not assigned one."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The advisory CVSS vector string, or null when npm has not assigned one."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "score",
+                          "vectorString"
+                        ],
+                        "description": "CVSS data reported by the npm advisory service."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "url",
+                      "title",
+                      "severity",
+                      "vulnerableVersions",
+                      "cwe",
+                      "cvss"
+                    ],
+                    "description": "One npm security advisory affecting a requested package."
+                  },
+                  "description": "Security advisories returned for this package."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "packageName",
+                "requestedVersions",
+                "advisories"
+              ],
+              "description": "Advisories for one requested package."
+            },
+            "description": "Audit results in the requested package order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summary",
+          "packages"
+        ],
+        "description": "Normalized npm security advisories grouped by requested package."
+      }
+    },
+    {
+      "id": "npm.get_current_user",
+      "service": "npm",
+      "name": "get_current_user",
+      "description": "Get the npm username associated with the connected access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving the current npm user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm username associated with the access token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "The npm user associated with the access token."
+      }
+    },
+    {
+      "id": "npm.get_package",
+      "service": "npm",
+      "name": "get_package",
+      "description": "Get a compact summary and version list for an npm package.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName"
+        ],
+        "description": "Input for retrieving compact npm package metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package name returned by npm."
+          },
+          "distTags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A string value."
+            },
+            "description": "npm distribution tags mapped to package versions."
+          },
+          "latestVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The version assigned to the latest distribution tag."
+          },
+          "modified": {
+            "type": "string",
+            "description": "The package modification timestamp returned by npm.",
+            "format": "date-time"
+          },
+          "versionNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A version name."
+            },
+            "description": "All version names published for the package."
+          },
+          "versionCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of published package versions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "distTags",
+          "latestVersion",
+          "modified",
+          "versionNames",
+          "versionCount"
+        ],
+        "description": "Compact npm package metadata."
+      }
+    },
+    {
+      "id": "npm.get_package_download_counts",
+      "service": "npm",
+      "name": "get_package_download_counts",
+      "description": "Get download totals for up to 128 npm packages over an inclusive period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The npm package name, including its scope when present."
+            },
+            "description": "The npm package names to compare. Scoped packages are supported.",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true
+          },
+          "period": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "last-day",
+                  "last-week",
+                  "last-month",
+                  "last-year"
+                ],
+                "description": "A preset period supported by the npm downloads API."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "startDate": {
+                    "type": "string",
+                    "description": "The inclusive start date in YYYY-MM-DD format.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "The inclusive end date in YYYY-MM-DD format.",
+                    "format": "date"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "startDate",
+                  "endDate"
+                ],
+                "description": "An inclusive custom date range for npm download statistics."
+              }
+            ],
+            "description": "A preset npm download period or an inclusive custom date range."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageNames",
+          "period"
+        ],
+        "description": "Input for retrieving download totals for one or more npm packages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "description": "The inclusive first day represented by the counts.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "The inclusive last day represented by the counts.",
+            "format": "date"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "packageName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The npm package name, including its scope when present."
+                },
+                "downloads": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of package downloads in the period."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "packageName",
+                "downloads"
+              ],
+              "description": "Download totals for one npm package."
+            },
+            "description": "Download totals in the requested package order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start",
+          "end",
+          "packages"
+        ],
+        "description": "Normalized npm package download totals for an inclusive period."
+      }
+    },
+    {
+      "id": "npm.get_package_download_trend",
+      "service": "npm",
+      "name": "get_package_download_trend",
+      "description": "Get daily download counts for one npm package over an inclusive period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          },
+          "period": {
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "last-day",
+                  "last-week",
+                  "last-month",
+                  "last-year"
+                ],
+                "description": "A preset period supported by the npm downloads API."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "startDate": {
+                    "type": "string",
+                    "description": "The inclusive start date in YYYY-MM-DD format.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "The inclusive end date in YYYY-MM-DD format.",
+                    "format": "date"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "startDate",
+                  "endDate"
+                ],
+                "description": "An inclusive custom date range for npm download statistics."
+              }
+            ],
+            "description": "A preset npm download period or an inclusive custom date range."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName",
+          "period"
+        ],
+        "description": "Input for retrieving daily npm downloads for one package."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          },
+          "start": {
+            "type": "string",
+            "description": "The inclusive first day represented by the trend.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "The inclusive last day represented by the trend.",
+            "format": "date"
+          },
+          "totalDownloads": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The sum of all daily downloads in the response."
+          },
+          "dailyDownloads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "The UTC calendar day in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "downloads": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of package downloads on this day."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "day",
+                "downloads"
+              ],
+              "description": "Download count for one UTC calendar day."
+            },
+            "description": "Daily download counts in upstream order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName",
+          "start",
+          "end",
+          "totalDownloads",
+          "dailyDownloads"
+        ],
+        "description": "Daily npm package download counts for an inclusive period."
+      }
+    },
+    {
+      "id": "npm.get_package_version",
+      "service": "npm",
+      "name": "get_package_version",
+      "description": "Get the manifest for a specific npm package version or distribution tag.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package version or distribution tag. Defaults to latest."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName"
+        ],
+        "description": "Input for retrieving one npm package version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package name."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resolved package version."
+          },
+          "description": {
+            "type": "string",
+            "description": "The package version description."
+          },
+          "license": {
+            "description": "The package license value."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A package keyword."
+            },
+            "description": "Keywords for this package version."
+          },
+          "homepage": {
+            "type": "string",
+            "description": "The package homepage."
+          },
+          "repository": {
+            "description": "The package repository string or object."
+          },
+          "author": {
+            "description": "The package author string or object."
+          },
+          "maintainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The npm username."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The npm user-provided email value."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An npm user identity with provider-defined fields."
+            },
+            "description": "Maintainers for this package version."
+          },
+          "main": {
+            "type": "string",
+            "description": "The package main entry point."
+          },
+          "types": {
+            "type": "string",
+            "description": "The package TypeScript declaration entry point."
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A dependency version range."
+            },
+            "description": "Runtime dependencies keyed by package name."
+          },
+          "devDependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A dependency version range."
+            },
+            "description": "Development dependencies keyed by package name."
+          },
+          "peerDependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A dependency version range."
+            },
+            "description": "Peer dependencies keyed by package name."
+          },
+          "dist": {
+            "type": "object",
+            "properties": {
+              "integrity": {
+                "type": "string",
+                "description": "The package tarball integrity value."
+              },
+              "shasum": {
+                "type": "string",
+                "description": "The package tarball SHA-1 checksum."
+              },
+              "tarball": {
+                "type": "string",
+                "description": "The package tarball URL.",
+                "format": "uri"
+              },
+              "fileCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of files in the package tarball."
+              },
+              "unpackedSize": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The unpacked package size in bytes."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "shasum",
+              "tarball"
+            ],
+            "description": "Distribution metadata for this package version."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name",
+          "version",
+          "dist"
+        ],
+        "description": "An npm package version manifest, with stable fields described explicitly."
+      }
+    },
+    {
+      "id": "npm.get_version_download_counts",
+      "service": "npm",
+      "name": "get_version_download_counts",
+      "description": "Get npm downloads grouped by package version for the last seven days.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName"
+        ],
+        "description": "Input for retrieving npm downloads by package version for the last seven days."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "packageName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The npm package name, including its scope when present."
+          },
+          "period": {
+            "const": "last-week",
+            "type": "string",
+            "description": "The fixed period supported by npm for version download counts."
+          },
+          "totalDownloads": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The sum of downloads across returned versions."
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The published package version."
+                },
+                "downloads": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Downloads for this version during the last seven days."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "version",
+                "downloads"
+              ],
+              "description": "Recent download count for one package version."
+            },
+            "description": "Version download counts sorted from most to least downloaded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "packageName",
+          "period",
+          "totalDownloads",
+          "versions"
+        ],
+        "description": "npm package downloads grouped by version for the last seven days."
+      }
+    },
+    {
+      "id": "npm.search_packages",
+      "service": "npm",
+      "name": "search_packages",
+      "description": "Search the npm registry for packages with offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 64,
+            "description": "The npm full-text package search query."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The number of results to return, from 1 to 250."
+          },
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Input for searching packages in the npm registry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The package name, including its scope when present."
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The latest package version returned by npm search."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "The package description."
+                    },
+                    "keywords": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A package keyword."
+                      },
+                      "description": "Keywords associated with the package."
+                    },
+                    "sanitized_name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The package name normalized by npm search."
+                    },
+                    "publisher": {
+                      "type": "object",
+                      "properties": {
+                        "username": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The npm username."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "The npm user-provided email value."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An npm user identity with provider-defined fields."
+                    },
+                    "maintainers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "username": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The npm username."
+                          },
+                          "email": {
+                            "type": "string",
+                            "description": "The npm user-provided email value."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "An npm user identity with provider-defined fields."
+                      },
+                      "description": "Maintainers returned by npm search."
+                    },
+                    "license": {
+                      "type": "string",
+                      "description": "The package license expression."
+                    },
+                    "date": {
+                      "type": "string",
+                      "description": "The package update timestamp returned by npm search."
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "A string value."
+                      },
+                      "description": "Links associated with the package, keyed by link type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "name",
+                    "version"
+                  ],
+                  "description": "An npm package returned by registry search, with stable fields described explicitly."
+                },
+                "score": {
+                  "type": "object",
+                  "properties": {
+                    "final": {
+                      "type": "number",
+                      "description": "The final npm search score."
+                    },
+                    "detail": {
+                      "type": "object",
+                      "properties": {
+                        "quality": {
+                          "type": "number",
+                          "description": "The quality score component."
+                        },
+                        "popularity": {
+                          "type": "number",
+                          "description": "The popularity score component."
+                        },
+                        "maintenance": {
+                          "type": "number",
+                          "description": "The maintenance score component."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Individual npm search score components."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "npm search ranking information."
+                },
+                "downloads": {
+                  "type": "object",
+                  "properties": {
+                    "monthly": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Monthly package downloads."
+                    },
+                    "weekly": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Weekly package downloads."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Recent download counts for the package."
+                },
+                "dependents": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The dependent count as an integer."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The dependent count as a string."
+                    }
+                  ],
+                  "description": "The dependent count returned by npm, as a number or numeric string."
+                },
+                "updated": {
+                  "type": "string",
+                  "description": "The timestamp when npm refreshed this search result."
+                },
+                "searchScore": {
+                  "type": "number",
+                  "description": "The top-level npm search score."
+                },
+                "flags": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "npm search flags for the package."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "package",
+                "score"
+              ],
+              "description": "One npm registry search result."
+            },
+            "description": "Packages matching the search query."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching packages."
+          },
+          "time": {
+            "type": "string",
+            "description": "The npm search response timestamp or timing value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objects",
+          "total",
+          "time"
+        ],
+        "description": "npm registry package search results."
+      }
+    }
+  ]
+}

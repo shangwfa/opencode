@@ -1,0 +1,201 @@
+{
+  "service": "chatpdf",
+  "displayName": "ChatPDF",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sec_...",
+      "description": "ChatPDF API key sent in the x-api-key header. View your key in the ChatPDF backend API documentation after signing in: https://www.chatpdf.com/docs/api/backend."
+    }
+  ],
+  "homepageUrl": "https://www.chatpdf.com",
+  "actions": [
+    {
+      "id": "chatpdf.add_source_url",
+      "service": "chatpdf",
+      "name": "add_source_url",
+      "description": "Import a publicly reachable PDF URL into ChatPDF and return its source ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The publicly reachable URL of the PDF to import.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The PDF URL to import into ChatPDF."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source ID assigned to the imported PDF."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ],
+        "description": "The ChatPDF source created from the URL."
+      }
+    },
+    {
+      "id": "chatpdf.chat",
+      "service": "chatpdf",
+      "name": "chat",
+      "description": "Ask ChatPDF one or more stateless questions about an imported PDF source.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ChatPDF source ID for the imported PDF."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The author role for this message."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message text sent to ChatPDF."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "One message in the stateless ChatPDF conversation."
+            },
+            "description": "The stateless conversation sent to ChatPDF.",
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "referenceSources": {
+            "type": "boolean",
+            "description": "Whether ChatPDF should include inline page citations and reference metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "messages"
+        ],
+        "description": "The source and conversation messages to send to ChatPDF."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The answer text generated from the PDF."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pageNumber": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The one-based PDF page number used in the answer."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "pageNumber"
+              ],
+              "description": "One PDF page referenced by ChatPDF."
+            },
+            "description": "The PDF pages cited in the answer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The answer returned by ChatPDF."
+      }
+    },
+    {
+      "id": "chatpdf.delete_sources",
+      "service": "chatpdf",
+      "name": "delete_sources",
+      "description": "Delete one or more imported PDF sources from ChatPDF.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ChatPDF source ID."
+            },
+            "description": "The source IDs to delete.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sources"
+        ],
+        "description": "The ChatPDF source IDs to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deletedSources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A deleted ChatPDF source ID."
+            },
+            "description": "The source IDs accepted for deletion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deletedSources"
+        ],
+        "description": "The source IDs accepted for deletion by ChatPDF."
+      }
+    }
+  ]
+}

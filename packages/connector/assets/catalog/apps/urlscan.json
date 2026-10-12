@@ -1,0 +1,288 @@
+{
+  "service": "urlscan",
+  "displayName": "urlscan.io",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "URLSCAN_API_KEY",
+      "description": "urlscan.io API key sent with the API-Key header. Create an account and manage API keys from the user area.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://urlscan.io",
+  "actions": [
+    {
+      "id": "urlscan.get_result",
+      "service": "urlscan",
+      "name": "get_result",
+      "description": "Retrieve the JSON result for a completed urlscan.io scan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "Unique scan UUID to retrieve.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a scan result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "Unique scan UUID used for the lookup.",
+            "format": "uuid"
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by urlscan.io."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized scan result returned by urlscan.io."
+      }
+    },
+    {
+      "id": "urlscan.search_scans",
+      "service": "urlscan",
+      "name": "search_scans",
+      "description": "Search urlscan.io scans with the documented search query syntax.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query using urlscan.io search syntax, for example \"domain:example.com\"."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of results to return."
+          },
+          "searchAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated search_after cursor value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string sort value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric sort value."
+                    }
+                  ],
+                  "description": "One sort value returned by urlscan.io."
+                },
+                "description": "Sort values from a urlscan.io search result."
+              }
+            ],
+            "description": "Pagination cursor from the sort values of the last result in the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching urlscan.io scans."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw JSON object returned by urlscan.io."
+            },
+            "description": "Raw JSON objects returned by urlscan.io."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching scan count reported by urlscan.io."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether urlscan.io reports that older results are available."
+          },
+          "nextSearchAfter": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string sort value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric sort value."
+                }
+              ],
+              "description": "One sort value returned by urlscan.io."
+            },
+            "description": "Sort values from a urlscan.io search result."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by urlscan.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "Normalized search response returned by urlscan.io."
+      }
+    },
+    {
+      "id": "urlscan.submit_scan",
+      "service": "urlscan",
+      "name": "submit_scan",
+      "description": "Submit a URL to urlscan.io for scanning.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL to submit for scanning.",
+            "format": "uri"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "private"
+            ],
+            "description": "Visibility level for the submitted scan."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag to add to the scan."
+            },
+            "description": "User-defined tags to annotate the scan.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "customagent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom User-Agent string to use for the scan."
+          },
+          "referer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom HTTP referer to use for the scan."
+          },
+          "overrideSafety": {
+            "type": "boolean",
+            "description": "Whether to disable URL reclassification when urlscan.io detects potential PII."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter ISO-3166-1 alpha-2 country code for the scan location."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input parameters for submitting a URL scan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Submission status message returned by urlscan.io."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Unique scan UUID assigned by urlscan.io.",
+            "format": "uuid"
+          },
+          "resultUrl": {
+            "type": "string",
+            "description": "Browser result URL for the submitted scan.",
+            "format": "uri"
+          },
+          "apiUrl": {
+            "type": "string",
+            "description": "Result API URL for the submitted scan.",
+            "format": "uri"
+          },
+          "visibility": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Visibility level applied to the submitted scan."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL submitted for scanning.",
+            "format": "uri"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country code used for the scan."
+          },
+          "options": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw JSON object returned by urlscan.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message",
+          "uuid",
+          "resultUrl",
+          "apiUrl",
+          "visibility",
+          "url"
+        ],
+        "description": "Normalized submission response returned by urlscan.io."
+      }
+    }
+  ]
+}

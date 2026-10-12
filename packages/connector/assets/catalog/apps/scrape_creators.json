@@ -1,0 +1,258 @@
+{
+  "service": "scrape_creators",
+  "displayName": "Scrape Creators",
+  "description": "Discover and invoke Scrape Creators social data API endpoints.",
+  "categories": [
+    "Data",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Your Scrape Creators API key",
+      "description": "API key sent with the x-api-key header. Create or view it in the Scrape Creators dashboard: https://app.scrapecreators.com."
+    }
+  ],
+  "homepageUrl": "https://scrapecreators.com/",
+  "actions": [
+    {
+      "id": "scrape_creators.discover_endpoints",
+      "service": "scrape_creators",
+      "name": "discover_endpoints",
+      "description": "Discover current Scrape Creators GET and POST endpoints from the official OpenAPI document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Text to match against the category, title, description, or path."
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "An exact OpenAPI category tag to include."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset into matching endpoints.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of endpoints to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for discovering Scrape Creators endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string",
+            "description": "The SHA-256 digest of the current OpenAPI document."
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "GET",
+                    "POST"
+                  ],
+                  "description": "The HTTP method accepted by this endpoint."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The absolute Scrape Creators API path."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The endpoint category from the first OpenAPI tag."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The endpoint summary from the OpenAPI document."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The endpoint description from the OpenAPI document."
+                },
+                "documentationUrl": {
+                  "type": "string",
+                  "description": "The official documentation URL for this endpoint.",
+                  "format": "uri"
+                },
+                "requestSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current query and JSON body request contract."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One endpoint discovered from the official OpenAPI document."
+            },
+            "description": "The discovered endpoints in this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of endpoints matching the filters."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next offset when more endpoints match."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next offset when more endpoints match."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "Whether a recent cached catalog was used after a refresh failure."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of currently documented Scrape Creators endpoints."
+      },
+      "followUpActions": [
+        "scrape_creators.invoke_endpoint"
+      ]
+    },
+    {
+      "id": "scrape_creators.get_credit_balance",
+      "service": "scrape_creators",
+      "name": "get_credit_balance",
+      "description": "Get the remaining credit balance for the current Scrape Creators API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for getting the current credit balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The remaining API credit balance when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The remaining API credit balance when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response returned by Scrape Creators."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Scrape Creators credit balance response."
+      }
+    },
+    {
+      "id": "scrape_creators.invoke_endpoint",
+      "service": "scrape_creators",
+      "name": "invoke_endpoint",
+      "description": "Invoke a currently documented Scrape Creators GET or POST endpoint at the fixed official API origin.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The documented endpoint HTTP method."
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact absolute path returned by discover_endpoints."
+          },
+          "request": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Query values keyed by exact upstream parameter name."
+              },
+              "body": {
+                "description": "The JSON body for a documented POST endpoint."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The query parameters and optional JSON body for the endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A controlled dynamic Scrape Creators API invocation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "description": "The HTTP method used for the request."
+          },
+          "path": {
+            "type": "string",
+            "description": "The documented API path used for the request."
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599,
+            "description": "The successful upstream HTTP status."
+          },
+          "response": {
+            "description": "The complete successful response body."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The successful Scrape Creators endpoint response."
+      },
+      "followUpActions": [
+        "scrape_creators.discover_endpoints"
+      ]
+    }
+  ]
+}

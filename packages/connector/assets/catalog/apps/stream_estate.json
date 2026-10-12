@@ -1,0 +1,629 @@
+{
+  "service": "stream_estate",
+  "displayName": "Stream Estate",
+  "categories": [
+    "Data",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "STREAM_ESTATE_API_KEY",
+      "description": "Stream Estate API key sent with the X-API-KEY header. Sign up and create a key in your account settings: https://stream.estate/signup."
+    }
+  ],
+  "homepageUrl": "https://stream.estate",
+  "actions": [
+    {
+      "id": "stream_estate.get_property",
+      "service": "stream_estate",
+      "name": "get_property",
+      "description": "Retrieve one Stream Estate property document by UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "description": "The UUID of the Stream Estate property.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "propertyId"
+        ],
+        "description": "The property to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "property": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The property document with upstream-defined fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "property"
+        ],
+        "description": "A retrieved Stream Estate property."
+      }
+    },
+    {
+      "id": "stream_estate.list_cities",
+      "service": "stream_estate",
+      "name": "list_cities",
+      "description": "List Stream Estate cities using official geographic and name filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "excludeGroupedCities": {
+            "type": "boolean",
+            "description": "Whether to exclude cities that contain grouped cities."
+          },
+          "insee": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A French INSEE code."
+            },
+            "description": "One or more French INSEE codes.",
+            "uniqueItems": true
+          },
+          "libelle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A city label to match."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A city name to match."
+          },
+          "orderName": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number, starting at 1."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A city slug to match."
+          },
+          "zipcode": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A postal code."
+            },
+            "description": "One or more postal codes.",
+            "uniqueItems": true
+          },
+          "additionalQuery": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string query value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric query value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean query value."
+                    }
+                  ],
+                  "description": "A scalar query value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string query value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric query value."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "A boolean query value."
+                      }
+                    ],
+                    "description": "A scalar query value."
+                  },
+                  "description": "Repeated values for one query parameter."
+                }
+              ],
+              "description": "A scalar query value or an array of repeated values."
+            },
+            "description": "Additional documented Stream Estate query parameters keyed by their exact upstream names, including bracket notation when required."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Stream Estate cities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A city or department with upstream-defined location fields."
+            },
+            "description": "Locations in the current response."
+          },
+          "totalItems": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching locations, or null when the endpoint omits it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching locations, or null when the endpoint omits it."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hydra pagination links returned by Stream Estate, or an empty object when absent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "totalItems",
+          "pagination"
+        ],
+        "description": "Normalized Stream Estate location results."
+      }
+    },
+    {
+      "id": "stream_estate.list_properties",
+      "service": "stream_estate",
+      "name": "list_properties",
+      "description": "Search Stream Estate property inventory with common filters and optional advanced query parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "propertyTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "description": "A Stream Estate property type code."
+            },
+            "description": "Property types: apartment 0, house 1, building 2, parking 3, office 4, land 5, or shop 6.",
+            "uniqueItems": true
+          },
+          "transactionType": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The transaction type: sale 0 or rent 1."
+          },
+          "includedCities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Stream Estate city IRI."
+            },
+            "description": "City IRIs returned by search_locations, such as /cities/30953.",
+            "uniqueItems": true
+          },
+          "includedDepartments": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Stream Estate department IRI."
+            },
+            "description": "Department IRIs returned by search_locations, such as /departments/77.",
+            "uniqueItems": true
+          },
+          "budgetMin": {
+            "type": "number",
+            "description": "The minimum property budget."
+          },
+          "budgetMax": {
+            "type": "number",
+            "description": "The maximum property budget."
+          },
+          "surfaceMin": {
+            "type": "number",
+            "description": "The minimum property surface area."
+          },
+          "surfaceMax": {
+            "type": "number",
+            "description": "The maximum property surface area."
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "Return properties created at or after this date-time.",
+            "format": "date-time"
+          },
+          "withCoherentPrice": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to filter by coherent prices; null disables the filter."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether to filter by coherent prices; null disables the filter."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of properties per page, from 1 to 30."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number, starting at 1."
+          },
+          "orderCreatedAt": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderUpdatedAt": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderPrice": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "additionalQuery": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string query value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric query value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean query value."
+                    }
+                  ],
+                  "description": "A scalar query value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string query value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric query value."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "A boolean query value."
+                      }
+                    ],
+                    "description": "A scalar query value."
+                  },
+                  "description": "Repeated values for one query parameter."
+                }
+              ],
+              "description": "A scalar query value or an array of repeated values."
+            },
+            "description": "Additional documented Stream Estate query parameters keyed by their exact upstream names, including bracket notation when required."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for searching Stream Estate properties."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Stream Estate property document with upstream-defined fields."
+            },
+            "description": "Property documents in the current page."
+          },
+          "totalItems": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching properties, or null when the endpoint omits it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching properties, or null when the endpoint omits it."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hydra pagination links returned by Stream Estate, or an empty object when absent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "totalItems",
+          "pagination"
+        ],
+        "description": "A normalized page of Stream Estate properties."
+      }
+    },
+    {
+      "id": "stream_estate.list_similar_properties",
+      "service": "stream_estate",
+      "name": "list_similar_properties",
+      "description": "List Stream Estate properties similar to a selected property.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "description": "The UUID of the Stream Estate property.",
+            "format": "uuid"
+          },
+          "fromDate": {
+            "type": "string",
+            "description": "Return properties created at or after this date-time.",
+            "format": "date-time"
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of properties per page, from 1 to 30."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number, starting at 1."
+          },
+          "orderCreatedAt": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderUpdatedAt": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderPricePerMeter": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderPrice": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "orderSurface": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "propertyId"
+        ],
+        "description": "The source property and pagination for similar properties."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Stream Estate property document with upstream-defined fields."
+            },
+            "description": "Property documents in the current page."
+          },
+          "totalItems": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching properties, or null when the endpoint omits it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching properties, or null when the endpoint omits it."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hydra pagination links returned by Stream Estate, or an empty object when absent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "totalItems",
+          "pagination"
+        ],
+        "description": "A normalized page of Stream Estate properties."
+      }
+    },
+    {
+      "id": "stream_estate.search_locations",
+      "service": "stream_estate",
+      "name": "search_locations",
+      "description": "Search Stream Estate cities and departments for property-filter identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city or department search term."
+          },
+          "excludedCityIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Stream Estate city IRI."
+            },
+            "description": "City IRIs to exclude from the results.",
+            "uniqueItems": true
+          },
+          "excludedDepartmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Stream Estate department IRI."
+            },
+            "description": "Department IRIs to exclude from the results.",
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Text and optional exclusions for Stream Estate location autocomplete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A city or department with upstream-defined location fields."
+            },
+            "description": "Locations in the current response."
+          },
+          "totalItems": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching locations, or null when the endpoint omits it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching locations, or null when the endpoint omits it."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hydra pagination links returned by Stream Estate, or an empty object when absent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "totalItems",
+          "pagination"
+        ],
+        "description": "Normalized Stream Estate location results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,470 @@
+{
+  "service": "dingtalk_bot",
+  "displayName": "DingTalk Bot",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Webhook Access Token",
+      "placeholder": "access_token from DingTalk webhook URL",
+      "description": "Paste the access_token query value from the DingTalk webhook URL. The full DingTalk custom bot webhook URL is also accepted.",
+      "extraFields": [
+        {
+          "key": "signingSecret",
+          "label": "Signing Secret",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "Optional SEC... secret from DingTalk signature mode",
+          "description": "Optional signing secret used when the DingTalk bot enables signature security mode."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.dingtalk.com",
+  "actions": [
+    {
+      "id": "dingtalk_bot.send_action_card_message",
+      "service": "dingtalk_bot",
+      "name": "send_action_card_message",
+      "description": "Send an actionCard message through the DingTalk custom bot webhook.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "cardMode": {
+                "const": "single",
+                "type": "string",
+                "description": "Use one overall action button."
+              },
+              "msgUuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional idempotency key used to deduplicate retries."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The actionCard title."
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The markdown actionCard body."
+              },
+              "singleTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The single action button title."
+              },
+              "singleUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The URL opened after clicking the single action."
+              },
+              "buttonOrientation": {
+                "type": "string",
+                "enum": [
+                  "vertical",
+                  "horizontal"
+                ],
+                "description": "How to arrange actionCard buttons. vertical maps to DingTalk 0, horizontal maps to 1."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cardMode",
+              "title",
+              "text",
+              "singleTitle",
+              "singleUrl"
+            ],
+            "description": "Input for sending a single-action DingTalk actionCard message."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "cardMode": {
+                "const": "buttons",
+                "type": "string",
+                "description": "Use multiple independent action buttons."
+              },
+              "msgUuid": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional idempotency key used to deduplicate retries."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The actionCard title."
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The markdown actionCard body."
+              },
+              "buttons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The button title."
+                    },
+                    "actionUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The URL opened after clicking the button."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "actionUrl"
+                  ],
+                  "description": "One actionCard button."
+                },
+                "description": "The action buttons shown on the card.",
+                "minItems": 1
+              },
+              "buttonOrientation": {
+                "type": "string",
+                "enum": [
+                  "vertical",
+                  "horizontal"
+                ],
+                "description": "How to arrange actionCard buttons. vertical maps to DingTalk 0, horizontal maps to 1."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cardMode",
+              "title",
+              "text",
+              "buttons"
+            ],
+            "description": "Input for sending a multi-button DingTalk actionCard message."
+          }
+        ],
+        "description": "Input for sending a DingTalk actionCard message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errcode": {
+            "type": "integer",
+            "description": "The DingTalk response code. 0 means success."
+          },
+          "errmsg": {
+            "type": "string",
+            "description": "The DingTalk response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errcode",
+          "errmsg"
+        ],
+        "description": "The normalized DingTalk custom bot send result."
+      }
+    },
+    {
+      "id": "dingtalk_bot.send_feed_card_message",
+      "service": "dingtalk_bot",
+      "name": "send_feed_card_message",
+      "description": "Send a feedCard message through the DingTalk custom bot webhook.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "msgUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional idempotency key used to deduplicate retries."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The link title."
+                },
+                "messageUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The URL opened after clicking the link."
+                },
+                "picUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The image URL shown for the link."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "messageUrl",
+                "picUrl"
+              ],
+              "description": "One feedCard link item."
+            },
+            "description": "The links included in the feedCard.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "links"
+        ],
+        "description": "Input for sending a DingTalk feedCard message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errcode": {
+            "type": "integer",
+            "description": "The DingTalk response code. 0 means success."
+          },
+          "errmsg": {
+            "type": "string",
+            "description": "The DingTalk response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errcode",
+          "errmsg"
+        ],
+        "description": "The normalized DingTalk custom bot send result."
+      }
+    },
+    {
+      "id": "dingtalk_bot.send_link_message",
+      "service": "dingtalk_bot",
+      "name": "send_link_message",
+      "description": "Send a link message through the DingTalk custom bot webhook.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "msgUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional idempotency key used to deduplicate retries."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message title."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message text shown in the card."
+          },
+          "messageUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL opened after clicking the message."
+          },
+          "picUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional image URL shown in the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "text",
+          "messageUrl"
+        ],
+        "description": "Input for sending a DingTalk link message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errcode": {
+            "type": "integer",
+            "description": "The DingTalk response code. 0 means success."
+          },
+          "errmsg": {
+            "type": "string",
+            "description": "The DingTalk response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errcode",
+          "errmsg"
+        ],
+        "description": "The normalized DingTalk custom bot send result."
+      }
+    },
+    {
+      "id": "dingtalk_bot.send_markdown_message",
+      "service": "dingtalk_bot",
+      "name": "send_markdown_message",
+      "description": "Send a markdown message through the DingTalk custom bot webhook.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "msgUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional idempotency key used to deduplicate retries."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title shown in the conversation preview."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The markdown message body."
+          },
+          "atMobiles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional mobile numbers to mention in the group.",
+            "minItems": 1
+          },
+          "atUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional DingTalk user IDs to mention in the group.",
+            "minItems": 1
+          },
+          "isAtAll": {
+            "type": "boolean",
+            "description": "Whether to mention everyone in the group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "text"
+        ],
+        "description": "Input for sending a DingTalk markdown message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errcode": {
+            "type": "integer",
+            "description": "The DingTalk response code. 0 means success."
+          },
+          "errmsg": {
+            "type": "string",
+            "description": "The DingTalk response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errcode",
+          "errmsg"
+        ],
+        "description": "The normalized DingTalk custom bot send result."
+      }
+    },
+    {
+      "id": "dingtalk_bot.send_text_message",
+      "service": "dingtalk_bot",
+      "name": "send_text_message",
+      "description": "Send a text message through the DingTalk custom bot webhook.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "msgUuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional idempotency key used to deduplicate retries."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text message content."
+          },
+          "atMobiles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional mobile numbers to mention in the group.",
+            "minItems": 1
+          },
+          "atUserIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional DingTalk user IDs to mention in the group.",
+            "minItems": 1
+          },
+          "isAtAll": {
+            "type": "boolean",
+            "description": "Whether to mention everyone in the group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "Input for sending a DingTalk text message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errcode": {
+            "type": "integer",
+            "description": "The DingTalk response code. 0 means success."
+          },
+          "errmsg": {
+            "type": "string",
+            "description": "The DingTalk response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errcode",
+          "errmsg"
+        ],
+        "description": "The normalized DingTalk custom bot send result."
+      }
+    }
+  ]
+}

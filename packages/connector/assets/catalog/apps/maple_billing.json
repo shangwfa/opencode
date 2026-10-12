@@ -1,0 +1,1721 @@
+{
+  "service": "maple_billing",
+  "displayName": "Measure",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "MEASURE_API_TOKEN",
+      "description": "Measure API token sent as a Bearer token. Create an API token in the Measure dashboard under Developers > API Token: https://docs.getmeasure.com/pages/guides/quickstart-with-api.",
+      "extraFields": [
+        {
+          "key": "companyId",
+          "label": "Company ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "cmp_...",
+          "description": "The Measure company ID with the cmp_ prefix used in API paths. The Measure API quickstart shows this as COMPANY_ID: https://docs.getmeasure.com/pages/guides/quickstart-with-api."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://getmeasure.com",
+  "actions": [
+    {
+      "id": "maple_billing.create_checkout_session",
+      "service": "maple_billing",
+      "name": "create_checkout_session",
+      "description": "Create a Measure hosted checkout session link.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure customer ID or external customer identifier."
+          },
+          "configItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One official Measure subscription config item."
+            },
+            "description": "Subscription configuration items forwarded to Measure.",
+            "minItems": 1
+          },
+          "productPricingIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Measure resource identifier."
+            },
+            "description": "Product pricing IDs that form the checkout session.",
+            "minItems": 1
+          },
+          "bundlePricingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bundle pricing ID that forms the checkout session."
+          },
+          "term": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The official Measure subscription term object."
+          },
+          "trial": {
+            "type": "boolean",
+            "description": "Whether the checkout session creates a trial subscription."
+          },
+          "trialTerm": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The official Measure trial term object."
+          },
+          "autoCharges": {
+            "type": "boolean",
+            "description": "Whether the subscription is automatically charged after checkout."
+          },
+          "autoRenews": {
+            "type": "boolean",
+            "description": "Whether the subscription auto-renews at the end of the term."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata key-value pairs forwarded to Measure."
+          },
+          "options": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Official Measure checkout session options."
+          },
+          "discounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One official Measure discount object."
+            },
+            "description": "Discounts attached to the checkout session."
+          },
+          "onetimeItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One official Measure one-time item object."
+            },
+            "description": "One-time charges attached to the checkout session."
+          },
+          "previousSubscriptionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The existing subscription ID whose plan changes with this checkout session."
+          },
+          "changeTiming": {
+            "type": "string",
+            "enum": [
+              "IMMEDIATE",
+              "PERIOD_END",
+              "RENEWAL"
+            ],
+            "description": "When Measure should apply a subscription plan change."
+          },
+          "changeProrationType": {
+            "type": "string",
+            "enum": [
+              "NEXT",
+              "IMMEDIATE",
+              "NONE"
+            ],
+            "description": "How Measure should prorate a subscription plan change."
+          },
+          "changeResetBillingAnchor": {
+            "type": "boolean",
+            "description": "Whether Measure should reset the billing anchor for a subscription plan change."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "CHECKOUT_SESSION"
+            ],
+            "description": "The Measure checkout session type."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Measure Idempotency-Key header value for mutation requests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId",
+          "configItems"
+        ],
+        "description": "Checkout session fields for creating a Measure hosted checkout link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkoutSession": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The hosted checkout session URL when returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The hosted checkout session URL when returned by Measure."
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Measure customer ID attached to this checkout session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Measure customer ID attached to this checkout session."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The checkout session status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The checkout session status returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure checkout session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure checkout session creation response."
+      }
+    },
+    {
+      "id": "maple_billing.create_customer",
+      "service": "maple_billing",
+      "name": "create_customer",
+      "description": "Create a Measure customer from JSON-friendly fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique identifier that ties the customer back to your system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The customer email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer name."
+          },
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization this customer belongs to."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer phone number."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer's title."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer's locale."
+          },
+          "address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The official Measure customer address object."
+          },
+          "billingEmails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One billing email address.",
+              "format": "email"
+            },
+            "description": "Additional email addresses to copy on customer invoices.",
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata key-value pairs forwarded to Measure."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One customer tag."
+            },
+            "description": "Tags to attach to the customer.",
+            "minItems": 1
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company user ID assigned to manage this customer."
+          },
+          "parentCustomerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent customer ID for parent-child billing."
+          },
+          "excludeFromMetrics": {
+            "type": "boolean",
+            "description": "Whether Measure should exclude this customer from metrics."
+          },
+          "childRollupBilling": {
+            "type": "boolean",
+            "description": "Whether Measure should enable rollup billing for children."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Measure Idempotency-Key header value for mutation requests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "Customer fields for creating a Measure customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "identifier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The external customer identifier when returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external customer identifier when returned by Measure."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The computed customer display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The computed customer display name."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer email address."
+              },
+              "orgName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer's organization name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer's organization name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer status returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure customer creation response."
+      }
+    },
+    {
+      "id": "maple_billing.find_customers",
+      "service": "maple_billing",
+      "name": "find_customers",
+      "description": "Search Measure customers with pagination and official query criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "The maximum number of records to return."
+              },
+              "fromKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The pagination cursor returned by a previous Measure find request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination parameters."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Official Measure query criteria for this find endpoint."
+          },
+          "sortKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Measure sort_key value for this find endpoint."
+          },
+          "includeMeta": {
+            "type": "boolean",
+            "description": "Whether Measure should include additional pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Measure find request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Measure resource identifier."
+                },
+                "identifier": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The external customer identifier when returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The external customer identifier when returned by Measure."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The computed customer display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The computed customer display name."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer email address."
+                },
+                "orgName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer's organization name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer's organization name."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer status returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer status returned by Measure."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Measure."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Measure customer."
+            },
+            "description": "Customers returned by Measure."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "fromKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page when Measure returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page when Measure returns one."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page size returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page size returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure customer search response."
+      }
+    },
+    {
+      "id": "maple_billing.find_product_pricing",
+      "service": "maple_billing",
+      "name": "find_product_pricing",
+      "description": "Search Measure product pricing records with official query criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "The maximum number of records to return."
+              },
+              "fromKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The pagination cursor returned by a previous Measure find request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination parameters."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Official Measure query criteria for this find endpoint."
+          },
+          "sortKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Measure sort_key value for this find endpoint."
+          },
+          "includeMeta": {
+            "type": "boolean",
+            "description": "Whether Measure should include additional pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Measure find request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "productPricing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Measure resource identifier."
+                },
+                "productId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Measure product ID attached to this pricing record."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Measure product ID attached to this pricing record."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product pricing name returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product pricing name returned by Measure."
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product pricing currency code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product pricing currency code."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product pricing state returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product pricing state returned by Measure."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Measure."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Measure product pricing record."
+            },
+            "description": "Product pricing records returned by Measure."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "fromKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page when Measure returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page when Measure returns one."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page size returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page size returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure product pricing search response."
+      }
+    },
+    {
+      "id": "maple_billing.find_products",
+      "service": "maple_billing",
+      "name": "find_products",
+      "description": "Search Measure products with pagination and official query criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "The maximum number of records to return."
+              },
+              "fromKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The pagination cursor returned by a previous Measure find request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination parameters."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Official Measure query criteria for this find endpoint."
+          },
+          "sortKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Measure sort_key value for this find endpoint."
+          },
+          "includeMeta": {
+            "type": "boolean",
+            "description": "Whether Measure should include additional pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Measure find request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Measure resource identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Measure product name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Measure product name."
+                },
+                "externalName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The external product name returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The external product name returned by Measure."
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product state returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product state returned by Measure."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Measure."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Measure product."
+            },
+            "description": "Products returned by Measure."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "fromKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page when Measure returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page when Measure returns one."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page size returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page size returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure product search response."
+      }
+    },
+    {
+      "id": "maple_billing.find_subscriptions",
+      "service": "maple_billing",
+      "name": "find_subscriptions",
+      "description": "Search Measure subscriptions with pagination and official query criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200,
+                "description": "The maximum number of records to return."
+              },
+              "fromKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The pagination cursor returned by a previous Measure find request."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination parameters."
+          },
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Official Measure subscription query criteria."
+          },
+          "sortKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Measure subscription sort_key value."
+          },
+          "includeMeta": {
+            "type": "boolean",
+            "description": "Whether Measure should include additional pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sortKey"
+        ],
+        "description": "Measure subscription find request parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Measure resource identifier."
+                },
+                "customerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Measure customer ID attached to this subscription."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Measure customer ID attached to this subscription."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The subscription status returned by Measure."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The subscription status returned by Measure."
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The subscription currency code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The subscription currency code."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Measure."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Measure subscription."
+            },
+            "description": "Subscriptions returned by Measure."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "fromKey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page when Measure returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page when Measure returns one."
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page size returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page size returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Measure pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure subscription search response."
+      }
+    },
+    {
+      "id": "maple_billing.get_checkout_session",
+      "service": "maple_billing",
+      "name": "get_checkout_session",
+      "description": "Retrieve a Measure checkout session by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "checkoutSessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Measure checkout session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checkoutSession": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The hosted checkout session URL when returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The hosted checkout session URL when returned by Measure."
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Measure customer ID attached to this checkout session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Measure customer ID attached to this checkout session."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The checkout session status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The checkout session status returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure checkout session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure checkout session response."
+      }
+    },
+    {
+      "id": "maple_billing.get_customer",
+      "service": "maple_billing",
+      "name": "get_customer",
+      "description": "Retrieve a Measure customer by ID or external identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure customer ID or external customer identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Measure customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "identifier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The external customer identifier when returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external customer identifier when returned by Measure."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The computed customer display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The computed customer display name."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer email address."
+              },
+              "orgName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer's organization name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer's organization name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer status returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure customer response."
+      }
+    },
+    {
+      "id": "maple_billing.get_product",
+      "service": "maple_billing",
+      "name": "get_product",
+      "description": "Retrieve a Measure product by ID or external identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Measure product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Measure product name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Measure product name."
+              },
+              "externalName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The external product name returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external product name returned by Measure."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product state returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product state returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure product response."
+      }
+    },
+    {
+      "id": "maple_billing.get_product_pricing",
+      "service": "maple_billing",
+      "name": "get_product_pricing",
+      "description": "Retrieve a Measure product pricing record by ID or external identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productPricingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Measure product pricing record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "productPricing": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "productId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Measure product ID attached to this pricing record."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Measure product ID attached to this pricing record."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product pricing name returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product pricing name returned by Measure."
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product pricing currency code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product pricing currency code."
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product pricing state returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product pricing state returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure product pricing record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure product pricing response."
+      }
+    },
+    {
+      "id": "maple_billing.get_subscription",
+      "service": "maple_billing",
+      "name": "get_subscription",
+      "description": "Retrieve a Measure subscription by ID or external identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for retrieving a Measure subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Measure customer ID attached to this subscription."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Measure customer ID attached to this subscription."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The subscription status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The subscription status returned by Measure."
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The subscription currency code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The subscription currency code."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure subscription."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure subscription response."
+      }
+    },
+    {
+      "id": "maple_billing.update_customer",
+      "service": "maple_billing",
+      "name": "update_customer",
+      "description": "Update common fields on a Measure customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Measure customer ID or external customer identifier."
+          },
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique identifier that ties the customer back to your system."
+          },
+          "email": {
+            "type": "string",
+            "description": "The customer email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer name."
+          },
+          "orgName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization this customer belongs to."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer phone number."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer's title."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The customer's locale."
+          },
+          "address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The official Measure customer address object."
+          },
+          "billingEmails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One billing email address.",
+              "format": "email"
+            },
+            "description": "Additional email addresses to copy on customer invoices.",
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata key-value pairs forwarded to Measure."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One customer tag."
+            },
+            "description": "Tags to attach to the customer.",
+            "minItems": 1
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company user ID assigned to manage this customer."
+          },
+          "parentCustomerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent customer ID for parent-child billing."
+          },
+          "excludeFromMetrics": {
+            "type": "boolean",
+            "description": "Whether Measure should exclude this customer from metrics."
+          },
+          "childRollupBilling": {
+            "type": "boolean",
+            "description": "Whether Measure should enable rollup billing for children."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Measure Idempotency-Key header value for mutation requests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Customer fields for updating a Measure customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Measure resource identifier."
+              },
+              "identifier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The external customer identifier when returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The external customer identifier when returned by Measure."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The computed customer display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The computed customer display name."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer email address."
+              },
+              "orgName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer's organization name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer's organization name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer status returned by Measure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer status returned by Measure."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Measure."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Measure customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Measure customer update response."
+      }
+    }
+  ]
+}

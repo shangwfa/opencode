@@ -1,0 +1,1446 @@
+{
+  "service": "paypal",
+  "displayName": "PayPal",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "required": true,
+          "inputType": "text",
+          "secret": false
+        },
+        {
+          "key": "clientSecret",
+          "label": "Client Secret",
+          "required": true,
+          "inputType": "password",
+          "secret": true
+        },
+        {
+          "key": "environment",
+          "label": "Environment",
+          "required": true,
+          "inputType": "text",
+          "secret": false,
+          "placeholder": "sandbox"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.paypal.com/",
+  "actions": [
+    {
+      "id": "paypal.add_tracking",
+      "service": "paypal",
+      "name": "add_tracking",
+      "description": "Add shipment tracking information to a completed capture in a PayPal order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "captureId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated captured payment ID."
+          },
+          "trackingNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The carrier tracking number for the shipment."
+          },
+          "carrier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The PayPal carrier code, or OTHER for an unlisted carrier."
+          },
+          "carrierNameOther": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The carrier name when carrier is OTHER."
+          },
+          "notifyPayer": {
+            "type": "boolean",
+            "description": "Whether PayPal should email the tracking information to the payer."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 127,
+                  "description": "The item name or title."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9999999999,
+                  "description": "The whole-number quantity included in this shipment."
+                },
+                "sku": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 127,
+                  "description": "The merchant stock keeping unit for the item."
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "description": "The public product page URL shown to the payer.",
+                  "format": "uri"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "description": "The public item image URL shown to the payer.",
+                  "format": "uri"
+                },
+                "upc": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "UPC-A",
+                        "UPC-B",
+                        "UPC-C",
+                        "UPC-D",
+                        "UPC-E",
+                        "UPC-2",
+                        "UPC-5"
+                      ],
+                      "description": "The UPC code format."
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 6,
+                      "maxLength": 17,
+                      "description": "The numeric UPC code.",
+                      "pattern": "^[0-9]+$"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The universal product code for the item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One order item included in the tracked shipment."
+            },
+            "description": "The order items included in this shipment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "captureId",
+          "trackingNumber",
+          "carrier"
+        ],
+        "description": "Tracking information to add to a completed capture in a PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal order resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal order result."
+      }
+    },
+    {
+      "id": "paypal.authorize_order",
+      "service": "paypal",
+      "name": "authorize_order",
+      "description": "Authorize an approved PayPal order so its funds can be captured later.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "An optional PayPal idempotency key. Reuse it when retrying the same operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "Input for authorizing an approved PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal order resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal order result."
+      }
+    },
+    {
+      "id": "paypal.capture_authorization",
+      "service": "paypal",
+      "name": "capture_authorization",
+      "description": "Capture all or part of an authorized PayPal payment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated authorization ID."
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "currencyCode": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3,
+                "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32,
+                "description": "The positive decimal amount represented as a string."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The partial amount to capture, or omit it to capture the remaining authorized amount."
+          },
+          "invoiceId": {
+            "type": "string",
+            "maxLength": 127,
+            "description": "The invoice identifier associated with this capture."
+          },
+          "finalCapture": {
+            "type": "boolean",
+            "description": "Whether this is the final capture against the authorization."
+          },
+          "noteToPayer": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "A note about the capture shown to the payer."
+          },
+          "softDescriptor": {
+            "type": "string",
+            "maxLength": 22,
+            "description": "The text shown on the payer's card statement."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "Required when amount is provided; reuse the same PayPal idempotency key when retrying the operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorizationId"
+        ],
+        "description": "Input for capturing an authorized PayPal payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "capture": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal captured payment resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal captured payment result."
+      }
+    },
+    {
+      "id": "paypal.capture_order",
+      "service": "paypal",
+      "name": "capture_order",
+      "description": "Capture payment for an approved PayPal order with CAPTURE intent.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "An optional PayPal idempotency key. Reuse it when retrying the same operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "Input for capturing an approved PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal order resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal order result."
+      }
+    },
+    {
+      "id": "paypal.create_order",
+      "service": "paypal",
+      "name": "create_order",
+      "description": "Create a PayPal order and return the approval links needed to continue checkout.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "CAPTURE",
+              "AUTHORIZE"
+            ],
+            "description": "Whether the order will be captured or authorized after approval."
+          },
+          "purchaseUnits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "referenceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "description": "The caller-defined purchase unit identifier."
+                },
+                "amount": {
+                  "type": "object",
+                  "properties": {
+                    "currencyCode": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 3,
+                      "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32,
+                      "description": "The positive decimal amount represented as a string."
+                    },
+                    "breakdown": {
+                      "type": "object",
+                      "properties": {
+                        "itemTotal": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The total amount for all items."
+                        },
+                        "shipping": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The shipping amount."
+                        },
+                        "handling": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The handling amount."
+                        },
+                        "taxTotal": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The total tax amount."
+                        },
+                        "insurance": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The insurance amount."
+                        },
+                        "shippingDiscount": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The shipping discount amount."
+                        },
+                        "discount": {
+                          "type": "object",
+                          "properties": {
+                            "currencyCode": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                            },
+                            "value": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 32,
+                              "description": "The non-negative decimal amount represented as a string."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The order discount amount."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Optional components that must add up to the purchase unit total."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "currencyCode",
+                    "value"
+                  ],
+                  "description": "The total amount for a PayPal purchase unit."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 3000,
+                  "description": "The purchase description."
+                },
+                "customId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "description": "The external reconciliation identifier."
+                },
+                "invoiceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 127,
+                  "description": "The merchant invoice identifier, which should be unique."
+                },
+                "softDescriptor": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "description": "The statement descriptor input; PayPal reflects only the first 22 characters in responses and card statements."
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 127,
+                        "description": "The item name or title."
+                      },
+                      "unitAmount": {
+                        "type": "object",
+                        "properties": {
+                          "currencyCode": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 3,
+                            "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "description": "The non-negative decimal amount represented as a string."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The price for one unit of the item."
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9999999999,
+                        "description": "The whole-number quantity purchased."
+                      },
+                      "tax": {
+                        "type": "object",
+                        "properties": {
+                          "currencyCode": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 3,
+                            "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+                          },
+                          "value": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "description": "The non-negative decimal amount represented as a string."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The tax charged for one unit of the item."
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "A detailed item description."
+                      },
+                      "sku": {
+                        "type": "string",
+                        "maxLength": 127,
+                        "description": "The stock keeping unit for the item."
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "DIGITAL_GOODS",
+                          "PHYSICAL_GOODS",
+                          "DONATION"
+                        ],
+                        "description": "The PayPal item category."
+                      },
+                      "url": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "The public product page URL shown to the payer.",
+                        "format": "uri"
+                      },
+                      "imageUrl": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "The public image URL shown for the item.",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "unitAmount",
+                      "quantity"
+                    ],
+                    "description": "One item purchased in a PayPal order."
+                  },
+                  "description": "The items purchased in this purchase unit.",
+                  "minItems": 1
+                },
+                "shipping": {
+                  "type": "object",
+                  "properties": {
+                    "fullName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300,
+                      "description": "The full name of the shipment recipient."
+                    },
+                    "addressLine1": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300,
+                      "description": "The first line of the shipping address."
+                    },
+                    "addressLine2": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "The second line of the shipping address."
+                    },
+                    "city": {
+                      "type": "string",
+                      "maxLength": 120,
+                      "description": "The city, town, or locality for the shipping address."
+                    },
+                    "state": {
+                      "type": "string",
+                      "maxLength": 300,
+                      "description": "The state, province, or region for the shipping address."
+                    },
+                    "postalCode": {
+                      "type": "string",
+                      "maxLength": 60,
+                      "description": "The postal or ZIP code for the shipping address."
+                    },
+                    "countryCode": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 2,
+                      "description": "The two-character ISO 3166-1 country code, such as US or GB; use C2 for PayPal's supported China cross-border cases."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "fullName",
+                    "addressLine1",
+                    "countryCode"
+                  ],
+                  "description": "A shipping name and address supplied to PayPal for this purchase unit."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount"
+              ],
+              "description": "One contract between the payer and the merchant within a PayPal order."
+            },
+            "description": "The purchase units included in the order.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "paypalExperience": {
+            "type": "object",
+            "properties": {
+              "brandName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127,
+                "description": "The business name shown during PayPal checkout."
+              },
+              "locale": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 10,
+                "description": "The BCP 47 locale for PayPal checkout pages, such as en-US."
+              },
+              "shippingPreference": {
+                "type": "string",
+                "enum": [
+                  "GET_FROM_FILE",
+                  "NO_SHIPPING",
+                  "SET_PROVIDED_ADDRESS"
+                ],
+                "description": "How PayPal obtains the shipping address."
+              },
+              "returnUrl": {
+                "type": "string",
+                "description": "The URL where PayPal redirects the payer after approval.",
+                "format": "uri"
+              },
+              "cancelUrl": {
+                "type": "string",
+                "description": "The URL where PayPal redirects the payer after cancellation.",
+                "format": "uri"
+              },
+              "landingPage": {
+                "type": "string",
+                "enum": [
+                  "LOGIN",
+                  "GUEST_CHECKOUT",
+                  "NO_PREFERENCE",
+                  "BILLING"
+                ],
+                "description": "The PayPal checkout landing page preference."
+              },
+              "userAction": {
+                "type": "string",
+                "enum": [
+                  "CONTINUE",
+                  "PAY_NOW"
+                ],
+                "description": "Whether checkout shows Continue or Pay Now."
+              },
+              "paymentMethodPreference": {
+                "type": "string",
+                "enum": [
+                  "UNRESTRICTED",
+                  "IMMEDIATE_PAYMENT_REQUIRED"
+                ],
+                "description": "The merchant payment method preference."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional settings for the payer's PayPal approval experience."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "An optional PayPal idempotency key. Reuse it when retrying the same operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "intent",
+          "purchaseUnits"
+        ],
+        "description": "Input for creating a PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal order resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal order result."
+      }
+    },
+    {
+      "id": "paypal.get_authorization",
+      "service": "paypal",
+      "name": "get_authorization",
+      "description": "Retrieve details for a PayPal authorized payment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated authorization ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving an authorized PayPal payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authorization": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal authorization resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal authorization result."
+      }
+    },
+    {
+      "id": "paypal.get_balances",
+      "service": "paypal",
+      "name": "get_balances",
+      "description": "Retrieve PayPal account balances, including available and withheld amounts by currency.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asOfTime": {
+            "type": "string",
+            "description": "An optional historical date and time, or omit it for the latest refreshed balances.",
+            "format": "date-time"
+          },
+          "currencyCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "A three-character ISO 4217 currency code, or ALL for every currency."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving PayPal account balances."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The complete balance detail for one PayPal account currency."
+            },
+            "description": "The PayPal balances grouped by currency."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The PayPal account ID associated with the balances."
+          },
+          "asOfTime": {
+            "type": "string",
+            "description": "The date and time represented by the balances.",
+            "format": "date-time"
+          },
+          "lastRefreshedAt": {
+            "type": "string",
+            "description": "The date and time when PayPal last refreshed the balances.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "balances"
+        ],
+        "description": "PayPal account balances and the time when they were measured."
+      }
+    },
+    {
+      "id": "paypal.get_capture",
+      "service": "paypal",
+      "name": "get_capture",
+      "description": "Retrieve details for a captured PayPal payment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "captureId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated captured payment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a captured PayPal payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "capture": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal captured payment resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal captured payment result."
+      }
+    },
+    {
+      "id": "paypal.get_order",
+      "service": "paypal",
+      "name": "get_order",
+      "description": "Retrieve the current details and status of a PayPal order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "includePaymentSource": {
+            "type": "boolean",
+            "description": "Whether PayPal should include the payment_source field in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "Input for retrieving a PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal order resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal order result."
+      }
+    },
+    {
+      "id": "paypal.get_refund",
+      "service": "paypal",
+      "name": "get_refund",
+      "description": "Retrieve the current details and status of a PayPal refund.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "refundId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated refund ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a PayPal refund."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal refund resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal refund result."
+      }
+    },
+    {
+      "id": "paypal.list_transactions",
+      "service": "paypal",
+      "name": "list_transactions",
+      "description": "List PayPal account transactions for reconciliation, support, and financial reporting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive start date and time for the transaction search.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive end date and time, no more than 31 days after startDate.",
+            "format": "date-time"
+          },
+          "transactionId": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 19,
+            "description": "A PayPal transaction or order ID to match."
+          },
+          "transactionType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A PayPal transaction event code, such as T0006 for an Express Checkout payment."
+          },
+          "transactionStatus": {
+            "type": "string",
+            "enum": [
+              "D",
+              "P",
+              "S",
+              "V"
+            ],
+            "description": "The transaction status to match."
+          },
+          "transactionAmountRange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A PayPal amount range in lower denominations, such as [500 TO 1005]."
+          },
+          "currencyCode": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+          },
+          "paymentInstrumentType": {
+            "type": "string",
+            "enum": [
+              "CREDITCARD",
+              "DEBITCARD"
+            ],
+            "description": "The payment instrument type to match."
+          },
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The merchant store ID to match."
+          },
+          "terminalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The merchant terminal ID to match."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "transaction_info",
+                "payer_info",
+                "shipping_info",
+                "auction_info",
+                "cart_info",
+                "incentive_info",
+                "store_info",
+                "all"
+              ],
+              "description": "One transaction detail group to include."
+            },
+            "description": "The transaction detail groups to include, or all for every available group.",
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "balanceAffectingRecordsOnly": {
+            "type": "boolean",
+            "description": "Whether to return only transactions that affect the PayPal account balance."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of transactions to return per page."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Filters for searching PayPal account transactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The complete PayPal transaction detail returned by the reporting API."
+            },
+            "description": "The matching PayPal transaction details."
+          },
+          "accountNumber": {
+            "type": "string",
+            "description": "The merchant account number returned by PayPal."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The start date and time represented by this result.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date and time represented by this result.",
+            "format": "date-time"
+          },
+          "lastRefreshedAt": {
+            "type": "string",
+            "description": "The date and time when PayPal last refreshed this report.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The returned page number."
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "The total number of matching transactions."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of result pages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transactions"
+        ],
+        "description": "A page of PayPal account transactions and reporting metadata."
+      }
+    },
+    {
+      "id": "paypal.refund_capture",
+      "service": "paypal",
+      "name": "refund_capture",
+      "description": "Refund all or part of a captured PayPal payment.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "captureId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated captured payment ID."
+          },
+          "amount": {
+            "type": "object",
+            "properties": {
+              "currencyCode": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3,
+                "description": "The three-character ISO 4217 currency code, such as USD or EUR."
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32,
+                "description": "The positive decimal amount represented as a string."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The partial amount to refund, or omit it to refund the remaining captured amount."
+          },
+          "customId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 127,
+            "description": "The merchant reconciliation identifier for this refund."
+          },
+          "invoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 127,
+            "description": "The merchant invoice identifier for this refund."
+          },
+          "noteToPayer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The refund reason shown to the payer."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "Required when amount is provided; reuse the same PayPal idempotency key when retrying the operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "captureId"
+        ],
+        "description": "Input for refunding a captured PayPal payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete PayPal refund resource returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A PayPal refund result."
+      }
+    },
+    {
+      "id": "paypal.update_tracking",
+      "service": "paypal",
+      "name": "update_tracking",
+      "description": "Update an order shipment tracker, replace its items, notify the payer, or cancel it.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "trackerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The tracker ID returned in the PayPal order resource."
+          },
+          "cancel": {
+            "const": true,
+            "type": "boolean",
+            "description": "Set to true to cancel this shipment tracker."
+          },
+          "notifyPayer": {
+            "type": "boolean",
+            "description": "Whether PayPal should notify the payer about this shipment."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 127,
+                  "description": "The item name or title."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9999999999,
+                  "description": "The whole-number quantity included in this shipment."
+                },
+                "sku": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 127,
+                  "description": "The merchant stock keeping unit for the item."
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "description": "The public product page URL shown to the payer.",
+                  "format": "uri"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "maxLength": 2048,
+                  "description": "The public item image URL shown to the payer.",
+                  "format": "uri"
+                },
+                "upc": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "UPC-A",
+                        "UPC-B",
+                        "UPC-C",
+                        "UPC-D",
+                        "UPC-E",
+                        "UPC-2",
+                        "UPC-5"
+                      ],
+                      "description": "The UPC code format."
+                    },
+                    "code": {
+                      "type": "string",
+                      "minLength": 6,
+                      "maxLength": 17,
+                      "description": "The numeric UPC code.",
+                      "pattern": "^[0-9]+$"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The universal product code for the item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One order item included in the tracked shipment."
+            },
+            "description": "The complete replacement set of order items included in this shipment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "trackerId"
+        ],
+        "description": "Changes to apply to tracking information in a PayPal order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "The PayPal-generated order ID."
+          },
+          "trackerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The PayPal tracker ID that was updated."
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Whether PayPal accepted the tracking update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of updating PayPal tracking information."
+      }
+    },
+    {
+      "id": "paypal.void_authorization",
+      "service": "paypal",
+      "name": "void_authorization",
+      "description": "Void a PayPal authorization that has not been fully captured.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated authorization ID."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 108,
+            "description": "An optional PayPal idempotency key. Reuse it when retrying the same operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorizationId"
+        ],
+        "description": "Input for voiding an authorized PayPal payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authorizationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PayPal-generated authorization ID."
+          },
+          "voided": {
+            "type": "boolean",
+            "description": "Whether PayPal accepted the void operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of voiding a PayPal authorization."
+      }
+    }
+  ]
+}

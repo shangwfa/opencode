@@ -1,0 +1,149 @@
+{
+  "service": "docraptor",
+  "displayName": "DocRaptor",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DOCRAPTOR_API_KEY",
+      "description": "DocRaptor API key used as the Basic auth username. Copy it from Account > API Credentials in the DocRaptor dashboard: https://docraptor.com/login"
+    }
+  ],
+  "homepageUrl": "https://docraptor.com",
+  "actions": [
+    {
+      "id": "docraptor.create_hosted_document",
+      "service": "docraptor",
+      "name": "create_hosted_document",
+      "description": "Create a hosted PDF or Excel document with DocRaptor from raw HTML or a public URL and return its download URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A name for identifying the generated document in DocRaptor."
+          },
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "xls",
+              "xlsx"
+            ],
+            "description": "The output document format."
+          },
+          "documentContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML or XML content to convert into a document."
+          },
+          "documentUrl": {
+            "type": "string",
+            "description": "A public URL that DocRaptor should fetch and convert.",
+            "format": "uri"
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether DocRaptor should create a test document. Test documents may include a watermark."
+          },
+          "javascript": {
+            "type": "boolean",
+            "description": "Whether DocRaptor should execute JavaScript during rendering."
+          },
+          "pipeline": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A specific DocRaptor pipeline version to use."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "The HTTP referrer DocRaptor should use when fetching document assets.",
+            "format": "uri"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An arbitrary tag stored with the document for account-side tracking."
+          },
+          "strict": {
+            "type": "string",
+            "enum": [
+              "none",
+              "html"
+            ],
+            "description": "The DocRaptor validation mode for input HTML."
+          },
+          "hostedDownloadLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of times the hosted document can be downloaded."
+          },
+          "hostedExpiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 date-time when the hosted document should expire.",
+            "format": "date-time"
+          },
+          "princeOptions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Advanced Prince PDF options forwarded to DocRaptor as-is using official prince_options keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "documentType"
+        ],
+        "description": "Input parameters for creating a hosted DocRaptor document from raw HTML or a public URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentUrl": {
+            "type": "string",
+            "description": "The URL for downloading the hosted document.",
+            "format": "uri"
+          },
+          "documentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The hosted document identifier when DocRaptor includes one in the response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The hosted document identifier when DocRaptor includes one in the response."
+          },
+          "numberOfPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The generated PDF page count when DocRaptor includes it in the response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The generated PDF page count when DocRaptor includes it in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized hosted DocRaptor document result returned by the connector."
+      }
+    }
+  ]
+}

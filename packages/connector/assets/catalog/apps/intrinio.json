@@ -1,0 +1,245 @@
+{
+  "service": "intrinio",
+  "displayName": "Intrinio",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "INTRINIO_API_KEY",
+      "description": "Intrinio API key sent as a Bearer token. View or create it on your Intrinio account page: https://account.intrinio.com/account/api_keys."
+    }
+  ],
+  "homepageUrl": "https://intrinio.com/",
+  "actions": [
+    {
+      "id": "intrinio.get_security_stock_prices",
+      "service": "intrinio",
+      "name": "get_security_stock_prices",
+      "description": "Get historical end-of-day stock prices for an Intrinio security.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Intrinio ID or supported ticker, CIK, LEI, FIGI, ISIN, or CUSIP identifier."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "description": "The time period represented by each returned stock price."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "nextPage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination token returned by a previous Intrinio request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The input payload for retrieving historical Intrinio stock prices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stockPrices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A historical stock price record returned by Intrinio."
+            },
+            "description": "The historical stock price records."
+          },
+          "security": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A security record returned by Intrinio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A security record returned by Intrinio."
+          },
+          "nextPage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The historical stock prices returned by Intrinio."
+      }
+    },
+    {
+      "id": "intrinio.lookup_company",
+      "service": "intrinio",
+      "name": "lookup_company",
+      "description": "Look up Intrinio company reference data and metadata by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Intrinio ID or supported ticker, CIK, LEI, FIGI, ISIN, or CUSIP identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for looking up an Intrinio company."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A company record returned by Intrinio."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The company returned by Intrinio."
+      }
+    },
+    {
+      "id": "intrinio.lookup_security",
+      "service": "intrinio",
+      "name": "lookup_security",
+      "description": "Look up Intrinio security reference data by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Intrinio ID or supported ticker, CIK, LEI, FIGI, ISIN, or CUSIP identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for looking up an Intrinio security."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A security record returned by Intrinio."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The security returned by Intrinio."
+      }
+    },
+    {
+      "id": "intrinio.search_companies",
+      "service": "intrinio",
+      "name": "search_companies",
+      "description": "Search Intrinio companies by ticker or company name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticker or company name text to search for."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether to return only actively traded companies."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "starts_with"
+            ],
+            "description": "The matching mode to use for the search query."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching Intrinio companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A company record returned by Intrinio."
+            },
+            "description": "The matching companies."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The companies returned by Intrinio."
+      }
+    }
+  ]
+}

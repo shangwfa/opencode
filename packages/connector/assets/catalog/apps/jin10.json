@@ -1,0 +1,814 @@
+{
+  "service": "jin10",
+  "displayName": "Jin10",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sk-...",
+      "description": "Jin10 MCP API key used as a Bearer token for https://mcp.jin10.com/mcp. Sign in, activate, and copy your MCP Token from the Jin10 Intelligent Open Platform: https://mcp.jin10.com/app/."
+    }
+  ],
+  "homepageUrl": "https://www.jin10.com",
+  "actions": [
+    {
+      "id": "jin10.get_kline",
+      "service": "jin10",
+      "name": "get_kline",
+      "description": "Get minute-level K-line data for a supported Jin10 instrument code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The quote instrument code, such as `XAUUSD`. Use `list_quote_codes` to discover supported codes."
+          },
+          "time": {
+            "type": "integer",
+            "description": "The start Unix timestamp in seconds, within the last 24 hours."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of minute K-lines to return, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "description": "Input for reading Jin10 minute-level K-line data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The quote instrument code."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The quote instrument name."
+                  },
+                  "klines": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "time": {
+                          "type": "integer",
+                          "description": "The K-line timestamp in Unix seconds."
+                        },
+                        "open": {
+                          "type": "string",
+                          "description": "The opening price."
+                        },
+                        "close": {
+                          "type": "string",
+                          "description": "The closing price."
+                        },
+                        "high": {
+                          "type": "string",
+                          "description": "The highest price."
+                        },
+                        "low": {
+                          "type": "string",
+                          "description": "The lowest price."
+                        },
+                        "volume": {
+                          "type": "integer",
+                          "description": "The traded volume."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "One minute-level K-line returned by Jin10."
+                    },
+                    "description": "Minute-level K-lines."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Jin10 K-line data for one instrument."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Jin10 K-line data for one instrument."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 K-line response."
+      }
+    },
+    {
+      "id": "jin10.get_news",
+      "service": "jin10",
+      "name": "get_news",
+      "description": "Get the full details for one Jin10 news article by article ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Jin10 article ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading a Jin10 article detail."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The article ID."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The article title."
+                  },
+                  "introduction": {
+                    "type": "string",
+                    "description": "The article introduction."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "The article body."
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "The article publication time."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "The original article URL.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A Jin10 news article detail."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Jin10 news article detail."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 article detail response."
+      }
+    },
+    {
+      "id": "jin10.get_quote",
+      "service": "jin10",
+      "name": "get_quote",
+      "description": "Get a real-time Jin10 quote for a supported instrument code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The quote instrument code, such as `XAUUSD`. Use `list_quote_codes` to discover supported codes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting a Jin10 quote instrument."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The quote instrument code."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The quote instrument name."
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "The quote publication time in RFC 3339 format."
+                  },
+                  "open": {
+                    "type": "string",
+                    "description": "The opening price."
+                  },
+                  "close": {
+                    "type": "string",
+                    "description": "The latest or closing price."
+                  },
+                  "high": {
+                    "type": "string",
+                    "description": "The highest price."
+                  },
+                  "low": {
+                    "type": "string",
+                    "description": "The lowest price."
+                  },
+                  "volume": {
+                    "type": "integer",
+                    "description": "The traded volume."
+                  },
+                  "ups_price": {
+                    "type": "string",
+                    "description": "The price change."
+                  },
+                  "ups_percent": {
+                    "type": "string",
+                    "description": "The percentage price change."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A real-time quote returned by Jin10."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A real-time quote returned by Jin10."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 real-time quote response."
+      }
+    },
+    {
+      "id": "jin10.list_calendar",
+      "service": "jin10",
+      "name": "list_calendar",
+      "description": "Get Jin10 economic calendar items for the current natural week.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pub_time": {
+                  "type": "string",
+                  "description": "The scheduled publication time."
+                },
+                "star": {
+                  "type": "integer",
+                  "description": "The importance level."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The calendar indicator title."
+                },
+                "previous": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The previous value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The previous value."
+                },
+                "consensus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The consensus forecast value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The consensus forecast value."
+                },
+                "actual": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The actual published value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The actual published value."
+                },
+                "revised": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The revised value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The revised value."
+                },
+                "affect_txt": {
+                  "type": "string",
+                  "description": "The market impact description."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Jin10 economic calendar item."
+            },
+            "description": "Economic calendar items for the current natural week."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 economic calendar response."
+      }
+    },
+    {
+      "id": "jin10.list_flash",
+      "service": "jin10",
+      "name": "list_flash",
+      "description": "List the latest Jin10 flash news items with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from `data.next_cursor` of the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading a cursor-paginated Jin10 list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "description": "The flash news title. This may be empty."
+                        },
+                        "content": {
+                          "type": "string",
+                          "description": "The flash news body."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "The flash news publication time."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The original flash news URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "content",
+                        "time",
+                        "url"
+                      ],
+                      "description": "A Jin10 flash news item."
+                    },
+                    "description": "Flash news items on this page."
+                  },
+                  "next_cursor": {
+                    "type": "string",
+                    "description": "The cursor for the next page, or an empty string when there is no page."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more pages are available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A paginated Jin10 flash news result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A paginated Jin10 flash news result."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 paginated flash news response."
+      }
+    },
+    {
+      "id": "jin10.list_news",
+      "service": "jin10",
+      "name": "list_news",
+      "description": "List the latest Jin10 news articles with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from `data.next_cursor` of the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading a cursor-paginated Jin10 list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The article ID."
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "The article title."
+                        },
+                        "introduction": {
+                          "type": "string",
+                          "description": "The article introduction."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "The article publication time."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The original article URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A Jin10 news article summary."
+                    },
+                    "description": "Article summaries on this page."
+                  },
+                  "next_cursor": {
+                    "type": "string",
+                    "description": "The cursor for the next page, or an empty string when there is no page."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more pages are available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A paginated Jin10 article result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A paginated Jin10 article result."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 paginated article response."
+      }
+    },
+    {
+      "id": "jin10.list_quote_codes",
+      "service": "jin10",
+      "name": "list_quote_codes",
+      "description": "List quote instrument codes supported by Jin10 from the `quote://codes` MCP resource.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The quote instrument code."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The quote instrument display name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Jin10 quote instrument code."
+            },
+            "description": "Supported quote instrument codes."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 quote instrument code list."
+      }
+    },
+    {
+      "id": "jin10.search_flash",
+      "service": "jin10",
+      "name": "search_flash",
+      "description": "Search Jin10 flash news by keyword. The MCP tool returns up to 150 items without pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search keyword."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching Jin10 content by keyword."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "description": "The flash news title. This may be empty."
+                        },
+                        "content": {
+                          "type": "string",
+                          "description": "The flash news body."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "The flash news publication time."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The original flash news URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "content",
+                        "time",
+                        "url"
+                      ],
+                      "description": "A Jin10 flash news item."
+                    },
+                    "description": "Matching flash news items. The upstream MCP tool returns up to 150.",
+                    "maxItems": 150
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Jin10 flash news search results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Jin10 flash news search results."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 flash news search response."
+      }
+    },
+    {
+      "id": "jin10.search_news",
+      "service": "jin10",
+      "name": "search_news",
+      "description": "Search Jin10 news articles by keyword with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search keyword."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from `data.next_cursor` of the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Input for searching Jin10 content with cursor pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The article ID."
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "The article title."
+                        },
+                        "introduction": {
+                          "type": "string",
+                          "description": "The article introduction."
+                        },
+                        "time": {
+                          "type": "string",
+                          "description": "The article publication time."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The original article URL.",
+                          "format": "uri"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A Jin10 news article summary."
+                    },
+                    "description": "Article summaries on this page."
+                  },
+                  "next_cursor": {
+                    "type": "string",
+                    "description": "The cursor for the next page, or an empty string when there is no page."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more pages are available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A paginated Jin10 article result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A paginated Jin10 article result."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The Jin10 status code. `200` means the request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Jin10 status message or error description."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Jin10 article search response."
+      }
+    }
+  ]
+}

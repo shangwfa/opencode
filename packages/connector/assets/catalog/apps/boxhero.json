@@ -1,0 +1,526 @@
+{
+  "service": "boxhero",
+  "displayName": "BoxHero",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "BOXHERO_API_TOKEN",
+      "description": "BoxHero API token sent with the Authorization Bearer header. Generate it from Settings > Integrations in the BoxHero web app."
+    }
+  ],
+  "homepageUrl": "https://www.boxhero-app.com",
+  "actions": [
+    {
+      "id": "boxhero.get_item",
+      "service": "boxhero",
+      "name": "get_item",
+      "description": "Get a single BoxHero inventory item by item identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The BoxHero item identifier."
+          },
+          "location_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "A BoxHero location identifier used to filter the request."
+            },
+            "description": "The location identifiers used to calculate quantity.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item_id"
+        ],
+        "description": "Input parameters for retrieving a single BoxHero item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The unique identifier of the BoxHero item."
+              },
+              "name": {
+                "type": "string",
+                "description": "The BoxHero item name."
+              },
+              "sku": {
+                "type": "string",
+                "description": "The BoxHero item SKU."
+              },
+              "barcode": {
+                "type": "string",
+                "description": "The barcode assigned to the BoxHero item."
+              },
+              "photo_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the BoxHero item photo."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the BoxHero item photo."
+              },
+              "attrs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The unique identifier of the item attribute specification."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "date",
+                        "number",
+                        "barcode"
+                      ],
+                      "description": "The BoxHero attribute type assigned to the item attribute."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The BoxHero item attribute name."
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string item attribute value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric item attribute value."
+                        }
+                      ],
+                      "description": "The item attribute value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A BoxHero item attribute entry."
+                },
+                "description": "The attributes assigned to the BoxHero item."
+              },
+              "cost": {
+                "type": "string",
+                "description": "The BoxHero item purchase cost."
+              },
+              "price": {
+                "type": "string",
+                "description": "The BoxHero item sale price."
+              },
+              "quantity": {
+                "type": "number",
+                "description": "The total BoxHero item quantity."
+              },
+              "quantities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "location_id": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The unique identifier of the location."
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "description": "The item quantity for the specified location."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The item quantity for a single BoxHero location."
+                },
+                "description": "The BoxHero item quantity for each requested location."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "sku",
+              "barcode",
+              "photo_url",
+              "quantity"
+            ],
+            "description": "A BoxHero item summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The BoxHero single item response."
+      }
+    },
+    {
+      "id": "boxhero.get_team_info",
+      "service": "boxhero",
+      "name": "get_team_info",
+      "description": "Get the linked BoxHero team information and team mode.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the linked BoxHero team."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The unique identifier of the BoxHero team."
+              },
+              "name": {
+                "type": "string",
+                "description": "The BoxHero team name."
+              },
+              "mode": {
+                "oneOf": [
+                  {
+                    "const": 0,
+                    "type": "number",
+                    "description": "Basic team mode."
+                  },
+                  {
+                    "const": 1,
+                    "type": "number",
+                    "description": "Unit team mode."
+                  },
+                  {
+                    "const": 2,
+                    "type": "number",
+                    "description": "Location team mode."
+                  }
+                ],
+                "description": "The linked BoxHero team mode."
+              },
+              "currency_symbol": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The currency symbol configured for the team."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The currency symbol configured for the team."
+              },
+              "memo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The notes stored for the team."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The notes stored for the team."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The linked BoxHero team."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The BoxHero linked team response."
+      }
+    },
+    {
+      "id": "boxhero.list_items",
+      "service": "boxhero",
+      "name": "list_items",
+      "description": "List BoxHero inventory items with optional location filters and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "A BoxHero item identifier used to filter the request."
+            },
+            "description": "The item identifiers to filter by.",
+            "minItems": 1
+          },
+          "location_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "A BoxHero location identifier used to filter the request."
+            },
+            "description": "The location identifiers used to calculate quantity.",
+            "minItems": 1
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The cursor returned by a previous BoxHero list_items response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing BoxHero items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The unique identifier of the BoxHero item."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The BoxHero item name."
+                },
+                "sku": {
+                  "type": "string",
+                  "description": "The BoxHero item SKU."
+                },
+                "barcode": {
+                  "type": "string",
+                  "description": "The barcode assigned to the BoxHero item."
+                },
+                "photo_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The URL of the BoxHero item photo."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The URL of the BoxHero item photo."
+                },
+                "attrs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The unique identifier of the item attribute specification."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "date",
+                          "number",
+                          "barcode"
+                        ],
+                        "description": "The BoxHero attribute type assigned to the item attribute."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The BoxHero item attribute name."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string item attribute value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric item attribute value."
+                          }
+                        ],
+                        "description": "The item attribute value."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A BoxHero item attribute entry."
+                  },
+                  "description": "The attributes assigned to the BoxHero item."
+                },
+                "cost": {
+                  "type": "string",
+                  "description": "The BoxHero item purchase cost."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "The BoxHero item sale price."
+                },
+                "quantity": {
+                  "type": "number",
+                  "description": "The total BoxHero item quantity."
+                },
+                "quantities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "location_id": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The unique identifier of the location."
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "description": "The item quantity for the specified location."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The item quantity for a single BoxHero location."
+                  },
+                  "description": "The BoxHero item quantity for each requested location."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "sku",
+                "barcode",
+                "photo_url",
+                "quantity"
+              ],
+              "description": "A BoxHero item summary."
+            },
+            "description": "The BoxHero items returned for the current page."
+          },
+          "count": {
+            "type": "number",
+            "description": "The number of BoxHero items in the current response."
+          },
+          "limit": {
+            "type": "number",
+            "description": "The page size returned by BoxHero."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The cursor for the next page of BoxHero items."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page of BoxHero items."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether BoxHero has more items after the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "count",
+          "cursor",
+          "has_more"
+        ],
+        "description": "The BoxHero list items response."
+      }
+    },
+    {
+      "id": "boxhero.list_locations",
+      "service": "boxhero",
+      "name": "list_locations",
+      "description": "List BoxHero locations available to the linked team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing BoxHero locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The unique identifier of the BoxHero location."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The BoxHero location name."
+                },
+                "quantity": {
+                  "type": "number",
+                  "description": "The total quantity currently stored at the BoxHero location."
+                },
+                "memo": {
+                  "type": "string",
+                  "description": "The notes stored for the BoxHero location."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A BoxHero location."
+            },
+            "description": "The BoxHero locations returned by the request."
+          },
+          "count": {
+            "type": "number",
+            "description": "The number of BoxHero locations in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The BoxHero list locations response."
+      }
+    }
+  ]
+}

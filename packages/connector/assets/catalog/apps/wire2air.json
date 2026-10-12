@@ -1,0 +1,189 @@
+{
+  "service": "wire2air",
+  "displayName": "Wire2Air",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WIRE2AIR_API_KEY",
+      "description": "Wire2Air API key sent with the apikey header. Generate one in the Wire2Air dashboard under Manage Account > Manage API Keys at https://mzone.wire2air.com."
+    }
+  ],
+  "homepageUrl": "https://www.wire2air.com",
+  "actions": [
+    {
+      "id": "wire2air.list_inbound_messages",
+      "service": "wire2air",
+      "name": "list_inbound_messages",
+      "description": "List inbound SMS and MMS messages from the Wire2Air inbox.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateFrom": {
+            "type": "string",
+            "description": "Start date in M/D/YYYY format; the date range cannot exceed 31 days."
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "End date in M/D/YYYY format; the date range cannot exceed 31 days."
+          },
+          "textNumber": {
+            "type": "string",
+            "description": "Assigned shortcode or text number to filter by."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Result page to retrieve; defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of messages to return; defaults to 10."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Wire2Air inbox messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "PageNo": {
+            "type": "integer",
+            "description": "Current page number returned by Wire2Air."
+          },
+          "PageSize": {
+            "type": "integer",
+            "description": "Page size returned by Wire2Air."
+          },
+          "TotalPages": {
+            "type": "number",
+            "description": "Total number of result pages."
+          },
+          "TotalRecords": {
+            "type": "integer",
+            "description": "Total number of matching messages."
+          },
+          "RowStart": {
+            "type": "integer",
+            "description": "One-based index of the first row on this page."
+          },
+          "RowEnd": {
+            "type": "integer",
+            "description": "One-based index of the last row on this page."
+          },
+          "ListItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One inbound Wire2Air message."
+            },
+            "description": "Inbound SMS or MMS messages on this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "PageNo",
+          "PageSize",
+          "TotalPages",
+          "TotalRecords",
+          "RowStart",
+          "RowEnd",
+          "ListItems"
+        ],
+        "description": "A paginated Wire2Air inbox result."
+      }
+    },
+    {
+      "id": "wire2air.send_message",
+      "service": "wire2air",
+      "name": "send_message",
+      "description": "Queue an SMS message or comma-separated bulk SMS messages with Wire2Air.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination number in international format, or comma-separated destination numbers for bulk sending.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Wire2Air shortcode or sender number.",
+            "pattern": "\\S"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SMS message text."
+          },
+          "deliveryDateTime": {
+            "type": "string",
+            "description": "Optional UTC delivery time in MM/DD/YYYY HH:MM:SS format."
+          },
+          "replyPath": {
+            "type": "string",
+            "description": "Callback URL that Wire2Air should use for message replies.",
+            "format": "uri"
+          },
+          "batchName": {
+            "type": "string",
+            "description": "Internal reporting name used for a bulk message batch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "from",
+          "text"
+        ],
+        "description": "Input for sending an SMS message with Wire2Air."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Response": {
+            "type": "string",
+            "description": "Human-readable submission status returned by Wire2Air."
+          },
+          "URI": {
+            "type": "string",
+            "description": "Relative URI for the queued message or batch."
+          },
+          "ID": {
+            "type": "string",
+            "description": "Identifier for the queued message or batch."
+          },
+          "Type": {
+            "type": "string",
+            "description": "Result type, such as Out or Batch."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "Response",
+          "URI",
+          "ID",
+          "Type"
+        ],
+        "description": "The Wire2Air message submission result."
+      }
+    }
+  ]
+}

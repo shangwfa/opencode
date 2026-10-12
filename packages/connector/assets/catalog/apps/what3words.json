@@ -1,0 +1,616 @@
+{
+  "service": "what3words",
+  "displayName": "what3words",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WHAT3WORDS_API_KEY",
+      "description": "what3words API key sent as the key query parameter. Create or manage keys in the what3words developer console: https://developer.what3words.com/public-api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://what3words.com",
+  "actions": [
+    {
+      "id": "what3words.autosuggest",
+      "service": "what3words",
+      "name": "autosuggest",
+      "description": "Return ranked three word address suggestions for partial or mistyped input.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial or mistyped three word address."
+          },
+          "nResults": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of suggestions to return."
+          },
+          "focusLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude used to bias suggestions."
+          },
+          "focusLng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude used to bias suggestions."
+          },
+          "nFocusResults": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results to prioritize around the focus point."
+          },
+          "clipToCountry": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of ISO 3166-1 alpha-2 country codes used to restrict suggestions."
+          },
+          "clipToCircle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A circle restriction formatted as latitude,longitude,kilometers."
+          },
+          "clipToBoundingBox": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A bounding box restriction formatted as southwest-lat,southwest-lng,northeast-lat,northeast-lng."
+          },
+          "clipToPolygon": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A polygon restriction formatted as comma-separated latitude,longitude coordinate pairs."
+          },
+          "inputType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "vocon-hybrid"
+            ],
+            "description": "The autosuggest input type."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The language code for autosuggest matching."
+          },
+          "preferLand": {
+            "type": "boolean",
+            "description": "Whether suggestions should prefer land locations."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A supported language code used to localize place names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input"
+        ],
+        "description": "Input for requesting three word address suggestions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country": {
+                  "type": "string",
+                  "description": "The ISO 3166-1 alpha-2 country code for the suggested address."
+                },
+                "nearestPlace": {
+                  "type": "string",
+                  "description": "The nearest named place for the suggested address."
+                },
+                "words": {
+                  "type": "string",
+                  "description": "The suggested three word address."
+                },
+                "distanceToFocusKm": {
+                  "type": "number",
+                  "description": "The distance in kilometers from the focus point when available."
+                },
+                "rank": {
+                  "type": "integer",
+                  "description": "The suggestion rank returned by what3words."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The language code for the suggested words."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "country",
+                "nearestPlace",
+                "words",
+                "distanceToFocusKm",
+                "rank",
+                "language"
+              ],
+              "description": "A what3words autosuggest result."
+            },
+            "description": "The ranked autosuggest results."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "suggestions"
+        ],
+        "description": "The response returned by the what3words autosuggest endpoint."
+      }
+    },
+    {
+      "id": "what3words.available_languages",
+      "service": "what3words",
+      "name": "available_languages",
+      "description": "List the languages supported by the what3words API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing available what3words languages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The language code."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The localized language name."
+                },
+                "nativeName": {
+                  "type": "string",
+                  "description": "The native language name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "code",
+                "name",
+                "nativeName"
+              ],
+              "description": "A language supported by what3words."
+            },
+            "description": "The supported what3words languages."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "languages"
+        ],
+        "description": "The response returned by the what3words available languages endpoint."
+      }
+    },
+    {
+      "id": "what3words.convert_to_3wa",
+      "service": "what3words",
+      "name": "convert_to_3wa",
+      "description": "Convert coordinates into a three word address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The latitude in decimal degrees."
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The longitude in decimal degrees."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The language code for the returned three word address."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "geojson"
+            ],
+            "description": "The response format requested from what3words."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "description": "Input for converting coordinates to a three word address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code for the address."
+          },
+          "square": {
+            "type": "object",
+            "properties": {
+              "southwest": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90,
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A latitude and longitude coordinate pair."
+              },
+              "northeast": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90,
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A latitude and longitude coordinate pair."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A what3words square geometry."
+          },
+          "nearestPlace": {
+            "type": "string",
+            "description": "The nearest named place for the what3words address."
+          },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "lat": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude in decimal degrees."
+              },
+              "lng": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A latitude and longitude coordinate pair."
+          },
+          "words": {
+            "type": "string",
+            "description": "The three word address."
+          },
+          "language": {
+            "type": "string",
+            "description": "The language code for the words."
+          },
+          "map": {
+            "type": "string",
+            "description": "A what3words map URL for the address."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "country",
+          "square",
+          "nearestPlace",
+          "coordinates",
+          "words",
+          "language",
+          "map"
+        ],
+        "description": "The response returned by a what3words address conversion endpoint."
+      }
+    },
+    {
+      "id": "what3words.convert_to_coordinates",
+      "service": "what3words",
+      "name": "convert_to_coordinates",
+      "description": "Convert a three word address into coordinates and square metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "words": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The three word address to convert, such as filled.count.soap."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "geojson"
+            ],
+            "description": "The response format requested from what3words."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A supported language code used to localize the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "words"
+        ],
+        "description": "Input for converting words to coordinates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code for the address."
+          },
+          "square": {
+            "type": "object",
+            "properties": {
+              "southwest": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90,
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A latitude and longitude coordinate pair."
+              },
+              "northeast": {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90,
+                    "description": "The latitude in decimal degrees."
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "The longitude in decimal degrees."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A latitude and longitude coordinate pair."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A what3words square geometry."
+          },
+          "nearestPlace": {
+            "type": "string",
+            "description": "The nearest named place for the what3words address."
+          },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "lat": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude in decimal degrees."
+              },
+              "lng": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A latitude and longitude coordinate pair."
+          },
+          "words": {
+            "type": "string",
+            "description": "The three word address."
+          },
+          "language": {
+            "type": "string",
+            "description": "The language code for the words."
+          },
+          "map": {
+            "type": "string",
+            "description": "A what3words map URL for the address."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "country",
+          "square",
+          "nearestPlace",
+          "coordinates",
+          "words",
+          "language",
+          "map"
+        ],
+        "description": "The response returned by a what3words address conversion endpoint."
+      }
+    },
+    {
+      "id": "what3words.grid_section",
+      "service": "what3words",
+      "name": "grid_section",
+      "description": "Return what3words grid line segments for a bounding box.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "southwestLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The southwest latitude of the bounding box."
+          },
+          "southwestLng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The southwest longitude of the bounding box."
+          },
+          "northeastLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "The northeast latitude of the bounding box."
+          },
+          "northeastLng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "The northeast longitude of the bounding box."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "geojson"
+            ],
+            "description": "The response format requested from what3words."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "southwestLat",
+          "southwestLng",
+          "northeastLat",
+          "northeastLng"
+        ],
+        "description": "Input for requesting what3words grid lines."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90,
+                      "description": "The latitude in decimal degrees."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180,
+                      "description": "The longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A latitude and longitude coordinate pair."
+                },
+                "end": {
+                  "type": "object",
+                  "properties": {
+                    "lat": {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90,
+                      "description": "The latitude in decimal degrees."
+                    },
+                    "lng": {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180,
+                      "description": "The longitude in decimal degrees."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A latitude and longitude coordinate pair."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "start",
+                "end"
+              ],
+              "description": "One grid line segment."
+            },
+            "description": "The grid lines covering the requested bounding box."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "lines"
+        ],
+        "description": "The response returned by the what3words grid section endpoint."
+      }
+    }
+  ]
+}

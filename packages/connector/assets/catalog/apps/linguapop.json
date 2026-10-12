@@ -1,0 +1,179 @@
+{
+  "service": "linguapop",
+  "displayName": "Linguapop",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Integration API Key",
+      "placeholder": "LINGUAPOP_INTEGRATION_API_KEY",
+      "description": "Linguapop integration API key sent in the sendInvitation request body. Organization admins can add integrations and view or refresh API keys in Linguapop Integrations: https://docs.linguapop.eu/integrations/."
+    }
+  ],
+  "homepageUrl": "https://www.linguapop.eu/",
+  "actions": [
+    {
+      "id": "linguapop.list_available_languages",
+      "service": "linguapop",
+      "name": "list_available_languages",
+      "description": "Fetch the available Linguapop placement test languages and their stable language codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No parameters are required to fetch Linguapop languages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Human-readable name of the language supported by Linguapop."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Stable Linguapop language code to use when creating placement test invitations."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A language supported by Linguapop placement tests."
+            },
+            "description": "The list of available placement test languages returned by Linguapop."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "languages"
+        ],
+        "description": "The normalized Linguapop language list."
+      }
+    },
+    {
+      "id": "linguapop.send_invitation",
+      "service": "linguapop",
+      "name": "send_invitation",
+      "description": "Create a Linguapop placement test invitation for a candidate, optionally send an email, generate a kiosk code, and configure callback or return URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "externalIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Optional CRM, LMS, or website identifier used to track the candidate."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional candidate name to include on the invitation."
+          },
+          "email": {
+            "type": "string",
+            "description": "Candidate email address for the placement test.",
+            "format": "email"
+          },
+          "languageCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Linguapop language code for the placement test, such as eng, ita, spa, ger, or fra."
+          },
+          "sendEmail": {
+            "type": "boolean",
+            "description": "Whether Linguapop should send an invitation email to the candidate."
+          },
+          "generateKioskCode": {
+            "type": "boolean",
+            "description": "Whether Linguapop should generate and return a kiosk code for the candidate."
+          },
+          "testReading": {
+            "type": "boolean",
+            "description": "Whether the placement test should include a reading section."
+          },
+          "testListening": {
+            "type": "boolean",
+            "description": "Whether the placement test should include a listening section."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Callback URL where Linguapop should POST placement test results when the test is completed.",
+            "format": "uri"
+          },
+          "returnUrl": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "URL where the candidate should be redirected after completing the placement test.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "languageCode",
+          "sendEmail"
+        ],
+        "description": "Parameters for creating a Linguapop placement test invitation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "integer",
+            "description": "Unique Linguapop invitation identifier for tracking the placement test."
+          },
+          "externalIdentifier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The external identifier echoed by Linguapop, or null when none was supplied."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The external identifier echoed by Linguapop, or null when none was supplied."
+          },
+          "url": {
+            "type": "string",
+            "description": "Direct URL to the Linguapop placement test invitation.",
+            "format": "uri"
+          },
+          "emailSent": {
+            "type": "boolean",
+            "description": "Whether Linguapop successfully sent the invitation email."
+          },
+          "kioskCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Generated kiosk code for the candidate, or null when no kiosk code was requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Generated kiosk code for the candidate, or null when no kiosk code was requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Linguapop placement test invitation result."
+      }
+    }
+  ]
+}

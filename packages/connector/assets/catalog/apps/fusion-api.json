@@ -1,0 +1,6159 @@
+{
+  "service": "fusion-api",
+  "displayName": "OOMOL Fusion API",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "OOMOL API Key",
+      "placeholder": "oomol_...",
+      "description": "OOMOL API key sent with the Authorization Bearer header to https://fusion-api.oomol.com. Create or manage keys from the OOMOL console API keys page.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.oomol.com",
+  "actions": [
+    {
+      "id": "fusion-api.cosyvoice_tts_generate",
+      "service": "fusion-api",
+      "name": "cosyvoice_tts_generate",
+      "description": "Generate speech audio with CosyVoice TTS.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "description": "Speech synthesis model. Different models support different voices."
+          },
+          "text": {
+            "type": "string",
+            "description": "Text content to synthesize into speech. SSML and LaTeX are supported."
+          },
+          "voice": {
+            "type": "string",
+            "description": "Voice name, cloned voice ID, or voice design name compatible with the selected model."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "mp3",
+              "pcm",
+              "wav",
+              "opus"
+            ],
+            "description": "Audio encoding format."
+          },
+          "sampleRate": {
+            "type": "integer",
+            "description": "Audio sample rate in Hz."
+          },
+          "volume": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Audio volume. Use 50 for standard volume."
+          },
+          "rate": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "Speech rate. Use 1.0 for standard speed."
+          },
+          "bitRate": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 510,
+            "description": "Audio bit rate in kbps. Only opus format supports this field."
+          },
+          "pitch": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "description": "Speech pitch. Use 1.0 for natural pitch."
+          },
+          "enableSSML": {
+            "type": "boolean",
+            "description": "Whether to enable SSML parsing."
+          },
+          "wordTimestampEnabled": {
+            "type": "boolean",
+            "description": "Whether to include word-level timestamps."
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Random seed used for generation."
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Target language hints. The current API recommends passing at most one value."
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Instruction that controls dialect, emotion, role, or other synthesis style."
+          },
+          "enableAIGCTag": {
+            "type": "boolean",
+            "description": "Whether to add an invisible AIGC tag to the generated audio."
+          },
+          "AIGCPropagator": {
+            "type": "string",
+            "description": "ContentPropagator value for the invisible AIGC tag."
+          },
+          "AIGCPropagateID": {
+            "type": "string",
+            "description": "PropagateID value for the invisible AIGC tag."
+          },
+          "hotFix": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One object property value."
+            },
+            "description": "Text hotfix configuration for pronunciation and replacement."
+          },
+          "enableMarkdownFilter": {
+            "type": "boolean",
+            "description": "Whether to enable Markdown filtering."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "text",
+          "voice"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.cphone_nano_banana_result",
+      "service": "fusion-api",
+      "name": "cphone_nano_banana_result",
+      "description": "Get cphone-nano-banana task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.cphone_nano_banana_state",
+      "service": "fusion-api",
+      "name": "cphone_nano_banana_state",
+      "description": "Get cphone-nano-banana task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.cphone_nano_banana_submit",
+      "service": "fusion-api",
+      "name": "cphone_nano_banana_submit",
+      "description": "Edit images with Nano Banana",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation or editing"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "nano-banana-2",
+              "nano-banana-2-2k",
+              "nano-banana-2-4k",
+              "gemini-3-pro-image-preview",
+              "gemini-2.5-flash-image",
+              "nano-banana-hd",
+              "nano-banana",
+              "gemini-2.5-flash-image-preview",
+              "nano-banana-pro",
+              "nano-banana-pro-4k"
+            ],
+            "description": "Model name to use, defaults to gemini-2.5-flash-image-preview",
+            "default": "gemini-2.5-flash-image-preview"
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "21:9",
+              "1:1",
+              "4:3",
+              "3:2",
+              "2:3",
+              "5:4",
+              "4:5",
+              "3:4",
+              "16:9",
+              "9:16"
+            ],
+            "description": "Generated image aspect ratio"
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "List of reference image URLs for image-to-image generation or editing"
+          },
+          "imageSize": {
+            "type": "string",
+            "enum": [
+              "1K",
+              "2K",
+              "4K"
+            ],
+            "description": "Generated image resolution, only supported by nano-banana-2"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.cphone_nano_banana_result",
+        "fusion-api.cphone_nano_banana_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.cphone_nano_banana_submit",
+        "statusActionId": "fusion-api.cphone_nano_banana_result"
+      }
+    },
+    {
+      "id": "fusion-api.deepseek_ocr_recognize",
+      "service": "fusion-api",
+      "name": "deepseek_ocr_recognize",
+      "description": "Recognize text from a single image.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the image to recognize.",
+            "format": "uri"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Custom OCR prompt."
+          },
+          "oomolApiKey": {
+            "type": "string",
+            "description": "Optional OOMOL API key that overrides the default key for this request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_stt_result",
+      "service": "fusion-api",
+      "name": "doubao_stt_result",
+      "description": "Get doubao-stt task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_stt_state",
+      "service": "fusion-api",
+      "name": "doubao_stt_state",
+      "description": "Get doubao-stt task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_stt_submit",
+      "service": "fusion-api",
+      "name": "doubao_stt_submit",
+      "description": "Convert speech to text with Doubao",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "audioURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the audio file to recognize",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "description": "Audio container format, supporting raw, wav, mp3, and ogg"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "audioURL",
+          "format"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.doubao_stt_result",
+        "fusion-api.doubao_stt_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.doubao_stt_submit",
+        "statusActionId": "fusion-api.doubao_stt_result"
+      }
+    },
+    {
+      "id": "fusion-api.doubao_text_to_image_seedream_generate",
+      "service": "fusion-api",
+      "name": "doubao_text_to_image_seedream_generate",
+      "description": "Generate images from text with Doubao Seedream",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation"
+          },
+          "image": {
+            "type": "string",
+            "description": "Reference image URL or Base64 encoding for image-to-image generation"
+          },
+          "size": {
+            "description": "Image size, supporting descriptive sizes (1K/2K/4K) or explicit width and height in pixels"
+          },
+          "multiple": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "auto"
+            ],
+            "description": "Whether to enable multi-image generation mode; auto lets the model decide",
+            "default": "disabled"
+          },
+          "maxCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 15,
+            "description": "Maximum number of images to generate in one request, only effective in multi-image mode",
+            "default": 1
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add a watermark",
+            "default": true
+          },
+          "optionsnew": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "fast"
+            ],
+            "description": "Generation mode: standard prioritizes quality, fast prioritizes speed",
+            "default": "standard"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_tts_result",
+      "service": "fusion-api",
+      "name": "doubao_tts_result",
+      "description": "Get doubao-tts task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_tts_state",
+      "service": "fusion-api",
+      "name": "doubao_tts_state",
+      "description": "Get doubao-tts task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.doubao_tts_submit",
+      "service": "fusion-api",
+      "name": "doubao_tts_submit",
+      "description": "Convert text to speech with Doubao",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text content to synthesize into speech, up to 100,000 characters"
+          },
+          "voice": {
+            "type": "string",
+            "description": "Speaker ID specifying the voice used for synthesized audio"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "text",
+          "voice"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.doubao_tts_result",
+        "fusion-api.doubao_tts_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.doubao_tts_submit",
+        "statusActionId": "fusion-api.doubao_tts_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_aura_sr_result",
+      "service": "fusion-api",
+      "name": "fal_aura_sr_result",
+      "description": "Get fal-aura-sr task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_aura_sr_state",
+      "service": "fusion-api",
+      "name": "fal_aura_sr_state",
+      "description": "Get fal-aura-sr task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_aura_sr_submit",
+      "service": "fusion-api",
+      "name": "fal_aura_sr_submit",
+      "description": "Image super-resolution upscaling",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "URL of the image to upscale with super resolution",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_aura_sr_result",
+        "fusion-api.fal_aura_sr_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_aura_sr_submit",
+        "statusActionId": "fusion-api.fal_aura_sr_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_2_result",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_2_result",
+      "description": "Get fal-nano-banana-2 task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_2_state",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_2_state",
+      "description": "Get fal-nano-banana-2 task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_2_submit",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_2_submit",
+      "description": "Generate or edit images with Nano Banana 2",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation or editing"
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "List of reference image URLs for image-to-image generation or editing"
+          },
+          "numImages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Number of images to generate",
+            "default": 1
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16"
+            ],
+            "description": "Generated image aspect ratio",
+            "default": "auto"
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "description": "Output image file format",
+            "default": "png"
+          },
+          "safetyTolerance": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ],
+            "description": "Content safety tolerance level, where 1 is the strictest and 6 is the loosest",
+            "default": "4"
+          },
+          "seed": {
+            "type": "integer",
+            "description": "Random seed used to reproduce results with the same input"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "0.5K",
+              "1K",
+              "2K",
+              "4K"
+            ],
+            "description": "Generated image resolution",
+            "default": "1K"
+          },
+          "limitGenerations": {
+            "type": "boolean",
+            "description": "Whether to restrict each prompt round to a single valid result",
+            "default": true
+          },
+          "enableWebSearch": {
+            "type": "boolean",
+            "description": "Whether to enable web-search-enhanced generation"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_nano_banana_2_result",
+        "fusion-api.fal_nano_banana_2_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_nano_banana_2_submit",
+        "statusActionId": "fusion-api.fal_nano_banana_2_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_pro_result",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_pro_result",
+      "description": "Get fal-nano-banana-pro task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_pro_state",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_pro_state",
+      "description": "Get fal-nano-banana-pro task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_pro_submit",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_pro_submit",
+      "description": "Edit images with Nano Banana Pro",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation or editing"
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "List of reference image URLs for image-to-image generation or editing"
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "21:9",
+              "16:9",
+              "3:2",
+              "4:3",
+              "5:4",
+              "1:1",
+              "4:5",
+              "3:4",
+              "2:3",
+              "9:16"
+            ],
+            "description": "Generated image aspect ratio",
+            "default": "1:1"
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp",
+              "jpg"
+            ],
+            "description": "Output image file format",
+            "default": "png"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "1K",
+              "2K",
+              "4K"
+            ],
+            "description": "Generated image resolution",
+            "default": "1K"
+          },
+          "numImages": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "Number of images to generate",
+            "default": 1
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_nano_banana_pro_result",
+        "fusion-api.fal_nano_banana_pro_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_nano_banana_pro_submit",
+        "statusActionId": "fusion-api.fal_nano_banana_pro_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_result",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_result",
+      "description": "Get fal-nano-banana task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_state",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_state",
+      "description": "Get fal-nano-banana task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_nano_banana_submit",
+      "service": "fusion-api",
+      "name": "fal_nano_banana_submit",
+      "description": "Edit images with Nano Banana",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation or editing"
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "List of reference image URLs for image-to-image generation or editing"
+          },
+          "numImages": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of images to generate"
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "jpeg",
+              "png",
+              "webp"
+            ],
+            "description": "Output image file format"
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "21:9",
+              "1:1",
+              "4:3",
+              "3:2",
+              "2:3",
+              "5:4",
+              "4:5",
+              "3:4",
+              "16:9",
+              "9:16"
+            ],
+            "description": "Generated image aspect ratio"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_nano_banana_result",
+        "fusion-api.fal_nano_banana_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_nano_banana_submit",
+        "statusActionId": "fusion-api.fal_nano_banana_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_qwen_image_layered_result",
+      "service": "fusion-api",
+      "name": "fal_qwen_image_layered_result",
+      "description": "Get the Qwen Image Layered task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_qwen_image_layered_state",
+      "service": "fusion-api",
+      "name": "fal_qwen_image_layered_state",
+      "description": "Get the Qwen Image Layered task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_qwen_image_layered_submit",
+      "service": "fusion-api",
+      "name": "fal_qwen_image_layered_submit",
+      "description": "Split an image into multiple layers with Qwen Image Layered",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "URL of the input image to split into layers.",
+            "format": "uri"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Optional description of the input image."
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Content to avoid during generation.",
+            "default": ""
+          },
+          "numInferenceSteps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Number of inference steps.",
+            "default": 28
+          },
+          "guidanceScale": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Prompt guidance strength.",
+            "default": 5
+          },
+          "seed": {
+            "type": "integer",
+            "description": "Seed used to reproduce a result."
+          },
+          "numLayers": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Number of layers to generate.",
+            "default": 4
+          },
+          "enableSafetyChecker": {
+            "type": "boolean",
+            "description": "Whether to enable the safety checker.",
+            "default": true
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "png",
+              "webp"
+            ],
+            "description": "Output image format.",
+            "default": "png"
+          },
+          "acceleration": {
+            "type": "string",
+            "enum": [
+              "none",
+              "regular",
+              "high"
+            ],
+            "description": "Inference acceleration level.",
+            "default": "regular"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_qwen_image_layered_result",
+        "fusion-api.fal_qwen_image_layered_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_qwen_image_layered_submit",
+        "statusActionId": "fusion-api.fal_qwen_image_layered_result"
+      }
+    },
+    {
+      "id": "fusion-api.fal_remove_background_result",
+      "service": "fusion-api",
+      "name": "fal_remove_background_result",
+      "description": "Image with background removed",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.fal_remove_background_state",
+      "service": "fusion-api",
+      "name": "fal_remove_background_state",
+      "description": "Get fal-remove-background task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.fal_remove_background_submit",
+      "service": "fusion-api",
+      "name": "fal_remove_background_submit",
+      "description": "Remove image backgrounds with the Fal.ai BRIA model",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "URL of the image whose background should be removed",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.fal_remove_background_result",
+        "fusion-api.fal_remove_background_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.fal_remove_background_submit",
+        "statusActionId": "fusion-api.fal_remove_background_result"
+      }
+    },
+    {
+      "id": "fusion-api.file_upload_abort_multipart_upload",
+      "service": "fusion-api",
+      "name": "file_upload_abort_multipart_upload",
+      "description": "Abort multipart upload",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uploadID": {
+            "type": "string",
+            "description": "Multipart upload ID to abort"
+          },
+          "key": {
+            "type": "string",
+            "description": "Storage path of the S3 object"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uploadID",
+          "key"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.file_upload_complete_multipart_upload",
+      "service": "fusion-api",
+      "name": "file_upload_complete_multipart_upload",
+      "description": "Complete multipart upload",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uploadID": {
+            "type": "string",
+            "description": "Multipart upload ID"
+          },
+          "key": {
+            "type": "string",
+            "description": "Storage path of the S3 object"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "List of uploaded part information"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uploadID",
+          "key",
+          "parts"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.file_upload_create_multipart_upload",
+      "service": "fusion-api",
+      "name": "file_upload_create_multipart_upload",
+      "description": "Initialize multipart upload",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileSuffix": {
+            "type": "string",
+            "description": "File suffix, mutually exclusive with filename"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Full filename, mutually exclusive with fileSuffix and preferred when provided"
+          },
+          "fileSize": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 524288000,
+            "description": "File size in bytes, up to 500 MB"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "fileSize"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.file_upload_generate_presigned_url",
+      "service": "fusion-api",
+      "name": "file_upload_generate_presigned_url",
+      "description": "Generate a presigned URL for file upload",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileSuffix": {
+            "type": "string",
+            "description": "File suffix, mutually exclusive with filename"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Full filename, mutually exclusive with fileSuffix and preferred when provided"
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.file_upload_generate_presigned_urls",
+      "service": "fusion-api",
+      "name": "file_upload_generate_presigned_urls",
+      "description": "Generate a presigned URL for multipart upload parts",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uploadID": {
+            "type": "string",
+            "description": "Multipart upload ID"
+          },
+          "key": {
+            "type": "string",
+            "description": "Storage path of the S3 object"
+          },
+          "partNumbers": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "List of part numbers for which to generate presigned URLs"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uploadID",
+          "key",
+          "partNumbers"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.jina_reader_read",
+      "service": "fusion-api",
+      "name": "jina_reader_read",
+      "description": "Read and extract URL content",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "URL": {
+            "type": "string",
+            "description": "Webpage URL whose content should be fetched",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html",
+              "text",
+              "screenshot",
+              "pageshot"
+            ],
+            "description": "Output content format"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "browser",
+              "cf-browser-rendering"
+            ],
+            "description": "Rendering engine type: direct for static fetching and browser for dynamic rendering"
+          },
+          "jsonResponse": {
+            "type": "boolean",
+            "description": "Whether to return the result in JSON format"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Page load wait timeout in seconds"
+          },
+          "tokenLimit": {
+            "type": "number",
+            "description": "Maximum number of tokens to return"
+          },
+          "useReaderLMV2": {
+            "type": "boolean",
+            "description": "Whether to use the ReaderLM-v2 model for HTML-to-Markdown conversion"
+          },
+          "selectorOnly": {
+            "type": "string",
+            "description": "Only extract content matching this CSS selector"
+          },
+          "selectorWait": {
+            "type": "string",
+            "description": "Wait for the element matching this CSS selector before extraction"
+          },
+          "selectorNone": {
+            "type": "string",
+            "description": "Remove elements matching this CSS selector before extraction"
+          },
+          "removeAllImages": {
+            "type": "boolean",
+            "description": "Whether to remove all images from the output"
+          },
+          "withLinkSummary": {
+            "type": "string",
+            "enum": [
+              "true",
+              "all"
+            ],
+            "description": "Generate a link summary section at the end; true includes only button links, all includes every link"
+          },
+          "withImageSummary": {
+            "type": "string",
+            "enum": [
+              "true",
+              "all"
+            ],
+            "description": "Generate an image summary section at the end"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "URL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.jina_reader_search",
+      "service": "fusion-api",
+      "name": "jina_reader_search",
+      "description": "Search web content",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Search query keywords"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "direct"
+            ],
+            "description": "Search engine type"
+          },
+          "jsonResponse": {
+            "type": "boolean",
+            "description": "Whether to return search results in JSON format"
+          },
+          "withFavicons": {
+            "type": "boolean",
+            "description": "Whether to include website icons in the result"
+          },
+          "googleLocal": {
+            "type": "string",
+            "enum": [
+              "US",
+              "CA",
+              "MX",
+              "GB",
+              "DE",
+              "FR",
+              "GP",
+              "CN",
+              "IN",
+              "BR",
+              "AU",
+              "RU",
+              "IT",
+              "ES",
+              "KR",
+              "NL",
+              "CH",
+              "SE",
+              "IE",
+              "SG",
+              "IL",
+              "SA",
+              "AE",
+              "ZA"
+            ],
+            "description": "Restrict the geographic location of search results using an ISO country code"
+          },
+          "hostLanguage": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es",
+              "fr",
+              "de",
+              "ja",
+              "zh-cn",
+              "hi",
+              "pt",
+              "it",
+              "ko",
+              "nl",
+              "ar",
+              "sv",
+              "iw",
+              "af",
+              "ru"
+            ],
+            "description": "Preferred language for search results"
+          },
+          "pageIndex": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Page number for search results"
+          },
+          "noCache": {
+            "type": "boolean",
+            "description": "Whether to bypass cache and fetch the latest result"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "content"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.openai_image_async_result",
+      "service": "fusion-api",
+      "name": "openai_image_async_result",
+      "description": "Get asynchronous OpenAI image generation result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.openai_image_async_submit",
+      "service": "fusion-api",
+      "name": "openai_image_async_submit",
+      "description": "Submit asynchronous OpenAI image generation requests, including gpt-image-2 image creation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation"
+          },
+          "model": {
+            "type": "string",
+            "description": "OpenAI image model name"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "transparent",
+              "opaque",
+              "auto"
+            ],
+            "description": "Background mode"
+          },
+          "moderation": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "low"
+            ],
+            "description": "Content moderation strictness"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Number of images to generate"
+          },
+          "output_compression": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "JPEG or WebP output compression level"
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "Output image format"
+          },
+          "partial_images": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Number of partial images for streaming responses"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "high",
+              "medium",
+              "low",
+              "hd",
+              "standard"
+            ],
+            "description": "Image quality"
+          },
+          "size": {
+            "type": "string",
+            "description": "Output image size. For GPT Image 2, use auto or WIDTHxHEIGHT. Official constraints: largest dimension <= 3840, width and height multiples of 16, longest side at most 3x the shortest side, and total pixels between 655360 and 8294400 inclusive."
+          },
+          "user": {
+            "type": "string",
+            "description": "End-user identifier"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.openai_image_async_result"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.openai_image_async_submit",
+        "statusActionId": "fusion-api.openai_image_async_result"
+      }
+    },
+    {
+      "id": "fusion-api.openai_image_edit_async_result",
+      "service": "fusion-api",
+      "name": "openai_image_edit_async_result",
+      "description": "Get asynchronous OpenAI image edit result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.openai_image_edit_async_submit",
+      "service": "fusion-api",
+      "name": "openai_image_edit_async_submit",
+      "description": "Submit asynchronous OpenAI image edit requests, including gpt-image-2 image editing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image editing"
+          },
+          "model": {
+            "type": "string",
+            "description": "OpenAI image model name"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "transparent",
+              "opaque",
+              "auto"
+            ],
+            "description": "Background mode"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Number of images to generate"
+          },
+          "output_compression": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "JPEG or WebP output compression level"
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "Output image format"
+          },
+          "partial_images": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Number of partial images for streaming responses"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "high",
+              "medium",
+              "low",
+              "hd",
+              "standard"
+            ],
+            "description": "Image quality"
+          },
+          "size": {
+            "type": "string",
+            "description": "Output image size. For GPT Image 2, use auto or WIDTHxHEIGHT. Official constraints: largest dimension <= 3840, width and height multiples of 16, longest side at most 3x the shortest side, and total pixels between 655360 and 8294400 inclusive."
+          },
+          "user": {
+            "type": "string",
+            "description": "End-user identifier"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Reference images to edit or compose from"
+          },
+          "mask": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One object property value."
+            },
+            "description": "Mask image reference for partial edits"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt",
+          "images"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.openai_image_edit_async_result"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.openai_image_edit_async_submit",
+        "statusActionId": "fusion-api.openai_image_edit_async_result"
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_epub_result",
+      "service": "fusion-api",
+      "name": "pdf_transform_epub_result",
+      "description": "Get pdf-transform-epub task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_epub_state",
+      "service": "fusion-api",
+      "name": "pdf_transform_epub_state",
+      "description": "Get pdf-transform-epub task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_epub_submit",
+      "service": "fusion-api",
+      "name": "pdf_transform_epub_submit",
+      "description": "Convert a PDF to EPUB format",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pdfURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the PDF file to convert",
+            "format": "uri"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "gundam"
+            ],
+            "description": "OCR model name",
+            "default": "gundam"
+          },
+          "includesFootnotes": {
+            "type": "boolean",
+            "description": "Whether to include footnote content",
+            "default": true
+          },
+          "ignorePdfErrors": {
+            "type": "boolean",
+            "description": "Whether to ignore PDF parsing errors so the whole file can still be output",
+            "default": true
+          },
+          "ignoreOcrErrors": {
+            "type": "boolean",
+            "description": "Whether to ignore OCR recognition errors",
+            "default": true
+          },
+          "ocrWorkers": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Number of parallel OCR worker threads",
+            "default": 1
+          },
+          "inlineLatex": {
+            "type": "boolean",
+            "description": "Whether to inline LaTeX formulas into the content",
+            "default": true
+          },
+          "oomolApiKey": {
+            "type": "string",
+            "description": "OOMOL API key, optionally overriding the default key"
+          },
+          "filename": {
+            "type": "string",
+            "description": "Output filename, optional"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "pdfURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.pdf_transform_epub_result",
+        "fusion-api.pdf_transform_epub_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.pdf_transform_epub_submit",
+        "statusActionId": "fusion-api.pdf_transform_epub_result"
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_markdown_result",
+      "service": "fusion-api",
+      "name": "pdf_transform_markdown_result",
+      "description": "Get pdf-transform-markdown task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_markdown_state",
+      "service": "fusion-api",
+      "name": "pdf_transform_markdown_state",
+      "description": "Get pdf-transform-markdown task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.pdf_transform_markdown_submit",
+      "service": "fusion-api",
+      "name": "pdf_transform_markdown_submit",
+      "description": "Convert a PDF to Markdown format",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pdfURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the PDF file to convert",
+            "format": "uri"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "gundam"
+            ],
+            "description": "OCR model name",
+            "default": "gundam"
+          },
+          "includesFootnotes": {
+            "type": "boolean",
+            "description": "Whether to include footnote content",
+            "default": true
+          },
+          "ignorePdfErrors": {
+            "type": "boolean",
+            "description": "Whether to ignore PDF parsing errors so the whole file can still be output",
+            "default": true
+          },
+          "ignoreOcrErrors": {
+            "type": "boolean",
+            "description": "Whether to ignore OCR recognition errors",
+            "default": true
+          },
+          "ocrWorkers": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Number of parallel OCR worker threads",
+            "default": 1
+          },
+          "oomolApiKey": {
+            "type": "string",
+            "description": "OOMOL API key, optionally overriding the default key"
+          },
+          "inlineLatex": {
+            "type": "boolean",
+            "description": "Whether to inline LaTeX formulas into Markdown",
+            "default": true
+          },
+          "filename": {
+            "type": "string",
+            "description": "Output filename, optional"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "pdfURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.pdf_transform_markdown_result",
+        "fusion-api.pdf_transform_markdown_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.pdf_transform_markdown_submit",
+        "statusActionId": "fusion-api.pdf_transform_markdown_result"
+      }
+    },
+    {
+      "id": "fusion-api.qwen_asr_filetrans_result",
+      "service": "fusion-api",
+      "name": "qwen_asr_filetrans_result",
+      "description": "Get Qwen ASR file transcription task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_asr_filetrans_state",
+      "service": "fusion-api",
+      "name": "qwen_asr_filetrans_state",
+      "description": "Get Qwen ASR file transcription task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_asr_filetrans_submit",
+      "service": "fusion-api",
+      "name": "qwen_asr_filetrans_submit",
+      "description": "Submit a long-audio speech recognition task with Qwen ASR file transcription",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the audio file to transcribe.",
+            "format": "uri"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "yue",
+              "en",
+              "ja",
+              "de",
+              "ko",
+              "ru",
+              "fr",
+              "pt",
+              "ar",
+              "it",
+              "es",
+              "hi",
+              "id",
+              "th",
+              "tr",
+              "uk",
+              "vi",
+              "cs",
+              "da",
+              "fil",
+              "fi",
+              "is",
+              "ms",
+              "no",
+              "pl",
+              "sv"
+            ],
+            "description": "Audio language. Leave unspecified when the language is unknown or the audio is multilingual."
+          },
+          "enableITN": {
+            "type": "boolean",
+            "description": "Whether to enable inverse text normalization for Chinese and English audio.",
+            "default": false
+          },
+          "enableWords": {
+            "type": "boolean",
+            "description": "Whether to return word-level timestamps.",
+            "default": false
+          },
+          "channelID": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Audio channel indexes to transcribe, starting from 0."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "fileURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.qwen_asr_filetrans_result",
+        "fusion-api.qwen_asr_filetrans_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.qwen_asr_filetrans_submit",
+        "statusActionId": "fusion-api.qwen_asr_filetrans_result"
+      }
+    },
+    {
+      "id": "fusion-api.qwen_doc_turbo_analyze",
+      "service": "fusion-api",
+      "name": "qwen_doc_turbo_analyze",
+      "description": "Analyze documents with Tongyi Qianwen",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "docURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "Array of document URLs to process, supporting PDF, Word, Excel, and other formats"
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Document analysis instruction describing the extraction requirements"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text content, mutually exclusive with docURLs mode"
+          },
+          "systemPrompt": {
+            "type": "string",
+            "description": "System prompt that sets the model role and behavior",
+            "default": "You are a helpful assistant."
+          },
+          "fileParsingStrategy": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "text_only",
+              "text_and_images"
+            ],
+            "description": "File parsing strategy: auto selects automatically, text_only parses text only, and text_and_images parses text and images",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_image_edit_plus_edit",
+      "service": "fusion-api",
+      "name": "qwen_image_edit_plus_edit",
+      "description": "Edit images with Tongyi Wanxiang",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen-image-edit-max",
+              "qwen-image-edit-plus",
+              "qwen-image-edit"
+            ],
+            "description": "Model name",
+            "default": "qwen-image-edit-plus"
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "Array of input image URLs, supporting 1 to 3 images"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Editing instruction describing changes to the image"
+          },
+          "generateImageCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Number of images to generate",
+            "default": 1
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "size": {
+            "type": "string",
+            "description": "The size input value."
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add a watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURLs",
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_image_generate",
+      "service": "fusion-api",
+      "name": "qwen_image_generate",
+      "description": "Generate images with Tongyi Qianwen",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen-image-2.0",
+              "qwen-image-2.0-pro"
+            ],
+            "description": "Model name",
+            "default": "qwen-image-2.0"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt for image generation"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "size": {
+            "type": "string",
+            "description": "The size input value."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Number of images to generate, supporting 1 to 6 images",
+            "default": 1
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add a watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_mt_image_result",
+      "service": "fusion-api",
+      "name": "qwen_mt_image_result",
+      "description": "Get qwen-mt-image task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_mt_image_state",
+      "service": "fusion-api",
+      "name": "qwen_mt_image_state",
+      "description": "Get qwen-mt-image task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_mt_image_submit",
+      "service": "fusion-api",
+      "name": "qwen_mt_image_submit",
+      "description": "Image machine translation",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "Publicly accessible URL of the image to translate",
+            "format": "uri"
+          },
+          "sourceLang": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "zh",
+              "en",
+              "ko",
+              "ja",
+              "ru",
+              "es",
+              "fr",
+              "pt",
+              "it",
+              "de",
+              "vi"
+            ],
+            "description": "Source language; auto enables automatic detection",
+            "default": "auto"
+          },
+          "targetLang": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en",
+              "ko",
+              "ja",
+              "ru",
+              "es",
+              "fr",
+              "pt",
+              "it",
+              "vi",
+              "ms",
+              "th",
+              "id",
+              "ar"
+            ],
+            "description": "Target language"
+          },
+          "domainHint": {
+            "type": "string",
+            "description": "Domain prompt describing the translation style; English is recommended"
+          },
+          "sensitivities": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Sensitive word filter list; exact matches are skipped during translation"
+          },
+          "terminologies": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Terminology override list specifying translations for specific words"
+          },
+          "skipImgSegment": {
+            "type": "boolean",
+            "description": "Whether to skip image subject segmentation and translate all text when skipped"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL",
+          "targetLang"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.qwen_mt_image_result",
+        "fusion-api.qwen_mt_image_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.qwen_mt_image_submit",
+        "statusActionId": "fusion-api.qwen_mt_image_result"
+      }
+    },
+    {
+      "id": "fusion-api.qwen_tts_generate",
+      "service": "fusion-api",
+      "name": "qwen_tts_generate",
+      "description": "Generate speech audio",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "qwen3-tts-instruct-flash",
+              "qwen3-tts-flash",
+              "qwen3-tts-vc-2026-01-22"
+            ],
+            "description": "Model name.",
+            "default": "qwen3-tts-flash"
+          },
+          "text": {
+            "type": "string",
+            "description": "Text content to synthesize into speech."
+          },
+          "voice": {
+            "type": "string",
+            "description": "Preset voice name or cloned voice ID.",
+            "default": "Cherry"
+          },
+          "languageType": {
+            "type": "string",
+            "enum": [
+              "Auto",
+              "Chinese",
+              "English",
+              "German",
+              "Italian",
+              "Portuguese",
+              "Spanish",
+              "Japanese",
+              "Korean",
+              "French",
+              "Russian"
+            ],
+            "description": "Language type of the text."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Speech performance control instruction, only available for instruct models."
+          },
+          "optimizeInstructions": {
+            "type": "boolean",
+            "description": "Whether to optimize speech performance instructions, only available for instruct models."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "text"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_cloning_create",
+      "service": "fusion-api",
+      "name": "qwen_voice_cloning_create",
+      "description": "Create a Qwen voice cloning voice and return a preview audio URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetModel": {
+            "type": "string",
+            "enum": [
+              "qwen3-tts-vc-realtime-2026-01-15",
+              "qwen3-tts-vc-realtime-2025-11-27",
+              "qwen3-tts-vc-2026-01-22"
+            ],
+            "description": "Speech synthesis model that drives the cloned voice.",
+            "default": "qwen3-tts-vc-2026-01-22"
+          },
+          "preferredName": {
+            "type": "string",
+            "description": "Short voice name used to identify the cloned voice."
+          },
+          "audioData": {
+            "type": "string",
+            "description": "Source audio data for cloning. Use a data URL or a public HTTPS URL."
+          },
+          "text": {
+            "type": "string",
+            "description": "Transcript matching the source audio content."
+          },
+          "previewText": {
+            "type": "string",
+            "description": "Text used to generate the preview audio."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh",
+              "en",
+              "de",
+              "it",
+              "pt",
+              "es",
+              "ja",
+              "ko",
+              "fr",
+              "ru"
+            ],
+            "description": "Language of the source audio."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "preferredName",
+          "audioData",
+          "previewText"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_design_create",
+      "service": "fusion-api",
+      "name": "qwen_voice_design_create",
+      "description": "Create a Qwen voice design voice and return preview audio.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "targetModel": {
+            "description": "Speech synthesis model that drives the designed voice."
+          },
+          "voicePrompt": {
+            "type": "string",
+            "description": "Voice description. Only Chinese and English are supported."
+          },
+          "previewText": {
+            "type": "string",
+            "description": "Text used for preview audio."
+          },
+          "preferredName": {
+            "type": "string",
+            "description": "Short voice name. Only letters, numbers, and underscores are allowed."
+          },
+          "language": {
+            "description": "Language tendency used for voice design."
+          },
+          "sampleRate": {
+            "description": "Preview audio sample rate."
+          },
+          "responseFormat": {
+            "description": "Preview audio format."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "voicePrompt",
+          "previewText",
+          "preferredName"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_design_delete",
+      "service": "fusion-api",
+      "name": "qwen_voice_design_delete",
+      "description": "Delete a Qwen voice design voice.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "voice": {
+            "type": "string",
+            "description": "Voice name."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "voice"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_design_generate",
+      "service": "fusion-api",
+      "name": "qwen_voice_design_generate",
+      "description": "Generate speech audio using a Qwen voice design voice.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text content to synthesize into speech."
+          },
+          "voice": {
+            "type": "string",
+            "description": "Voice name created by Qwen voice design."
+          },
+          "model": {
+            "description": "Speech synthesis model for the voice design voice."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "text",
+          "voice"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_design_list",
+      "service": "fusion-api",
+      "name": "qwen_voice_design_list",
+      "description": "List Qwen voice design voices.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Page index.",
+            "default": 0
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Number of voices per page.",
+            "default": 10
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.qwen_voice_design_query",
+      "service": "fusion-api",
+      "name": "qwen_voice_design_query",
+      "description": "Get details for a Qwen voice design voice.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "voice": {
+            "type": "string",
+            "description": "Voice name."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "voice"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.seedance_video_result",
+      "service": "fusion-api",
+      "name": "seedance_video_result",
+      "description": "Query a Seedance video generation task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.seedance_video_state",
+      "service": "fusion-api",
+      "name": "seedance_video_state",
+      "description": "Get a Seedance video generation task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.seedance_video_submit",
+      "service": "fusion-api",
+      "name": "seedance_video_submit",
+      "description": "Generate videos with Doubao Seedance",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "doubao-seedance-2-0-260128",
+              "doubao-seedance-2-0-fast-260128",
+              "doubao-seedance-2-5-260628"
+            ],
+            "description": "Video generation model",
+            "default": "doubao-seedance-2-0-260128"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Video generation prompt"
+          },
+          "omniReferenceTaskType": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "reference",
+              "edit",
+              "extend"
+            ],
+            "description": "All-modal reference task type guidance"
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "mp4",
+              "mov"
+            ],
+            "description": "Output video file format"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Reference, first-frame, or last-frame images"
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Reference videos. Only reference_video is supported."
+          },
+          "audios": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Reference audio files. Only reference_audio is supported."
+          },
+          "returnLastFrame": {
+            "type": "boolean",
+            "description": "Whether to return the generated video's last-frame image",
+            "default": false
+          },
+          "executionExpiresAfter": {
+            "type": "integer",
+            "minimum": 3600,
+            "maximum": 259200,
+            "description": "Task expiration threshold in seconds"
+          },
+          "generateAudio": {
+            "type": "boolean",
+            "description": "Whether the generated video should include synchronized audio",
+            "default": true
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "description": "One array item."
+            },
+            "description": "Tools the model may call"
+          },
+          "safetyIdentifier": {
+            "type": "string",
+            "description": "Unique end-user identifier"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "480p",
+              "720p",
+              "1080p"
+            ],
+            "description": "Video resolution",
+            "default": "720p"
+          },
+          "ratio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "21:9",
+              "adaptive"
+            ],
+            "description": "Generated video aspect ratio",
+            "default": "adaptive"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Video duration in seconds. Supported values depend on the selected model; use -1 to let the model choose automatically. Unsupported values are rejected by the upstream API.",
+            "default": 5
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 4294967295,
+            "description": "Random seed"
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add a watermark",
+            "default": false
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.seedance_video_result",
+        "fusion-api.seedance_video_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.seedance_video_submit",
+        "statusActionId": "fusion-api.seedance_video_result"
+      }
+    },
+    {
+      "id": "fusion-api.tinify_png_shrink_compress",
+      "service": "fusion-api",
+      "name": "tinify_png_shrink_compress",
+      "description": "Compress PNG images with the Tinify API",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageURL": {
+            "type": "string",
+            "description": "URL of the original image to compress, supporting PNG, JPEG, and WebP formats",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "description": "The normalized Fusion API action result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_i2v_video_result",
+      "service": "fusion-api",
+      "name": "wanx_i2v_video_result",
+      "description": "Query first-frame-to-video task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_i2v_video_state",
+      "service": "fusion-api",
+      "name": "wanx_i2v_video_state",
+      "description": "Get wanx-i2v-video task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_i2v_video_submit",
+      "service": "fusion-api",
+      "name": "wanx_i2v_video_submit",
+      "description": "Generate videos from the first frame with Tongyi Wanxiang",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "wan2.6-i2v-flash",
+              "wan2.6-i2v"
+            ],
+            "description": "Model name",
+            "default": "wan2.6-i2v-flash"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Video generation prompt"
+          },
+          "imageURL": {
+            "type": "string",
+            "description": "First-frame image URL or Base64-encoded data",
+            "format": "uri"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "audio": {
+            "type": "boolean",
+            "description": "Whether to generate video with audio; only flash models support disabling audio",
+            "default": true
+          },
+          "audioURL": {
+            "type": "string",
+            "description": "Custom audio file URL, used only when audio is needed",
+            "format": "uri"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 15,
+            "description": "Output video duration in seconds",
+            "default": 5
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720P",
+              "1080P"
+            ],
+            "description": "Output video resolution",
+            "default": "1080P"
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting",
+            "default": true
+          },
+          "shotType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ],
+            "description": "Shot type, effective when intelligent prompt rewriting is enabled"
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add an AI-generated watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "imageURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.wanx_i2v_video_result",
+        "fusion-api.wanx_i2v_video_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.wanx_i2v_video_submit",
+        "statusActionId": "fusion-api.wanx_i2v_video_result"
+      }
+    },
+    {
+      "id": "fusion-api.wanx_image_result",
+      "service": "fusion-api",
+      "name": "wanx_image_result",
+      "description": "Get wanx-image task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_image_state",
+      "service": "fusion-api",
+      "name": "wanx_image_state",
+      "description": "Get wanx-image task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_image_submit",
+      "service": "fusion-api",
+      "name": "wanx_image_submit",
+      "description": "Generate and edit images with Tongyi Wanxiang AI",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "wan2.6-image"
+            ],
+            "description": "Model name",
+            "default": "wan2.6-image"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "image-edit",
+              "interleave"
+            ],
+            "description": "Image generation mode: image-edit for image editing, interleave for mixed text-image layout",
+            "default": "image-edit"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Positive prompt describing the desired generated image content"
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "Array of input image URLs; edit mode requires 1-4 images, interleave mode allows 0-1 images"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "size": {
+            "type": "string",
+            "description": "The size input value."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "Number of images to generate: 1-4 in edit mode, fixed at 1 in interleave mode",
+            "default": 4
+          },
+          "maxImages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Maximum number of generated images in mixed-layout mode, only effective in interleave mode"
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting, only effective in edit mode",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add an AI-generated watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.wanx_image_result",
+        "fusion-api.wanx_image_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.wanx_image_submit",
+        "statusActionId": "fusion-api.wanx_image_result"
+      }
+    },
+    {
+      "id": "fusion-api.wanx_kf2v_video_result",
+      "service": "fusion-api",
+      "name": "wanx_kf2v_video_result",
+      "description": "Get wanx-kf2v-video task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_kf2v_video_state",
+      "service": "fusion-api",
+      "name": "wanx_kf2v_video_state",
+      "description": "Get wanx-kf2v-video task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_kf2v_video_submit",
+      "service": "fusion-api",
+      "name": "wanx_kf2v_video_submit",
+      "description": "Generate videos from keyframes with Tongyi Wanxiang",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "wan2.2-kf2v-flash",
+              "wanx2.1-kf2v-plus"
+            ],
+            "description": "Model name",
+            "default": "wan2.2-kf2v-flash"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Text prompt describing the video transition process"
+          },
+          "firstFrameURL": {
+            "type": "string",
+            "description": "First-frame image URL, which determines the video aspect ratio",
+            "format": "uri"
+          },
+          "lastFrameURL": {
+            "type": "string",
+            "description": "Last-frame image URL, used with the first frame to generate a transition video",
+            "format": "uri"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "template": {
+            "type": "string",
+            "description": "Video effect template name; prompt and last frame are not required when using a template"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "480P",
+              "720P",
+              "1080P"
+            ],
+            "description": "Generated video resolution tier",
+            "default": "720P"
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add a watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "firstFrameURL"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.wanx_kf2v_video_result",
+        "fusion-api.wanx_kf2v_video_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.wanx_kf2v_video_submit",
+        "statusActionId": "fusion-api.wanx_kf2v_video_result"
+      }
+    },
+    {
+      "id": "fusion-api.wanx_r2v_video_result",
+      "service": "fusion-api",
+      "name": "wanx_r2v_video_result",
+      "description": "Query reference-to-video task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_r2v_video_state",
+      "service": "fusion-api",
+      "name": "wanx_r2v_video_state",
+      "description": "Get wanx-r2v-video task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_r2v_video_submit",
+      "service": "fusion-api",
+      "name": "wanx_r2v_video_submit",
+      "description": "Generate videos from reference assets with Tongyi Wanxiang",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "wan2.6-r2v-flash",
+              "wan2.6-r2v"
+            ],
+            "description": "Model name",
+            "default": "wan2.6-r2v-flash"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Video generation prompt; use identifiers such as character1 to reference characters"
+          },
+          "referenceURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL accepted by Fusion API.",
+              "format": "uri"
+            },
+            "description": "Array of reference image or video URLs, ordered from character1 to characterN"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "1280*720",
+              "720*1280",
+              "960*960",
+              "1088*832",
+              "832*1088",
+              "1920*1080",
+              "1080*1920",
+              "1440*1440",
+              "1632*1248",
+              "1248*1632"
+            ],
+            "description": "Output video resolution; explicit width and height are required",
+            "default": "1920*1080"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 10,
+            "description": "Output video duration in seconds",
+            "default": 5
+          },
+          "shotType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ],
+            "description": "Shot type: single for a single shot, multi for multiple shots"
+          },
+          "audio": {
+            "type": "boolean",
+            "description": "Whether to generate video with audio; only flash models support disabling audio",
+            "default": true
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add an AI-generated watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt",
+          "referenceURLs"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.wanx_r2v_video_result",
+        "fusion-api.wanx_r2v_video_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.wanx_r2v_video_submit",
+        "statusActionId": "fusion-api.wanx_r2v_video_result"
+      }
+    },
+    {
+      "id": "fusion-api.wanx_t2v_video_result",
+      "service": "fusion-api",
+      "name": "wanx_t2v_video_result",
+      "description": "Query text-to-video task result",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              },
+              "data": {
+                "description": "Task result data returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed with result data."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task result."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_t2v_video_state",
+      "service": "fusion-api",
+      "name": "wanx_t2v_video_state",
+      "description": "Get wanx-t2v-video task state",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionID": {
+            "type": "string",
+            "description": "Session ID"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sessionID"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "completed",
+                "type": "string",
+                "description": "Task state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task completed."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "Task state."
+              },
+              "progress": {
+                "type": "number",
+                "description": "Task progress reported by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task is still processing."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failed",
+                  "not_found"
+                ],
+                "description": "Task state."
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message returned by Fusion API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Fusion API task failed or was not found."
+          }
+        ],
+        "description": "The normalized Fusion API task state."
+      }
+    },
+    {
+      "id": "fusion-api.wanx_t2v_video_submit",
+      "service": "fusion-api",
+      "name": "wanx_t2v_video_submit",
+      "description": "Generate text-to-video videos with Tongyi Wanxiang",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Video generation prompt"
+          },
+          "negativePrompt": {
+            "type": "string",
+            "description": "Negative prompt describing content to avoid"
+          },
+          "audioURL": {
+            "type": "string",
+            "description": "The audioURL input value.",
+            "format": "uri"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "1280*720",
+              "720*1280",
+              "960*960",
+              "1088*832",
+              "832*1088",
+              "1920*1080",
+              "1080*1920",
+              "1440*1440",
+              "1632*1248",
+              "1248*1632"
+            ],
+            "description": "Output video resolution; explicit width and height are required",
+            "default": "1920*1080"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 15,
+            "description": "Output video duration in seconds",
+            "default": 5
+          },
+          "promptExtend": {
+            "type": "boolean",
+            "description": "Whether to enable intelligent prompt rewriting",
+            "default": true
+          },
+          "shotType": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ],
+            "description": "Shot type: single for a single shot, multi for multiple shots"
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether to add an AI-generated watermark",
+            "default": false
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Random seed; fixed seeds can reproduce results"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The Fusion API request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task session ID used by result and state actions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Fusion API task submission handle."
+      },
+      "followUpActions": [
+        "fusion-api.wanx_t2v_video_result",
+        "fusion-api.wanx_t2v_video_state"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "fusion-api.wanx_t2v_video_submit",
+        "statusActionId": "fusion-api.wanx_t2v_video_result"
+      }
+    }
+  ]
+}

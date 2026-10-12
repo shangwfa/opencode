@@ -1,0 +1,932 @@
+{
+  "service": "groqcloud",
+  "displayName": "GroqCloud",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "gsk_...",
+      "description": "GroqCloud API key used with the Authorization Bearer header. Get it from https://console.groq.com/keys."
+    }
+  ],
+  "homepageUrl": "https://groq.com",
+  "actions": [
+    {
+      "id": "groqcloud.create_audio_transcription",
+      "service": "groqcloud",
+      "name": "create_audio_transcription",
+      "description": "Transcribe an audio file into text in its original language using a GroqCloud Whisper model. Supply the audio inline as base64 or as a public URL that GroqCloud downloads.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "whisper-large-v3",
+              "whisper-large-v3-turbo"
+            ],
+            "description": "The GroqCloud speech-to-text model identifier."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file name reported to GroqCloud, including the audio file extension. Required with content_base64."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the audio file, such as audio/mpeg."
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A public URL that GroqCloud downloads the audio from."
+              },
+              "content_base64": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The base64-encoded audio content to upload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The audio source. Provide url for GroqCloud to fetch the audio, or content_base64 to upload the bytes inline.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "content_base64",
+                  "name"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "content_base64"
+              ]
+            }
+          },
+          "language": {
+            "type": "string",
+            "description": "The ISO-639-1 code of the spoken language, such as en, which improves accuracy and latency."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Optional context or style guidance for the transcript, limited to 224 tokens."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "verbose_json"
+            ],
+            "description": "The transcript format to return. This connector returns structured payloads, so the plain text format is not offered."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The sampling temperature applied to the transcription."
+          },
+          "timestamp_granularities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "word",
+                "segment"
+              ],
+              "description": "A timestamp granularity."
+            },
+            "description": "The timestamp detail to include. Requires response_format to be verbose_json.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "file"
+        ],
+        "description": "The input payload for transcribing audio with GroqCloud."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The full transcript text."
+          },
+          "language": {
+            "type": "string",
+            "description": "The detected or requested language of the audio."
+          },
+          "duration": {
+            "type": "number",
+            "description": "The audio duration in seconds."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The segment index."
+                },
+                "seek": {
+                  "type": "integer",
+                  "description": "The seek offset of the segment."
+                },
+                "start": {
+                  "type": "number",
+                  "description": "The segment start time in seconds."
+                },
+                "end": {
+                  "type": "number",
+                  "description": "The segment end time in seconds."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The transcribed text for the segment."
+                },
+                "tokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A token identifier."
+                  },
+                  "description": "The token identifiers for the segment."
+                },
+                "temperature": {
+                  "type": "number",
+                  "description": "The sampling temperature used for the segment."
+                },
+                "avg_logprob": {
+                  "type": "number",
+                  "description": "The average log probability of the segment."
+                },
+                "compression_ratio": {
+                  "type": "number",
+                  "description": "The compression ratio of the segment."
+                },
+                "no_speech_prob": {
+                  "type": "number",
+                  "description": "The probability that the segment contains no speech."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A transcribed segment of the audio."
+            },
+            "description": "The transcribed segments, returned for the verbose_json format."
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "word": {
+                  "type": "string",
+                  "description": "The transcribed word."
+                },
+                "start": {
+                  "type": "number",
+                  "description": "The word start time in seconds."
+                },
+                "end": {
+                  "type": "number",
+                  "description": "The word end time in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A transcribed word with timestamps."
+            },
+            "description": "The transcribed words, returned when word timestamp granularity is requested."
+          },
+          "x_groq": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the upstream API."
+            },
+            "description": "Any JSON object."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The transcript payload returned by GroqCloud."
+      }
+    },
+    {
+      "id": "groqcloud.create_audio_translation",
+      "service": "groqcloud",
+      "name": "create_audio_translation",
+      "description": "Translate an audio file into English text using a GroqCloud Whisper model. Supply the audio inline as base64 or as a public URL that GroqCloud downloads.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "whisper-large-v3"
+            ],
+            "description": "The GroqCloud speech-to-text model identifier. Only whisper-large-v3 supports translation."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file name reported to GroqCloud, including the audio file extension. Required with content_base64."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The MIME type of the audio file, such as audio/mpeg."
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A public URL that GroqCloud downloads the audio from."
+              },
+              "content_base64": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The base64-encoded audio content to upload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The audio source. Provide url for GroqCloud to fetch the audio, or content_base64 to upload the bytes inline.",
+            "anyOf": [
+              {
+                "required": [
+                  "url"
+                ]
+              },
+              {
+                "required": [
+                  "content_base64",
+                  "name"
+                ]
+              }
+            ],
+            "not": {
+              "required": [
+                "url",
+                "content_base64"
+              ]
+            }
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Optional context or style guidance for the transcript, limited to 224 tokens."
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "verbose_json"
+            ],
+            "description": "The transcript format to return. This connector returns structured payloads, so the plain text format is not offered."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The sampling temperature applied to the transcription."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "file"
+        ],
+        "description": "The input payload for translating audio into English with GroqCloud."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The full transcript text."
+          },
+          "language": {
+            "type": "string",
+            "description": "The detected or requested language of the audio."
+          },
+          "duration": {
+            "type": "number",
+            "description": "The audio duration in seconds."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The segment index."
+                },
+                "seek": {
+                  "type": "integer",
+                  "description": "The seek offset of the segment."
+                },
+                "start": {
+                  "type": "number",
+                  "description": "The segment start time in seconds."
+                },
+                "end": {
+                  "type": "number",
+                  "description": "The segment end time in seconds."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The transcribed text for the segment."
+                },
+                "tokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "A token identifier."
+                  },
+                  "description": "The token identifiers for the segment."
+                },
+                "temperature": {
+                  "type": "number",
+                  "description": "The sampling temperature used for the segment."
+                },
+                "avg_logprob": {
+                  "type": "number",
+                  "description": "The average log probability of the segment."
+                },
+                "compression_ratio": {
+                  "type": "number",
+                  "description": "The compression ratio of the segment."
+                },
+                "no_speech_prob": {
+                  "type": "number",
+                  "description": "The probability that the segment contains no speech."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A transcribed segment of the audio."
+            },
+            "description": "The transcribed segments, returned for the verbose_json format."
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "word": {
+                  "type": "string",
+                  "description": "The transcribed word."
+                },
+                "start": {
+                  "type": "number",
+                  "description": "The word start time in seconds."
+                },
+                "end": {
+                  "type": "number",
+                  "description": "The word end time in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A transcribed word with timestamps."
+            },
+            "description": "The transcribed words, returned when word timestamp granularity is requested."
+          },
+          "x_groq": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the upstream API."
+            },
+            "description": "Any JSON object."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The transcript payload returned by GroqCloud."
+      }
+    },
+    {
+      "id": "groqcloud.create_chat_completion",
+      "service": "groqcloud",
+      "name": "create_chat_completion",
+      "description": "Create a non-streaming GroqCloud OpenAI-compatible chat completion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GroqCloud model identifier to use."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the upstream API."
+                        },
+                        "description": "Any JSON object."
+                      },
+                      "description": "Structured message content blocks."
+                    },
+                    {
+                      "type": "null",
+                      "description": "Null value."
+                    }
+                  ],
+                  "description": "The message content sent to the model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The optional participant name for the message."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "The identifier of the tool call that this tool message responds to."
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "description": "Any JSON value accepted by the upstream API."
+                    },
+                    "description": "Any JSON object."
+                  },
+                  "description": "Tool calls emitted by the assistant."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "role"
+              ],
+              "description": "A message in the OpenAI-compatible chat completion request."
+            },
+            "description": "The ordered conversation history sent to the model.",
+            "minItems": 1
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The frequency penalty applied to repeated tokens."
+          },
+          "logit_bias": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the upstream API."
+            },
+            "description": "Any JSON object."
+          },
+          "logprobs": {
+            "type": "boolean",
+            "description": "Whether to include token-level log probabilities."
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of completion tokens to generate."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The deprecated maximum token field accepted by OpenAI-compatible clients."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of chat completions to generate."
+          },
+          "parallel_tool_calls": {
+            "type": "boolean",
+            "description": "Whether the model may call tools in parallel."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The presence penalty applied to newly introduced tokens."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json_object",
+                  "json_schema"
+                ],
+                "description": "The requested response format type."
+              },
+              "json_schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "Any JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Response format configuration."
+          },
+          "seed": {
+            "type": "integer",
+            "description": "A seed for deterministic sampling."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single stop sequence."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A stop sequence."
+                },
+                "description": "A list of stop sequences."
+              }
+            ],
+            "description": "One or more sequences where generation should stop."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "auto",
+                  "required"
+                ],
+                "description": "A predefined tool selection mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "Any JSON object."
+              }
+            ],
+            "description": "Tool selection strategy for the request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the upstream API."
+              },
+              "description": "Any JSON object."
+            },
+            "description": "Tools available to the model."
+          },
+          "top_logprobs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of top token log probabilities to include."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          },
+          "user": {
+            "type": "string",
+            "description": "An end-user identifier for monitoring or abuse detection."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for creating a non-streaming GroqCloud chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the completion was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used to generate the completion."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant",
+                        "tool"
+                      ],
+                      "description": "The role of the message author."
+                    },
+                    "content": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Plain text message content."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "Any JSON value accepted by the upstream API."
+                            },
+                            "description": "Any JSON object."
+                          },
+                          "description": "Structured message content blocks."
+                        },
+                        {
+                          "type": "null",
+                          "description": "Null value."
+                        }
+                      ],
+                      "description": "The message content sent to the model."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The optional participant name for the message."
+                    },
+                    "tool_call_id": {
+                      "type": "string",
+                      "description": "The identifier of the tool call that this tool message responds to."
+                    },
+                    "tool_calls": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the upstream API."
+                        },
+                        "description": "Any JSON object."
+                      },
+                      "description": "Tool calls emitted by the assistant."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "role"
+                  ],
+                  "description": "A message in the OpenAI-compatible chat completion request."
+                },
+                "finish_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reason generation finished for this choice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reason generation finished for this choice."
+                },
+                "logprobs": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON value accepted by the upstream API."
+                      },
+                      "description": "Any JSON object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Any JSON object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A chat completion choice."
+            },
+            "description": "The generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "prompt_tokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens consumed."
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "The number of completion tokens generated."
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "The total number of tokens consumed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage information."
+          },
+          "system_fingerprint": {
+            "type": "string",
+            "description": "The backend system fingerprint for the completion."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for a GroqCloud chat completion."
+      }
+    },
+    {
+      "id": "groqcloud.get_model",
+      "service": "groqcloud",
+      "name": "get_model",
+      "description": "Fetch metadata for one GroqCloud model.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact GroqCloud model identifier to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a GroqCloud model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The model identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the model was created."
+          },
+          "owned_by": {
+            "type": "string",
+            "description": "The organization that owns the model."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the model is currently active."
+          },
+          "context_window": {
+            "type": "integer",
+            "description": "The model context window size."
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "description": "The maximum completion tokens supported by the model."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A GroqCloud model record."
+      }
+    },
+    {
+      "id": "groqcloud.list_models",
+      "service": "groqcloud",
+      "name": "list_models",
+      "description": "List the GroqCloud models available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by the API."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when the model was created."
+                },
+                "owned_by": {
+                  "type": "string",
+                  "description": "The organization that owns the model."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the model is currently active."
+                },
+                "context_window": {
+                  "type": "integer",
+                  "description": "The model context window size."
+                },
+                "max_completion_tokens": {
+                  "type": "integer",
+                  "description": "The maximum completion tokens supported by the model."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A GroqCloud model record."
+            },
+            "description": "The list of available GroqCloud models."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for listing GroqCloud models."
+      }
+    }
+  ]
+}

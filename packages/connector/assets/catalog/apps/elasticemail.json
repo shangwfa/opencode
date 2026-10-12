@@ -1,0 +1,1212 @@
+{
+  "service": "elasticemail",
+  "displayName": "Elastic Email",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Elastic Email API key",
+      "description": "Elastic Email API key used with the X-ElasticEmail-ApiKey request header. Manage access tokens in the Elastic Email API settings: https://app.elasticemail.com/marketing/settings/new/manage-api."
+    }
+  ],
+  "homepageUrl": "https://elasticemail.com",
+  "actions": [
+    {
+      "id": "elasticemail.add_contacts",
+      "service": "elasticemail",
+      "name": "add_contacts",
+      "description": "Add up to 1000 contacts to Elastic Email and optionally assign them to lists.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "Proper email address accepted by Elastic Email.",
+                  "format": "email"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "Transactional",
+                    "Engaged",
+                    "Active",
+                    "Bounced",
+                    "Unsubscribed",
+                    "Abuse",
+                    "Inactive",
+                    "Stale",
+                    "NotConfirmed"
+                  ],
+                  "description": "Elastic Email contact status."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "Contact first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "Contact last name."
+                },
+                "customFields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "One custom field string value."
+                  },
+                  "description": "Key-value collection of Elastic Email custom contact fields."
+                },
+                "consent": {
+                  "type": "object",
+                  "properties": {
+                    "consentIp": {
+                      "type": "string",
+                      "description": "IP address of consent to send email; Elastic Email uses the current public IP when omitted."
+                    },
+                    "consentDate": {
+                      "type": "string",
+                      "description": "Date of consent to send email.",
+                      "format": "date-time"
+                    },
+                    "consentTracking": {
+                      "type": "string",
+                      "enum": [
+                        "Unknown",
+                        "Allow",
+                        "Deny"
+                      ],
+                      "description": "Elastic Email consent tracking value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Consent data accepted by Elastic Email contact write endpoints."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "One contact payload accepted by the Elastic Email add-contacts endpoint."
+            },
+            "description": "Contact payloads to create or add through Elastic Email.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "listNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Elastic Email contact list name.",
+              "pattern": "\\S"
+            },
+            "description": "Names of lists to which Elastic Email should add the uploaded contacts.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts"
+        ],
+        "description": "Request payload for adding up to 1000 Elastic Email contacts."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Email": {
+              "type": "string",
+              "description": "Contact email address."
+            },
+            "Status": {
+              "type": "string",
+              "description": "Elastic Email contact status."
+            },
+            "FirstName": {
+              "type": "string",
+              "description": "Contact first name."
+            },
+            "LastName": {
+              "type": "string",
+              "description": "Contact last name."
+            },
+            "CustomFields": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "description": "One custom field string value."
+              },
+              "description": "Elastic Email custom contact fields returned for this contact."
+            },
+            "Consent": {
+              "type": "object",
+              "properties": {
+                "ConsentIP": {
+                  "type": "string",
+                  "description": "IP address recorded for consent."
+                },
+                "ConsentDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Date of consent returned by Elastic Email, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date of consent returned by Elastic Email, when present."
+                },
+                "ConsentTracking": {
+                  "type": "string",
+                  "description": "Consent tracking value returned by Elastic Email."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Consent data returned by Elastic Email."
+            },
+            "Source": {
+              "type": "string",
+              "description": "Contact source returned by Elastic Email."
+            },
+            "SourceInfo": {
+              "type": "string",
+              "description": "Additional contact source information."
+            },
+            "DateAdded": {
+              "type": "string",
+              "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+            },
+            "DateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact update date returned by Elastic Email, when present."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact update date returned by Elastic Email, when present."
+            },
+            "StatusChangeDate": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact status-change date returned by Elastic Email."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact status-change date returned by Elastic Email."
+            },
+            "Activity": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Contact activity object returned by Elastic Email, when present."
+            }
+          },
+          "additionalProperties": true,
+          "description": "Contact object returned by Elastic Email."
+        },
+        "description": "Contacts returned by the official Elastic Email API."
+      }
+    },
+    {
+      "id": "elasticemail.add_contacts_to_list",
+      "service": "elasticemail",
+      "name": "add_contacts_to_list",
+      "description": "Add existing Elastic Email contacts to a contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Proper email address accepted by Elastic Email.",
+              "format": "email"
+            },
+            "description": "Contact email addresses accepted by Elastic Email list membership endpoints.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName",
+          "emails"
+        ],
+        "description": "Request payload for Elastic Email list membership."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ListName": {
+            "type": "string",
+            "description": "Elastic Email list name."
+          },
+          "PublicListID": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Elastic Email public list identifier, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Elastic Email public list identifier, when present."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "AllowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email allows unsubscribing from this list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact list object returned by Elastic Email."
+      }
+    },
+    {
+      "id": "elasticemail.create_list",
+      "service": "elasticemail",
+      "name": "create_list",
+      "description": "Create a new Elastic Email contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          },
+          "allowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email should allow unsubscribing from this list."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Proper email address accepted by Elastic Email.",
+              "format": "email"
+            },
+            "description": "Existing contact emails to add to the new list.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName"
+        ],
+        "description": "Request payload for creating an Elastic Email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ListName": {
+            "type": "string",
+            "description": "Elastic Email list name."
+          },
+          "PublicListID": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Elastic Email public list identifier, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Elastic Email public list identifier, when present."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "AllowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email allows unsubscribing from this list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact list object returned by Elastic Email."
+      }
+    },
+    {
+      "id": "elasticemail.delete_contact",
+      "service": "elasticemail",
+      "name": "delete_contact",
+      "description": "Delete one Elastic Email contact by email address.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Proper email address accepted by Elastic Email.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Path parameters for one Elastic Email contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Elastic Email accepted the operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after Elastic Email accepts a request."
+      }
+    },
+    {
+      "id": "elasticemail.delete_list",
+      "service": "elasticemail",
+      "name": "delete_list",
+      "description": "Delete an Elastic Email list without deleting its contacts.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName"
+        ],
+        "description": "Path parameters for one Elastic Email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Elastic Email accepted the operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after Elastic Email accepts a request."
+      }
+    },
+    {
+      "id": "elasticemail.get_contact",
+      "service": "elasticemail",
+      "name": "get_contact",
+      "description": "Fetch one Elastic Email contact by email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Proper email address accepted by Elastic Email.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Path parameters for one Elastic Email contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Email": {
+            "type": "string",
+            "description": "Contact email address."
+          },
+          "Status": {
+            "type": "string",
+            "description": "Elastic Email contact status."
+          },
+          "FirstName": {
+            "type": "string",
+            "description": "Contact first name."
+          },
+          "LastName": {
+            "type": "string",
+            "description": "Contact last name."
+          },
+          "CustomFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One custom field string value."
+            },
+            "description": "Elastic Email custom contact fields returned for this contact."
+          },
+          "Consent": {
+            "type": "object",
+            "properties": {
+              "ConsentIP": {
+                "type": "string",
+                "description": "IP address recorded for consent."
+              },
+              "ConsentDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Date of consent returned by Elastic Email, when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date of consent returned by Elastic Email, when present."
+              },
+              "ConsentTracking": {
+                "type": "string",
+                "description": "Consent tracking value returned by Elastic Email."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Consent data returned by Elastic Email."
+          },
+          "Source": {
+            "type": "string",
+            "description": "Contact source returned by Elastic Email."
+          },
+          "SourceInfo": {
+            "type": "string",
+            "description": "Additional contact source information."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "DateUpdated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Last contact update date returned by Elastic Email, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last contact update date returned by Elastic Email, when present."
+          },
+          "StatusChangeDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Last contact status-change date returned by Elastic Email."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last contact status-change date returned by Elastic Email."
+          },
+          "Activity": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Contact activity object returned by Elastic Email, when present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact object returned by Elastic Email."
+      }
+    },
+    {
+      "id": "elasticemail.get_list",
+      "service": "elasticemail",
+      "name": "get_list",
+      "description": "Fetch one Elastic Email contact list by name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName"
+        ],
+        "description": "Path parameters for one Elastic Email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ListName": {
+            "type": "string",
+            "description": "Elastic Email list name."
+          },
+          "PublicListID": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Elastic Email public list identifier, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Elastic Email public list identifier, when present."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "AllowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email allows unsubscribing from this list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact list object returned by Elastic Email."
+      }
+    },
+    {
+      "id": "elasticemail.list_contacts",
+      "service": "elasticemail",
+      "name": "list_contacts",
+      "description": "List contacts available to the current Elastic Email API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of returned items accepted by Elastic Email."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Elastic Email limit and offset query parameters."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Email": {
+              "type": "string",
+              "description": "Contact email address."
+            },
+            "Status": {
+              "type": "string",
+              "description": "Elastic Email contact status."
+            },
+            "FirstName": {
+              "type": "string",
+              "description": "Contact first name."
+            },
+            "LastName": {
+              "type": "string",
+              "description": "Contact last name."
+            },
+            "CustomFields": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "description": "One custom field string value."
+              },
+              "description": "Elastic Email custom contact fields returned for this contact."
+            },
+            "Consent": {
+              "type": "object",
+              "properties": {
+                "ConsentIP": {
+                  "type": "string",
+                  "description": "IP address recorded for consent."
+                },
+                "ConsentDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Date of consent returned by Elastic Email, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date of consent returned by Elastic Email, when present."
+                },
+                "ConsentTracking": {
+                  "type": "string",
+                  "description": "Consent tracking value returned by Elastic Email."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Consent data returned by Elastic Email."
+            },
+            "Source": {
+              "type": "string",
+              "description": "Contact source returned by Elastic Email."
+            },
+            "SourceInfo": {
+              "type": "string",
+              "description": "Additional contact source information."
+            },
+            "DateAdded": {
+              "type": "string",
+              "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+            },
+            "DateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact update date returned by Elastic Email, when present."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact update date returned by Elastic Email, when present."
+            },
+            "StatusChangeDate": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact status-change date returned by Elastic Email."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact status-change date returned by Elastic Email."
+            },
+            "Activity": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Contact activity object returned by Elastic Email, when present."
+            }
+          },
+          "additionalProperties": true,
+          "description": "Contact object returned by Elastic Email."
+        },
+        "description": "Contacts returned by the official Elastic Email API."
+      }
+    },
+    {
+      "id": "elasticemail.list_contacts_in_list",
+      "service": "elasticemail",
+      "name": "list_contacts_in_list",
+      "description": "List contacts that belong to an Elastic Email contact list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of returned items accepted by Elastic Email."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName"
+        ],
+        "description": "Path and query parameters for listing contacts in an Elastic Email list."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Email": {
+              "type": "string",
+              "description": "Contact email address."
+            },
+            "Status": {
+              "type": "string",
+              "description": "Elastic Email contact status."
+            },
+            "FirstName": {
+              "type": "string",
+              "description": "Contact first name."
+            },
+            "LastName": {
+              "type": "string",
+              "description": "Contact last name."
+            },
+            "CustomFields": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "description": "One custom field string value."
+              },
+              "description": "Elastic Email custom contact fields returned for this contact."
+            },
+            "Consent": {
+              "type": "object",
+              "properties": {
+                "ConsentIP": {
+                  "type": "string",
+                  "description": "IP address recorded for consent."
+                },
+                "ConsentDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Date of consent returned by Elastic Email, when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date of consent returned by Elastic Email, when present."
+                },
+                "ConsentTracking": {
+                  "type": "string",
+                  "description": "Consent tracking value returned by Elastic Email."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Consent data returned by Elastic Email."
+            },
+            "Source": {
+              "type": "string",
+              "description": "Contact source returned by Elastic Email."
+            },
+            "SourceInfo": {
+              "type": "string",
+              "description": "Additional contact source information."
+            },
+            "DateAdded": {
+              "type": "string",
+              "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+            },
+            "DateUpdated": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact update date returned by Elastic Email, when present."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact update date returned by Elastic Email, when present."
+            },
+            "StatusChangeDate": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Last contact status-change date returned by Elastic Email."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last contact status-change date returned by Elastic Email."
+            },
+            "Activity": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Contact activity object returned by Elastic Email, when present."
+            }
+          },
+          "additionalProperties": true,
+          "description": "Contact object returned by Elastic Email."
+        },
+        "description": "Contacts returned by the official Elastic Email API."
+      }
+    },
+    {
+      "id": "elasticemail.list_lists",
+      "service": "elasticemail",
+      "name": "list_lists",
+      "description": "List Elastic Email contact lists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of returned items accepted by Elastic Email."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Elastic Email limit and offset query parameters."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "ListName": {
+              "type": "string",
+              "description": "Elastic Email list name."
+            },
+            "PublicListID": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Elastic Email public list identifier, when present."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Elastic Email public list identifier, when present."
+            },
+            "DateAdded": {
+              "type": "string",
+              "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+            },
+            "AllowUnsubscribe": {
+              "type": "boolean",
+              "description": "Whether Elastic Email allows unsubscribing from this list."
+            }
+          },
+          "additionalProperties": true,
+          "description": "Contact list object returned by Elastic Email."
+        },
+        "description": "Contact lists returned by the official Elastic Email API."
+      }
+    },
+    {
+      "id": "elasticemail.remove_contacts_from_list",
+      "service": "elasticemail",
+      "name": "remove_contacts_from_list",
+      "description": "Remove Elastic Email contacts from a contact list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Proper email address accepted by Elastic Email.",
+              "format": "email"
+            },
+            "description": "Contact email addresses accepted by Elastic Email list membership endpoints.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName",
+          "emails"
+        ],
+        "description": "Request payload for Elastic Email list membership."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Elastic Email accepted the operation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Success marker returned after Elastic Email accepts a request."
+      }
+    },
+    {
+      "id": "elasticemail.update_contact",
+      "service": "elasticemail",
+      "name": "update_contact",
+      "description": "Update an existing Elastic Email contact by email address.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Proper email address accepted by Elastic Email.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Contact first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Contact last name."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One custom field string value."
+            },
+            "description": "Key-value collection of Elastic Email custom contact fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Request payload for updating one Elastic Email contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Email": {
+            "type": "string",
+            "description": "Contact email address."
+          },
+          "Status": {
+            "type": "string",
+            "description": "Elastic Email contact status."
+          },
+          "FirstName": {
+            "type": "string",
+            "description": "Contact first name."
+          },
+          "LastName": {
+            "type": "string",
+            "description": "Contact last name."
+          },
+          "CustomFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One custom field string value."
+            },
+            "description": "Elastic Email custom contact fields returned for this contact."
+          },
+          "Consent": {
+            "type": "object",
+            "properties": {
+              "ConsentIP": {
+                "type": "string",
+                "description": "IP address recorded for consent."
+              },
+              "ConsentDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Date of consent returned by Elastic Email, when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date of consent returned by Elastic Email, when present."
+              },
+              "ConsentTracking": {
+                "type": "string",
+                "description": "Consent tracking value returned by Elastic Email."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Consent data returned by Elastic Email."
+          },
+          "Source": {
+            "type": "string",
+            "description": "Contact source returned by Elastic Email."
+          },
+          "SourceInfo": {
+            "type": "string",
+            "description": "Additional contact source information."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "DateUpdated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Last contact update date returned by Elastic Email, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last contact update date returned by Elastic Email, when present."
+          },
+          "StatusChangeDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Last contact status-change date returned by Elastic Email."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last contact status-change date returned by Elastic Email."
+          },
+          "Activity": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Contact activity object returned by Elastic Email, when present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact object returned by Elastic Email."
+      }
+    },
+    {
+      "id": "elasticemail.update_list",
+      "service": "elasticemail",
+      "name": "update_list",
+      "description": "Update an existing Elastic Email contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Elastic Email contact list name.",
+            "pattern": "\\S"
+          },
+          "newListName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New Elastic Email list name."
+          },
+          "allowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email should allow unsubscribing from this list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listName"
+        ],
+        "description": "Request payload for updating one Elastic Email list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ListName": {
+            "type": "string",
+            "description": "Elastic Email list name."
+          },
+          "PublicListID": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Elastic Email public list identifier, when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Elastic Email public list identifier, when present."
+          },
+          "DateAdded": {
+            "type": "string",
+            "description": "Date and time string returned by Elastic Email, usually in YYYY-MM-DDThh:mm:ss format."
+          },
+          "AllowUnsubscribe": {
+            "type": "boolean",
+            "description": "Whether Elastic Email allows unsubscribing from this list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Contact list object returned by Elastic Email."
+      }
+    }
+  ]
+}

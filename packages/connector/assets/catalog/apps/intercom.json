@@ -1,0 +1,1788 @@
+{
+  "service": "intercom",
+  "displayName": "Intercom",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://app.intercom.com/oauth",
+      "tokenUrl": "https://api.intercom.io/auth/eagle/token",
+      "scopes": [],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://www.intercom.com",
+  "actions": [
+    {
+      "id": "intercom.close_conversation",
+      "service": "intercom",
+      "name": "close_conversation",
+      "description": "Close an Intercom conversation.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Write conversations"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom conversation identifier."
+          },
+          "adminId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom admin identifier performing the close."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional closing message to append to the conversation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId",
+          "adminId"
+        ],
+        "description": "Input parameters for closing an Intercom conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom conversation payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom conversation write response wrapper."
+      }
+    },
+    {
+      "id": "intercom.create_contact",
+      "service": "intercom",
+      "name": "create_contact",
+      "description": "Create a new Intercom contact.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Read and write users"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "lead"
+            ],
+            "description": "Intercom contact role."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External identifier stored on the Intercom contact."
+          },
+          "email": {
+            "type": "string",
+            "description": "Primary email address for the Intercom contact.",
+            "format": "email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Phone number for the Intercom contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Phone number for the Intercom contact."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display name for the Intercom contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name for the Intercom contact."
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Avatar image URL for the Intercom contact.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Avatar image URL for the Intercom contact."
+          },
+          "signedUpAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "UNIX timestamp when the contact signed up."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UNIX timestamp when the contact signed up."
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "UNIX timestamp when the contact was last seen."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UNIX timestamp when the contact was last seen."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Intercom admin identifier."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Intercom admin identifier."
+                  }
+                ],
+                "description": "Intercom admin identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Intercom admin identifier."
+          },
+          "unsubscribedFromEmails": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the contact is unsubscribed from emails."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the contact is unsubscribed from emails."
+          },
+          "customAttributes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "An Intercom field value."
+                },
+                "description": "Intercom key-value object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Intercom key-value object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating an Intercom contact. At least one of email, externalId, or role is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom contact write response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_admin",
+      "service": "intercom",
+      "name": "get_admin",
+      "description": "Get a single Intercom admin by identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read admins"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "adminId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Intercom admin identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Intercom admin identifier."
+              }
+            ],
+            "description": "Intercom admin identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom admin."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "admin": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom admin payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single admin response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_article",
+      "service": "intercom",
+      "name": "get_article",
+      "description": "Get a single Intercom help center article by identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and List articles"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Intercom resource identifier."
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Intercom resource identifier."
+              }
+            ],
+            "description": "Intercom resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "article": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom article payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single article response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_company",
+      "service": "intercom",
+      "name": "get_company",
+      "description": "Get a single Intercom company by company ID or name.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company identifier defined by you in Intercom."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company name to look up in Intercom."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom company. Exactly one of companyId or name is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom company payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single company response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_contact",
+      "service": "intercom",
+      "name": "get_contact",
+      "description": "Get a single Intercom contact by identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom contact identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single contact response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_contact_by_external_id",
+      "service": "intercom",
+      "name": "get_contact_by_external_id",
+      "description": "Get a single Intercom contact by external ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External identifier stored on the Intercom contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom contact by external ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single contact response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_conversation",
+      "service": "intercom",
+      "name": "get_conversation",
+      "description": "Get a single Intercom conversation with its conversation parts.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read conversations"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom conversation identifier."
+          },
+          "displayAs": {
+            "type": "string",
+            "enum": [
+              "plaintext",
+              "html"
+            ],
+            "description": "How Intercom should render conversation message bodies in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId"
+        ],
+        "description": "Input parameters for reading a single Intercom conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom conversation payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single conversation response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_counts",
+      "service": "intercom",
+      "name": "get_counts",
+      "description": "Read Intercom workspace, conversation, or grouped counts.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read counts"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom count type to request, such as conversation."
+          },
+          "count": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom count grouping to request, such as tag or segment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading Intercom counts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Intercom counts payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom counts response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_current_admin",
+      "service": "intercom",
+      "name": "get_current_admin",
+      "description": "Get the currently authorized Intercom admin and workspace metadata.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read admins"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for reading the currently authorized Intercom admin."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "admin": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom admin payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom current admin response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_job_status",
+      "service": "intercom",
+      "name": "get_job_status",
+      "description": "Get the status of an Intercom asynchronous job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read status of jobs"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom job identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading Intercom job status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom job status payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom job status response wrapper."
+      }
+    },
+    {
+      "id": "intercom.get_ticket",
+      "service": "intercom",
+      "name": "get_ticket",
+      "description": "Get a single Intercom ticket by internal ticket identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read tickets"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Internal Intercom ticket identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single Intercom ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom ticket payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom single ticket response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_admins",
+      "service": "intercom",
+      "name": "list_admins",
+      "description": "List Intercom admins for the current workspace.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read admins"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayAvatar": {
+            "type": "boolean",
+            "description": "Whether Intercom should include admin avatar objects in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom admins."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "admins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom admin payload."
+            },
+            "description": "Intercom admins returned for the current workspace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom admin list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_articles",
+      "service": "intercom",
+      "name": "list_articles",
+      "description": "List Intercom help center articles.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and List articles"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom article payload."
+            },
+            "description": "Intercom articles returned for the current page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom article list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_companies",
+      "service": "intercom",
+      "name": "list_companies",
+      "description": "List Intercom companies with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based Intercom page number to fetch."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Order in which Intercom should return companies."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom company payload."
+            },
+            "description": "Intercom companies returned for the current page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom company list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_contacts",
+      "service": "intercom",
+      "name": "list_contacts",
+      "description": "List Intercom contacts with cursor-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom contact payload."
+            },
+            "description": "Intercom contacts returned for the current page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom contact list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_conversations",
+      "service": "intercom",
+      "name": "list_conversations",
+      "description": "List Intercom conversations with cursor-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read conversations"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom conversations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom conversation payload."
+            },
+            "description": "Intercom conversations returned for the current page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom conversation list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_events",
+      "service": "intercom",
+      "name": "list_events",
+      "description": "List recent Intercom data events for one user or lead.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read events"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User ID used to identify the Intercom user."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address used to identify the Intercom user.",
+            "format": "email"
+          },
+          "intercomUserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom user or lead identifier."
+          },
+          "summary": {
+            "type": "boolean",
+            "description": "Whether Intercom should return event summary data."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading Intercom user data events. Exactly one of userId, email, or intercomUserId is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom event."
+            },
+            "description": "Intercom events returned by the endpoint."
+          },
+          "eventSummary": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Intercom event summary payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom user event response wrapper."
+      }
+    },
+    {
+      "id": "intercom.list_tags",
+      "service": "intercom",
+      "name": "list_tags",
+      "description": "List all Intercom tags for the current workspace.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read tags"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Intercom tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom tag."
+            },
+            "description": "Intercom tags returned for the workspace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom tag list response wrapper."
+      }
+    },
+    {
+      "id": "intercom.reopen_conversation",
+      "service": "intercom",
+      "name": "reopen_conversation",
+      "description": "Reopen an Intercom conversation.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Write conversations"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom conversation identifier."
+          },
+          "adminId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom admin identifier performing the reopen."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reopening an Intercom conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom conversation payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom conversation write response wrapper."
+      }
+    },
+    {
+      "id": "intercom.reply_to_conversation",
+      "service": "intercom",
+      "name": "reply_to_conversation",
+      "description": "Reply to an Intercom conversation as an admin.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Write conversations"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom conversation identifier, or `last` to target the most recent part."
+          },
+          "adminId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom admin identifier sending the reply."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reply body to send to the conversation."
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "comment",
+              "note"
+            ],
+            "description": "Intercom reply type to create. Defaults to `comment`."
+          },
+          "attachmentUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Public attachment URL to include in the reply.",
+              "format": "uri"
+            },
+            "description": "Attachment URLs to include with the reply.",
+            "maxItems": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId",
+          "adminId",
+          "body"
+        ],
+        "description": "Input parameters for replying to an Intercom conversation as an admin."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom conversation payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom conversation write response wrapper."
+      }
+    },
+    {
+      "id": "intercom.search_contacts",
+      "service": "intercom",
+      "name": "search_contacts",
+      "description": "Search Intercom contacts with the official search DSL.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read and list users and companies"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An Intercom field value."
+            },
+            "description": "Intercom key-value object."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Intercom contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom contact payload."
+            },
+            "description": "Intercom contacts returned by the search query."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom contact search response wrapper."
+      }
+    },
+    {
+      "id": "intercom.search_tickets",
+      "service": "intercom",
+      "name": "search_tickets",
+      "description": "Search Intercom tickets with the official search DSL.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read tickets"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An Intercom field value."
+            },
+            "description": "Intercom key-value object."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150,
+            "description": "Maximum number of Intercom records to return."
+          },
+          "startingAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque Intercom cursor returned from a previous paginated response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Intercom tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Intercom ticket payload."
+            },
+            "description": "Intercom tickets returned by the search query."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether Intercom reported another page of results."
+              },
+              "nextStartingAfter": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Intercom page, or null when there is no next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Intercom page, or null when there is no next page."
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number reported by Intercom, or null when omitted."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page size reported by Intercom, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page size reported by Intercom, or null when omitted."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom pages reported by the endpoint, or null when omitted."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total Intercom record count reported by the endpoint, or null when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized Intercom cursor pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom ticket search response wrapper."
+      }
+    },
+    {
+      "id": "intercom.update_contact",
+      "service": "intercom",
+      "name": "update_contact",
+      "description": "Update an existing Intercom contact.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Read and write users"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Intercom contact identifier."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "lead"
+            ],
+            "description": "Intercom contact role."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External identifier stored on the Intercom contact."
+          },
+          "email": {
+            "type": "string",
+            "description": "Primary email address for the Intercom contact.",
+            "format": "email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Phone number for the Intercom contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Phone number for the Intercom contact."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Display name for the Intercom contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Display name for the Intercom contact."
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Avatar image URL for the Intercom contact.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Avatar image URL for the Intercom contact."
+          },
+          "signedUpAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "UNIX timestamp when the contact signed up."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UNIX timestamp when the contact signed up."
+          },
+          "lastSeenAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "UNIX timestamp when the contact was last seen."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "UNIX timestamp when the contact was last seen."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Intercom admin identifier."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Intercom admin identifier."
+                  }
+                ],
+                "description": "Intercom admin identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Intercom admin identifier."
+          },
+          "unsubscribedFromEmails": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the contact is unsubscribed from emails."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the contact is unsubscribed from emails."
+          },
+          "customAttributes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "An Intercom field value."
+                },
+                "description": "Intercom key-value object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Intercom key-value object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactId"
+        ],
+        "description": "Input parameters for updating an Intercom contact. At least one field besides contactId must be provided."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Intercom contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Intercom contact write response wrapper."
+      }
+    }
+  ]
+}

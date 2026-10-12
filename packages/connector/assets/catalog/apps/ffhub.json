@@ -1,0 +1,506 @@
+{
+  "service": "ffhub",
+  "displayName": "FFHub",
+  "categories": [
+    "Media",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ffhub_api_key",
+      "description": "FFHub API key sent with the Authorization Bearer header. Create and manage it in FFHub Settings > API Keys: https://ffhub.io/settings/apikeys"
+    }
+  ],
+  "homepageUrl": "https://ffhub.io",
+  "actions": [
+    {
+      "id": "ffhub.create_ffmpeg_task",
+      "service": "ffhub",
+      "name": "create_ffmpeg_task",
+      "description": "Create a new FFHub FFmpeg transcoding task from a full FFmpeg command or argument-only command string.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full FFmpeg command or argument-only command string accepted by FFHub, including remote input URLs and output file names."
+          },
+          "webhook": {
+            "type": "string",
+            "description": "Optional callback URL that receives the same payload as get_ffmpeg_task.",
+            "format": "uri"
+          },
+          "withMetadata": {
+            "type": "boolean",
+            "description": "Whether FFHub should collect ffprobe metadata for generated output files."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "command"
+        ],
+        "description": "Input parameters for creating an FFHub FFmpeg task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "Created FFHub task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Identifier for the created FFHub task."
+      },
+      "followUpActions": [
+        "ffhub.get_ffmpeg_task"
+      ]
+    },
+    {
+      "id": "ffhub.get_ffmpeg_task",
+      "service": "ffhub",
+      "name": "get_ffmpeg_task",
+      "description": "Get the current status, timing, error, and output files for one FFHub FFmpeg task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "FFHub task ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Identifier of the FFHub task to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "description": "FFHub task ID."
+              },
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "FFHub customer identifier when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "FFHub customer identifier when returned."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "running",
+                  "completed",
+                  "failed"
+                ],
+                "description": "FFHub task status."
+              },
+              "progress": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Task progress percentage when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Task progress percentage when returned."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Task error message when the task failed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Task error message when the task failed."
+              },
+              "elapsed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Worker execution time in seconds when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Worker execution time in seconds when returned."
+              },
+              "totalElapsed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Total elapsed time from creation to completion in seconds when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total elapsed time from creation to completion in seconds when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Task creation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Task creation timestamp."
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Task completion timestamp, or null when pending."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Task completion timestamp, or null when pending."
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filename": {
+                      "type": "string",
+                      "description": "Output file name."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Output file URL."
+                    },
+                    "size": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Output file size in bytes when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Output file size in bytes when available."
+                    },
+                    "metadata": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "description": "One raw ffprobe metadata value returned by FFHub."
+                          },
+                          "description": "Raw ffprobe metadata object returned by FFHub when requested."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Raw ffprobe metadata object returned by FFHub when requested."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "filename",
+                    "url",
+                    "size",
+                    "metadata"
+                  ],
+                  "description": "Single FFHub output file."
+                },
+                "description": "Output files generated by the task."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "userId",
+              "status",
+              "progress",
+              "error",
+              "elapsed",
+              "totalElapsed",
+              "createdAt",
+              "finishedAt",
+              "outputs"
+            ],
+            "description": "Normalized FFHub task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "Single FFHub task detail."
+      }
+    },
+    {
+      "id": "ffhub.list_ffmpeg_tasks",
+      "service": "ffhub",
+      "name": "list_ffmpeg_tasks",
+      "description": "List FFHub FFmpeg tasks with optional customer, status, limit, and offset filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional FFHub customer identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "description": "FFHub task status."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of tasks to return, from 1 to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of tasks to skip before reading the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing FFHub FFmpeg tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "type": "string",
+                  "description": "FFHub task ID."
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "FFHub customer identifier when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "FFHub customer identifier when returned."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "running",
+                    "completed",
+                    "failed"
+                  ],
+                  "description": "FFHub task status."
+                },
+                "progress": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Task progress percentage when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Task progress percentage when returned."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Task error message when the task failed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Task error message when the task failed."
+                },
+                "elapsed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Worker execution time in seconds when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Worker execution time in seconds when returned."
+                },
+                "totalElapsed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Total elapsed time from creation to completion in seconds when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Total elapsed time from creation to completion in seconds when returned."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Task creation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Task creation timestamp."
+                },
+                "finishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Task completion timestamp, or null when pending."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Task completion timestamp, or null when pending."
+                },
+                "outputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "description": "Output file name."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "Output file URL."
+                      },
+                      "size": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "Output file size in bytes when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Output file size in bytes when available."
+                      },
+                      "metadata": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "One raw ffprobe metadata value returned by FFHub."
+                            },
+                            "description": "Raw ffprobe metadata object returned by FFHub when requested."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Raw ffprobe metadata object returned by FFHub when requested."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "filename",
+                      "url",
+                      "size",
+                      "metadata"
+                    ],
+                    "description": "Single FFHub output file."
+                  },
+                  "description": "Output files generated by the task."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "taskId",
+                "userId",
+                "status",
+                "progress",
+                "error",
+                "elapsed",
+                "totalElapsed",
+                "createdAt",
+                "finishedAt",
+                "outputs"
+              ],
+              "description": "Normalized FFHub task."
+            },
+            "description": "Normalized FFHub tasks."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching FFHub tasks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks",
+          "total"
+        ],
+        "description": "Paginated FFHub task list."
+      }
+    }
+  ]
+}

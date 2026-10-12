@@ -1,0 +1,303 @@
+{
+  "service": "concord",
+  "displayName": "Concord",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_CONCORD_API_KEY",
+      "description": "Concord API key sent in the X-API-KEY header. Generate one from your paid Concord account: https://help.concord.app/hc/en-us/articles/360055115911-getting-started-with-the-concord-api."
+    }
+  ],
+  "homepageUrl": "https://www.concord.app/",
+  "actions": [
+    {
+      "id": "concord.get_current_user",
+      "service": "concord",
+      "name": "get_current_user",
+      "description": "Get profile and current-organization information for the Concord API key owner.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No parameters are required to get the current Concord user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The current user returned by Concord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The current Concord user profile."
+      }
+    },
+    {
+      "id": "concord.get_organization",
+      "service": "concord",
+      "name": "get_organization",
+      "description": "Get one Concord organization by its numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Concord organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizationId"
+        ],
+        "description": "A Concord organization selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The organization returned by Concord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organization"
+        ],
+        "description": "The requested Concord organization."
+      }
+    },
+    {
+      "id": "concord.list_agreements",
+      "service": "concord",
+      "name": "list_agreements",
+      "description": "List and search agreements accessible to the current user in a Concord organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Concord organization ID."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "VALIDATION",
+                "NEGOTIATION",
+                "SIGNING",
+                "UNKNOWN_CONTRACT",
+                "FUTURE_CONTRACT",
+                "CURRENT_CONTRACT",
+                "COMPLETED_CONTRACT",
+                "COMPLETED_CANCEL_CONTRACT",
+                "COMPLETED_CONTRACT_RENEWABLE",
+                "BROKEN",
+                "TRASHED",
+                "NEGO_INVITE",
+                "TEMPLATE",
+                "TEMPLATE_AUTO"
+              ],
+              "description": "One documented Concord agreement stage."
+            },
+            "description": "The agreement stages to include.",
+            "minItems": 1
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result page to retrieve."
+          },
+          "numberOfItemsByPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of agreements per page."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text to match against agreement titles and descriptions."
+          },
+          "isInboxed": {
+            "type": "boolean",
+            "description": "Whether to return only agreements displayed in the inbox."
+          },
+          "isBookmarked": {
+            "type": "boolean",
+            "description": "Whether to return only bookmarked agreements."
+          },
+          "sortByColumn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Concord column name used to sort agreements."
+          },
+          "sortByAsc": {
+            "type": "boolean",
+            "description": "Whether to sort agreements in ascending order."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Concord tag ID."
+            },
+            "description": "The numeric tag IDs used to filter agreements."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizationId",
+          "statuses"
+        ],
+        "description": "Filters and pagination for listing Concord agreements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Concord agreement."
+            },
+            "description": "The agreements on this page."
+          },
+          "numberOfItems": {
+            "type": "number",
+            "description": "The number of items in this response."
+          },
+          "numberOfItemsByPage": {
+            "type": "number",
+            "description": "The maximum number of items on one page."
+          },
+          "page": {
+            "type": "number",
+            "description": "The current page number."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total matching documents and invitations."
+          },
+          "totalInvitations": {
+            "type": "integer",
+            "description": "The total matching invitations."
+          },
+          "result": {
+            "type": "string",
+            "description": "The optional Concord result status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "numberOfItems",
+          "numberOfItemsByPage",
+          "page",
+          "total",
+          "totalInvitations"
+        ],
+        "description": "A page of Concord agreements."
+      }
+    },
+    {
+      "id": "concord.list_folders",
+      "service": "concord",
+      "name": "list_folders",
+      "description": "List the folder tree shared with the current user in a Concord organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Concord organization ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizationId"
+        ],
+        "description": "A Concord organization selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The root folder tree returned by Concord."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folder"
+        ],
+        "description": "The shared Concord folder tree."
+      }
+    },
+    {
+      "id": "concord.list_organizations",
+      "service": "concord",
+      "name": "list_organizations",
+      "description": "List the Concord organizations available to the API key owner.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No parameters are required to list Concord organizations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Concord organization."
+            },
+            "description": "The available Concord organizations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizations"
+        ],
+        "description": "The Concord organizations available to the current user."
+      }
+    }
+  ]
+}

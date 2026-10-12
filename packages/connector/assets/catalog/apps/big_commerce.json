@@ -1,0 +1,916 @@
+{
+  "service": "big_commerce",
+  "displayName": "BigCommerce",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "BIGCOMMERCE_ACCESS_TOKEN",
+      "description": "BigCommerce Store API account access token used with the X-Auth-Token header. Create or view Store API accounts in Settings > Store-level API accounts: https://support.bigcommerce.com/s/article/Store-API-Accounts",
+      "extraFields": [
+        {
+          "key": "storeHash",
+          "label": "Store Hash",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "abc123",
+          "description": "Your BigCommerce store hash used in the Management API base URL https://api.bigcommerce.com/stores/{store_hash}/v3. Find it in your store API path or Store API account details."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.bigcommerce.com",
+  "actions": [
+    {
+      "id": "big_commerce.create_product",
+      "service": "big_commerce",
+      "name": "create_product",
+      "description": "Create a BigCommerce catalog product from JSON-friendly fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250,
+            "description": "The product name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physical",
+              "digital"
+            ],
+            "description": "The BigCommerce product type."
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product price in the store currency."
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The product SKU."
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product weight."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product description as HTML or plain text."
+          },
+          "isVisible": {
+            "type": "boolean",
+            "description": "Whether the product is visible in the storefront."
+          },
+          "inventoryTracking": {
+            "type": "string",
+            "enum": [
+              "none",
+              "product",
+              "variant"
+            ],
+            "description": "The BigCommerce inventory tracking mode for the product."
+          },
+          "inventoryLevel": {
+            "type": "integer",
+            "description": "The product inventory level."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A category ID."
+            },
+            "description": "BigCommerce category IDs assigned to the product.",
+            "minItems": 1
+          },
+          "brandId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce brand ID."
+          },
+          "customUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom URL path for the product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "price",
+          "weight"
+        ],
+        "description": "Product fields for creating a BigCommerce catalog product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The BigCommerce product ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product type returned by BigCommerce."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product type returned by BigCommerce."
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product SKU when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product SKU when present."
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The product price in the store currency."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product price in the store currency."
+              },
+              "inventoryLevel": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The product inventory level when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product inventory level when returned."
+              },
+              "isVisible": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the product is visible in the storefront."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the product is visible in the storefront."
+              },
+              "customUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product custom URL path when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product custom URL path when returned."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw product object returned by BigCommerce."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized BigCommerce product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "product"
+        ],
+        "description": "The normalized BigCommerce product creation response."
+      }
+    },
+    {
+      "id": "big_commerce.delete_product",
+      "service": "big_commerce",
+      "name": "delete_product",
+      "description": "Delete a BigCommerce catalog product by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce product ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for deleting a BigCommerce product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the product delete request succeeded."
+          },
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce product ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "productId"
+        ],
+        "description": "The normalized BigCommerce product deletion response."
+      }
+    },
+    {
+      "id": "big_commerce.get_product",
+      "service": "big_commerce",
+      "name": "get_product",
+      "description": "Retrieve one BigCommerce catalog product by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce product ID."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "variants",
+                "images",
+                "custom_fields",
+                "bulk_pricing_rules",
+                "primary_image",
+                "modifiers",
+                "options",
+                "videos"
+              ],
+              "description": "Related product resources to include."
+            },
+            "description": "Related product resources to include.",
+            "minItems": 1
+          },
+          "includeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A product field name."
+            },
+            "description": "Product fields to include in the response.",
+            "minItems": 1
+          },
+          "excludeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A product field name."
+            },
+            "description": "Product fields to exclude from the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "Path and query parameters for retrieving a BigCommerce product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The BigCommerce product ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product type returned by BigCommerce."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product type returned by BigCommerce."
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product SKU when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product SKU when present."
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The product price in the store currency."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product price in the store currency."
+              },
+              "inventoryLevel": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The product inventory level when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product inventory level when returned."
+              },
+              "isVisible": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the product is visible in the storefront."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the product is visible in the storefront."
+              },
+              "customUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product custom URL path when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product custom URL path when returned."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw product object returned by BigCommerce."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized BigCommerce product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "product"
+        ],
+        "description": "The normalized BigCommerce product response."
+      }
+    },
+    {
+      "id": "big_commerce.list_products",
+      "service": "big_commerce",
+      "name": "list_products",
+      "description": "List BigCommerce catalog products with common filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The product page number to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The maximum number of products to return."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search products by keyword."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter products by name."
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter products by SKU."
+          },
+          "isVisible": {
+            "type": "boolean",
+            "description": "Filter products by storefront visibility."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "variants",
+                "images",
+                "custom_fields",
+                "bulk_pricing_rules",
+                "primary_image",
+                "modifiers",
+                "options",
+                "videos"
+              ],
+              "description": "Related product resources to include."
+            },
+            "description": "Related product resources to include.",
+            "minItems": 1
+          },
+          "includeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A product field name."
+            },
+            "description": "Product fields to include in the response.",
+            "minItems": 1
+          },
+          "excludeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A product field name."
+            },
+            "description": "Product fields to exclude from the response.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name",
+              "sku",
+              "price",
+              "date_created",
+              "date_modified",
+              "inventory_level",
+              "is_visible"
+            ],
+            "description": "The product field to sort by."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for product list results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing BigCommerce catalog products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The BigCommerce product ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The product name."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product type returned by BigCommerce."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product type returned by BigCommerce."
+                },
+                "sku": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product SKU when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product SKU when present."
+                },
+                "price": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The product price in the store currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product price in the store currency."
+                },
+                "inventoryLevel": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The product inventory level when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product inventory level when returned."
+                },
+                "isVisible": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the product is visible in the storefront."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the product is visible in the storefront."
+                },
+                "customUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product custom URL path when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product custom URL path when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw product object returned by BigCommerce."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized BigCommerce product."
+            },
+            "description": "Products returned by BigCommerce."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching products."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching products."
+              },
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of products returned in this page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of products returned in this page."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The requested page size."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested page size."
+              },
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page number."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of pages."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "BigCommerce pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "products",
+          "pagination"
+        ],
+        "description": "The normalized BigCommerce product list response."
+      }
+    },
+    {
+      "id": "big_commerce.update_product",
+      "service": "big_commerce",
+      "name": "update_product",
+      "description": "Update provided fields on a BigCommerce catalog product.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce product ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250,
+            "description": "The product name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "physical",
+              "digital"
+            ],
+            "description": "The BigCommerce product type."
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product price in the store currency."
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The product SKU."
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The product weight."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product description as HTML or plain text."
+          },
+          "isVisible": {
+            "type": "boolean",
+            "description": "Whether the product is visible in the storefront."
+          },
+          "inventoryTracking": {
+            "type": "string",
+            "enum": [
+              "none",
+              "product",
+              "variant"
+            ],
+            "description": "The BigCommerce inventory tracking mode for the product."
+          },
+          "inventoryLevel": {
+            "type": "integer",
+            "description": "The product inventory level."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A category ID."
+            },
+            "description": "BigCommerce category IDs assigned to the product.",
+            "minItems": 1
+          },
+          "brandId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The BigCommerce brand ID."
+          },
+          "customUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom URL path for the product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "Product fields for updating a BigCommerce catalog product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The BigCommerce product ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product type returned by BigCommerce."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product type returned by BigCommerce."
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product SKU when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product SKU when present."
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The product price in the store currency."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product price in the store currency."
+              },
+              "inventoryLevel": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The product inventory level when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product inventory level when returned."
+              },
+              "isVisible": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the product is visible in the storefront."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the product is visible in the storefront."
+              },
+              "customUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The product custom URL path when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The product custom URL path when returned."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw product object returned by BigCommerce."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized BigCommerce product."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "product"
+        ],
+        "description": "The normalized BigCommerce product update response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1779 @@
+{
+  "service": "waffo",
+  "displayName": "Waffo Pancake",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "merchantId",
+          "label": "Merchant ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "MER_...",
+          "description": "The Waffo Merchant ID shown under Dashboard → API & Development → API Keys. See https://docs.waffo.ai/api-reference/authentication."
+        },
+        {
+          "key": "privateKey",
+          "label": "API Private Key",
+          "inputType": "textarea",
+          "required": true,
+          "secret": true,
+          "placeholder": "-----BEGIN PRIVATE KEY-----",
+          "description": "The RSA private key downloaded when creating a Waffo API key. Paste PEM text or use escaped \\n line breaks. Waffo shows the key only once: https://docs.waffo.ai/api-reference/authentication."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.waffo.ai",
+  "actions": [
+    {
+      "id": "waffo.cancel_subscription",
+      "service": "waffo",
+      "name": "cancel_subscription",
+      "description": "Cancel a pending Waffo subscription immediately or schedule an active subscription to end after its current period.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The subscription order ID in `ORD_...` format."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for canceling a Waffo subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "The Waffo subscription order ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "canceling",
+              "canceled"
+            ],
+            "description": "The resulting subscription status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Waffo subscription state."
+      }
+    },
+    {
+      "id": "waffo.create_checkout_session",
+      "service": "waffo",
+      "name": "create_checkout_session",
+      "description": "Create a Waffo hosted checkout session for a one-time or subscription product.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo product ID in `PROD_...` format."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "The uppercase ISO 4217 checkout currency code.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "priceSnapshot": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive price in major currency units.",
+                "pattern": "\\S"
+              },
+              "taxIncluded": {
+                "type": "boolean",
+                "description": "Whether the price already includes tax."
+              },
+              "taxCategory": {
+                "type": "string",
+                "enum": [
+                  "digital_goods",
+                  "saas",
+                  "software",
+                  "ebook",
+                  "online_course",
+                  "consulting",
+                  "professional_service"
+                ],
+                "description": "The tax category applied to the checkout price."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "amount",
+              "taxCategory"
+            ],
+            "description": "An optional merchant-controlled checkout price override."
+          },
+          "withTrial": {
+            "type": "boolean",
+            "description": "Whether to enable the subscription product trial."
+          },
+          "buyerEmail": {
+            "type": "string",
+            "description": "The customer email to prefill on the checkout page."
+          },
+          "billingDetail": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2,
+                "description": "The ISO 3166-1 alpha-2 billing country code.",
+                "pattern": "^[A-Za-z]{2}$"
+              },
+              "isBusiness": {
+                "type": "boolean",
+                "description": "Whether this is a business purchase."
+              },
+              "postcode": {
+                "type": "string",
+                "description": "The postal or ZIP code."
+              },
+              "state": {
+                "type": "string",
+                "description": "The state or province code."
+              },
+              "businessName": {
+                "type": "string",
+                "description": "The legal business name."
+              },
+              "taxId": {
+                "type": "string",
+                "description": "The buyer tax registration number."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "country",
+              "isBusiness"
+            ],
+            "description": "Billing details to prefill and lock for the checkout session."
+          },
+          "successUrl": {
+            "type": "string",
+            "description": "The HTTP(S) redirect URL used after successful checkout."
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 604800,
+            "description": "The checkout session lifetime in seconds."
+          },
+          "darkMode": {
+            "type": "boolean",
+            "description": "Whether the hosted checkout should initially use dark mode."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-serializable metadata value."
+            },
+            "description": "Custom JSON metadata attached to the Waffo resource."
+          },
+          "orderMerchantExternalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The merchant-side order reference."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "pt-BR",
+              "es-MX",
+              "id-ID",
+              "vi-VN",
+              "ru-RU",
+              "en-KE",
+              "es-PE",
+              "es-CO",
+              "es-CL",
+              "zh-Hant-TW",
+              "zh-Hant-HK",
+              "th-TH",
+              "ja-JP",
+              "en-NG",
+              "ko-KR",
+              "en-HK",
+              "zh-Hans-HK",
+              "pl-PL",
+              "tr-TR",
+              "zh-Hans",
+              "ms-MY"
+            ],
+            "description": "The IETF BCP 47 checkout language supported by Waffo."
+          },
+          "includePaymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "card",
+                "applepay",
+                "googlepay",
+                "wechat"
+              ],
+              "description": "A Waffo hosted checkout payment method."
+            },
+            "description": "The payment methods to allow for this checkout session."
+          },
+          "excludePaymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "card",
+                "applepay",
+                "googlepay",
+                "wechat"
+              ],
+              "description": "A Waffo hosted checkout payment method."
+            },
+            "description": "The payment methods to hide for this checkout session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId",
+          "currency"
+        ],
+        "description": "Parameters for creating a Waffo hosted checkout session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The Waffo checkout session ID."
+          },
+          "checkoutUrl": {
+            "type": "string",
+            "description": "The hosted checkout URL to open for the customer."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 checkout session expiration timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo hosted checkout session."
+      }
+    },
+    {
+      "id": "waffo.create_one_time_product",
+      "service": "waffo",
+      "name": "create_one_time_product",
+      "description": "Create a one-time purchase product with multi-currency pricing in Waffo.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo store ID in `STO_...` format."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The product name."
+          },
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The positive price in major currency units, such as `29.00`.",
+                  "pattern": "\\S"
+                },
+                "taxIncluded": {
+                  "type": "boolean",
+                  "description": "Whether the price already includes tax."
+                },
+                "taxCategory": {
+                  "type": "string",
+                  "enum": [
+                    "digital_goods",
+                    "saas",
+                    "software",
+                    "ebook",
+                    "online_course",
+                    "consulting",
+                    "professional_service"
+                  ],
+                  "description": "The tax category applied to this price."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "taxCategory"
+              ],
+              "description": "A Waffo price for one currency."
+            },
+            "description": "Prices keyed by uppercase ISO 4217 currency code.",
+            "minProperties": 1,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Markdown product description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Markdown product description."
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video"
+                  ],
+                  "description": "The media type."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The publicly accessible media URL."
+                },
+                "alt": {
+                  "type": "string",
+                  "description": "Alternative text for the media item."
+                },
+                "thumbnail": {
+                  "type": "string",
+                  "description": "The optional thumbnail URL, recommended for videos."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "url"
+              ],
+              "description": "One Waffo product media item."
+            },
+            "description": "Product images or videos displayed by Waffo."
+          },
+          "successUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-serializable metadata value."
+            },
+            "description": "Custom JSON metadata attached to the Waffo resource.",
+            "maxProperties": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "name",
+          "prices"
+        ],
+        "description": "Parameters for creating a Waffo one-time product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo product ID."
+              },
+              "storeId": {
+                "type": "string",
+                "description": "The owning Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The product status in the API key environment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "storeId",
+              "name",
+              "status"
+            ],
+            "description": "The Waffo product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo product result."
+      }
+    },
+    {
+      "id": "waffo.create_refund_ticket",
+      "service": "waffo",
+      "name": "create_refund_ticket",
+      "description": "Request a full or partial Waffo refund for a succeeded payment.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The succeeded payment ID in `PAY_...` format."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The refund reason shown to the customer and merchant."
+          },
+          "requestedAmount": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive refund amount in major currency units.",
+                "pattern": "\\S"
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3,
+                "description": "The uppercase ISO 4217 payment currency code.",
+                "pattern": "^[A-Za-z]{3}$"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The requested refund amount."
+          },
+          "refundTicketMerchantExternalId": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "The merchant-side refund reference."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paymentId",
+          "reason",
+          "requestedAmount"
+        ],
+        "description": "Parameters for creating a Waffo refund ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo refund ticket ID."
+              },
+              "status": {
+                "type": "string",
+                "description": "The refund ticket status."
+              },
+              "subjectId": {
+                "type": "string",
+                "description": "The refunded Waffo payment ID."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status",
+              "subjectId"
+            ],
+            "description": "The created Waffo refund ticket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo refund ticket creation result."
+      }
+    },
+    {
+      "id": "waffo.create_store",
+      "service": "waffo",
+      "name": "create_store",
+      "description": "Create a Waffo store for the connected merchant account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 48,
+            "description": "The store name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for creating a Waffo store."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The store name."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The hosted store slug."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The hosted store slug."
+              },
+              "status": {
+                "type": "string",
+                "description": "The store status."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "slug",
+              "status"
+            ],
+            "description": "The created Waffo store."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo store creation result."
+      }
+    },
+    {
+      "id": "waffo.create_subscription_product",
+      "service": "waffo",
+      "name": "create_subscription_product",
+      "description": "Create a recurring subscription product with multi-currency pricing in Waffo.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo store ID in `STO_...` format."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The product name."
+          },
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The positive price in major currency units, such as `29.00`.",
+                  "pattern": "\\S"
+                },
+                "taxIncluded": {
+                  "type": "boolean",
+                  "description": "Whether the price already includes tax."
+                },
+                "taxCategory": {
+                  "type": "string",
+                  "enum": [
+                    "digital_goods",
+                    "saas",
+                    "software",
+                    "ebook",
+                    "online_course",
+                    "consulting",
+                    "professional_service"
+                  ],
+                  "description": "The tax category applied to this price."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "taxCategory"
+              ],
+              "description": "A Waffo price for one currency."
+            },
+            "description": "Prices keyed by uppercase ISO 4217 currency code.",
+            "minProperties": 1,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Markdown product description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Markdown product description."
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video"
+                  ],
+                  "description": "The media type."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The publicly accessible media URL."
+                },
+                "alt": {
+                  "type": "string",
+                  "description": "Alternative text for the media item."
+                },
+                "thumbnail": {
+                  "type": "string",
+                  "description": "The optional thumbnail URL, recommended for videos."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "url"
+              ],
+              "description": "One Waffo product media item."
+            },
+            "description": "Product images or videos displayed by Waffo."
+          },
+          "successUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "trialDays": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 365,
+                "description": "The optional subscription trial length in days."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Custom JSON metadata attached to the subscription product."
+          },
+          "billingPeriod": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "description": "The recurring billing interval."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "name",
+          "prices",
+          "billingPeriod"
+        ],
+        "description": "Parameters for creating a Waffo subscription product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo product ID."
+              },
+              "storeId": {
+                "type": "string",
+                "description": "The owning Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The product status in the API key environment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "storeId",
+              "name",
+              "status"
+            ],
+            "description": "The Waffo product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo product result."
+      }
+    },
+    {
+      "id": "waffo.list_products",
+      "service": "waffo",
+      "name": "list_products",
+      "description": "List one-time or subscription products in the connected Waffo API key environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo store ID in `STO_...` format."
+          },
+          "productType": {
+            "type": "string",
+            "enum": [
+              "one_time",
+              "subscription"
+            ],
+            "description": "The Waffo product billing model."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The product status to match."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "productType"
+        ],
+        "description": "Parameters for listing Waffo products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Waffo product ID."
+                },
+                "productType": {
+                  "type": "string",
+                  "enum": [
+                    "one_time",
+                    "subscription"
+                  ],
+                  "description": "The Waffo product billing model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The product name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The product status in the connected API key environment."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "productType",
+                "name",
+                "status"
+              ],
+              "description": "A Waffo product returned by the search."
+            },
+            "description": "The matching Waffo products."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching products."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The requested page offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Waffo products."
+      }
+    },
+    {
+      "id": "waffo.list_stores",
+      "service": "waffo",
+      "name": "list_stores",
+      "description": "List stores available to the connected Waffo merchant account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Parameters for listing Waffo stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Waffo store ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The store name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The store status."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "status"
+              ],
+              "description": "A Waffo store."
+            },
+            "description": "The Waffo stores."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of returned stores."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connected merchant's Waffo stores."
+      }
+    },
+    {
+      "id": "waffo.publish_product",
+      "service": "waffo",
+      "name": "publish_product",
+      "description": "Publish the active test version of a one-time or subscription product to production for the first time.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "one_time",
+              "subscription"
+            ],
+            "description": "The Waffo product billing model."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo product ID in `PROD_...` format."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for publishing a Waffo product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo product ID."
+              },
+              "storeId": {
+                "type": "string",
+                "description": "The owning Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The product status in the API key environment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "storeId",
+              "name",
+              "status"
+            ],
+            "description": "The Waffo product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo product result."
+      }
+    },
+    {
+      "id": "waffo.resubmit_refund_ticket",
+      "service": "waffo",
+      "name": "resubmit_refund_ticket",
+      "description": "Revise and resubmit a rejected or failed Waffo refund ticket.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The refund ticket ID in `TKT_...` format."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The revised refund reason."
+          },
+          "requestedAmount": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The positive refund amount in major currency units.",
+                "pattern": "\\S"
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3,
+                "description": "The uppercase ISO 4217 payment currency code.",
+                "pattern": "^[A-Za-z]{3}$"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The revised refund amount."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for resubmitting a Waffo refund ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo refund ticket ID."
+              },
+              "status": {
+                "type": "string",
+                "description": "The refund ticket status."
+              },
+              "subjectId": {
+                "type": "string",
+                "description": "The refunded Waffo payment ID."
+              },
+              "versionNumber": {
+                "type": "integer",
+                "description": "The new refund ticket version number."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status",
+              "subjectId",
+              "versionNumber"
+            ],
+            "description": "The revised Waffo refund ticket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo refund ticket resubmission result."
+      }
+    },
+    {
+      "id": "waffo.run_query",
+      "service": "waffo",
+      "name": "run_query",
+      "description": "Run a read-only query against the Waffo GraphQL API for stores, products, orders, payments, refunds, customers, or analytics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphQL query document to execute.",
+            "pattern": "\\S"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-serializable GraphQL variable value."
+            },
+            "description": "GraphQL variables keyed by variable name."
+          },
+          "operationName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The operation name when the document defines multiple queries.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Parameters for running a Waffo GraphQL query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "The GraphQL data returned by Waffo."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The GraphQL error message."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "message"
+              ],
+              "description": "One Waffo GraphQL error."
+            },
+            "description": "GraphQL errors returned by Waffo."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Waffo GraphQL response envelope."
+      }
+    },
+    {
+      "id": "waffo.search_orders",
+      "service": "waffo",
+      "name": "search_orders",
+      "description": "Search one-time or subscription orders by store, status, merchant reference, or creation time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo store ID in `STO_...` format."
+          },
+          "orderType": {
+            "type": "string",
+            "enum": [
+              "one_time",
+              "subscription"
+            ],
+            "description": "The order billing model."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact Waffo order status to match."
+          },
+          "orderMerchantExternalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-side order reference to match."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Return records created at or after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Return records created at or before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId",
+          "orderType"
+        ],
+        "description": "Filters for searching Waffo one-time or subscription orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Waffo order ID."
+                },
+                "orderType": {
+                  "type": "string",
+                  "enum": [
+                    "one_time",
+                    "subscription"
+                  ],
+                  "description": "The order billing model."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The order status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 order creation timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "orderType",
+                "status",
+                "createdAt"
+              ],
+              "description": "A Waffo order."
+            },
+            "description": "The matching Waffo orders."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching orders."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The requested page offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Waffo orders."
+      }
+    },
+    {
+      "id": "waffo.search_payments",
+      "service": "waffo",
+      "name": "search_payments",
+      "description": "Find a Waffo payment by ID or search payments by status, merchant order reference, or creation time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A specific Waffo payment ID in `PAY_...` format."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact Waffo payment status to match."
+          },
+          "orderMerchantExternalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-side order reference to match."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Return records created at or after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Return records created at or before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for searching Waffo payments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Waffo payment ID."
+                },
+                "orderId": {
+                  "type": "string",
+                  "description": "The related Waffo order ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The payment status."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "orderId",
+                "status"
+              ],
+              "description": "A Waffo payment."
+            },
+            "description": "The matching Waffo payments."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching payments."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The requested page offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Waffo payments."
+      }
+    },
+    {
+      "id": "waffo.search_refund_tickets",
+      "service": "waffo",
+      "name": "search_refund_tickets",
+      "description": "Search Waffo refund tickets by status, payment, merchant reference, or creation time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact Waffo refund ticket status to match."
+          },
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo payment ID associated with the ticket."
+          },
+          "refundTicketMerchantExternalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant-side refund reference to match."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Return records created at or after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Return records created at or before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching records to skip."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for searching Waffo refund tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refundTickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Waffo refund ticket ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The refund ticket status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 refund ticket creation timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "status",
+                "createdAt"
+              ],
+              "description": "A Waffo refund ticket."
+            },
+            "description": "The matching Waffo refund tickets."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching refund tickets."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The requested page offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Waffo refund tickets."
+      }
+    },
+    {
+      "id": "waffo.set_product_status",
+      "service": "waffo",
+      "name": "set_product_status",
+      "description": "Activate or deactivate a one-time or subscription product in the connected Waffo API key environment.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "one_time",
+              "subscription"
+            ],
+            "description": "The Waffo product billing model."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo product ID in `PROD_...` format."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "description": "The new product status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for changing a Waffo product status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo product ID."
+              },
+              "storeId": {
+                "type": "string",
+                "description": "The owning Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The product status in the API key environment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "storeId",
+              "name",
+              "status"
+            ],
+            "description": "The Waffo product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo product result."
+      }
+    },
+    {
+      "id": "waffo.update_product",
+      "service": "waffo",
+      "name": "update_product",
+      "description": "Update a one-time or subscription product in the connected Waffo API key environment, creating an immutable version when content changes.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productType": {
+            "type": "string",
+            "enum": [
+              "one_time",
+              "subscription"
+            ],
+            "description": "The Waffo product billing model."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waffo product ID in `PROD_...` format."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The updated product name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated Markdown description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated Markdown description, or null to clear it."
+          },
+          "prices": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The positive price in major currency units, such as `29.00`.",
+                  "pattern": "\\S"
+                },
+                "taxIncluded": {
+                  "type": "boolean",
+                  "description": "Whether the price already includes tax."
+                },
+                "taxCategory": {
+                  "type": "string",
+                  "enum": [
+                    "digital_goods",
+                    "saas",
+                    "software",
+                    "ebook",
+                    "online_course",
+                    "consulting",
+                    "professional_service"
+                  ],
+                  "description": "The tax category applied to this price."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "taxCategory"
+              ],
+              "description": "A Waffo price for one currency."
+            },
+            "description": "Prices keyed by uppercase ISO 4217 currency code.",
+            "minProperties": 1,
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video"
+                  ],
+                  "description": "The media type."
+                },
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The publicly accessible media URL."
+                },
+                "alt": {
+                  "type": "string",
+                  "description": "Alternative text for the media item."
+                },
+                "thumbnail": {
+                  "type": "string",
+                  "description": "The optional thumbnail URL, recommended for videos."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "url"
+              ],
+              "description": "One Waffo product media item."
+            },
+            "description": "Product images or videos displayed by Waffo."
+          },
+          "successUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512,
+                "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HTTP(S) redirect URL used after successful payment, or null to clear it."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-serializable metadata value."
+            },
+            "description": "Custom JSON metadata attached to the Waffo resource."
+          },
+          "billingPeriod": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ],
+            "description": "The updated subscription billing interval."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productType",
+          "id"
+        ],
+        "description": "Parameters for updating a Waffo product in the connected API key environment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Waffo product ID."
+              },
+              "storeId": {
+                "type": "string",
+                "description": "The owning Waffo store ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "status": {
+                "type": "string",
+                "description": "The product status in the API key environment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "storeId",
+              "name",
+              "status"
+            ],
+            "description": "The Waffo product."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Waffo product result."
+      }
+    }
+  ]
+}

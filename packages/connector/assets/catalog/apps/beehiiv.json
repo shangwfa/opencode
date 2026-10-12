@@ -1,0 +1,1835 @@
+{
+  "service": "beehiiv",
+  "displayName": "Beehiiv",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "beehiiv_api_key",
+      "description": "Beehiiv API key used as a bearer token. Create it from Settings > Integrations > API in your Beehiiv account: https://developers.beehiiv.com/welcome/create-an-api-key."
+    }
+  ],
+  "homepageUrl": "https://www.beehiiv.com",
+  "actions": [
+    {
+      "id": "beehiiv.get_post",
+      "service": "beehiiv",
+      "name": "get_post",
+      "description": "Fetch one Beehiiv post by ID with optional statistics or content expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv publication ID that owns the post."
+          },
+          "postId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv post ID to retrieve."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "free_web_content",
+                "free_email_content",
+                "free_rss_content",
+                "premium_web_content",
+                "premium_email_content"
+              ],
+              "description": "One Beehiiv post expand value."
+            },
+            "description": "Post fields to expand in the Beehiiv response. HTML content expansions can make responses large."
+          },
+          "premiumTiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One premium tier display name."
+            },
+            "description": "Premium tier display names used to scope expanded post content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId",
+          "postId"
+        ],
+        "description": "Path and query parameters for fetching a Beehiiv post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Beehiiv post ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "Post title."
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Post subtitle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Post subtitle."
+              },
+              "authors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One post author."
+                },
+                "description": "Post author names."
+              },
+              "created": {
+                "type": "number",
+                "description": "Post creation time as seconds since the Unix epoch."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "confirmed",
+                  "archived"
+                ],
+                "description": "Post status."
+              },
+              "publish_date": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Post publish time as seconds since the Unix epoch."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Post publish time as seconds since the Unix epoch."
+              },
+              "displayed_date": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Post displayed date as seconds since the Unix epoch."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Post displayed date as seconds since the Unix epoch."
+              },
+              "split_tested": {
+                "type": "boolean",
+                "description": "Whether the post was split tested."
+              },
+              "subject_line": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Email subject line for the post."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email subject line for the post."
+              },
+              "preview_text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Email preview text for the post."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email preview text for the post."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Post slug."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Post slug."
+              },
+              "thumbnail_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Post thumbnail URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Post thumbnail URL."
+              },
+              "web_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Public web URL for the post."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Public web URL for the post."
+              },
+              "audience": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "premium",
+                  "both"
+                ],
+                "description": "Audience that can access the post."
+              },
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "web",
+                  "email",
+                  "both"
+                ],
+                "description": "Platform where the post is published."
+              },
+              "content_tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One content tag."
+                },
+                "description": "Content tags associated with the post."
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "free": {
+                    "type": "object",
+                    "properties": {
+                      "web": {
+                        "type": "string",
+                        "description": "Web HTML rendered to a free reader."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Email HTML rendered to a free reader."
+                      },
+                      "rss": {
+                        "type": "string",
+                        "description": "RSS HTML rendered for the post."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Expanded content for free readers."
+                  },
+                  "premium": {
+                    "type": "object",
+                    "properties": {
+                      "web": {
+                        "type": "string",
+                        "description": "Web HTML rendered to a premium reader."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Email HTML rendered to a premium reader."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Expanded content for premium readers."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Expanded Beehiiv post HTML content."
+              },
+              "stats": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Expanded post statistics returned by Beehiiv."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "title",
+              "subtitle",
+              "authors",
+              "created",
+              "status",
+              "publish_date",
+              "displayed_date",
+              "split_tested",
+              "subject_line",
+              "preview_text",
+              "slug",
+              "thumbnail_url",
+              "web_url",
+              "audience",
+              "platform",
+              "content_tags"
+            ],
+            "description": "Beehiiv post object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Beehiiv post response."
+      }
+    },
+    {
+      "id": "beehiiv.get_publication",
+      "service": "beehiiv",
+      "name": "get_publication",
+      "description": "Fetch one Beehiiv publication by ID with optional statistics expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv publication ID to retrieve."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "stat_active_subscriptions",
+                "stat_active_premium_subscriptions",
+                "stat_active_free_subscriptions",
+                "stat_average_open_rate",
+                "stat_average_click_rate",
+                "stat_total_sent",
+                "stat_total_unique_opened",
+                "stat_total_clicked"
+              ],
+              "description": "One Beehiiv publication expand value."
+            },
+            "description": "Publication fields to expand in the Beehiiv response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId"
+        ],
+        "description": "Path and query parameters for fetching a Beehiiv publication."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Beehiiv publication ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Publication name."
+              },
+              "organization_name": {
+                "type": "string",
+                "description": "Organization name."
+              },
+              "referral_program_enabled": {
+                "type": "boolean",
+                "description": "Whether the referral program is enabled."
+              },
+              "created": {
+                "type": "number",
+                "description": "Publication creation time as seconds since the Unix epoch."
+              },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "active_subscriptions": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Subscription count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total active free and premium subscriptions."
+                  },
+                  "active_premium_subscriptions": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Subscription count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total active premium subscriptions."
+                  },
+                  "active_free_subscriptions": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Subscription count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total active free subscriptions."
+                  },
+                  "average_open_rate": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "Average open rate."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Historical average open rate."
+                  },
+                  "average_click_rate": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "Average click-through rate."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Historical average click-through rate."
+                  },
+                  "total_sent": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Email count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total emails sent."
+                  },
+                  "total_unique_opened": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Open count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total uniquely opened emails."
+                  },
+                  "total_clicked": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Click count."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when Beehiiv did not include this stat."
+                      }
+                    ],
+                    "description": "Total links clicked from emails."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Beehiiv publication statistics."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "organization_name",
+              "referral_program_enabled",
+              "created"
+            ],
+            "description": "Beehiiv publication object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Beehiiv publication response."
+      }
+    },
+    {
+      "id": "beehiiv.get_subscription",
+      "service": "beehiiv",
+      "name": "get_subscription",
+      "description": "Fetch one Beehiiv subscription by ID with optional expansions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv publication ID that owns the subscription."
+          },
+          "subscriptionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv subscription ID to retrieve."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "custom_fields",
+                "referrals",
+                "tags",
+                "newsletter_lists"
+              ],
+              "description": "One Beehiiv subscription expand value."
+            },
+            "description": "Subscription fields to expand in the Beehiiv response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId",
+          "subscriptionId"
+        ],
+        "description": "Path and query parameters for fetching a Beehiiv subscription by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Beehiiv subscription ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "Subscriber email address.",
+                "format": "email"
+              },
+              "status": {
+                "type": "string",
+                "description": "Beehiiv subscription status."
+              },
+              "created": {
+                "type": "integer",
+                "description": "Subscription creation time as seconds since the Unix epoch."
+              },
+              "subscription_tier": {
+                "type": "string",
+                "description": "Current subscription tier."
+              },
+              "subscription_premium_tiers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Beehiiv tier ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Tier name."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Tier status."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Beehiiv subscription premium tier."
+                },
+                "description": "Premium tiers associated with the subscription."
+              },
+              "utm_source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Subscription UTM source."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Subscription UTM source."
+              },
+              "utm_medium": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Subscription UTM medium."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Subscription UTM medium."
+              },
+              "utm_channel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Subscription UTM channel."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Subscription UTM channel."
+              },
+              "utm_campaign": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Subscription UTM campaign."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Subscription UTM campaign."
+              },
+              "referring_site": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Referring site captured for the subscription."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Referring site captured for the subscription."
+              },
+              "referral_code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Referral code assigned to the subscription."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Referral code assigned to the subscription."
+              },
+              "stripe_customer_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Stripe customer ID associated with the subscription."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Stripe customer ID associated with the subscription."
+              },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "emails_received": {
+                    "type": "integer",
+                    "description": "Total emails sent to the subscriber."
+                  },
+                  "open_rate": {
+                    "type": "number",
+                    "description": "Subscriber open rate."
+                  },
+                  "click_through_rate": {
+                    "type": "number",
+                    "description": "Subscriber click-through rate."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Beehiiv subscription statistics."
+              },
+              "custom_fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Custom field name."
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Custom field value type."
+                    },
+                    "value": {
+                      "description": "Custom field value returned by Beehiiv."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Beehiiv subscription custom field."
+                },
+                "description": "Custom fields set on the subscription."
+              },
+              "referrals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Referred subscription ID."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "Referred subscriber email address.",
+                      "format": "email"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Referred subscription status."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Limited referral subscription object."
+                },
+                "description": "Subscriptions referred by this subscription."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One subscription tag."
+                },
+                "description": "Tags set on the subscription."
+              },
+              "newsletter_lists": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One newsletter list ID."
+                },
+                "description": "Newsletter list IDs the subscription is actively subscribed to."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "email",
+              "status",
+              "created",
+              "subscription_tier"
+            ],
+            "description": "Beehiiv subscription object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Beehiiv subscription response."
+      }
+    },
+    {
+      "id": "beehiiv.list_posts",
+      "service": "beehiiv",
+      "name": "list_posts",
+      "description": "List Beehiiv posts for a publication with documented filters and optional expansions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv publication ID whose posts should be listed."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "free_web_content",
+                "free_email_content",
+                "free_rss_content",
+                "premium_web_content",
+                "premium_email_content"
+              ],
+              "description": "One Beehiiv post expand value."
+            },
+            "description": "Post fields to expand in the Beehiiv response. HTML content expansions can make responses large."
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "free",
+              "premium",
+              "all"
+            ],
+            "description": "Audience filter for returned posts."
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "email",
+              "both",
+              "all"
+            ],
+            "description": "Platform filter for returned posts."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "confirmed",
+              "archived",
+              "all"
+            ],
+            "description": "Status filter for returned posts."
+          },
+          "contentTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag."
+            },
+            "description": "Content tags used to filter returned posts."
+          },
+          "slugs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One slug."
+            },
+            "description": "Post slugs used to filter returned posts."
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One author."
+            },
+            "description": "Author names used to filter returned posts."
+          },
+          "premiumTiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One premium tier display name."
+            },
+            "description": "Premium tier display names used to filter returned posts and expanded content."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of objects to return. Beehiiv documents a range from 1 to 100 and defaults to 10."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Offset-based page number for Beehiiv pagination."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "created",
+              "publish_date",
+              "displayed_date"
+            ],
+            "description": "Field used to sort Beehiiv posts."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for the Beehiiv request."
+          },
+          "hiddenFromFeed": {
+            "type": "string",
+            "enum": [
+              "all",
+              "true",
+              "false"
+            ],
+            "description": "Filter by whether posts are hidden from the feed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId"
+        ],
+        "description": "Path and query parameters for listing Beehiiv posts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Beehiiv post ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Post title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Post subtitle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Post subtitle."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One post author."
+                  },
+                  "description": "Post author names."
+                },
+                "created": {
+                  "type": "number",
+                  "description": "Post creation time as seconds since the Unix epoch."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "confirmed",
+                    "archived"
+                  ],
+                  "description": "Post status."
+                },
+                "publish_date": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Post publish time as seconds since the Unix epoch."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Post publish time as seconds since the Unix epoch."
+                },
+                "displayed_date": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Post displayed date as seconds since the Unix epoch."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Post displayed date as seconds since the Unix epoch."
+                },
+                "split_tested": {
+                  "type": "boolean",
+                  "description": "Whether the post was split tested."
+                },
+                "subject_line": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Email subject line for the post."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Email subject line for the post."
+                },
+                "preview_text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Email preview text for the post."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Email preview text for the post."
+                },
+                "slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Post slug."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Post slug."
+                },
+                "thumbnail_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Post thumbnail URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Post thumbnail URL."
+                },
+                "web_url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Public web URL for the post."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Public web URL for the post."
+                },
+                "audience": {
+                  "type": "string",
+                  "enum": [
+                    "free",
+                    "premium",
+                    "both"
+                  ],
+                  "description": "Audience that can access the post."
+                },
+                "platform": {
+                  "type": "string",
+                  "enum": [
+                    "web",
+                    "email",
+                    "both"
+                  ],
+                  "description": "Platform where the post is published."
+                },
+                "content_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One content tag."
+                  },
+                  "description": "Content tags associated with the post."
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "free": {
+                      "type": "object",
+                      "properties": {
+                        "web": {
+                          "type": "string",
+                          "description": "Web HTML rendered to a free reader."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "Email HTML rendered to a free reader."
+                        },
+                        "rss": {
+                          "type": "string",
+                          "description": "RSS HTML rendered for the post."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Expanded content for free readers."
+                    },
+                    "premium": {
+                      "type": "object",
+                      "properties": {
+                        "web": {
+                          "type": "string",
+                          "description": "Web HTML rendered to a premium reader."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "Email HTML rendered to a premium reader."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Expanded content for premium readers."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Expanded Beehiiv post HTML content."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Expanded post statistics returned by Beehiiv."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "subtitle",
+                "authors",
+                "created",
+                "status",
+                "publish_date",
+                "displayed_date",
+                "split_tested",
+                "subject_line",
+                "preview_text",
+                "slug",
+                "thumbnail_url",
+                "web_url",
+                "audience",
+                "platform",
+                "content_tags"
+              ],
+              "description": "Beehiiv post object."
+            },
+            "description": "Posts returned by Beehiiv."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of objects requested per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current offset pagination page."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching objects."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of offset pagination pages."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "limit",
+          "page",
+          "total_results",
+          "total_pages"
+        ],
+        "description": "Paginated Beehiiv posts response."
+      }
+    },
+    {
+      "id": "beehiiv.list_publications",
+      "service": "beehiiv",
+      "name": "list_publications",
+      "description": "List Beehiiv publications associated with the API key, with optional sorting and expansion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "stat_active_subscriptions",
+                "stat_active_premium_subscriptions",
+                "stat_active_free_subscriptions",
+                "stat_average_open_rate",
+                "stat_average_click_rate",
+                "stat_total_sent",
+                "stat_total_unique_opened",
+                "stat_total_clicked"
+              ],
+              "description": "One Beehiiv publication expand value."
+            },
+            "description": "Publication fields to expand in the Beehiiv response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of objects to return. Beehiiv documents a range from 1 to 100 and defaults to 10."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Offset-based page number for Beehiiv pagination."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for the Beehiiv request."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "created",
+              "name"
+            ],
+            "description": "Field used to sort Beehiiv publications."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Beehiiv publications."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Beehiiv publication ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Publication name."
+                },
+                "organization_name": {
+                  "type": "string",
+                  "description": "Organization name."
+                },
+                "referral_program_enabled": {
+                  "type": "boolean",
+                  "description": "Whether the referral program is enabled."
+                },
+                "created": {
+                  "type": "number",
+                  "description": "Publication creation time as seconds since the Unix epoch."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {
+                    "active_subscriptions": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Subscription count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total active free and premium subscriptions."
+                    },
+                    "active_premium_subscriptions": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Subscription count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total active premium subscriptions."
+                    },
+                    "active_free_subscriptions": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Subscription count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total active free subscriptions."
+                    },
+                    "average_open_rate": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Average open rate."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Historical average open rate."
+                    },
+                    "average_click_rate": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Average click-through rate."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Historical average click-through rate."
+                    },
+                    "total_sent": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Email count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total emails sent."
+                    },
+                    "total_unique_opened": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Open count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total uniquely opened emails."
+                    },
+                    "total_clicked": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Click count."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "False when Beehiiv did not include this stat."
+                        }
+                      ],
+                      "description": "Total links clicked from emails."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Beehiiv publication statistics."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "organization_name",
+                "referral_program_enabled",
+                "created"
+              ],
+              "description": "Beehiiv publication object."
+            },
+            "description": "Publications returned by Beehiiv."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of objects requested per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current offset pagination page."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching objects."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of offset pagination pages."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "limit",
+          "page",
+          "total_results",
+          "total_pages"
+        ],
+        "description": "Paginated Beehiiv publications response."
+      }
+    },
+    {
+      "id": "beehiiv.list_subscriptions",
+      "service": "beehiiv",
+      "name": "list_subscriptions",
+      "description": "List Beehiiv subscriptions for a publication with cursor pagination and documented filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "publicationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beehiiv publication ID whose subscriptions should be listed."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stats",
+                "custom_fields",
+                "referrals",
+                "tags",
+                "newsletter_lists"
+              ],
+              "description": "One Beehiiv subscription expand value."
+            },
+            "description": "Subscription fields to expand in the Beehiiv response."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "validating",
+              "invalid",
+              "pending",
+              "active",
+              "inactive",
+              "all"
+            ],
+            "description": "Status filter for returned subscriptions."
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "free",
+              "premium",
+              "all"
+            ],
+            "description": "Tier filter for returned subscriptions."
+          },
+          "premiumTiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One premium tier name."
+            },
+            "description": "Premium tier names used to filter returned subscriptions."
+          },
+          "premiumTierIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One premium tier ID."
+            },
+            "description": "Premium tier IDs used to filter returned subscriptions."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of objects to return. Beehiiv documents a range from 1 to 100 and defaults to 10."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor token for cursor-based pagination."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Offset-based page number for Beehiiv pagination."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address used to find a matching subscription.",
+            "format": "email"
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "created"
+            ],
+            "description": "Field used to sort Beehiiv subscriptions."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for the Beehiiv request."
+          },
+          "creationDate": {
+            "type": "string",
+            "pattern": "^\\d{4}/\\d{2}/\\d{2}$",
+            "description": "Creation date filter in YYYY/MM/DD format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "publicationId"
+        ],
+        "description": "Path and query parameters for listing Beehiiv subscriptions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Beehiiv subscription ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Subscriber email address.",
+                  "format": "email"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Beehiiv subscription status."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "Subscription creation time as seconds since the Unix epoch."
+                },
+                "subscription_tier": {
+                  "type": "string",
+                  "description": "Current subscription tier."
+                },
+                "subscription_premium_tiers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Beehiiv tier ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Tier name."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Tier status."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Beehiiv subscription premium tier."
+                  },
+                  "description": "Premium tiers associated with the subscription."
+                },
+                "utm_source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Subscription UTM source."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Subscription UTM source."
+                },
+                "utm_medium": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Subscription UTM medium."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Subscription UTM medium."
+                },
+                "utm_channel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Subscription UTM channel."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Subscription UTM channel."
+                },
+                "utm_campaign": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Subscription UTM campaign."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Subscription UTM campaign."
+                },
+                "referring_site": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Referring site captured for the subscription."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Referring site captured for the subscription."
+                },
+                "referral_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Referral code assigned to the subscription."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Referral code assigned to the subscription."
+                },
+                "stripe_customer_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Stripe customer ID associated with the subscription."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Stripe customer ID associated with the subscription."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {
+                    "emails_received": {
+                      "type": "integer",
+                      "description": "Total emails sent to the subscriber."
+                    },
+                    "open_rate": {
+                      "type": "number",
+                      "description": "Subscriber open rate."
+                    },
+                    "click_through_rate": {
+                      "type": "number",
+                      "description": "Subscriber click-through rate."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Beehiiv subscription statistics."
+                },
+                "custom_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Custom field name."
+                      },
+                      "kind": {
+                        "type": "string",
+                        "description": "Custom field value type."
+                      },
+                      "value": {
+                        "description": "Custom field value returned by Beehiiv."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Beehiiv subscription custom field."
+                  },
+                  "description": "Custom fields set on the subscription."
+                },
+                "referrals": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Referred subscription ID."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Referred subscriber email address.",
+                        "format": "email"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Referred subscription status."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Limited referral subscription object."
+                  },
+                  "description": "Subscriptions referred by this subscription."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One subscription tag."
+                  },
+                  "description": "Tags set on the subscription."
+                },
+                "newsletter_lists": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One newsletter list ID."
+                  },
+                  "description": "Newsletter list IDs the subscription is actively subscribed to."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "email",
+                "status",
+                "created",
+                "subscription_tier"
+              ],
+              "description": "Beehiiv subscription object."
+            },
+            "description": "Subscriptions returned by Beehiiv."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Number of objects requested per page."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current offset pagination page when returned by Beehiiv."
+          },
+          "total_results": {
+            "type": "integer",
+            "description": "Total number of matching objects when returned by Beehiiv."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of offset pagination pages when returned by Beehiiv."
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor token for the next page of results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor token for the next page of results."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data",
+          "limit",
+          "page",
+          "total_results",
+          "total_pages",
+          "next_cursor"
+        ],
+        "description": "Paginated Beehiiv subscriptions response."
+      }
+    }
+  ]
+}

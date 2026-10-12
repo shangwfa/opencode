@@ -1,0 +1,512 @@
+{
+  "service": "currencyscoop",
+  "displayName": "CurrencyBeacon",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CURRENCYBEACON_API_KEY",
+      "description": "CurrencyBeacon API key sent with the api_key query parameter. Get it from https://currencybeacon.com/account/dashboard."
+    }
+  ],
+  "homepageUrl": "https://currencybeacon.com",
+  "actions": [
+    {
+      "id": "currencyscoop.convert_currency",
+      "service": "currencyscoop",
+      "name": "convert_currency",
+      "description": "Convert an amount between two currencies using CurrencyBeacon exchange rates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source currency code for the conversion.",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency code for the conversion.",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Positive amount to convert."
+          },
+          "date": {
+            "type": "string",
+            "description": "Optional historical date in YYYY-MM-DD format for historical conversion.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "amount"
+        ],
+        "description": "Input parameters for converting an amount between two currencies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP-like status code reported by CurrencyBeacon."
+              },
+              "disclaimer": {
+                "type": "string",
+                "description": "Optional disclaimer text returned by CurrencyBeacon."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "description": "Metadata returned by CurrencyBeacon."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp reported by CurrencyBeacon for the conversion."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date associated with the conversion result."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source currency code used for the conversion."
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target currency code used for the conversion."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount used for the conversion."
+          },
+          "value": {
+            "type": "number",
+            "description": "Converted value returned by CurrencyBeacon."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "timestamp",
+          "date",
+          "from",
+          "to",
+          "amount",
+          "value"
+        ],
+        "description": "Currency conversion result returned by CurrencyBeacon."
+      }
+    },
+    {
+      "id": "currencyscoop.get_currencies",
+      "service": "currencyscoop",
+      "name": "get_currencies",
+      "description": "Retrieve the supported currencies exposed by CurrencyBeacon.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving supported currencies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP-like status code reported by CurrencyBeacon."
+              },
+              "disclaimer": {
+                "type": "string",
+                "description": "Optional disclaimer text returned by CurrencyBeacon."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "description": "Metadata returned by CurrencyBeacon."
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Internal numeric identifier for the currency."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "Numeric or upstream currency code field returned by CurrencyBeacon."
+                },
+                "shortCode": {
+                  "type": "string",
+                  "description": "Short currency code such as USD or BTC."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the currency."
+                },
+                "precision": {
+                  "type": "integer",
+                  "description": "Number of decimal places used by the currency."
+                },
+                "subunit": {
+                  "type": "integer",
+                  "description": "Number of subunits in one main unit."
+                },
+                "symbol": {
+                  "type": "string",
+                  "description": "Primary currency symbol."
+                },
+                "symbolFirst": {
+                  "type": "boolean",
+                  "description": "Whether the symbol is rendered before the amount."
+                },
+                "decimalMark": {
+                  "type": "string",
+                  "description": "Character used as the decimal separator."
+                },
+                "thousandsSeparator": {
+                  "type": "string",
+                  "description": "Character used as the thousands separator."
+                },
+                "countries": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One country associated with the currency."
+                  },
+                  "description": "Countries associated with the currency."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "code",
+                "shortCode",
+                "name"
+              ],
+              "description": "A supported currency returned by CurrencyBeacon."
+            },
+            "description": "Supported currencies returned by CurrencyBeacon."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "currencies"
+        ],
+        "description": "Supported currencies from CurrencyBeacon."
+      }
+    },
+    {
+      "id": "currencyscoop.get_historical_rates",
+      "service": "currencyscoop",
+      "name": "get_historical_rates",
+      "description": "Retrieve historical exchange rates for a specific date from CurrencyBeacon.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code for the historical exchange rates.",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "date": {
+            "type": "string",
+            "description": "Historical date in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A supported target currency code.",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "description": "List of target currency codes to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "Input parameters for retrieving historical exchange rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP-like status code reported by CurrencyBeacon."
+              },
+              "disclaimer": {
+                "type": "string",
+                "description": "Optional disclaimer text returned by CurrencyBeacon."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "description": "Metadata returned by CurrencyBeacon."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency used for the returned rates."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Upstream date or datetime string associated with the returned rates."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "Exchange rate value."
+            },
+            "description": "Mapping of currency codes to exchange rates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "base",
+          "date",
+          "rates"
+        ],
+        "description": "Exchange rate snapshot returned by CurrencyBeacon."
+      }
+    },
+    {
+      "id": "currencyscoop.get_latest_rates",
+      "service": "currencyscoop",
+      "name": "get_latest_rates",
+      "description": "Retrieve the latest exchange rates for a base currency from CurrencyBeacon.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code for the requested exchange rates.",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A supported target currency code.",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "description": "List of target currency codes to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the latest exchange rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP-like status code reported by CurrencyBeacon."
+              },
+              "disclaimer": {
+                "type": "string",
+                "description": "Optional disclaimer text returned by CurrencyBeacon."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "description": "Metadata returned by CurrencyBeacon."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency used for the returned rates."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Upstream date or datetime string associated with the returned rates."
+          },
+          "rates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "Exchange rate value."
+            },
+            "description": "Mapping of currency codes to exchange rates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "base",
+          "date",
+          "rates"
+        ],
+        "description": "Exchange rate snapshot returned by CurrencyBeacon."
+      }
+    },
+    {
+      "id": "currencyscoop.get_timeseries_rates",
+      "service": "currencyscoop",
+      "name": "get_timeseries_rates",
+      "description": "Retrieve exchange rates across a date range from CurrencyBeacon.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency code for the timeseries exchange rates.",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Start date of the timeseries range in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "End date of the timeseries range in YYYY-MM-DD format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A supported target currency code.",
+              "pattern": "^[A-Z0-9_]+$"
+            },
+            "description": "List of target currency codes to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for retrieving timeseries exchange rates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "HTTP-like status code reported by CurrencyBeacon."
+              },
+              "disclaimer": {
+                "type": "string",
+                "description": "Optional disclaimer text returned by CurrencyBeacon."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "code"
+            ],
+            "description": "Metadata returned by CurrencyBeacon."
+          },
+          "base": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base currency used for the returned timeseries rates."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Start date of the returned timeseries range."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "End date of the returned timeseries range."
+          },
+          "ratesByDate": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "description": "Exchange rate value."
+              }
+            },
+            "description": "Mapping of YYYY-MM-DD dates to per-currency exchange rates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "base",
+          "startDate",
+          "endDate",
+          "ratesByDate"
+        ],
+        "description": "Timeseries exchange rates returned by CurrencyBeacon."
+      }
+    }
+  ]
+}

@@ -1,0 +1,955 @@
+{
+  "service": "googleforms",
+  "displayName": "Google Forms",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2",
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "scopes": [
+        "https://www.googleapis.com/auth/forms.body.readonly",
+        "https://www.googleapis.com/auth/forms.body",
+        "https://www.googleapis.com/auth/forms.responses.readonly",
+        "openid",
+        "email",
+        "profile"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    },
+    {
+      "type": "custom_credential",
+      "label": "Service Account",
+      "description": "Connect with a Google Cloud service account key instead of a user account, optionally impersonating a Workspace user through domain-wide delegation.",
+      "fields": [
+        {
+          "key": "serviceAccountJson",
+          "label": "Service Account JSON",
+          "inputType": "textarea",
+          "required": true,
+          "secret": true,
+          "placeholder": "{\"type\": \"service_account\", \"project_id\": \"...\", ...}",
+          "description": "The complete service account key JSON from Google Cloud Console (IAM & Admin > Service Accounts > Keys). Enable the Forms API for its project and share forms with the service account email, or use domain-wide delegation below."
+        },
+        {
+          "key": "subject",
+          "label": "Subject Email (optional)",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "user@your-domain.com",
+          "description": "Optional Workspace user to impersonate through domain-wide delegation. In the Workspace Admin console (Security > Access and data control > API Controls > Domain-wide Delegation), grant the service account client ID the Forms scopes this provider requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://workspace.google.com/products/forms/",
+  "actions": [
+    {
+      "id": "googleforms.batch_update_form",
+      "service": "googleforms",
+      "name": "batch_update_form",
+      "description": "Apply a batch of Google Forms update requests with optional revision controls and an optional updated form payload.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form to update."
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A JSON-like object with arbitrary string keys."
+            },
+            "description": "An array of JSON-like objects."
+          },
+          "requiredRevisionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The revision ID that must match before the update is applied."
+          },
+          "targetRevisionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target revision ID used for transformed writes."
+          },
+          "includeFormInResponse": {
+            "type": "boolean",
+            "description": "Whether the full updated form should be returned in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "requests"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "description": "The ID of the form that was updated."
+          },
+          "requestCount": {
+            "type": "integer",
+            "description": "The number of update requests submitted."
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A JSON-like object with arbitrary string keys."
+            },
+            "description": "An array of JSON-like objects."
+          },
+          "requiredRevisionId": {
+            "type": "string",
+            "description": "The resulting required revision ID after the update."
+          },
+          "targetRevisionId": {
+            "type": "string",
+            "description": "The resulting target revision ID after the update."
+          },
+          "form": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The updated form payload when includeFormInResponse is true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "requestCount",
+          "replies"
+        ],
+        "description": "The normalized result of a batch update request."
+      }
+    },
+    {
+      "id": "googleforms.create_form",
+      "service": "googleforms",
+      "name": "create_form",
+      "description": "Create a Google Form with a simple title-based input and optionally initialize the description and unpublished state.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The visible title of the new form."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The description shown below the form title."
+          },
+          "documentTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Google Drive document title for the new form."
+          },
+          "unpublished": {
+            "type": "boolean",
+            "description": "Whether the form should start unpublished and not accept responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "description": "The ID of the Google Form."
+          },
+          "title": {
+            "type": "string",
+            "description": "The visible title of the form."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description shown below the title."
+          },
+          "documentTitle": {
+            "type": "string",
+            "description": "The Google Drive document title for the form."
+          },
+          "revisionId": {
+            "type": "string",
+            "description": "The revision ID of the form."
+          },
+          "responderUri": {
+            "type": "string",
+            "description": "The URI where respondents can open the form."
+          },
+          "linkedSheetId": {
+            "type": "string",
+            "description": "The linked Google Sheets spreadsheet ID, when present."
+          },
+          "isPublished": {
+            "type": "boolean",
+            "description": "Whether the form is published."
+          },
+          "isAcceptingResponses": {
+            "type": "boolean",
+            "description": "Whether the form is accepting responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "title"
+        ],
+        "description": "A simplified Google Form summary."
+      }
+    },
+    {
+      "id": "googleforms.get_form",
+      "service": "googleforms",
+      "name": "get_form",
+      "description": "Retrieve the current structure, settings, publish state, and items of a Google Form.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.body.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.body.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "description": "The ID of the Google Form."
+          },
+          "title": {
+            "type": "string",
+            "description": "The visible title of the form."
+          },
+          "description": {
+            "type": "string",
+            "description": "The description shown below the title."
+          },
+          "documentTitle": {
+            "type": "string",
+            "description": "The Google Drive document title for the form."
+          },
+          "revisionId": {
+            "type": "string",
+            "description": "The revision ID of the form."
+          },
+          "responderUri": {
+            "type": "string",
+            "description": "The URI where respondents can open the form."
+          },
+          "linkedSheetId": {
+            "type": "string",
+            "description": "The linked Google Sheets spreadsheet ID, when present."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "quizSettings": {
+                "type": "object",
+                "properties": {
+                  "isQuiz": {
+                    "type": "boolean",
+                    "description": "Whether the form is configured as a quiz."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Quiz-related settings for the form."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Simplified form settings."
+          },
+          "publishSettings": {
+            "type": "object",
+            "properties": {
+              "isPublished": {
+                "type": "boolean",
+                "description": "Whether the form is published."
+              },
+              "isAcceptingResponses": {
+                "type": "boolean",
+                "description": "Whether the form accepts responses."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "isPublished",
+              "isAcceptingResponses"
+            ],
+            "description": "The simplified publish settings returned by the connector."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string",
+                  "description": "The unique ID of the form item."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The title or question text of the item."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Additional description for the item."
+                },
+                "questionItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Question-specific payload for the item."
+                },
+                "questionGroupItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Question-group-specific payload for the item."
+                },
+                "pageBreakItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Page-break-specific payload for the item."
+                },
+                "textItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Text-item-specific payload for the item."
+                },
+                "imageItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Image-item-specific payload for the item."
+                },
+                "videoItem": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Video-item-specific payload for the item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A simplified Google Forms item."
+            },
+            "description": "The items currently present in the form."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "title",
+          "items"
+        ],
+        "description": "A simplified Google Form detail."
+      }
+    },
+    {
+      "id": "googleforms.get_response",
+      "service": "googleforms",
+      "name": "get_response",
+      "description": "Retrieve a single Google Forms response by its response ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form that owns the response."
+          },
+          "responseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the response to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "responseId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseId": {
+            "type": "string",
+            "description": "The unique ID of the form response."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The time when the response was created."
+          },
+          "lastSubmittedTime": {
+            "type": "string",
+            "description": "The most recent submission time for the response."
+          },
+          "respondentEmail": {
+            "type": "string",
+            "description": "The respondent email when email collection is enabled."
+          },
+          "totalScore": {
+            "type": "number",
+            "description": "The total score of the response for quiz forms."
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string",
+                  "description": "The question ID this answer belongs to."
+                },
+                "grade": {
+                  "type": "object",
+                  "properties": {
+                    "score": {
+                      "type": "number",
+                      "description": "The awarded score for the answer."
+                    },
+                    "correct": {
+                      "type": "boolean",
+                      "description": "Whether the answer was correct."
+                    },
+                    "feedback": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Feedback returned for the graded answer."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Grade information for an answer."
+                },
+                "textAnswers": {
+                  "type": "object",
+                  "properties": {
+                    "answers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "A text answer value."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "value"
+                        ],
+                        "description": "A single text answer."
+                      },
+                      "description": "The text answers submitted for the question."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "answers"
+                  ],
+                  "description": "Text answers for the question."
+                },
+                "fileUploadAnswers": {
+                  "type": "object",
+                  "properties": {
+                    "answers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fileId": {
+                            "type": "string",
+                            "description": "The Google Drive file ID for the uploaded file."
+                          },
+                          "fileName": {
+                            "type": "string",
+                            "description": "The filename of the uploaded file."
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "The MIME type of the uploaded file."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A single file-upload answer."
+                      },
+                      "description": "The uploaded files submitted for the question."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "answers"
+                  ],
+                  "description": "File-upload answers for the question."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized answer payload."
+            },
+            "description": "A map from question IDs to normalized answer payloads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "responseId",
+          "answers"
+        ],
+        "description": "A normalized Google Forms response."
+      }
+    },
+    {
+      "id": "googleforms.list_responses",
+      "service": "googleforms",
+      "name": "list_responses",
+      "description": "List responses for a Google Form with optional filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form whose responses should be listed."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Google Forms filter expression used to filter responses."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "The maximum number of responses to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A pagination token returned by a previous list_responses call."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "responseId": {
+                  "type": "string",
+                  "description": "The unique ID of the form response."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The time when the response was created."
+                },
+                "lastSubmittedTime": {
+                  "type": "string",
+                  "description": "The most recent submission time for the response."
+                },
+                "respondentEmail": {
+                  "type": "string",
+                  "description": "The respondent email when email collection is enabled."
+                },
+                "totalScore": {
+                  "type": "number",
+                  "description": "The total score of the response for quiz forms."
+                },
+                "answers": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "string",
+                        "description": "The question ID this answer belongs to."
+                      },
+                      "grade": {
+                        "type": "object",
+                        "properties": {
+                          "score": {
+                            "type": "number",
+                            "description": "The awarded score for the answer."
+                          },
+                          "correct": {
+                            "type": "boolean",
+                            "description": "Whether the answer was correct."
+                          },
+                          "feedback": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": true,
+                            "description": "Feedback returned for the graded answer."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Grade information for an answer."
+                      },
+                      "textAnswers": {
+                        "type": "object",
+                        "properties": {
+                          "answers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "value": {
+                                  "type": "string",
+                                  "description": "A text answer value."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "required": [
+                                "value"
+                              ],
+                              "description": "A single text answer."
+                            },
+                            "description": "The text answers submitted for the question."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "answers"
+                        ],
+                        "description": "Text answers for the question."
+                      },
+                      "fileUploadAnswers": {
+                        "type": "object",
+                        "properties": {
+                          "answers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fileId": {
+                                  "type": "string",
+                                  "description": "The Google Drive file ID for the uploaded file."
+                                },
+                                "fileName": {
+                                  "type": "string",
+                                  "description": "The filename of the uploaded file."
+                                },
+                                "mimeType": {
+                                  "type": "string",
+                                  "description": "The MIME type of the uploaded file."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "A single file-upload answer."
+                            },
+                            "description": "The uploaded files submitted for the question."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "answers"
+                        ],
+                        "description": "File-upload answers for the question."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized answer payload."
+                  },
+                  "description": "A map from question IDs to normalized answer payloads."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "responseId",
+                "answers"
+              ],
+              "description": "A normalized Google Forms response."
+            },
+            "description": "The list of matching form responses."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A pagination token for fetching the next page of responses."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A pagination token for fetching the next page of responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "responses",
+          "nextPageToken"
+        ],
+        "description": "The normalized result of listing form responses."
+      }
+    },
+    {
+      "id": "googleforms.list_watches",
+      "service": "googleforms",
+      "name": "list_watches",
+      "description": "List watches configured for a Google Form.",
+      "operationType": "read",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.body.readonly",
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.body.readonly",
+        "https://www.googleapis.com/auth/forms.responses.readonly"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form whose watches should be listed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "watches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique ID of the watch."
+                },
+                "eventType": {
+                  "type": "string",
+                  "description": "The event type monitored by the watch."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state of the watch."
+                },
+                "errorType": {
+                  "type": "string",
+                  "description": "The last error type reported for the watch."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The creation time of the watch."
+                },
+                "expireTime": {
+                  "type": "string",
+                  "description": "The expiration time of the watch."
+                },
+                "target": {
+                  "type": "object",
+                  "properties": {
+                    "topicName": {
+                      "type": "string",
+                      "description": "The Pub/Sub topic name used by the watch."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "topicName"
+                  ],
+                  "description": "The watch delivery target."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "eventType",
+                "target"
+              ],
+              "description": "A normalized Google Forms watch."
+            },
+            "description": "The watches configured for the form."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "watches"
+        ],
+        "description": "The normalized list of Google Forms watches."
+      }
+    },
+    {
+      "id": "googleforms.set_publish_settings",
+      "service": "googleforms",
+      "name": "set_publish_settings",
+      "description": "Update whether a Google Form is published and whether it is accepting responses.",
+      "operationType": "write",
+      "requiredScopes": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "providerPermissions": [
+        "https://www.googleapis.com/auth/forms.body"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the form to update."
+          },
+          "publishSettings": {
+            "type": "object",
+            "properties": {
+              "publishState": {
+                "type": "object",
+                "properties": {
+                  "isPublished": {
+                    "type": "boolean",
+                    "description": "Whether the form should be published."
+                  },
+                  "isAcceptingResponses": {
+                    "type": "boolean",
+                    "description": "Whether the form should accept responses."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "isPublished",
+                  "isAcceptingResponses"
+                ],
+                "description": "The Google Forms publish state to write."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "publishState"
+            ],
+            "description": "The Google Forms publish settings payload to write."
+          },
+          "updateMask": {
+            "type": "string",
+            "enum": [
+              "publishState",
+              "*"
+            ],
+            "description": "The publishSettings fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "publishSettings"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "description": "The ID of the form that was updated."
+          },
+          "isPublished": {
+            "type": "boolean",
+            "description": "Whether the form is now published."
+          },
+          "isAcceptingResponses": {
+            "type": "boolean",
+            "description": "Whether the form is now accepting responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "isPublished",
+          "isAcceptingResponses"
+        ],
+        "description": "The normalized publish state of the form."
+      }
+    }
+  ]
+}

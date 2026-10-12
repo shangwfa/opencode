@@ -1,0 +1,2373 @@
+{
+  "service": "trilium",
+  "displayName": "TriliumNext Notes",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "ETAPI Token",
+      "placeholder": "ETAPI_TOKEN",
+      "description": "Trilium ETAPI token sent as a Bearer credential. Create one under Options > ETAPI in your Trilium instance.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://trilium.example.com",
+          "description": "The HTTP or HTTPS URL of your Trilium instance. Private targets require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://triliumnotes.org",
+  "actions": [
+    {
+      "id": "trilium.create_attribute",
+      "service": "trilium",
+      "name": "create_attribute",
+      "description": "Create a label or relation attribute on a Trilium note.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "label",
+              "relation"
+            ],
+            "description": "Whether this attribute is a label or relation."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attribute name without whitespace."
+          },
+          "value": {
+            "type": "string",
+            "description": "The label value or target note id for a relation."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The attribute ordering position."
+          },
+          "isInheritable": {
+            "type": "boolean",
+            "description": "Whether child notes inherit the attribute."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attributeId",
+          "noteId",
+          "type",
+          "name"
+        ],
+        "description": "Input parameters for creating a note attribute.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "relation"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "object",
+            "properties": {
+              "attributeId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "label",
+                  "relation"
+                ],
+                "description": "Whether this attribute is a label or relation."
+              },
+              "name": {
+                "type": "string",
+                "description": "The attribute name."
+              },
+              "value": {
+                "type": "string",
+                "description": "The label value or related note id."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attribute ordering position."
+              },
+              "isInheritable": {
+                "type": "boolean",
+                "description": "Whether child notes inherit the attribute."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium note attribute."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attribute"
+        ],
+        "description": "The created Trilium attribute."
+      }
+    },
+    {
+      "id": "trilium.create_branch",
+      "service": "trilium",
+      "name": "create_branch",
+      "description": "Place an existing Trilium note under another parent, or update that placement if it exists.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "parentNoteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "notePosition": {
+            "type": "integer",
+            "description": "The note position under its parent."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The branch-specific title prefix."
+          },
+          "isExpanded": {
+            "type": "boolean",
+            "description": "Whether the branch should appear expanded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId",
+          "parentNoteId"
+        ],
+        "description": "Input parameters for creating or replacing a note-tree branch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "object",
+            "properties": {
+              "branchId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "parentNoteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "prefix": {
+                "type": "string",
+                "description": "The branch-specific title prefix."
+              },
+              "notePosition": {
+                "type": "integer",
+                "description": "The note position under its parent."
+              },
+              "isExpanded": {
+                "type": "boolean",
+                "description": "Whether the branch is expanded in the note tree."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium branch placing a note in the note tree."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branch"
+        ],
+        "description": "The created or updated Trilium branch."
+      }
+    },
+    {
+      "id": "trilium.create_note",
+      "service": "trilium",
+      "name": "create_note",
+      "description": "Create a note and place it under a parent in the Trilium note tree.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentNoteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "title": {
+            "type": "string",
+            "description": "The note title."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "code",
+              "file",
+              "image",
+              "search",
+              "book",
+              "relationMap",
+              "render"
+            ],
+            "description": "The Trilium note type."
+          },
+          "content": {
+            "type": "string",
+            "description": "The initial note content."
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MIME type required for code, file, and image notes."
+          },
+          "notePosition": {
+            "type": "integer",
+            "description": "The note position under its parent."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The branch-specific title prefix."
+          },
+          "isExpanded": {
+            "type": "boolean",
+            "description": "Whether the new note should appear expanded."
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "dateCreated": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Trilium local timestamp overriding the creation time."
+          },
+          "utcDateCreated": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Trilium UTC timestamp overriding the creation time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parentNoteId",
+          "title",
+          "type",
+          "content"
+        ],
+        "description": "Input parameters for creating a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "title": {
+                "type": "string",
+                "description": "The note title."
+              },
+              "type": {
+                "type": "string",
+                "description": "The note type returned by Trilium."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The note MIME type."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether the note is protected."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The content blob id used as a content hash."
+              },
+              "attributes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "noteId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "label",
+                        "relation"
+                      ],
+                      "description": "Whether this attribute is a label or relation."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The attribute name."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The label value or related note id."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "The attribute ordering position."
+                    },
+                    "isInheritable": {
+                      "type": "boolean",
+                      "description": "Whether child notes inherit the attribute."
+                    },
+                    "utcDateModified": {
+                      "type": "string",
+                      "description": "The UTC modification time returned by Trilium."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Trilium note attribute."
+                },
+                "description": "Attributes attached to the note."
+              },
+              "parentNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent note ids."
+              },
+              "childNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child note ids."
+              },
+              "parentBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent branch ids."
+              },
+              "childBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child branch ids."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "The local note creation time."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local note modification time."
+              },
+              "utcDateCreated": {
+                "type": "string",
+                "description": "The UTC note creation time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC note modification time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium note metadata."
+          },
+          "branch": {
+            "type": "object",
+            "properties": {
+              "branchId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "parentNoteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "prefix": {
+                "type": "string",
+                "description": "The branch-specific title prefix."
+              },
+              "notePosition": {
+                "type": "integer",
+                "description": "The note position under its parent."
+              },
+              "isExpanded": {
+                "type": "boolean",
+                "description": "Whether the branch is expanded in the note tree."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium branch placing a note in the note tree."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note",
+          "branch"
+        ],
+        "description": "The created Trilium note and its first branch."
+      },
+      "followUpActions": [
+        "trilium.get_note",
+        "trilium.create_attribute"
+      ]
+    },
+    {
+      "id": "trilium.delete_attachment",
+      "service": "trilium",
+      "name": "delete_attachment",
+      "description": "Delete a Trilium attachment.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachmentId"
+        ],
+        "description": "Input parameters for deleting an attachment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Trilium accepted the deletion."
+          },
+          "attachmentId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "attachmentId"
+        ],
+        "description": "The attachment deletion result."
+      }
+    },
+    {
+      "id": "trilium.delete_attribute",
+      "service": "trilium",
+      "name": "delete_attribute",
+      "description": "Delete a Trilium label or relation attribute.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attributeId"
+        ],
+        "description": "Input parameters for deleting an attribute."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Trilium accepted the deletion."
+          },
+          "attributeId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "attributeId"
+        ],
+        "description": "The attribute deletion result."
+      }
+    },
+    {
+      "id": "trilium.delete_branch",
+      "service": "trilium",
+      "name": "delete_branch",
+      "description": "Delete a Trilium branch; deleting a note's final branch also deletes the note.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branchId"
+        ],
+        "description": "Input parameters for deleting a branch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Trilium accepted the deletion."
+          },
+          "branchId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "branchId"
+        ],
+        "description": "The branch deletion result."
+      }
+    },
+    {
+      "id": "trilium.delete_note",
+      "service": "trilium",
+      "name": "delete_note",
+      "description": "Delete a Trilium note and all of its placements from the note tree.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId"
+        ],
+        "description": "Input parameters for deleting a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Trilium accepted the deletion."
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "noteId"
+        ],
+        "description": "The note deletion result."
+      }
+    },
+    {
+      "id": "trilium.get_attachment",
+      "service": "trilium",
+      "name": "get_attachment",
+      "description": "Get Trilium attachment metadata by attachment id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachmentId"
+        ],
+        "description": "Input parameters for reading attachment metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "role": {
+                "type": "string",
+                "description": "The attachment role."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "title": {
+                "type": "string",
+                "description": "The attachment title or filename."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attachment ordering position."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The attachment blob id used as a content hash."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local modification time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time."
+              },
+              "utcDateScheduledForErasureSince": {
+                "type": "string",
+                "description": "The UTC time when erasure was scheduled."
+              },
+              "contentLength": {
+                "type": "integer",
+                "description": "The attachment content length in bytes."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The requested Trilium attachment metadata."
+      }
+    },
+    {
+      "id": "trilium.get_attribute",
+      "service": "trilium",
+      "name": "get_attribute",
+      "description": "Get a Trilium label or relation attribute by attribute id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attributeId"
+        ],
+        "description": "Input parameters for reading an attribute."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "object",
+            "properties": {
+              "attributeId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "label",
+                  "relation"
+                ],
+                "description": "Whether this attribute is a label or relation."
+              },
+              "name": {
+                "type": "string",
+                "description": "The attribute name."
+              },
+              "value": {
+                "type": "string",
+                "description": "The label value or related note id."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attribute ordering position."
+              },
+              "isInheritable": {
+                "type": "boolean",
+                "description": "Whether child notes inherit the attribute."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium note attribute."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attribute"
+        ],
+        "description": "The requested Trilium attribute."
+      }
+    },
+    {
+      "id": "trilium.get_branch",
+      "service": "trilium",
+      "name": "get_branch",
+      "description": "Get a Trilium note-tree branch by branch id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branchId"
+        ],
+        "description": "Input parameters for reading a branch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "object",
+            "properties": {
+              "branchId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "parentNoteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "prefix": {
+                "type": "string",
+                "description": "The branch-specific title prefix."
+              },
+              "notePosition": {
+                "type": "integer",
+                "description": "The note position under its parent."
+              },
+              "isExpanded": {
+                "type": "boolean",
+                "description": "Whether the branch is expanded in the note tree."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium branch placing a note in the note tree."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branch"
+        ],
+        "description": "The requested Trilium branch."
+      }
+    },
+    {
+      "id": "trilium.get_note",
+      "service": "trilium",
+      "name": "get_note",
+      "description": "Get Trilium note metadata by note id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId"
+        ],
+        "description": "Input parameters for reading note metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "title": {
+                "type": "string",
+                "description": "The note title."
+              },
+              "type": {
+                "type": "string",
+                "description": "The note type returned by Trilium."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The note MIME type."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether the note is protected."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The content blob id used as a content hash."
+              },
+              "attributes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "noteId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "label",
+                        "relation"
+                      ],
+                      "description": "Whether this attribute is a label or relation."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The attribute name."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The label value or related note id."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "The attribute ordering position."
+                    },
+                    "isInheritable": {
+                      "type": "boolean",
+                      "description": "Whether child notes inherit the attribute."
+                    },
+                    "utcDateModified": {
+                      "type": "string",
+                      "description": "The UTC modification time returned by Trilium."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Trilium note attribute."
+                },
+                "description": "Attributes attached to the note."
+              },
+              "parentNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent note ids."
+              },
+              "childNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child note ids."
+              },
+              "parentBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent branch ids."
+              },
+              "childBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child branch ids."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "The local note creation time."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local note modification time."
+              },
+              "utcDateCreated": {
+                "type": "string",
+                "description": "The UTC note creation time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC note modification time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium note metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note"
+        ],
+        "description": "The requested Trilium note metadata."
+      },
+      "followUpActions": [
+        "trilium.get_note_content"
+      ]
+    },
+    {
+      "id": "trilium.get_note_content",
+      "service": "trilium",
+      "name": "get_note_content",
+      "description": "Read the text content of a text-based Trilium note.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId"
+        ],
+        "description": "Input parameters for reading text note content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "content": {
+            "type": "string",
+            "description": "The note content decoded as UTF-8 text."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "The MIME type returned by Trilium."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId",
+          "content",
+          "mimeType"
+        ],
+        "description": "The text content returned by Trilium."
+      }
+    },
+    {
+      "id": "trilium.list_note_attachments",
+      "service": "trilium",
+      "name": "list_note_attachments",
+      "description": "List attachment metadata owned by a Trilium note.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId"
+        ],
+        "description": "Input parameters for listing note attachments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attachmentId": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "ownerId": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The attachment role."
+                },
+                "mime": {
+                  "type": "string",
+                  "description": "The attachment MIME type."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The attachment title or filename."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "The attachment ordering position."
+                },
+                "blobId": {
+                  "type": "string",
+                  "description": "The attachment blob id used as a content hash."
+                },
+                "dateModified": {
+                  "type": "string",
+                  "description": "The local modification time."
+                },
+                "utcDateModified": {
+                  "type": "string",
+                  "description": "The UTC modification time."
+                },
+                "utcDateScheduledForErasureSince": {
+                  "type": "string",
+                  "description": "The UTC time when erasure was scheduled."
+                },
+                "contentLength": {
+                  "type": "integer",
+                  "description": "The attachment content length in bytes."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Trilium attachment metadata."
+            },
+            "description": "The attachment metadata returned by Trilium."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachments"
+        ],
+        "description": "The attachments owned by the note."
+      },
+      "followUpActions": [
+        "trilium.get_attachment"
+      ]
+    },
+    {
+      "id": "trilium.search_notes",
+      "service": "trilium",
+      "name": "search_notes",
+      "description": "Search Trilium notes using full text, labels, subtree constraints, and ordering options.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trilium search query, including full-text terms and label expressions such as #book."
+          },
+          "fastSearch": {
+            "type": "boolean",
+            "description": "Whether to skip note-content full-text matching for a faster search."
+          },
+          "includeArchivedNotes": {
+            "type": "boolean",
+            "description": "Whether archived notes should be included."
+          },
+          "ancestorNoteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "ancestorDepth": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A subtree depth expression such as eq1, lt4, or gt2."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note property or label used to order results."
+          },
+          "orderDirection": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result ordering direction."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of results to return."
+          },
+          "debug": {
+            "type": "boolean",
+            "description": "Whether Trilium should include search parser debugging information."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search"
+        ],
+        "description": "Input parameters for searching notes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "noteId": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The note title."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The note type returned by Trilium."
+                },
+                "mime": {
+                  "type": "string",
+                  "description": "The note MIME type."
+                },
+                "isProtected": {
+                  "type": "boolean",
+                  "description": "Whether the note is protected."
+                },
+                "blobId": {
+                  "type": "string",
+                  "description": "The content blob id used as a content hash."
+                },
+                "attributes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attributeId": {
+                        "type": "string",
+                        "minLength": 4,
+                        "maxLength": 32,
+                        "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                        "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                      },
+                      "noteId": {
+                        "type": "string",
+                        "minLength": 4,
+                        "maxLength": 32,
+                        "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                        "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "label",
+                          "relation"
+                        ],
+                        "description": "Whether this attribute is a label or relation."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The attribute name."
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The label value or related note id."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "description": "The attribute ordering position."
+                      },
+                      "isInheritable": {
+                        "type": "boolean",
+                        "description": "Whether child notes inherit the attribute."
+                      },
+                      "utcDateModified": {
+                        "type": "string",
+                        "description": "The UTC modification time returned by Trilium."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Trilium note attribute."
+                  },
+                  "description": "Attributes attached to the note."
+                },
+                "parentNoteIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 32,
+                    "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                    "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                  },
+                  "description": "Parent note ids."
+                },
+                "childNoteIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 32,
+                    "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                    "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                  },
+                  "description": "Child note ids."
+                },
+                "parentBranchIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 32,
+                    "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                    "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                  },
+                  "description": "Parent branch ids."
+                },
+                "childBranchIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 32,
+                    "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                    "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                  },
+                  "description": "Child branch ids."
+                },
+                "dateCreated": {
+                  "type": "string",
+                  "description": "The local note creation time."
+                },
+                "dateModified": {
+                  "type": "string",
+                  "description": "The local note modification time."
+                },
+                "utcDateCreated": {
+                  "type": "string",
+                  "description": "The UTC note creation time."
+                },
+                "utcDateModified": {
+                  "type": "string",
+                  "description": "The UTC note modification time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Trilium note metadata."
+            },
+            "description": "The matching notes."
+          },
+          "debugInfo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Search parser debugging information when requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Search parser debugging information when requested."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notes",
+          "debugInfo"
+        ],
+        "description": "The Trilium note search response."
+      },
+      "followUpActions": [
+        "trilium.get_note"
+      ]
+    },
+    {
+      "id": "trilium.update_attachment",
+      "service": "trilium",
+      "name": "update_attachment",
+      "description": "Update mutable metadata on a Trilium attachment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated attachment role."
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated attachment MIME type."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated attachment title or filename."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The updated attachment ordering position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachmentId"
+        ],
+        "description": "Input parameters for updating attachment metadata.",
+        "anyOf": [
+          {
+            "required": [
+              "role"
+            ]
+          },
+          {
+            "required": [
+              "mime"
+            ]
+          },
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "position"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "role": {
+                "type": "string",
+                "description": "The attachment role."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "title": {
+                "type": "string",
+                "description": "The attachment title or filename."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attachment ordering position."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The attachment blob id used as a content hash."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local modification time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time."
+              },
+              "utcDateScheduledForErasureSince": {
+                "type": "string",
+                "description": "The UTC time when erasure was scheduled."
+              },
+              "contentLength": {
+                "type": "integer",
+                "description": "The attachment content length in bytes."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The updated Trilium attachment metadata."
+      }
+    },
+    {
+      "id": "trilium.update_attribute",
+      "service": "trilium",
+      "name": "update_attribute",
+      "description": "Update the value or position of a Trilium label, or the position of a relation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attributeId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "value": {
+            "type": "string",
+            "description": "The updated label value. Relations cannot change targets through this action."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The updated attribute ordering position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attributeId"
+        ],
+        "description": "Input parameters for updating an attribute.",
+        "anyOf": [
+          {
+            "required": [
+              "value"
+            ]
+          },
+          {
+            "required": [
+              "position"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "object",
+            "properties": {
+              "attributeId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "label",
+                  "relation"
+                ],
+                "description": "Whether this attribute is a label or relation."
+              },
+              "name": {
+                "type": "string",
+                "description": "The attribute name."
+              },
+              "value": {
+                "type": "string",
+                "description": "The label value or related note id."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attribute ordering position."
+              },
+              "isInheritable": {
+                "type": "boolean",
+                "description": "Whether child notes inherit the attribute."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium note attribute."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attribute"
+        ],
+        "description": "The updated Trilium attribute."
+      }
+    },
+    {
+      "id": "trilium.update_branch",
+      "service": "trilium",
+      "name": "update_branch",
+      "description": "Update the position, prefix, or expanded state of a Trilium branch.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "notePosition": {
+            "type": "integer",
+            "description": "The updated note position."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The updated branch-specific title prefix."
+          },
+          "isExpanded": {
+            "type": "boolean",
+            "description": "The updated expanded state."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branchId"
+        ],
+        "description": "Input parameters for updating a branch.",
+        "anyOf": [
+          {
+            "required": [
+              "notePosition"
+            ]
+          },
+          {
+            "required": [
+              "prefix"
+            ]
+          },
+          {
+            "required": [
+              "isExpanded"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "branch": {
+            "type": "object",
+            "properties": {
+              "branchId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "parentNoteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "prefix": {
+                "type": "string",
+                "description": "The branch-specific title prefix."
+              },
+              "notePosition": {
+                "type": "integer",
+                "description": "The note position under its parent."
+              },
+              "isExpanded": {
+                "type": "boolean",
+                "description": "Whether the branch is expanded in the note tree."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time returned by Trilium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Trilium branch placing a note in the note tree."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "branch"
+        ],
+        "description": "The updated Trilium branch."
+      }
+    },
+    {
+      "id": "trilium.update_note",
+      "service": "trilium",
+      "name": "update_note",
+      "description": "Update mutable metadata on a Trilium note.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated note title."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "code",
+              "render",
+              "file",
+              "image",
+              "search",
+              "relationMap",
+              "book",
+              "noteMap",
+              "mermaid",
+              "webView",
+              "shortcut",
+              "doc",
+              "contentWidget",
+              "launcher"
+            ],
+            "description": "The updated Trilium note type."
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated note MIME type."
+          },
+          "dateCreated": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated local creation timestamp."
+          },
+          "utcDateCreated": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated UTC creation timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId"
+        ],
+        "description": "Input parameters for updating note metadata.",
+        "anyOf": [
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "required": [
+              "mime"
+            ]
+          },
+          {
+            "required": [
+              "dateCreated"
+            ]
+          },
+          {
+            "required": [
+              "utcDateCreated"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "object",
+            "properties": {
+              "noteId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "title": {
+                "type": "string",
+                "description": "The note title."
+              },
+              "type": {
+                "type": "string",
+                "description": "The note type returned by Trilium."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The note MIME type."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether the note is protected."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The content blob id used as a content hash."
+              },
+              "attributes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "noteId": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 32,
+                      "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                      "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "label",
+                        "relation"
+                      ],
+                      "description": "Whether this attribute is a label or relation."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The attribute name."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The label value or related note id."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "description": "The attribute ordering position."
+                    },
+                    "isInheritable": {
+                      "type": "boolean",
+                      "description": "Whether child notes inherit the attribute."
+                    },
+                    "utcDateModified": {
+                      "type": "string",
+                      "description": "The UTC modification time returned by Trilium."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Trilium note attribute."
+                },
+                "description": "Attributes attached to the note."
+              },
+              "parentNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent note ids."
+              },
+              "childNoteIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child note ids."
+              },
+              "parentBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Parent branch ids."
+              },
+              "childBranchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32,
+                  "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                  "pattern": "^[a-zA-Z0-9_]{4,32}$"
+                },
+                "description": "Child branch ids."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "The local note creation time."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local note modification time."
+              },
+              "utcDateCreated": {
+                "type": "string",
+                "description": "The UTC note creation time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC note modification time."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium note metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "note"
+        ],
+        "description": "The updated Trilium note metadata."
+      }
+    },
+    {
+      "id": "trilium.update_note_content",
+      "service": "trilium",
+      "name": "update_note_content",
+      "description": "Replace the text content of a text-based Trilium note.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "content": {
+            "type": "string",
+            "description": "The complete replacement note content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "noteId",
+          "content"
+        ],
+        "description": "Input parameters for replacing text note content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Trilium accepted the content update."
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated",
+          "noteId"
+        ],
+        "description": "The note content update result."
+      }
+    },
+    {
+      "id": "trilium.upload_attachment",
+      "service": "trilium",
+      "name": "upload_attachment",
+      "description": "Download a public file URL and upload it as a Trilium note attachment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 32,
+            "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+            "pattern": "^[a-zA-Z0-9_]{4,32}$"
+          },
+          "fileUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public HTTP or HTTPS URL of the file to upload."
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trilium attachment role, such as file or image."
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment MIME type. When omitted, the source response type is used."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The attachment title or filename."
+          },
+          "position": {
+            "type": "integer",
+            "description": "The attachment ordering position."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ownerId",
+          "fileUrl",
+          "role",
+          "title"
+        ],
+        "description": "Input parameters for uploading a Trilium attachment from a URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "attachmentId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 32,
+                "description": "A Trilium entity id containing 4 to 32 letters, digits, or underscores.",
+                "pattern": "^[a-zA-Z0-9_]{4,32}$"
+              },
+              "role": {
+                "type": "string",
+                "description": "The attachment role."
+              },
+              "mime": {
+                "type": "string",
+                "description": "The attachment MIME type."
+              },
+              "title": {
+                "type": "string",
+                "description": "The attachment title or filename."
+              },
+              "position": {
+                "type": "integer",
+                "description": "The attachment ordering position."
+              },
+              "blobId": {
+                "type": "string",
+                "description": "The attachment blob id used as a content hash."
+              },
+              "dateModified": {
+                "type": "string",
+                "description": "The local modification time."
+              },
+              "utcDateModified": {
+                "type": "string",
+                "description": "The UTC modification time."
+              },
+              "utcDateScheduledForErasureSince": {
+                "type": "string",
+                "description": "The UTC time when erasure was scheduled."
+              },
+              "contentLength": {
+                "type": "integer",
+                "description": "The attachment content length in bytes."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Trilium attachment metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "attachment"
+        ],
+        "description": "The uploaded Trilium attachment metadata."
+      }
+    }
+  ]
+}

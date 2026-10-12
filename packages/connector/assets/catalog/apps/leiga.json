@@ -1,0 +1,768 @@
+{
+  "service": "leiga",
+  "displayName": "Leiga",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal API Key",
+      "placeholder": "LEIGA_ACCESS_TOKEN",
+      "description": "Leiga personal API key sent with the accessToken header. Create or manage it under My Settings > Personal API Keys: https://guide.leiga.com/personal/key",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.leiga.com/",
+  "actions": [
+    {
+      "id": "leiga.get_issue_by_number",
+      "service": "leiga",
+      "name": "get_issue_by_number",
+      "description": "Fetch one Leiga issue by its official issueNo identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issueNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Leiga issue number such as CORE-1."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one Leiga issue by issue number."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The internal Leiga issue ID when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The internal Leiga issue ID when available."
+              },
+              "issueId": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The internal Leiga issue ID from detail endpoints when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The internal Leiga issue ID from detail endpoints when available."
+              },
+              "issueNo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issue number returned by Leiga."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue number returned by Leiga."
+              },
+              "summary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issue summary returned by Leiga."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue summary returned by Leiga."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issue description returned by Leiga."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue description returned by Leiga."
+              },
+              "statusName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issue status name returned by Leiga."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue status name returned by Leiga."
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The project ID associated with the issue when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project ID associated with the issue when available."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw issue object returned by Leiga."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Leiga issue record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Leiga issue by issue number."
+      }
+    },
+    {
+      "id": "leiga.get_issue_schema",
+      "service": "leiga",
+      "name": "get_issue_schema",
+      "description": "Fetch the Leiga issue field schema for one project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The official Leiga project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching the Leiga issue schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The issue schema ID when Leiga returns it as a number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue schema ID when Leiga returns it as a number."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issue schema name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issue schema name."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field identifier."
+                    },
+                    "fieldName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field display name."
+                    },
+                    "fieldType": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The field type returned by Leiga."
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "description": "Whether Leiga marks the field as required."
+                    },
+                    "options": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "description": "One raw option entry."
+                          },
+                          "description": "The optional field choices returned by Leiga."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The optional field choices returned by Leiga."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One field definition from a Leiga issue schema."
+                },
+                "description": "The issue field definitions returned by Leiga."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw issue schema object returned by Leiga."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized Leiga issue schema object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching the Leiga issue schema."
+      }
+    },
+    {
+      "id": "leiga.get_project",
+      "service": "leiga",
+      "name": "get_project",
+      "description": "Fetch one Leiga project by its official numeric projectId.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The official Leiga project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one Leiga project by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Leiga project ID."
+              },
+              "pname": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Leiga project name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Leiga project name."
+              },
+              "pkey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Leiga project key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Leiga project key."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Whether the project is archived, where 1 means yes and 0 means no."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the project is archived, where 1 means yes and 0 means no."
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The owner object returned by Leiga when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owner object returned by Leiga when available."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw project object returned by Leiga."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Leiga project record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Leiga project by ID."
+      }
+    },
+    {
+      "id": "leiga.get_project_by_key",
+      "service": "leiga",
+      "name": "get_project_by_key",
+      "description": "Fetch one Leiga project by its official project key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Leiga project key."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one Leiga project by key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Leiga project ID."
+              },
+              "pname": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Leiga project name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Leiga project name."
+              },
+              "pkey": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Leiga project key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Leiga project key."
+              },
+              "archived": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Whether the project is archived, where 1 means yes and 0 means no."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the project is archived, where 1 means yes and 0 means no."
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The owner object returned by Leiga when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owner object returned by Leiga when available."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw project object returned by Leiga."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Leiga project record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Leiga project by key."
+      }
+    },
+    {
+      "id": "leiga.list_issues",
+      "service": "leiga",
+      "name": "list_issues",
+      "description": "List Leiga issues for one project using the official issue query body.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The official Leiga project ID."
+          },
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request from Leiga."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of issues to request from Leiga."
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional summary keyword filter."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field name used for sorting."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction returned by Leiga."
+          },
+          "statusTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One issue status type ID."
+            },
+            "description": "The optional list of issue status type IDs to filter by.",
+            "minItems": 1
+          },
+          "showedCustomFieldCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One custom field code."
+            },
+            "description": "The optional custom field codes that should be included in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "pageNumber",
+          "pageSize"
+        ],
+        "description": "The input payload for listing Leiga issues."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "The total number of issues returned by Leiga for this query."
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The internal Leiga issue ID when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The internal Leiga issue ID when available."
+                },
+                "issueId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The internal Leiga issue ID from detail endpoints when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The internal Leiga issue ID from detail endpoints when available."
+                },
+                "issueNo": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue number returned by Leiga."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue number returned by Leiga."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue summary returned by Leiga."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue summary returned by Leiga."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue description returned by Leiga."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue description returned by Leiga."
+                },
+                "statusName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue status name returned by Leiga."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue status name returned by Leiga."
+                },
+                "projectId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The project ID associated with the issue when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project ID associated with the issue when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw issue object returned by Leiga."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Leiga issue record."
+            },
+            "description": "The normalized Leiga issues in the current page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw issue list response returned by Leiga."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Leiga issues."
+      }
+    },
+    {
+      "id": "leiga.list_projects",
+      "service": "leiga",
+      "name": "list_projects",
+      "description": "List Leiga projects using the official project list filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter projects by one project ID."
+          },
+          "pname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter projects by project name."
+          },
+          "pkey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter projects by project key."
+          },
+          "archived": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Filter by archived status where 1 means archived and 0 means active."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Leiga projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Leiga project ID."
+                },
+                "pname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Leiga project name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Leiga project name."
+                },
+                "pkey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Leiga project key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Leiga project key."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Whether the project is archived, where 1 means yes and 0 means no."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the project is archived, where 1 means yes and 0 means no."
+                },
+                "owner": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The owner object returned by Leiga when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The owner object returned by Leiga when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw project object returned by Leiga."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Leiga project record."
+            },
+            "description": "The normalized Leiga projects that matched the filters."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of returned projects."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw project list response returned by Leiga."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Leiga projects."
+      }
+    }
+  ]
+}

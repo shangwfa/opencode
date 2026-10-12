@@ -1,0 +1,1540 @@
+{
+  "service": "mixpanel",
+  "displayName": "Mixpanel",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Service Account Secret",
+      "placeholder": "mixpanel_service_account_secret",
+      "description": "Mixpanel service account secret used with HTTP Basic authentication for project-scoped query APIs. Create it from Mixpanel Service Accounts: https://developer.mixpanel.com/reference/service-accounts-api.",
+      "extraFields": [
+        {
+          "key": "serviceAccountUsername",
+          "label": "Service Account Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "svc_analytics_bot",
+          "description": "Mixpanel service account username paired with the secret for Basic auth. Find it on the same Mixpanel Service Accounts page."
+        },
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "1234567",
+          "description": "Default Mixpanel project ID used for validation and for actions that omit project_id. Find it in Mixpanel project settings."
+        },
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://mixpanel.com",
+          "description": "Optional Mixpanel query and app API base URL. Leave empty to use https://mixpanel.com."
+        },
+        {
+          "key": "exportBaseUrl",
+          "label": "Export Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://data.mixpanel.com",
+          "description": "Optional Mixpanel raw export API base URL. Leave empty to use https://data.mixpanel.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://mixpanel.com",
+  "actions": [
+    {
+      "id": "mixpanel.export_events",
+      "service": "mixpanel",
+      "name": "export_events",
+      "description": "Export raw Mixpanel events for a project and date range.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the raw event export.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the raw event export.",
+            "format": "date"
+          },
+          "event": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional event names to include in the raw event export.",
+            "minItems": 1
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel where expression used to filter exported events."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_date",
+          "to_date"
+        ],
+        "description": "The input payload for exporting raw Mixpanel events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jsonl": {
+            "type": "string",
+            "description": "Raw JSONL response body returned by the Mixpanel export API."
+          },
+          "event_count": {
+            "type": "integer",
+            "description": "Number of JSON event lines parsed from the export response."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "description": "Event name returned by the raw export."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Mixpanel object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Single raw event line returned by the Mixpanel export API."
+            },
+            "description": "Parsed raw events returned by the export."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jsonl",
+          "event_count",
+          "events"
+        ],
+        "description": "The Mixpanel raw event export response."
+      }
+    },
+    {
+      "id": "mixpanel.list_funnels",
+      "service": "mixpanel",
+      "name": "list_funnels",
+      "description": "List saved funnels available in a Mixpanel project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing saved funnels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "funnels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "funnel_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "String identifier."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "Numeric identifier."
+                    }
+                  ],
+                  "description": "Identifier accepted by the official Mixpanel API."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Saved funnel name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Saved funnel summary returned by Mixpanel."
+            },
+            "description": "Saved funnels returned by Mixpanel."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Mixpanel object."
+            },
+            "description": "Raw saved funnel objects returned by Mixpanel."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "funnels",
+          "raw"
+        ],
+        "description": "The saved funnel list returned by Mixpanel."
+      },
+      "followUpActions": [
+        "mixpanel.query_funnel"
+      ]
+    },
+    {
+      "id": "mixpanel.list_saved_cohorts",
+      "service": "mixpanel",
+      "name": "list_saved_cohorts",
+      "description": "List saved cohorts available in a Mixpanel project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing saved cohorts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cohorts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "String identifier."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "Numeric identifier."
+                    }
+                  ],
+                  "description": "Identifier accepted by the official Mixpanel API."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Saved cohort name."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "Current cohort member count."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Saved cohort description when Mixpanel returns one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Saved cohort description when Mixpanel returns one."
+                },
+                "is_visible": {
+                  "type": "boolean",
+                  "description": "Whether the saved cohort is visible in the Mixpanel UI."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Creation timestamp returned by Mixpanel when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Creation timestamp returned by Mixpanel when available."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Saved cohort summary returned by Mixpanel."
+            },
+            "description": "Saved cohorts returned by Mixpanel."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Mixpanel object."
+            },
+            "description": "Raw saved cohort objects returned by Mixpanel."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cohorts",
+          "raw"
+        ],
+        "description": "The saved cohort list returned by Mixpanel."
+      },
+      "followUpActions": [
+        "mixpanel.query_profiles"
+      ]
+    },
+    {
+      "id": "mixpanel.profile_event_activity",
+      "service": "mixpanel",
+      "name": "profile_event_activity",
+      "description": "Get event activity for one or more Mixpanel profiles over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "distinct_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Distinct IDs to fetch activity for.",
+            "minItems": 1
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the activity query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the activity query.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "distinct_ids",
+          "from_date",
+          "to_date"
+        ],
+        "description": "The input payload for querying Mixpanel profile event activity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status returned by Mixpanel."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "description": "Event name returned in the profile activity feed."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Mixpanel object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Single profile-activity event returned by Mixpanel."
+            },
+            "description": "Activity-feed events returned by Mixpanel."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "raw"
+        ],
+        "description": "The Mixpanel profile activity response."
+      }
+    },
+    {
+      "id": "mixpanel.query_frequency_report",
+      "service": "mixpanel",
+      "name": "query_frequency_report",
+      "description": "Query how frequently users perform an event in Mixpanel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the frequency query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the frequency query.",
+            "format": "date"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Overall time period to return event frequency for."
+          },
+          "addiction_unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "description": "Granularity used inside each frequency bucket."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional event name to measure frequency for."
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter the event."
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to segment the frequency report."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of segmented property values to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_date",
+          "to_date",
+          "unit",
+          "addiction_unit"
+        ],
+        "description": "The input payload for querying a Mixpanel frequency report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "The Mixpanel frequency report response."
+      }
+    },
+    {
+      "id": "mixpanel.query_funnel",
+      "service": "mixpanel",
+      "name": "query_funnel",
+      "description": "Query a saved Mixpanel funnel report over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "funnel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the funnel query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the funnel query.",
+            "format": "date"
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "Maximum number of units each user has to complete the funnel."
+          },
+          "length_unit": {
+            "type": "string",
+            "enum": [
+              "second",
+              "minute",
+              "hour",
+              "day"
+            ],
+            "description": "Unit used by the length parameter."
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of days to include in each bucket."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Alternate time unit for bucketing the funnel report."
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to segment the funnel report."
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter funnel events."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Maximum number of segmented property values to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "funnel_id",
+          "from_date",
+          "to_date"
+        ],
+        "description": "The input payload for querying a saved Mixpanel funnel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "The Mixpanel saved funnel response."
+      },
+      "followUpActions": [
+        "mixpanel.query_retention_report"
+      ]
+    },
+    {
+      "id": "mixpanel.query_numeric_average",
+      "service": "mixpanel",
+      "name": "query_numeric_average",
+      "description": "Average a numeric expression for a Mixpanel event over time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event name to aggregate."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the numeric average query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the numeric average query.",
+            "format": "date"
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Numeric Mixpanel expression to average per unit time."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "description": "Time unit used for bucketing the numeric average query."
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter events before averaging."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "from_date",
+          "to_date",
+          "on"
+        ],
+        "description": "The input payload for querying a Mixpanel numeric average report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status returned by Mixpanel."
+          },
+          "computed_at": {
+            "type": "string",
+            "description": "Timestamp when Mixpanel computed the numeric average report."
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "description": "Numeric value."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Numeric value."
+            },
+            "description": "Map of YYYY-MM-DD dates to numeric values returned by Mixpanel."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "raw"
+        ],
+        "description": "The Mixpanel numeric average response."
+      },
+      "followUpActions": [
+        "mixpanel.query_top_events"
+      ]
+    },
+    {
+      "id": "mixpanel.query_numeric_sum",
+      "service": "mixpanel",
+      "name": "query_numeric_sum",
+      "description": "Sum a numeric expression for a Mixpanel event over time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event name to aggregate."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the numeric sum query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the numeric sum query.",
+            "format": "date"
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Numeric Mixpanel expression to sum per unit time."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "description": "Time unit used for bucketing the numeric sum query."
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter events before summing."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "from_date",
+          "to_date",
+          "on"
+        ],
+        "description": "The input payload for querying a Mixpanel numeric sum report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Status returned by Mixpanel."
+          },
+          "computed_at": {
+            "type": "string",
+            "description": "Timestamp when Mixpanel computed the numeric sum report."
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "description": "Numeric value."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Numeric value."
+            },
+            "description": "Map of YYYY-MM-DD dates to numeric values returned by Mixpanel."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "raw"
+        ],
+        "description": "The Mixpanel numeric sum response."
+      },
+      "followUpActions": [
+        "mixpanel.query_numeric_average"
+      ]
+    },
+    {
+      "id": "mixpanel.query_profiles",
+      "service": "mixpanel",
+      "name": "query_profiles",
+      "description": "Query Mixpanel profiles with optional filters, paging, and selected properties.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "distinct_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional distinct IDs to filter the profile query.",
+            "minItems": 1
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel where expression used to filter profiles."
+          },
+          "output_properties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional profile properties to include in the response.",
+            "minItems": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination session ID returned by a previous Mixpanel profile query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page number used together with session_id when paginating."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for querying Mixpanel profiles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Current page number returned by Mixpanel."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of profiles returned in the current page."
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Pagination session ID returned by Mixpanel for subsequent pages."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of matching profiles."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "$distinct_id": {
+                  "type": "string",
+                  "description": "Distinct ID for the profile."
+                },
+                "$last_seen": {
+                  "type": "string",
+                  "description": "Last seen timestamp for the profile."
+                },
+                "$email": {
+                  "type": "string",
+                  "description": "Email property returned for the profile when available."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Profile object returned by Mixpanel."
+            },
+            "description": "Profiles returned by the Mixpanel query."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "raw"
+        ],
+        "description": "The Mixpanel profile query response."
+      },
+      "followUpActions": [
+        "mixpanel.profile_event_activity"
+      ]
+    },
+    {
+      "id": "mixpanel.query_retention_report",
+      "service": "mixpanel",
+      "name": "query_retention_report",
+      "description": "Query a Mixpanel retention report over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the retention query.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the retention query.",
+            "format": "date"
+          },
+          "retention_type": {
+            "type": "string",
+            "enum": [
+              "birth",
+              "compounded"
+            ],
+            "description": "Type of retention analysis to run."
+          },
+          "born_event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Initial event that defines the entry cohort for birth retention."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target event to measure retention against."
+          },
+          "born_where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter born_event."
+          },
+          "where": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to filter retained events."
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of units per returned interval bucket."
+          },
+          "interval_count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of interval buckets to return."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "Interval unit used for the retention query."
+          },
+          "unbounded_retention": {
+            "type": "boolean",
+            "description": "Whether retention counts should accumulate from right to left."
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to segment the retention report."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of segmented property values to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_date",
+          "to_date"
+        ],
+        "description": "The input payload for querying a Mixpanel retention report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "The Mixpanel retention report response."
+      },
+      "followUpActions": [
+        "mixpanel.query_frequency_report"
+      ]
+    },
+    {
+      "id": "mixpanel.query_saved_report",
+      "service": "mixpanel",
+      "name": "query_saved_report",
+      "description": "Query a saved Mixpanel report by bookmark ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "bookmark_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bookmark_id"
+        ],
+        "description": "The input payload for querying a saved Mixpanel report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "The Mixpanel saved report response."
+      },
+      "followUpActions": [
+        "mixpanel.export_events"
+      ]
+    },
+    {
+      "id": "mixpanel.query_segmentation_report",
+      "service": "mixpanel",
+      "name": "query_segmentation_report",
+      "description": "Query a Mixpanel segmentation report for one event over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event name to query in the segmentation report."
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start date for the segmentation report.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End date for the segmentation report.",
+            "format": "date"
+          },
+          "on": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Mixpanel expression used to group or break down the report."
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional interval unit accepted by Mixpanel, such as day, hour, or month."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional measurement type accepted by Mixpanel, such as general or unique."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event",
+          "from_date",
+          "to_date"
+        ],
+        "description": "The input payload for querying a Mixpanel segmentation report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "The Mixpanel segmentation report response."
+      },
+      "followUpActions": [
+        "mixpanel.export_events"
+      ]
+    },
+    {
+      "id": "mixpanel.query_top_events",
+      "service": "mixpanel",
+      "name": "query_top_events",
+      "description": "Get today's top Mixpanel events with counts and percent change from yesterday.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "String identifier."
+              },
+              {
+                "type": "integer",
+                "description": "Numeric identifier."
+              }
+            ],
+            "description": "Identifier accepted by the official Mixpanel API."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "general",
+              "unique",
+              "average"
+            ],
+            "description": "Analysis type used by the top-events query."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of top events to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "description": "The input payload for querying Mixpanel top events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "general",
+              "unique",
+              "average"
+            ],
+            "description": "Analysis type returned by Mixpanel."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "description": "Event name returned by Mixpanel."
+                },
+                "amount": {
+                  "type": "number",
+                  "description": "Event count or computed value returned by Mixpanel."
+                },
+                "percent_change": {
+                  "type": "number",
+                  "description": "Percent change from the previous comparison window."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "event",
+                "amount",
+                "percent_change"
+              ],
+              "description": "Single top-event item returned by Mixpanel."
+            },
+            "description": "Top events returned by Mixpanel."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Mixpanel object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "events",
+          "raw"
+        ],
+        "description": "The Mixpanel top-events response."
+      }
+    }
+  ]
+}

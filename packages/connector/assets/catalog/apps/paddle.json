@@ -1,0 +1,1364 @@
+{
+  "service": "paddle",
+  "displayName": "Paddle",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "pdl_live_apikey_...",
+      "description": "Paddle API key sent as a Bearer token. Create or copy it from Paddle > Developer Tools > Authentication: https://developer.paddle.com/api-reference/about/authentication.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.paddle.com",
+  "actions": [
+    {
+      "id": "paddle.create_customer",
+      "service": "paddle",
+      "name": "create_customer",
+      "description": "Create a Paddle customer.",
+      "operationType": "write",
+      "requiredScopes": [
+        "customer.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full name for this customer."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email address for this customer.",
+            "format": "email"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IETF BCP 47 locale tag for this customer."
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Customer fields forwarded to Paddle."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A created Paddle customer result."
+      }
+    },
+    {
+      "id": "paddle.create_price",
+      "service": "paddle",
+      "name": "create_price",
+      "description": "Create a Paddle price for a product.",
+      "operationType": "write",
+      "requiredScopes": [
+        "price.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle product ID, prefixed with `pro_`."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Internal description for this price."
+          },
+          "unit_price": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Amount in the lowest denomination for the currency, represented as a string."
+              },
+              "currency_code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Three-letter ISO 4217 currency code."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Money amount in Paddle's lowest currency denomination."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of this price."
+          },
+          "billing_cycle": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "year"
+                    ],
+                    "description": "Billing interval unit."
+                  },
+                  "frequency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of intervals in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Recurring billing cycle for a Paddle price, or null for a one-time price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recurring billing cycle for a Paddle price, or null for a one-time price."
+          },
+          "trial_period": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "year"
+                    ],
+                    "description": "Billing interval unit."
+                  },
+                  "frequency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of intervals in the trial period."
+                  },
+                  "requires_payment_method": {
+                    "type": "boolean",
+                    "description": "Whether a payment method is required for the trial."
+                  },
+                  "unit_price": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "amount": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Amount in the lowest denomination for the currency, represented as a string."
+                          },
+                          "currency_code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Three-letter ISO 4217 currency code."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Money amount in Paddle's lowest currency denomination."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Money amount in Paddle's lowest currency denomination."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "interval",
+                  "frequency"
+                ],
+                "description": "Trial period configuration for a Paddle price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trial period configuration for a Paddle price."
+          },
+          "tax_mode": {
+            "type": "string",
+            "enum": [
+              "account_setting",
+              "external",
+              "internal",
+              "location"
+            ],
+            "description": "How Paddle should calculate tax for this price."
+          },
+          "quantity": {
+            "type": "object",
+            "properties": {
+              "minimum": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Minimum quantity that can be purchased."
+              },
+              "maximum": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum quantity that can be purchased."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Quantity limits for the related product at this price."
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "description",
+          "unit_price"
+        ],
+        "description": "Price fields forwarded to Paddle."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A created Paddle price result."
+      }
+    },
+    {
+      "id": "paddle.create_product",
+      "service": "paddle",
+      "name": "create_product",
+      "description": "Create a Paddle product in the catalog.",
+      "operationType": "write",
+      "requiredScopes": [
+        "product.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the product."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Short description for the product."
+          },
+          "tax_category": {
+            "type": "string",
+            "enum": [
+              "digital-goods",
+              "ebooks",
+              "implementation-services",
+              "professional-services",
+              "saas",
+              "software-programming-services",
+              "standard",
+              "training-services",
+              "website-hosting"
+            ],
+            "description": "Paddle product tax category."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          },
+          "image_url": {
+            "type": "string",
+            "description": "Image URL for this product.",
+            "format": "uri"
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Product fields forwarded to Paddle."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A created Paddle product result."
+      }
+    },
+    {
+      "id": "paddle.get_customer",
+      "service": "paddle",
+      "name": "get_customer",
+      "description": "Get one Paddle customer by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "customer.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle customer ID, prefixed with `ctm_`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Paddle customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Paddle customer result."
+      }
+    },
+    {
+      "id": "paddle.get_price",
+      "service": "paddle",
+      "name": "get_price",
+      "description": "Get one Paddle price by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "price.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle price ID, prefixed with `pri_`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Paddle price."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Paddle price result."
+      }
+    },
+    {
+      "id": "paddle.get_product",
+      "service": "paddle",
+      "name": "get_product",
+      "description": "Get one Paddle product by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "product.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle product ID, prefixed with `pro_`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Paddle product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Paddle product result."
+      }
+    },
+    {
+      "id": "paddle.list_customers",
+      "service": "paddle",
+      "name": "list_customers",
+      "description": "List Paddle customers with optional email, status, search, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "customer.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle ID cursor returned in a previous list response."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of entities to request from Paddle."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle order_by expression such as `id[DESC]`."
+          },
+          "skipCount": {
+            "type": "boolean",
+            "description": "Whether to send Skip-Count: true to speed up list responses."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Paddle customer ID."
+            },
+            "description": "Customer IDs to return."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A customer email address."
+            },
+            "description": "Email addresses to match exactly."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ],
+              "description": "Paddle entity status."
+            },
+            "description": "Customer statuses to return."
+          },
+          "search": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Search query matched against customer ID, name, and email."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Paddle customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Paddle entity returned by the API."
+            },
+            "description": "A Paddle customer entity."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata, including pagination for list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Customers returned by Paddle."
+      }
+    },
+    {
+      "id": "paddle.list_prices",
+      "service": "paddle",
+      "name": "list_prices",
+      "description": "List Paddle prices with optional product, status, recurring, and billing filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "price.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle ID cursor returned in a previous list response."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of entities to request from Paddle."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle order_by expression such as `id[DESC]`."
+          },
+          "skipCount": {
+            "type": "boolean",
+            "description": "Whether to send Skip-Count: true to speed up list responses."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Paddle price ID."
+            },
+            "description": "Price IDs to return."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "product"
+              ],
+              "description": "A supported Paddle price include value."
+            },
+            "description": "Related entities to include in each price."
+          },
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Paddle product ID."
+            },
+            "description": "Product IDs whose prices should be returned."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ],
+              "description": "Paddle entity status."
+            },
+            "description": "Price statuses to return."
+          },
+          "recurring": {
+            "type": "boolean",
+            "description": "Whether to return recurring prices."
+          },
+          "billingCycleInterval": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ],
+            "description": "Billing interval unit."
+          },
+          "billingCycleFrequency": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Billing cycle frequency to filter by."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Paddle prices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Paddle entity returned by the API."
+            },
+            "description": "A Paddle price entity."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata, including pagination for list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Prices returned by Paddle."
+      }
+    },
+    {
+      "id": "paddle.list_products",
+      "service": "paddle",
+      "name": "list_products",
+      "description": "List Paddle products with optional filtering, pagination, and price inclusion.",
+      "operationType": "read",
+      "requiredScopes": [
+        "product.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle ID cursor returned in a previous list response."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Maximum number of entities to request from Paddle."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle order_by expression such as `id[DESC]`."
+          },
+          "skipCount": {
+            "type": "boolean",
+            "description": "Whether to send Skip-Count: true to speed up list responses."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Paddle product ID."
+            },
+            "description": "Product IDs to return."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "prices"
+              ],
+              "description": "A supported Paddle product include value."
+            },
+            "description": "Related entities to include in each product."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ],
+              "description": "Paddle entity status."
+            },
+            "description": "Product statuses to return."
+          },
+          "taxCategory": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "digital-goods",
+                "ebooks",
+                "implementation-services",
+                "professional-services",
+                "saas",
+                "software-programming-services",
+                "standard",
+                "training-services",
+                "website-hosting"
+              ],
+              "description": "Paddle product tax category."
+            },
+            "description": "Product tax categories to return."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Paddle products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Paddle entity returned by the API."
+            },
+            "description": "A Paddle product entity."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata, including pagination for list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Products returned by Paddle."
+      }
+    },
+    {
+      "id": "paddle.update_customer",
+      "service": "paddle",
+      "name": "update_customer",
+      "description": "Update a Paddle customer, including archiving or reactivating it through status.",
+      "operationType": "write",
+      "requiredScopes": [
+        "customer.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle customer ID, prefixed with `ctm_`."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full name for this customer."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email address for this customer.",
+            "format": "email"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IETF BCP 47 locale tag for this customer."
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Paddle entity status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for updating a Paddle customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An updated Paddle customer result."
+      }
+    },
+    {
+      "id": "paddle.update_price",
+      "service": "paddle",
+      "name": "update_price",
+      "description": "Update a Paddle price, including archiving or reactivating it through status.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "price.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle price ID, prefixed with `pri_`."
+          },
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle product ID, prefixed with `pro_`."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Internal description for this price."
+          },
+          "unit_price": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Amount in the lowest denomination for the currency, represented as a string."
+              },
+              "currency_code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Three-letter ISO 4217 currency code."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Money amount in Paddle's lowest currency denomination."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of this price."
+          },
+          "billing_cycle": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "year"
+                    ],
+                    "description": "Billing interval unit."
+                  },
+                  "frequency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of intervals in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Recurring billing cycle for a Paddle price, or null for a one-time price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recurring billing cycle for a Paddle price, or null for a one-time price."
+          },
+          "trial_period": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "interval": {
+                    "type": "string",
+                    "enum": [
+                      "day",
+                      "week",
+                      "month",
+                      "year"
+                    ],
+                    "description": "Billing interval unit."
+                  },
+                  "frequency": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of intervals in the trial period."
+                  },
+                  "requires_payment_method": {
+                    "type": "boolean",
+                    "description": "Whether a payment method is required for the trial."
+                  },
+                  "unit_price": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "amount": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Amount in the lowest denomination for the currency, represented as a string."
+                          },
+                          "currency_code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Three-letter ISO 4217 currency code."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Money amount in Paddle's lowest currency denomination."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Money amount in Paddle's lowest currency denomination."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "interval",
+                  "frequency"
+                ],
+                "description": "Trial period configuration for a Paddle price."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trial period configuration for a Paddle price."
+          },
+          "tax_mode": {
+            "type": "string",
+            "enum": [
+              "account_setting",
+              "external",
+              "internal",
+              "location"
+            ],
+            "description": "How Paddle should calculate tax for this price."
+          },
+          "quantity": {
+            "type": "object",
+            "properties": {
+              "minimum": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Minimum quantity that can be purchased."
+              },
+              "maximum": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum quantity that can be purchased."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Quantity limits for the related product at this price."
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Paddle entity status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for updating a Paddle price."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An updated Paddle price result."
+      }
+    },
+    {
+      "id": "paddle.update_product",
+      "service": "paddle",
+      "name": "update_product",
+      "description": "Update a Paddle product, including archiving or reactivating it through status.",
+      "operationType": "write",
+      "requiredScopes": [
+        "product.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Paddle product ID, prefixed with `pro_`."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the product."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Short description for the product."
+          },
+          "tax_category": {
+            "type": "string",
+            "enum": [
+              "digital-goods",
+              "ebooks",
+              "implementation-services",
+              "professional-services",
+              "saas",
+              "software-programming-services",
+              "standard",
+              "training-services",
+              "website-hosting"
+            ],
+            "description": "Paddle product tax category."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "custom"
+            ],
+            "description": "Paddle entity type."
+          },
+          "image_url": {
+            "type": "string",
+            "description": "Image URL for this product.",
+            "format": "uri"
+          },
+          "custom_data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom data value."
+                },
+                "description": "Custom data attached to a Paddle entity."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom data attached to a Paddle entity."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Paddle entity status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for updating a Paddle product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Paddle entity returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw Paddle entity returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paddle response metadata when returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An updated Paddle product result."
+      }
+    }
+  ]
+}

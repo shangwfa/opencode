@@ -1,0 +1,424 @@
+{
+  "service": "anysearch",
+  "displayName": "AnySearch",
+  "description": "Real-time web and vertical-domain search, batch search, and page extraction for AI agents.",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Enter your AnySearch API key",
+      "description": "AnySearch API key sent as a Bearer token. Create and manage keys in the AnySearch console: https://www.anysearch.com/console/api-keys."
+    }
+  ],
+  "homepageUrl": "https://anysearch.com/home",
+  "actions": [
+    {
+      "id": "anysearch.batch_search",
+      "service": "anysearch",
+      "name": "batch_search",
+      "description": "Run up to five independent general or vertical AnySearch queries in parallel and return agent-ready Markdown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The search query with one intent."
+                },
+                "domain": {
+                  "type": "string",
+                  "enum": [
+                    "general",
+                    "resource",
+                    "social_media",
+                    "finance",
+                    "academic",
+                    "legal",
+                    "health",
+                    "business",
+                    "security",
+                    "ip",
+                    "code",
+                    "energy",
+                    "environment",
+                    "agriculture",
+                    "travel",
+                    "film",
+                    "gaming"
+                  ],
+                  "description": "The vertical domain selected after calling get_sub_domains."
+                },
+                "sub_domain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sub-domain routing key returned by get_sub_domains."
+                },
+                "sub_domain_params": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A sub-domain-specific parameter value."
+                  },
+                  "description": "Structured parameters returned for the selected sub-domain."
+                },
+                "max_results": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "description": "The maximum number of results for this query."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "query"
+              ],
+              "description": "One query in an AnySearch batch search request."
+            },
+            "description": "The search queries to execute in parallel.",
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "description": "The parallel AnySearch query batch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Markdown containing the result of every query in the batch."
+          },
+          "request_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One AnySearch request identifier."
+            },
+            "description": "The AnySearch request identifiers associated with the batch.",
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "description": "The combined AnySearch batch search result."
+      }
+    },
+    {
+      "id": "anysearch.extract",
+      "service": "anysearch",
+      "name": "extract",
+      "description": "Fetch an HTML page through AnySearch and return its cleaned content as Markdown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The HTTP or HTTPS page URL to fetch and convert to Markdown.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The page to extract through AnySearch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The extracted page content as Markdown."
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AnySearch request identifier used for tracing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The cleaned page content returned by AnySearch."
+      }
+    },
+    {
+      "id": "anysearch.get_sub_domains",
+      "service": "anysearch",
+      "name": "get_sub_domains",
+      "description": "Discover AnySearch vertical sub-domains and their required parameters before running a specialized search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "resource",
+                  "social_media",
+                  "finance",
+                  "academic",
+                  "legal",
+                  "health",
+                  "business",
+                  "security",
+                  "ip",
+                  "code",
+                  "energy",
+                  "environment",
+                  "agriculture",
+                  "travel",
+                  "film",
+                  "gaming"
+                ],
+                "description": "The domain whose sub-domains should be returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Discover capabilities for one AnySearch domain."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "general",
+                    "resource",
+                    "social_media",
+                    "finance",
+                    "academic",
+                    "legal",
+                    "health",
+                    "business",
+                    "security",
+                    "ip",
+                    "code",
+                    "energy",
+                    "environment",
+                    "agriculture",
+                    "travel",
+                    "film",
+                    "gaming"
+                  ],
+                  "description": "One AnySearch vertical domain."
+                },
+                "description": "The domains whose sub-domains should be returned.",
+                "minItems": 1,
+                "maxItems": 5
+              }
+            },
+            "additionalProperties": false,
+            "description": "Discover capabilities for multiple AnySearch domains."
+          }
+        ],
+        "description": "One domain or a batch of up to five domains to discover."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Markdown describing matching sub-domains and their parameters."
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AnySearch request identifier used for tracing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current AnySearch vertical capability directory."
+      }
+    },
+    {
+      "id": "anysearch.search",
+      "service": "anysearch",
+      "name": "search",
+      "description": "Search AnySearch's automatically routed data sources and return structured source results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query to execute."
+          },
+          "max_results": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of search results to return."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "general",
+              "code",
+              "tech",
+              "fashion",
+              "travel",
+              "home",
+              "ecommerce",
+              "gaming",
+              "film",
+              "music",
+              "finance",
+              "academic",
+              "legal",
+              "business",
+              "ip",
+              "security",
+              "education",
+              "health",
+              "religion",
+              "geo",
+              "environment",
+              "energy"
+            ],
+            "description": "The top-level domain used to route the search."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A sub-domain capability tag, such as code.doc. Use a sub-domain returned by get_sub_domains when possible."
+          },
+          "content_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One AnySearch content type."
+            },
+            "description": "Content types to include, such as web, news, or doc.",
+            "minItems": 1
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "cn",
+              "intl"
+            ],
+            "description": "The regional search zone used by AnySearch."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred result language, such as zh-CN or en."
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A tag-specific parameter value."
+            },
+            "description": "Parameters required by the selected tag. Use values returned by get_sub_domains when possible."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for an AnySearch unified REST search request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The source title."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The original source URL.",
+                  "format": "uri"
+                },
+                "snippet": {
+                  "type": "string",
+                  "description": "A short summary of the source."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The cleaned source content."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "title",
+                "url",
+                "snippet",
+                "content"
+              ],
+              "description": "One source returned by AnySearch."
+            },
+            "description": "The structured sources returned by AnySearch."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "total_results": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of results returned by AnySearch."
+              },
+              "search_time_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The end-to-end search latency reported by AnySearch in milliseconds."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "total_results",
+              "search_time_ms"
+            ],
+            "description": "Metadata describing the AnySearch request."
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AnySearch request identifier used for tracing."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results",
+          "metadata",
+          "request_id"
+        ],
+        "description": "The normalized AnySearch search response."
+      }
+    }
+  ]
+}

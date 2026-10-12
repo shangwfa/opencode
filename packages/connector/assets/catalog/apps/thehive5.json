@@ -1,0 +1,578 @@
+{
+  "service": "thehive5",
+  "displayName": "TheHive 5",
+  "description": "Create and inspect alerts and cases in a TheHive 5 instance.",
+  "categories": [
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Your TheHive 5 API key",
+      "description": "The API key sent as a Bearer token. Organization administrators create user keys from Organization > Create API Key; super administrators use Users > Create API Key. See https://docs.strangebee.com/thehive/administration/authentication/configure-authentication/.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://thehive.example.com",
+          "description": "The root HTTP or HTTPS URL of your TheHive 5 instance. Private-network instances require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK in the self-hosted runtime; reserved, local, and cloud-metadata targets remain blocked."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://strangebee.com/thehive",
+  "actions": [
+    {
+      "id": "thehive5.create_alert",
+      "service": "thehive5",
+      "name": "create_alert",
+      "description": "Create a JSON alert without file observables in a TheHive 5 instance.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The alert type."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The alert source."
+          },
+          "sourceRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The unique reference within the alert source."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The alert title."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "The alert description."
+          },
+          "externalLink": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "An external URL related to the alert."
+          },
+          "date": {
+            "type": "integer",
+            "description": "The alert timestamp in Unix milliseconds."
+          },
+          "flag": {
+            "type": "boolean",
+            "description": "Whether the alert is flagged."
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "A concise alert summary."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The alert status."
+          },
+          "assignee": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The login of the assigned user."
+          },
+          "caseTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The case template ID or name."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom field values keyed by custom field name."
+          },
+          "severity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "The severity level from 1 through 4."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag."
+            },
+            "description": "Tags assigned to the entity."
+          },
+          "tlp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "The Traffic Light Protocol level from 0 through 4."
+          },
+          "pap": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "The Permissible Actions Protocol level from 0 through 3."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "source",
+          "sourceRef",
+          "title",
+          "description"
+        ],
+        "description": "The input for creating a TheHive 5 alert."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The alert ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The alert title."
+              },
+              "source": {
+                "type": "string",
+                "description": "The alert source."
+              },
+              "sourceRef": {
+                "type": "string",
+                "description": "The source-specific alert reference."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A TheHive 5 alert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created TheHive 5 alert response."
+      }
+    },
+    {
+      "id": "thehive5.create_case",
+      "service": "thehive5",
+      "name": "create_case",
+      "description": "Create a case in a TheHive 5 instance.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The case title."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "The Markdown case description."
+          },
+          "startDate": {
+            "type": "integer",
+            "description": "The case start timestamp in Unix milliseconds."
+          },
+          "endDate": {
+            "type": "integer",
+            "description": "The case end timestamp in Unix milliseconds."
+          },
+          "flag": {
+            "type": "boolean",
+            "description": "Whether the case is flagged."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The case status."
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "A concise case summary."
+          },
+          "assignee": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The login of the assigned user."
+          },
+          "caseTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The case template ID or name."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom field values keyed by custom field name."
+          },
+          "severity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "The severity level from 1 through 4."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag."
+            },
+            "description": "Tags assigned to the entity."
+          },
+          "tlp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "The Traffic Light Protocol level from 0 through 4."
+          },
+          "pap": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "The Permissible Actions Protocol level from 0 through 3."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "description"
+        ],
+        "description": "The input for creating a TheHive 5 case."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The case ID."
+              },
+              "number": {
+                "type": "integer",
+                "description": "The numeric case reference."
+              },
+              "title": {
+                "type": "string",
+                "description": "The case title."
+              },
+              "description": {
+                "type": "string",
+                "description": "The case description."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A TheHive 5 case."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created TheHive 5 case response."
+      }
+    },
+    {
+      "id": "thehive5.get_alert",
+      "service": "thehive5",
+      "name": "get_alert",
+      "description": "Retrieve one TheHive 5 alert by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "alertId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TheHive entity ID or numeric case reference."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for retrieving a TheHive 5 alert."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alert": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The alert ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The alert title."
+              },
+              "source": {
+                "type": "string",
+                "description": "The alert source."
+              },
+              "sourceRef": {
+                "type": "string",
+                "description": "The source-specific alert reference."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A TheHive 5 alert."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TheHive 5 alert response."
+      }
+    },
+    {
+      "id": "thehive5.get_case",
+      "service": "thehive5",
+      "name": "get_case",
+      "description": "Retrieve one TheHive 5 case by ID or numeric reference.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TheHive entity ID or numeric case reference."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for retrieving a TheHive 5 case."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "case": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The case ID."
+              },
+              "number": {
+                "type": "integer",
+                "description": "The numeric case reference."
+              },
+              "title": {
+                "type": "string",
+                "description": "The case title."
+              },
+              "description": {
+                "type": "string",
+                "description": "The case description."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A TheHive 5 case."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TheHive 5 case response."
+      }
+    },
+    {
+      "id": "thehive5.list_alerts",
+      "service": "thehive5",
+      "name": "list_alerts",
+      "description": "List alerts visible to the connected TheHive 5 user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to return, up to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing TheHive 5 alerts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The alert ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The alert title."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "The alert source."
+                },
+                "sourceRef": {
+                  "type": "string",
+                  "description": "The source-specific alert reference."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A TheHive 5 alert."
+            },
+            "description": "Alerts returned by TheHive 5."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The zero-based offset used for this result page."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset to request for the next page, or null when this page is incomplete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset to request for the next page, or null when this page is incomplete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TheHive 5 alert list response."
+      }
+    },
+    {
+      "id": "thehive5.list_cases",
+      "service": "thehive5",
+      "name": "list_cases",
+      "description": "List cases visible to the connected TheHive 5 user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records to return, up to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing TheHive 5 cases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The case ID."
+                },
+                "number": {
+                  "type": "integer",
+                  "description": "The numeric case reference."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The case title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The case description."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A TheHive 5 case."
+            },
+            "description": "Cases returned by TheHive 5."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "The zero-based offset used for this result page."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset to request for the next page, or null when this page is incomplete."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset to request for the next page, or null when this page is incomplete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TheHive 5 case list response."
+      }
+    }
+  ]
+}

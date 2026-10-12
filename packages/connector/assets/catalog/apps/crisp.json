@@ -1,0 +1,591 @@
+{
+  "service": "crisp",
+  "displayName": "Crisp",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Token Key",
+      "placeholder": "CRISP_TOKEN_KEY",
+      "description": "Crisp token key used as the Basic Auth password. For website tokens, generate the key in Crisp Dashboard > Settings > Workspace Settings > Advanced configuration > API Token: https://app.crisp.chat/",
+      "extraFields": [
+        {
+          "key": "tokenIdentifier",
+          "label": "Token Identifier",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "CRISP_TOKEN_ID",
+          "description": "Crisp token identifier used as the Basic Auth username. Copy it with the token key from Crisp Dashboard > Settings > Workspace Settings > Advanced configuration > API Token: https://app.crisp.chat/"
+        },
+        {
+          "key": "websiteId",
+          "label": "Website ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "8c842203-7ed8-4e29-a608-7cf78a7d2fcc",
+          "description": "Crisp website identifier used in REST API paths. Find it in Crisp Dashboard > Settings > Workspace Settings > Setup Instructions: https://app.crisp.chat/"
+        },
+        {
+          "key": "tokenTier",
+          "label": "Token Tier",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "website",
+          "description": "Crisp REST API token tier sent with X-Crisp-Tier. Use website for Dashboard website tokens or plugin for Marketplace plugin tokens."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://crisp.chat/",
+  "actions": [
+    {
+      "id": "crisp.get_conversation",
+      "service": "crisp",
+      "name": "get_conversation",
+      "description": "Retrieve one Crisp conversation by session ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "website:conversation:sessions"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Crisp conversation session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Crisp conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "description": "The Crisp conversation session identifier."
+              },
+              "websiteId": {
+                "type": "string",
+                "description": "The Crisp website identifier."
+              },
+              "state": {
+                "type": "string",
+                "description": "The Crisp conversation state."
+              },
+              "status": {
+                "type": "integer",
+                "description": "The Crisp conversation status code."
+              },
+              "lastMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string value returned by Crisp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A string value returned by Crisp."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "A Crisp timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "A Crisp timestamp in milliseconds."
+              },
+              "unread": {
+                "type": "object",
+                "properties": {
+                  "operator": {
+                    "type": "integer",
+                    "description": "Unread messages visible to operators."
+                  },
+                  "visitor": {
+                    "type": "integer",
+                    "description": "Unread messages visible to the visitor."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Unread message counters returned by Crisp."
+              },
+              "visitor": {
+                "type": "object",
+                "properties": {
+                  "nickname": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string value returned by Crisp."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A string value returned by Crisp."
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string value returned by Crisp."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A string value returned by Crisp."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Visitor metadata normalized from a Crisp conversation."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Crisp conversation object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "sessionId",
+              "websiteId",
+              "raw"
+            ],
+            "description": "A Crisp conversation with stable top-level fields and the raw upstream object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Crisp conversation response."
+      }
+    },
+    {
+      "id": "crisp.get_website",
+      "service": "crisp",
+      "name": "get_website",
+      "description": "Retrieve the Crisp website connected to the configured token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the Crisp website connected to this credential."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "website": {
+            "type": "object",
+            "properties": {
+              "websiteId": {
+                "type": "string",
+                "description": "The Crisp website identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Crisp website name."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The Crisp website domain."
+              },
+              "logo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string value returned by Crisp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A string value returned by Crisp."
+              },
+              "verified": {
+                "type": "boolean",
+                "description": "Whether the Crisp website is verified."
+              },
+              "institutional": {
+                "type": "boolean",
+                "description": "Whether the Crisp website is institutional."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Crisp website object."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "websiteId",
+              "raw"
+            ],
+            "description": "A Crisp website returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Crisp website connected to this credential."
+      }
+    },
+    {
+      "id": "crisp.list_conversation_messages",
+      "service": "crisp",
+      "name": "list_conversation_messages",
+      "description": "List messages in a Crisp conversation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "website:conversation:messages"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Crisp conversation session identifier."
+          },
+          "timestampBefore": {
+            "type": "integer",
+            "description": "A Crisp timestamp in milliseconds."
+          },
+          "timestampAfter": {
+            "type": "integer",
+            "description": "A Crisp timestamp in milliseconds."
+          },
+          "timestampAround": {
+            "type": "integer",
+            "description": "A Crisp timestamp in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ],
+        "description": "Input parameters for listing messages in a Crisp conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "description": "The Crisp conversation session identifier."
+                },
+                "websiteId": {
+                  "type": "string",
+                  "description": "The Crisp website identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Crisp message type."
+                },
+                "from": {
+                  "type": "string",
+                  "description": "The Crisp message sender side."
+                },
+                "origin": {
+                  "type": "string",
+                  "description": "The Crisp message origin."
+                },
+                "content": {
+                  "description": "The Crisp message content."
+                },
+                "fingerprint": {
+                  "type": "number",
+                  "description": "The Crisp message fingerprint."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "A Crisp timestamp in milliseconds."
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string",
+                      "description": "The Crisp user identifier attached to the message."
+                    },
+                    "nickname": {
+                      "type": "string",
+                      "description": "The user nickname attached to the message."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "User metadata normalized from a Crisp message."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crisp message object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "sessionId",
+                "websiteId",
+                "raw"
+              ],
+              "description": "A Crisp conversation message with stable top-level fields and the raw upstream object."
+            },
+            "description": "The messages returned by Crisp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Crisp conversation messages."
+      }
+    },
+    {
+      "id": "crisp.list_conversations",
+      "service": "crisp",
+      "name": "list_conversations",
+      "description": "List conversations for the connected Crisp website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "website:conversation:sessions"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based conversation page number to request from Crisp."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of conversations to request per page."
+          },
+          "searchQuery": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search text used by Crisp conversation search."
+          },
+          "includeEmpty": {
+            "type": "boolean",
+            "description": "Whether Crisp should include empty conversations."
+          },
+          "filterUnread": {
+            "type": "boolean",
+            "description": "Whether Crisp should return only unread conversations."
+          },
+          "filterResolved": {
+            "type": "boolean",
+            "description": "Whether Crisp should return only resolved conversations."
+          },
+          "filterNotResolved": {
+            "type": "boolean",
+            "description": "Whether Crisp should return only unresolved conversations."
+          },
+          "filterAssigned": {
+            "type": "boolean",
+            "description": "Whether Crisp should return only assigned conversations."
+          },
+          "filterUnassigned": {
+            "type": "boolean",
+            "description": "Whether Crisp should return only unassigned conversations."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Crisp conversations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "description": "The Crisp conversation session identifier."
+                },
+                "websiteId": {
+                  "type": "string",
+                  "description": "The Crisp website identifier."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The Crisp conversation state."
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "The Crisp conversation status code."
+                },
+                "lastMessage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string value returned by Crisp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A string value returned by Crisp."
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "description": "A Crisp timestamp in milliseconds."
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "description": "A Crisp timestamp in milliseconds."
+                },
+                "unread": {
+                  "type": "object",
+                  "properties": {
+                    "operator": {
+                      "type": "integer",
+                      "description": "Unread messages visible to operators."
+                    },
+                    "visitor": {
+                      "type": "integer",
+                      "description": "Unread messages visible to the visitor."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Unread message counters returned by Crisp."
+                },
+                "visitor": {
+                  "type": "object",
+                  "properties": {
+                    "nickname": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string value returned by Crisp."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A string value returned by Crisp."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string value returned by Crisp."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A string value returned by Crisp."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Visitor metadata normalized from a Crisp conversation."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crisp conversation object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "sessionId",
+                "websiteId",
+                "raw"
+              ],
+              "description": "A Crisp conversation with stable top-level fields and the raw upstream object."
+            },
+            "description": "The conversations returned by Crisp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Crisp conversations."
+      }
+    },
+    {
+      "id": "crisp.send_text_message",
+      "service": "crisp",
+      "name": "send_text_message",
+      "description": "Send an operator text message to a Crisp conversation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "website:conversation:messages"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Crisp conversation session identifier."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text content to send to the Crisp conversation."
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "email"
+            ],
+            "description": "The Crisp message origin to use for the text message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId",
+          "content"
+        ],
+        "description": "Input parameters for sending a text message to a Crisp conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "The Crisp response reason."
+          },
+          "fingerprint": {
+            "type": "number",
+            "description": "The dispatched Crisp message fingerprint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "description": "The Crisp text message dispatch result."
+      }
+    }
+  ]
+}

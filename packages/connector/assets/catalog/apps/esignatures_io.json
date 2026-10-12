@@ -1,0 +1,1263 @@
+{
+  "service": "esignatures_io",
+  "displayName": "eSignatures.com",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Token",
+      "placeholder": "YOUR_SECRET_TOKEN",
+      "description": "eSignatures.com Secret Token used as the HTTP Basic Auth username with an empty password. Find it on the API page after signing in to your eSignatures.com account: https://esignatures.com/docs/api."
+    }
+  ],
+  "homepageUrl": "https://esignatures.com",
+  "actions": [
+    {
+      "id": "esignatures_io.create_contract",
+      "service": "esignatures_io",
+      "name": "create_contract",
+      "description": "Create an eSignatures.com contract from an existing template and signer list, sending it unless saved as a draft.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template ID eSignatures.com should use for the contract."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer email address.",
+                  "format": "email"
+                },
+                "mobile": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer mobile number, including country code when needed."
+                },
+                "companyName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer company name."
+                },
+                "signingOrder": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The sequence number for signing. Signers with the same number are notified together."
+                },
+                "autoSign": {
+                  "type": "boolean",
+                  "description": "Whether eSignatures.com should automatically sign for this signer."
+                },
+                "signatureRequestDeliveryMethods": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "sms"
+                    ],
+                    "description": "How eSignatures.com should deliver the signature request to the signer."
+                  },
+                  "description": "Delivery methods for the signature request. Use an empty array to skip sending."
+                },
+                "signedDocumentDeliveryMethod": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "sms",
+                    ""
+                  ],
+                  "description": "How eSignatures.com should deliver the final signed document to the signer."
+                },
+                "multiFactorAuthentications": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "sms_verification_code",
+                      "email_verification_code",
+                      "photo_id"
+                    ],
+                    "description": "A multi-factor authentication method eSignatures.com should require for the signer."
+                  },
+                  "description": "Multi-factor authentication methods required for this signer."
+                },
+                "redirectUrl": {
+                  "type": "string",
+                  "description": "The URL eSignatures.com redirects the signer to after signing.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "description": "One signer to add to a new eSignatures.com contract.",
+              "anyOf": [
+                {
+                  "required": [
+                    "email"
+                  ]
+                },
+                {
+                  "required": [
+                    "mobile"
+                  ]
+                }
+              ]
+            },
+            "description": "People required to sign the contract.",
+            "minItems": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The contract title. Defaults to the template title when omitted."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The language setting for signer pages and emails."
+          },
+          "metadata": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom metadata to attach to the contract."
+          },
+          "expiresInHours": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of hours before the contract expires."
+          },
+          "customWebhookUrl": {
+            "type": "string",
+            "description": "A webhook URL eSignatures.com should notify for this contract.",
+            "format": "uri"
+          },
+          "assignedUserEmail": {
+            "type": "string",
+            "description": "The eSignatures.com user email assigned to manage the contract.",
+            "format": "email"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One contract label."
+            },
+            "description": "Labels to assign to the contract."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether eSignatures.com should mark the contract as a test."
+          },
+          "saveAsDraft": {
+            "type": "boolean",
+            "description": "Whether eSignatures.com should save the contract as a draft instead of sending it."
+          },
+          "placeholderFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "placeholderKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The template placeholder key without surrounding braces."
+                },
+                "replaceWithText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Plain text to replace the placeholder."
+                },
+                "replaceWithMarkdown": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Markdown content to replace the placeholder."
+                },
+                "replaceWithTemplate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Template ID whose full content should replace the placeholder."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "placeholderKey"
+              ],
+              "description": "One placeholder replacement for a new eSignatures.com contract."
+            },
+            "description": "Placeholder replacements to apply when creating the contract."
+          },
+          "signerFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signerFieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer field ID configured in the template editor."
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The default value eSignatures.com should pre-fill."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One signer field default value."
+            },
+            "description": "Signer field default values to pre-fill on the contract."
+          },
+          "emails": {
+            "type": "object",
+            "properties": {
+              "signatureRequestSubject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email subject used to request a signature."
+              },
+              "signatureRequestText": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email body used to request a signature."
+              },
+              "finalContractSubject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email subject used to send the signed contract."
+              },
+              "finalContractText": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email body used to send the signed contract."
+              },
+              "ccEmailAddresses": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One CC email address.",
+                  "format": "email"
+                },
+                "description": "Email addresses to CC when eSignatures.com sends the signed PDF."
+              },
+              "replyTo": {
+                "type": "string",
+                "description": "The reply-to email address for contract emails.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Custom email copy for eSignatures.com contract notifications."
+          },
+          "customBranding": {
+            "type": "object",
+            "properties": {
+              "companyName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company name eSignatures.com should display as sender."
+              },
+              "logoUrl": {
+                "type": "string",
+                "description": "The URL of the custom logo image.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Custom branding values for the eSignatures.com signing flow."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "signers"
+        ],
+        "description": "Input for creating an eSignatures.com contract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The operation status returned by eSignatures.com."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operation status returned by eSignatures.com."
+          },
+          "contract": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The eSignatures.com contract ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The eSignatures.com contract ID."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contract status returned by eSignatures.com."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contract status returned by eSignatures.com."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contract title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contract title."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The custom metadata attached to the contract."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom metadata attached to the contract."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The source that created the contract, such as api or ui."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The source that created the contract, such as api or ui."
+              },
+              "test": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no"
+                    ],
+                    "description": "The yes or no flag returned by eSignatures.com."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The yes or no flag returned by eSignatures.com."
+              },
+              "contractPdfUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary URL for the finalized signed PDF when eSignatures.com returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary URL for the finalized signed PDF when eSignatures.com returns one."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One contract label."
+                },
+                "description": "Labels assigned to the contract."
+              },
+              "signers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The eSignatures.com signer ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The eSignatures.com signer ID."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer name."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer email address."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer email address."
+                    },
+                    "mobile": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer mobile number."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer mobile number."
+                    },
+                    "companyName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer company name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer company name."
+                    },
+                    "signPageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The URL where this signer can review and sign."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The URL where this signer can review and sign."
+                    },
+                    "signerFieldValues": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "Values entered by the signer for template signer fields."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Values entered by the signer for template signer fields."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw eSignatures.com API object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A normalized eSignatures.com signer."
+                },
+                "description": "Signers attached to the contract."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw eSignatures.com API object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized eSignatures.com contract."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An eSignatures.com create contract response."
+      }
+    },
+    {
+      "id": "esignatures_io.create_template",
+      "service": "esignatures_io",
+      "name": "create_template",
+      "description": "Create an eSignatures.com template from a title, Markdown document content, and optional labels.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title of the new template."
+          },
+          "markdown": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Markdown document content for the template."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One template label."
+            },
+            "description": "Labels to assign to the template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "markdown"
+        ],
+        "description": "Input for creating an eSignatures.com template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The eSignatures.com template ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The eSignatures.com template ID."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template title."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template creation timestamp returned by eSignatures.com."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template creation timestamp returned by eSignatures.com."
+                },
+                "placeholderFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One placeholder field key."
+                  },
+                  "description": "Placeholder field keys configured in the template."
+                },
+                "signerFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One signer field ID."
+                  },
+                  "description": "Signer field IDs configured in the template."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw eSignatures.com API object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized eSignatures.com template."
+            },
+            "description": "Created template records returned by eSignatures.com."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Created eSignatures.com template IDs."
+      }
+    },
+    {
+      "id": "esignatures_io.get_contract",
+      "service": "esignatures_io",
+      "name": "get_contract",
+      "description": "Retrieve one eSignatures.com contract by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eSignatures.com contract ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting an eSignatures.com contract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contract": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The eSignatures.com contract ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The eSignatures.com contract ID."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contract status returned by eSignatures.com."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contract status returned by eSignatures.com."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contract title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contract title."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The custom metadata attached to the contract."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The custom metadata attached to the contract."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The source that created the contract, such as api or ui."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The source that created the contract, such as api or ui."
+              },
+              "test": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no"
+                    ],
+                    "description": "The yes or no flag returned by eSignatures.com."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The yes or no flag returned by eSignatures.com."
+              },
+              "contractPdfUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary URL for the finalized signed PDF when eSignatures.com returns one.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary URL for the finalized signed PDF when eSignatures.com returns one."
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One contract label."
+                },
+                "description": "Labels assigned to the contract."
+              },
+              "signers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The eSignatures.com signer ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The eSignatures.com signer ID."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer name."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer email address."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer email address."
+                    },
+                    "mobile": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer mobile number."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer mobile number."
+                    },
+                    "companyName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The signer company name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The signer company name."
+                    },
+                    "signPageUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The URL where this signer can review and sign."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The URL where this signer can review and sign."
+                    },
+                    "signerFieldValues": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "Values entered by the signer for template signer fields."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Values entered by the signer for template signer fields."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw eSignatures.com API object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A normalized eSignatures.com signer."
+                },
+                "description": "Signers attached to the contract."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw eSignatures.com API object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized eSignatures.com contract."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An eSignatures.com contract response."
+      }
+    },
+    {
+      "id": "esignatures_io.get_contract_content",
+      "service": "esignatures_io",
+      "name": "get_contract_content",
+      "description": "Retrieve the Markdown content for one eSignatures.com contract.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eSignatures.com contract ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting an eSignatures.com contract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The eSignatures.com contract ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The eSignatures.com contract ID."
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The contract Markdown content."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contract Markdown content."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Markdown content of an eSignatures.com contract."
+      }
+    },
+    {
+      "id": "esignatures_io.get_template",
+      "service": "esignatures_io",
+      "name": "get_template",
+      "description": "Retrieve one eSignatures.com template by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eSignatures.com template ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting an eSignatures.com template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "templateId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The eSignatures.com template ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The eSignatures.com template ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The template title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The template title."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The template creation timestamp returned by eSignatures.com."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The template creation timestamp returned by eSignatures.com."
+              },
+              "placeholderFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One placeholder field key."
+                },
+                "description": "Placeholder field keys configured in the template."
+              },
+              "signerFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One signer field ID."
+                },
+                "description": "Signer field IDs configured in the template."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw eSignatures.com API object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized eSignatures.com template."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An eSignatures.com template response."
+      }
+    },
+    {
+      "id": "esignatures_io.get_template_content",
+      "service": "esignatures_io",
+      "name": "get_template_content",
+      "description": "Retrieve the Markdown content for one eSignatures.com template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eSignatures.com template ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting an eSignatures.com template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The eSignatures.com template ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The eSignatures.com template ID."
+          },
+          "markdown": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The template Markdown content."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The template Markdown content."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Markdown content of an eSignatures.com template."
+      }
+    },
+    {
+      "id": "esignatures_io.list_templates",
+      "service": "esignatures_io",
+      "name": "list_templates",
+      "description": "List eSignatures.com templates available to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing eSignatures.com templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The eSignatures.com template ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The eSignatures.com template ID."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template title."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The template creation timestamp returned by eSignatures.com."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The template creation timestamp returned by eSignatures.com."
+                },
+                "placeholderFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One placeholder field key."
+                  },
+                  "description": "Placeholder field keys configured in the template."
+                },
+                "signerFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One signer field ID."
+                  },
+                  "description": "Signer field IDs configured in the template."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw eSignatures.com API object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized eSignatures.com template."
+            },
+            "description": "Templates returned by eSignatures.com."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of eSignatures.com templates."
+      }
+    },
+    {
+      "id": "esignatures_io.withdraw_contract",
+      "service": "esignatures_io",
+      "name": "withdraw_contract",
+      "description": "Withdraw an eSignatures.com contract so it can no longer be signed while preserving query access.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contractId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The eSignatures.com contract ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for selecting an eSignatures.com contract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The operation status returned by eSignatures.com."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The operation status returned by eSignatures.com."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw eSignatures.com API object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An eSignatures.com withdraw contract response."
+      }
+    }
+  ]
+}

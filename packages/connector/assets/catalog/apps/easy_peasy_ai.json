@@ -1,0 +1,361 @@
+{
+  "service": "easy_peasy_ai",
+  "displayName": "Easy-Peasy.AI",
+  "homepageUrl": "https://easy-peasy.ai",
+  "categories": [
+    "AI",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Create an Easy-Peasy.AI API key at https://easy-peasy.ai/settings/api. It authenticates requests through the x-api-key header."
+    }
+  ],
+  "actions": [
+    {
+      "id": "easy_peasy_ai.generate_text",
+      "service": "easy_peasy_ai",
+      "name": "generate_text",
+      "description": "Generate text with an Easy-Peasy.AI preset. Use get_preset first for template-specific fields and constraints; generation consumes word credits.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template slug to use for generation."
+          },
+          "keywords": {
+            "type": "string",
+            "description": "The main input text or topic; may be empty for templates that use other fields."
+          },
+          "tone": {
+            "type": "string",
+            "description": "The desired tone, such as professional, friendly, or funny."
+          },
+          "length": {
+            "type": "string",
+            "enum": [
+              "Short",
+              "Medium",
+              "Long"
+            ],
+            "description": "The desired output length."
+          },
+          "outputs": {
+            "type": "integer",
+            "description": "Number of outputs to generate; defaults to 1."
+          },
+          "language": {
+            "type": "string",
+            "description": "Output language; defaults to English."
+          },
+          "shouldUseGPT4": {
+            "type": "boolean",
+            "description": "Whether to use the advanced AI model; defaults to false."
+          },
+          "extra1": {
+            "type": "string",
+            "description": "Additional context, such as background information, key skills, or a blog introduction."
+          },
+          "extra2": {
+            "type": "string",
+            "description": "Additional context, such as a blog title or reply sentiment."
+          },
+          "extra3": {
+            "type": "string",
+            "description": "Additional context, such as a job title."
+          },
+          "extra4": {
+            "type": "string",
+            "description": "Additional context, such as recommendation details."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "End section text for the Fill the Gaps template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "preset",
+          "keywords"
+        ],
+        "description": "Text generation parameters; field meanings and length limits depend on the preset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The generated output ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The generated text."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A generated text output."
+            },
+            "description": "The generated outputs returned by Easy-Peasy.AI."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "outputs"
+        ],
+        "description": "Generated text outputs."
+      }
+    },
+    {
+      "id": "easy_peasy_ai.get_preset",
+      "service": "easy_peasy_ai",
+      "name": "get_preset",
+      "description": "Get an Easy-Peasy.AI preset's input fields and current constraints before generating text.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preset slug, such as custom-generator or paragraph-writer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "slug"
+        ],
+        "description": "The preset to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Unique preset identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable preset name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Short description of what the preset does."
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A preset category."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A preset category."
+                },
+                "description": "Preset categories."
+              }
+            ],
+            "description": "Category or categories the preset belongs to."
+          },
+          "isFree": {
+            "type": "boolean",
+            "description": "Whether this preset is available on the free plan."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The request body field name."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Human-readable field label."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Input control type."
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether the preset requires this field."
+                },
+                "placeholder": {
+                  "type": "string",
+                  "description": "An example value or input hint."
+                },
+                "maxLength": {
+                  "type": "integer",
+                  "description": "Maximum text length for this field."
+                },
+                "radioOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "The value to send."
+                      },
+                      "default": {
+                        "type": "boolean",
+                        "description": "Whether this choice is the default."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "value"
+                    ],
+                    "description": "A radio choice."
+                  },
+                  "description": "Choices for a radio input."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name"
+              ],
+              "description": "A preset input field and its constraints."
+            },
+            "description": "Input fields to pass to generate_text, including template-specific constraints."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "slug",
+          "title",
+          "fields"
+        ],
+        "description": "The preset configuration and input requirements."
+      }
+    },
+    {
+      "id": "easy_peasy_ai.list_presets",
+      "service": "easy_peasy_ai",
+      "name": "list_presets",
+      "description": "List Easy-Peasy.AI text generation presets, optionally filtered by category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "Social Media",
+              "Content",
+              "Business",
+              "HR",
+              "Marketing",
+              "Resume",
+              "Education",
+              "Project Management",
+              "Tools",
+              "Other"
+            ],
+            "description": "Filter presets by category."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for discovering text generation presets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "presets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "description": "Unique preset identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Human-readable preset name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Short description of what the preset does."
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A preset category."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A preset category."
+                      },
+                      "description": "Preset categories."
+                    }
+                  ],
+                  "description": "Category or categories the preset belongs to."
+                },
+                "isFree": {
+                  "type": "boolean",
+                  "description": "Whether this preset is available on the free plan."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "slug",
+                "title"
+              ],
+              "description": "A text generation preset."
+            },
+            "description": "List of available presets."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of presets returned."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A preset category."
+            },
+            "description": "All available preset categories."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "presets",
+          "total",
+          "categories"
+        ],
+        "description": "Available text generation presets."
+      }
+    }
+  ]
+}

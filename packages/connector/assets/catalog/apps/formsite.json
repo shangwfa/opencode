@@ -1,0 +1,821 @@
+{
+  "service": "formsite",
+  "displayName": "Formsite",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "formsite_access_token",
+      "description": "Formsite access token used with the Authorization bearer header. Copy it from Settings > Integrations > Formsite API in your Formsite account: https://support.formsite.com/hc/en-us/articles/46181026038931-API.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://fs8.formsite.com/api/v2",
+          "description": "The exact API base URL shown on your Formsite API page, ending with /api/v2. Formsite provides this in Settings > Integrations > Formsite API."
+        },
+        {
+          "key": "userDir",
+          "label": "Default User Directory",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "user123",
+          "description": "Optional default user directory shown on your Formsite API page or in form URLs between the host and /forms/. Leave it empty only if you want to pass user_dir explicitly in actions."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.formsite.com",
+  "actions": [
+    {
+      "id": "formsite.delete_webhook",
+      "service": "formsite",
+      "name": "delete_webhook",
+      "description": "Delete one Formsite webhook from a form by its destination URL.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier whose webhook should be deleted.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          },
+          "url": {
+            "type": "string",
+            "description": "The webhook URL to delete from the form.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_dir",
+          "url"
+        ],
+        "description": "Input payload for deleting a Formsite webhook by URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the webhook delete request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The normalized delete response returned by the Formsite webhook endpoint."
+      }
+    },
+    {
+      "id": "formsite.get_form",
+      "service": "formsite",
+      "name": "get_form",
+      "description": "Get one Formsite form by its form directory identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier to retrieve.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_dir"
+        ],
+        "description": "Input payload for retrieving one Formsite form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "The internal form description."
+              },
+              "directory": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The form directory identifier used in Formsite URLs.",
+                "pattern": "\\S"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The form display name.",
+                "pattern": "\\S"
+              },
+              "publish": {
+                "type": "object",
+                "properties": {
+                  "embed_code": {
+                    "type": "string",
+                    "description": "The embeddable code returned by Formsite for the form."
+                  },
+                  "link": {
+                    "type": "string",
+                    "description": "The public link returned by Formsite for the form."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The publish metadata returned for a Formsite form."
+              },
+              "state": {
+                "type": "string",
+                "description": "The form state returned by Formsite, such as open or a closed reason."
+              },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "filesSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total uploaded file size in bytes stored for the form."
+                  },
+                  "resultsCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The number of results currently stored for the form."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The stored file and result statistics returned by Formsite."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "directory",
+              "name"
+            ],
+            "description": "One normalized Formsite form object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form"
+        ],
+        "description": "The normalized single-form response returned by Formsite."
+      }
+    },
+    {
+      "id": "formsite.get_form_items",
+      "service": "formsite",
+      "name": "get_form_items",
+      "description": "List the item definitions for one Formsite form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier whose items should be listed.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          },
+          "results_labels": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional results labels ID to apply when reading item labels.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_dir"
+        ],
+        "description": "Input payload for listing item definitions on one Formsite form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique Formsite item identifier.",
+                  "pattern": "\\S"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The sequential position of the item inside the form."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The visible question label for the item.",
+                  "pattern": "\\S"
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One child item identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The child item identifiers for compound items."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "position",
+                "label"
+              ],
+              "description": "One Formsite item definition."
+            },
+            "description": "The item definitions returned by Formsite."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The normalized form-item response returned by Formsite."
+      }
+    },
+    {
+      "id": "formsite.get_form_results",
+      "service": "formsite",
+      "name": "get_form_results",
+      "description": "List results for one Formsite form with pagination, date windows, result ID windows, and upstream search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional alias for the form directory identifier. form_id is preferred and wins when both are provided.",
+            "pattern": "\\S"
+          },
+          "form_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier whose results should be listed.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of results to return, up to 500."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to request."
+          },
+          "after_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return results updated after this timestamp or local datetime string.",
+            "pattern": "\\S"
+          },
+          "before_date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return results updated before this timestamp or local datetime string.",
+            "pattern": "\\S"
+          },
+          "after_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return results whose IDs are greater than this result ID.",
+            "pattern": "\\S"
+          },
+          "before_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return results whose IDs are less than this result ID.",
+            "pattern": "\\S"
+          },
+          "sort_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional item or meta field identifier to use as the upstream sort key.",
+            "pattern": "\\S"
+          },
+          "results_view": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional results view identifier to apply.",
+            "pattern": "\\S"
+          },
+          "sort_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The upstream result sort direction."
+          },
+          "search_method": {
+            "type": "string",
+            "enum": [
+              "and",
+              "or"
+            ],
+            "description": "How multiple search clauses should be combined."
+          },
+          "search_equals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The value to compare against for this Formsite search field."
+            },
+            "description": "A map from Formsite item or meta field IDs to search values, encoded as search_*[fieldId]=value."
+          },
+          "search_contains": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The value to compare against for this Formsite search field."
+            },
+            "description": "A map from Formsite item or meta field IDs to search values, encoded as search_*[fieldId]=value."
+          },
+          "search_begins": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The value to compare against for this Formsite search field."
+            },
+            "description": "A map from Formsite item or meta field IDs to search values, encoded as search_*[fieldId]=value."
+          },
+          "search_ends": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "The value to compare against for this Formsite search field."
+            },
+            "description": "A map from Formsite item or meta field IDs to search values, encoded as search_*[fieldId]=value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing results on one Formsite form.",
+        "anyOf": [
+          {
+            "required": [
+              "form_id"
+            ]
+          },
+          {
+            "required": [
+              "form_dir"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Formsite result identifier.",
+                  "pattern": "\\S"
+                },
+                "date_start": {
+                  "type": "string",
+                  "description": "The timestamp when the result was started, when available."
+                },
+                "date_finish": {
+                  "type": "string",
+                  "description": "The timestamp when the result was finished, when available."
+                },
+                "date_update": {
+                  "type": "string",
+                  "description": "The timestamp when the result was last updated."
+                },
+                "login_email": {
+                  "type": "string",
+                  "description": "The Save & Return email associated with the result, when available."
+                },
+                "login_username": {
+                  "type": "string",
+                  "description": "The Save & Return username associated with the result, when available."
+                },
+                "payment_amount": {
+                  "type": "number",
+                  "description": "The payment amount associated with the result, when available."
+                },
+                "payment_status": {
+                  "type": "string",
+                  "description": "The payment status associated with the result, when available."
+                },
+                "result_status": {
+                  "type": "string",
+                  "description": "The result status returned by Formsite."
+                },
+                "user_browser": {
+                  "type": "string",
+                  "description": "The browser reported for the submitter."
+                },
+                "user_device": {
+                  "type": "string",
+                  "description": "The device type reported for the submitter."
+                },
+                "user_ip": {
+                  "type": "string",
+                  "description": "The IP address reported for the submitter."
+                },
+                "user_referrer": {
+                  "type": "string",
+                  "description": "The referring URL reported by Formsite, when available."
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The Formsite item identifier.",
+                        "pattern": "\\S"
+                      },
+                      "position": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The sequential position of the item in the form."
+                      },
+                      "value": {
+                        "type": "string",
+                        "description": "The scalar text value returned for single-value items."
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "A string result item value."
+                              },
+                              {
+                                "type": "number",
+                                "description": "A numeric result item value."
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "A boolean result item value."
+                              },
+                              {
+                                "type": "null",
+                                "description": "A null result item value."
+                              }
+                            ],
+                            "description": "One primitive value returned inside a multi-value Formsite result item."
+                          },
+                          "description": "One keyed value object returned for a multi-value item."
+                        },
+                        "description": "The structured values returned for multi-value Formsite items."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "position"
+                    ],
+                    "description": "One Formsite result item."
+                  },
+                  "description": "The captured item values for the result."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "items"
+              ],
+              "description": "One normalized Formsite result."
+            },
+            "description": "The results returned by Formsite."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The normalized form-result response returned by Formsite."
+      }
+    },
+    {
+      "id": "formsite.list_forms",
+      "service": "formsite",
+      "name": "list_forms",
+      "description": "List all forms available in the connected Formsite account user directory.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing forms in a Formsite account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "The internal form description."
+                },
+                "directory": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The form directory identifier used in Formsite URLs.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The form display name.",
+                  "pattern": "\\S"
+                },
+                "publish": {
+                  "type": "object",
+                  "properties": {
+                    "embed_code": {
+                      "type": "string",
+                      "description": "The embeddable code returned by Formsite for the form."
+                    },
+                    "link": {
+                      "type": "string",
+                      "description": "The public link returned by Formsite for the form."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The publish metadata returned for a Formsite form."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The form state returned by Formsite, such as open or a closed reason."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {
+                    "filesSize": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The total uploaded file size in bytes stored for the form."
+                    },
+                    "resultsCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The number of results currently stored for the form."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The stored file and result statistics returned by Formsite."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "directory",
+                "name"
+              ],
+              "description": "One normalized Formsite form object."
+            },
+            "description": "The forms returned by Formsite."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "forms"
+        ],
+        "description": "The normalized form-list response returned by Formsite."
+      }
+    },
+    {
+      "id": "formsite.list_webhooks",
+      "service": "formsite",
+      "name": "list_webhooks",
+      "description": "List all webhooks configured for one Formsite form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier whose webhooks should be listed.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_dir"
+        ],
+        "description": "Input payload for listing webhooks on one Formsite form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Formsite event subscribed by the webhook.",
+                  "pattern": "\\S"
+                },
+                "handshake_key": {
+                  "type": "string",
+                  "description": "The optional handshake key configured for the webhook."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The webhook delivery URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "event",
+                "url"
+              ],
+              "description": "One Formsite webhook definition."
+            },
+            "description": "The webhooks configured on the form."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhooks"
+        ],
+        "description": "The normalized webhook-list response returned by Formsite."
+      }
+    },
+    {
+      "id": "formsite.upsert_webhook",
+      "service": "formsite",
+      "name": "upsert_webhook",
+      "description": "Create a new Formsite webhook, or update the existing webhook that matches the same URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The form directory identifier whose webhook should be created or updated.",
+            "pattern": "\\S"
+          },
+          "user_dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Formsite user directory. When omitted, the connected default userDir is used.",
+            "pattern": "\\S"
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The event name to subscribe, such as result_completed.",
+            "pattern": "\\S"
+          },
+          "url": {
+            "type": "string",
+            "description": "The webhook destination URL.",
+            "format": "uri"
+          },
+          "handshake_key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional handshake key to include in deliveries.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_dir",
+          "event",
+          "url"
+        ],
+        "description": "Input payload for creating or updating a Formsite webhook."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Formsite event subscribed by the webhook.",
+                "pattern": "\\S"
+              },
+              "handshake_key": {
+                "type": "string",
+                "description": "The optional handshake key configured for the webhook."
+              },
+              "url": {
+                "type": "string",
+                "description": "The webhook delivery URL.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "event",
+              "url"
+            ],
+            "description": "One Formsite webhook definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "The normalized single-webhook response returned by Formsite."
+      }
+    }
+  ]
+}

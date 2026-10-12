@@ -1,0 +1,620 @@
+{
+  "service": "infolobby",
+  "displayName": "InfoLobby",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "il_live_... or il_user_...",
+      "description": "InfoLobby account or personal API key sent as a Bearer token. See https://infolobby.com/api-docs/authentication.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://infolobby.com/",
+  "actions": [
+    {
+      "id": "infolobby.count_records",
+      "service": "infolobby",
+      "name": "count_records",
+      "description": "Count InfoLobby records matching filters, search, or a saved view.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "where": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-encodable InfoLobby field or filter value."
+            },
+            "description": "Simple equality or comparison filters keyed by field id."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field id to filter."
+                },
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An alternative field id to filter."
+                },
+                "compare": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The documented comparison operator or alias."
+                },
+                "value": {
+                  "description": "A JSON-encodable InfoLobby field or filter value."
+                },
+                "connector": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "How this filter joins the preceding filter."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "compare"
+              ],
+              "description": "One InfoLobby record query filter."
+            },
+            "description": "The explicit filters applied to records.",
+            "minItems": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A case-insensitive search term applied across selected fields."
+          },
+          "viewId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The saved view id, or 0 for the synthesized default view."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId"
+        ],
+        "description": "The input for counting InfoLobby records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The number of records matching the query."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of records in the table."
+          },
+          "totalApprox": {
+            "type": "boolean",
+            "description": "Whether the total is an approximate estimate."
+          },
+          "restricted": {
+            "type": "boolean",
+            "description": "Whether the query narrows the table."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "total",
+          "totalApprox",
+          "restricted"
+        ],
+        "description": "The InfoLobby record count result."
+      }
+    },
+    {
+      "id": "infolobby.create_record",
+      "service": "infolobby",
+      "name": "create_record",
+      "description": "Create a record in an InfoLobby table.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-encodable InfoLobby field or filter value."
+            },
+            "description": "Record field values keyed by InfoLobby field id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "data"
+        ],
+        "description": "The input for creating an InfoLobby record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "The record created by InfoLobby."
+      }
+    },
+    {
+      "id": "infolobby.delete_record",
+      "service": "infolobby",
+      "name": "delete_record",
+      "description": "Delete one InfoLobby record.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "recordId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby record id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "recordId"
+        ],
+        "description": "The input for deleting an InfoLobby record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON response returned by the delete endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The response returned after deleting the InfoLobby record."
+      }
+    },
+    {
+      "id": "infolobby.get_record",
+      "service": "infolobby",
+      "name": "get_record",
+      "description": "Get one InfoLobby record with typed field values.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "recordId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby record id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "recordId"
+        ],
+        "description": "The input for retrieving an InfoLobby record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "The requested InfoLobby record."
+      }
+    },
+    {
+      "id": "infolobby.get_space",
+      "service": "infolobby",
+      "name": "get_space",
+      "description": "Get storage-oriented metadata for one InfoLobby workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby workspace id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaceId"
+        ],
+        "description": "The input for retrieving an InfoLobby workspace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "space"
+        ],
+        "description": "The requested InfoLobby workspace."
+      }
+    },
+    {
+      "id": "infolobby.get_table",
+      "service": "infolobby",
+      "name": "get_table",
+      "description": "Get an InfoLobby table and its field schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId"
+        ],
+        "description": "The input for retrieving an InfoLobby table schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table"
+        ],
+        "description": "The requested InfoLobby table and field schema."
+      }
+    },
+    {
+      "id": "infolobby.list_spaces",
+      "service": "infolobby",
+      "name": "list_spaces",
+      "description": "List InfoLobby workspaces accessible to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for listing accessible InfoLobby workspaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by InfoLobby."
+            },
+            "description": "The workspaces returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaces"
+        ],
+        "description": "The accessible InfoLobby workspaces."
+      }
+    },
+    {
+      "id": "infolobby.list_tables",
+      "service": "infolobby",
+      "name": "list_tables",
+      "description": "List tables in an InfoLobby workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby workspace id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaceId"
+        ],
+        "description": "The input for listing InfoLobby tables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by InfoLobby."
+            },
+            "description": "The tables returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tables"
+        ],
+        "description": "The InfoLobby tables in the workspace."
+      }
+    },
+    {
+      "id": "infolobby.query_records",
+      "service": "infolobby",
+      "name": "query_records",
+      "description": "Query and page through flat InfoLobby table rows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field id."
+            },
+            "description": "The field ids to include in query rows.",
+            "minItems": 1
+          },
+          "where": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-encodable InfoLobby field or filter value."
+            },
+            "description": "Simple equality or comparison filters keyed by field id."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field id to filter."
+                },
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An alternative field id to filter."
+                },
+                "compare": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The documented comparison operator or alias."
+                },
+                "value": {
+                  "description": "A JSON-encodable InfoLobby field or filter value."
+                },
+                "connector": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "How this filter joins the preceding filter."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "compare"
+              ],
+              "description": "One InfoLobby record query filter."
+            },
+            "description": "The explicit filters applied to records.",
+            "minItems": 1
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A case-insensitive search term applied across selected fields."
+          },
+          "viewId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The saved view id, or 0 for the synthesized default view."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The field id used to sort query rows."
+          },
+          "orderDir": {
+            "type": "string",
+            "enum": [
+              "A",
+              "D"
+            ],
+            "description": "The InfoLobby ascending or descending sort direction."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based row offset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId"
+        ],
+        "description": "The input for querying InfoLobby records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The object returned by InfoLobby."
+            },
+            "description": "The flat stored-value rows returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "The flat rows returned by InfoLobby."
+      }
+    },
+    {
+      "id": "infolobby.update_record",
+      "service": "infolobby",
+      "name": "update_record",
+      "description": "Update selected fields on an InfoLobby record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby table id."
+          },
+          "recordId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The InfoLobby record id."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-encodable InfoLobby field or filter value."
+            },
+            "description": "Record field values keyed by InfoLobby field id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "recordId",
+          "data"
+        ],
+        "description": "The input for updating an InfoLobby record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The object returned by InfoLobby."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "The record updated by InfoLobby."
+      }
+    }
+  ]
+}

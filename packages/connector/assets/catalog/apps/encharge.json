@@ -1,0 +1,190 @@
+{
+  "service": "encharge",
+  "displayName": "Encharge",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ENCHARGE_API_KEY",
+      "description": "Encharge API key used with the X-Encharge-Token header. Get it from your Encharge account page: https://app.encharge.io/account/info."
+    }
+  ],
+  "homepageUrl": "https://encharge.io",
+  "actions": [
+    {
+      "id": "encharge.send_email",
+      "service": "encharge",
+      "name": "send_email",
+      "description": "Send a transactional email through the current Encharge account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "html",
+              "template"
+            ],
+            "description": "Which Encharge email content field to send."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain-text body, HTML body, or template name based on contentType."
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Recipient email address.",
+                "format": "email"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "User ID of an existing Encharge person."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Existing Encharge person reference used to resolve the recipient email."
+              }
+            ],
+            "description": "Recipient email address string or an existing Encharge person reference."
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Email address.",
+                "format": "email"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "Email address.",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Display name to use with the email address."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "email"
+                ],
+                "description": "An email address with an optional display name accepted by Encharge."
+              }
+            ],
+            "description": "Email address string or object with email and name."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email subject. Required for text and HTML email content."
+          },
+          "templateProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Template replacement value."
+            },
+            "description": "Dictionary of template values that Encharge replaces in the email subject or body."
+          },
+          "unsubscribeCheck": {
+            "type": "boolean",
+            "description": "Whether Encharge should skip sending to people who unsubscribed from emails."
+          },
+          "UTMTags": {
+            "type": "boolean",
+            "description": "Whether Encharge should apply account-level automatic UTM tagging to links."
+          },
+          "cc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated email address list accepted by Encharge."
+          },
+          "bcc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated email address list accepted by Encharge."
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Email address.",
+                "format": "email"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "Email address.",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Display name to use with the email address."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "email"
+                ],
+                "description": "An email address with an optional display name accepted by Encharge."
+              }
+            ],
+            "description": "Email address string or object with email and name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "content",
+          "to",
+          "from"
+        ],
+        "description": "Input payload for sending an Encharge transactional email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Encharge accepted the send request."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON response returned by Encharge, when present."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "Normalized Encharge transactional email send result."
+      }
+    }
+  ]
+}

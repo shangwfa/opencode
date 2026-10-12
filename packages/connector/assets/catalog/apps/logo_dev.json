@@ -1,0 +1,897 @@
+{
+  "service": "logo_dev",
+  "displayName": "Logo.dev",
+  "categories": [
+    "Design & Media",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "sk_xxx",
+      "description": "Logo.dev secret key used for search and describe requests. Create it in the API Keys dashboard and do not use a publishable key: https://www.logo.dev/dashboard/api-keys."
+    }
+  ],
+  "homepageUrl": "https://logo.dev",
+  "actions": [
+    {
+      "id": "logo_dev.describe_brand",
+      "service": "logo_dev",
+      "name": "describe_brand",
+      "description": "Fetch structured Logo.dev brand metadata for a domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company domain to describe."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for describing a brand."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The brand name."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The brand domain."
+          },
+          "description": {
+            "type": "string",
+            "description": "The brand description."
+          },
+          "socials": {
+            "description": "The brand social profile payload."
+          },
+          "blurhash": {
+            "type": "string",
+            "description": "The blurhash for the brand logo."
+          },
+          "colors": {
+            "description": "The brand color palette payload."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The ready-to-use Logo.dev image URL.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The normalized output payload for a Logo.dev brand description."
+      }
+    },
+    {
+      "id": "logo_dev.get_logo_by_crypto",
+      "service": "logo_dev",
+      "name": "get_logo_by_crypto",
+      "description": "Build a Logo.dev image URL for a crypto symbol.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The crypto symbol to look up."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publishable Logo.dev token used to build the image URL."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested logo size in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "png",
+              "webp"
+            ],
+            "description": "The requested output image format."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "The logo theme to request from Logo.dev."
+          },
+          "greyscale": {
+            "type": "boolean",
+            "description": "Whether the logo should be rendered in greyscale."
+          },
+          "retina": {
+            "type": "boolean",
+            "description": "Whether to request a retina-quality image variant."
+          },
+          "fallback": {
+            "type": "string",
+            "enum": [
+              "monogram",
+              "404"
+            ],
+            "description": "The fallback behavior when the brand logo is unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "token"
+        ],
+        "description": "The input payload for building a logo URL from a crypto symbol."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupType": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "name",
+              "ticker",
+              "crypto",
+              "isin"
+            ],
+            "description": "The identifier type used to build the logo URL."
+          },
+          "lookupValue": {
+            "type": "string",
+            "description": "The original identifier value used for the lookup."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The fully qualified Logo.dev image URL.",
+            "format": "uri"
+          },
+          "requested": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The publishable Logo.dev token used to build the image URL."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested logo size in pixels."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The requested output image format."
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "light",
+                  "dark"
+                ],
+                "description": "The logo theme to request from Logo.dev."
+              },
+              "greyscale": {
+                "type": "boolean",
+                "description": "Whether the logo should be rendered in greyscale."
+              },
+              "retina": {
+                "type": "boolean",
+                "description": "Whether to request a retina-quality image variant."
+              },
+              "fallback": {
+                "type": "string",
+                "enum": [
+                  "monogram",
+                  "404"
+                ],
+                "description": "The fallback behavior when the brand logo is unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "token"
+            ],
+            "description": "The normalized image request options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Return a ready-to-use Logo.dev image URL using the requested identifier and image options."
+      }
+    },
+    {
+      "id": "logo_dev.get_logo_by_domain",
+      "service": "logo_dev",
+      "name": "get_logo_by_domain",
+      "description": "Build a Logo.dev image URL for a company domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company domain to look up, for example openai.com."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publishable Logo.dev token used to build the image URL."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested logo size in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "png",
+              "webp"
+            ],
+            "description": "The requested output image format."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "The logo theme to request from Logo.dev."
+          },
+          "greyscale": {
+            "type": "boolean",
+            "description": "Whether the logo should be rendered in greyscale."
+          },
+          "retina": {
+            "type": "boolean",
+            "description": "Whether to request a retina-quality image variant."
+          },
+          "fallback": {
+            "type": "string",
+            "enum": [
+              "monogram",
+              "404"
+            ],
+            "description": "The fallback behavior when the brand logo is unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "token"
+        ],
+        "description": "The input payload for building a logo URL from a domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupType": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "name",
+              "ticker",
+              "crypto",
+              "isin"
+            ],
+            "description": "The identifier type used to build the logo URL."
+          },
+          "lookupValue": {
+            "type": "string",
+            "description": "The original identifier value used for the lookup."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The fully qualified Logo.dev image URL.",
+            "format": "uri"
+          },
+          "requested": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The publishable Logo.dev token used to build the image URL."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested logo size in pixels."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The requested output image format."
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "light",
+                  "dark"
+                ],
+                "description": "The logo theme to request from Logo.dev."
+              },
+              "greyscale": {
+                "type": "boolean",
+                "description": "Whether the logo should be rendered in greyscale."
+              },
+              "retina": {
+                "type": "boolean",
+                "description": "Whether to request a retina-quality image variant."
+              },
+              "fallback": {
+                "type": "string",
+                "enum": [
+                  "monogram",
+                  "404"
+                ],
+                "description": "The fallback behavior when the brand logo is unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "token"
+            ],
+            "description": "The normalized image request options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Return a ready-to-use Logo.dev image URL using the requested identifier and image options."
+      }
+    },
+    {
+      "id": "logo_dev.get_logo_by_isin",
+      "service": "logo_dev",
+      "name": "get_logo_by_isin",
+      "description": "Build a Logo.dev image URL for an ISIN identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISIN identifier to look up."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publishable Logo.dev token used to build the image URL."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested logo size in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "png",
+              "webp"
+            ],
+            "description": "The requested output image format."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "The logo theme to request from Logo.dev."
+          },
+          "greyscale": {
+            "type": "boolean",
+            "description": "Whether the logo should be rendered in greyscale."
+          },
+          "retina": {
+            "type": "boolean",
+            "description": "Whether to request a retina-quality image variant."
+          },
+          "fallback": {
+            "type": "string",
+            "enum": [
+              "monogram",
+              "404"
+            ],
+            "description": "The fallback behavior when the brand logo is unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "isin",
+          "token"
+        ],
+        "description": "The input payload for building a logo URL from an ISIN identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupType": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "name",
+              "ticker",
+              "crypto",
+              "isin"
+            ],
+            "description": "The identifier type used to build the logo URL."
+          },
+          "lookupValue": {
+            "type": "string",
+            "description": "The original identifier value used for the lookup."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The fully qualified Logo.dev image URL.",
+            "format": "uri"
+          },
+          "requested": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The publishable Logo.dev token used to build the image URL."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested logo size in pixels."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The requested output image format."
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "light",
+                  "dark"
+                ],
+                "description": "The logo theme to request from Logo.dev."
+              },
+              "greyscale": {
+                "type": "boolean",
+                "description": "Whether the logo should be rendered in greyscale."
+              },
+              "retina": {
+                "type": "boolean",
+                "description": "Whether to request a retina-quality image variant."
+              },
+              "fallback": {
+                "type": "string",
+                "enum": [
+                  "monogram",
+                  "404"
+                ],
+                "description": "The fallback behavior when the brand logo is unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "token"
+            ],
+            "description": "The normalized image request options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Return a ready-to-use Logo.dev image URL using the requested identifier and image options."
+      }
+    },
+    {
+      "id": "logo_dev.get_logo_by_name",
+      "service": "logo_dev",
+      "name": "get_logo_by_name",
+      "description": "Build a Logo.dev image URL for a brand name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brandName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The brand name to look up."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publishable Logo.dev token used to build the image URL."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested logo size in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "png",
+              "webp"
+            ],
+            "description": "The requested output image format."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "The logo theme to request from Logo.dev."
+          },
+          "greyscale": {
+            "type": "boolean",
+            "description": "Whether the logo should be rendered in greyscale."
+          },
+          "retina": {
+            "type": "boolean",
+            "description": "Whether to request a retina-quality image variant."
+          },
+          "fallback": {
+            "type": "string",
+            "enum": [
+              "monogram",
+              "404"
+            ],
+            "description": "The fallback behavior when the brand logo is unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "brandName",
+          "token"
+        ],
+        "description": "The input payload for building a logo URL from a brand name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupType": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "name",
+              "ticker",
+              "crypto",
+              "isin"
+            ],
+            "description": "The identifier type used to build the logo URL."
+          },
+          "lookupValue": {
+            "type": "string",
+            "description": "The original identifier value used for the lookup."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The fully qualified Logo.dev image URL.",
+            "format": "uri"
+          },
+          "requested": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The publishable Logo.dev token used to build the image URL."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested logo size in pixels."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The requested output image format."
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "light",
+                  "dark"
+                ],
+                "description": "The logo theme to request from Logo.dev."
+              },
+              "greyscale": {
+                "type": "boolean",
+                "description": "Whether the logo should be rendered in greyscale."
+              },
+              "retina": {
+                "type": "boolean",
+                "description": "Whether to request a retina-quality image variant."
+              },
+              "fallback": {
+                "type": "string",
+                "enum": [
+                  "monogram",
+                  "404"
+                ],
+                "description": "The fallback behavior when the brand logo is unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "token"
+            ],
+            "description": "The normalized image request options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Return a ready-to-use Logo.dev image URL using the requested identifier and image options."
+      }
+    },
+    {
+      "id": "logo_dev.get_logo_by_ticker",
+      "service": "logo_dev",
+      "name": "get_logo_by_ticker",
+      "description": "Build a Logo.dev image URL for a stock ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The stock ticker symbol to look up."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publishable Logo.dev token used to build the image URL."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested logo size in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "jpg",
+              "png",
+              "webp"
+            ],
+            "description": "The requested output image format."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "description": "The logo theme to request from Logo.dev."
+          },
+          "greyscale": {
+            "type": "boolean",
+            "description": "Whether the logo should be rendered in greyscale."
+          },
+          "retina": {
+            "type": "boolean",
+            "description": "Whether to request a retina-quality image variant."
+          },
+          "fallback": {
+            "type": "string",
+            "enum": [
+              "monogram",
+              "404"
+            ],
+            "description": "The fallback behavior when the brand logo is unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticker",
+          "token"
+        ],
+        "description": "The input payload for building a logo URL from a stock ticker."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupType": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "name",
+              "ticker",
+              "crypto",
+              "isin"
+            ],
+            "description": "The identifier type used to build the logo URL."
+          },
+          "lookupValue": {
+            "type": "string",
+            "description": "The original identifier value used for the lookup."
+          },
+          "logoUrl": {
+            "type": "string",
+            "description": "The fully qualified Logo.dev image URL.",
+            "format": "uri"
+          },
+          "requested": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The publishable Logo.dev token used to build the image URL."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested logo size in pixels."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpg",
+                  "png",
+                  "webp"
+                ],
+                "description": "The requested output image format."
+              },
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "light",
+                  "dark"
+                ],
+                "description": "The logo theme to request from Logo.dev."
+              },
+              "greyscale": {
+                "type": "boolean",
+                "description": "Whether the logo should be rendered in greyscale."
+              },
+              "retina": {
+                "type": "boolean",
+                "description": "Whether to request a retina-quality image variant."
+              },
+              "fallback": {
+                "type": "string",
+                "enum": [
+                  "monogram",
+                  "404"
+                ],
+                "description": "The fallback behavior when the brand logo is unavailable."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "token"
+            ],
+            "description": "The normalized image request options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Return a ready-to-use Logo.dev image URL using the requested identifier and image options."
+      }
+    },
+    {
+      "id": "logo_dev.search_brands",
+      "service": "logo_dev",
+      "name": "search_brands",
+      "description": "Search Logo.dev brands by query text and return candidate brands.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The brand query text to search for."
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "typeahead",
+              "match"
+            ],
+            "description": "The Logo.dev search strategy to apply."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching brands."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The brand name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The primary brand domain."
+                },
+                "logoUrl": {
+                  "type": "string",
+                  "description": "The ready-to-use Logo.dev image URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "domain"
+              ],
+              "description": "One matching brand candidate."
+            },
+            "description": "The matching brand candidates."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for a Logo.dev brand search."
+      }
+    }
+  ]
+}

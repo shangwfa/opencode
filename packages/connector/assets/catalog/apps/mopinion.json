@@ -1,0 +1,1354 @@
+{
+  "service": "mopinion",
+  "displayName": "Mopinion",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "publicKey",
+          "label": "Public Key",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "public_key",
+          "description": "Mopinion public key used as the application identifier in signed API requests. Create or view API credentials in Mopinion Suite under Settings > Feedback Api or Integrations > Feedback API: https://developer.mopinion.com/api/."
+        },
+        {
+          "key": "signatureToken",
+          "label": "Signature Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "signature_token",
+          "description": "Mopinion signature token used to create the HMAC value for x-auth-token. Create or view API credentials in Mopinion Suite under Settings > Feedback Api or Integrations > Feedback API: https://developer.mopinion.com/api/."
+        }
+      ],
+      "testAction": {
+        "actionName": "get_account",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://www.mopinion.com",
+  "actions": [
+    {
+      "id": "mopinion.get_account",
+      "service": "mopinion",
+      "name": "get_account",
+      "description": "Fetch the current Mopinion account profile and available account limits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The Mopinion account name."
+              },
+              "package": {
+                "type": "string",
+                "description": "The Mopinion account package."
+              },
+              "enddate": {
+                "type": "string",
+                "description": "The current Mopinion package end date."
+              },
+              "number_users": {
+                "type": "integer",
+                "description": "The number of users allowed."
+              },
+              "number_charts": {
+                "type": "integer",
+                "description": "The number of charts allowed."
+              },
+              "number_forms": {
+                "type": "integer",
+                "description": "The number of forms allowed."
+              },
+              "number_reports": {
+                "type": "integer",
+                "description": "The number of reports allowed."
+              },
+              "reports": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The Mopinion report identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The Mopinion report name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "The Mopinion report description."
+                    },
+                    "language": {
+                      "type": "string",
+                      "description": "The Mopinion report language."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "The Mopinion report creation date."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Mopinion report object."
+                },
+                "description": "The reports included in the account."
+              },
+              "_meta": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Mopinion account object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "The output payload for retrieving the current Mopinion account."
+      }
+    },
+    {
+      "id": "mopinion.get_dataset",
+      "service": "mopinion",
+      "name": "get_dataset",
+      "description": "Fetch basic metadata for one Mopinion dataset or feedback form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion dataset identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Mopinion dataset identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Mopinion dataset name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Mopinion dataset name."
+              },
+              "report_id": {
+                "type": "integer",
+                "description": "The parent Mopinion report identifier."
+              },
+              "description": {
+                "type": "string",
+                "description": "The Mopinion dataset description."
+              },
+              "data_source": {
+                "type": "string",
+                "description": "The Mopinion dataset source type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Mopinion dataset object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "The output payload for retrieving one Mopinion dataset."
+      }
+    },
+    {
+      "id": "mopinion.get_dataset_feedback",
+      "service": "mopinion",
+      "name": "get_dataset_feedback",
+      "description": "Fetch one feedback item from a Mopinion dataset or feedback form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion dataset identifier."
+          },
+          "feedbackId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion feedback identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "feedbackId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion dataset feedback item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Mopinion feedback identifier."
+              },
+              "created": {
+                "type": "string",
+                "description": "The feedback creation timestamp."
+              },
+              "report_id": {
+                "type": "integer",
+                "description": "The parent Mopinion report identifier."
+              },
+              "dataset_id": {
+                "type": "integer",
+                "description": "The parent Mopinion dataset identifier."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One feedback tag."
+                },
+                "description": "The tags assigned to the feedback item."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Mopinion feedback object including any dynamic answer fields returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feedback"
+        ],
+        "description": "The output payload for retrieving one Mopinion dataset feedback item."
+      }
+    },
+    {
+      "id": "mopinion.get_deployment",
+      "service": "mopinion",
+      "name": "get_deployment",
+      "description": "Fetch one Mopinion deployment by deployment identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion deployment identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deploymentId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion deployment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "The Mopinion deployment key."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Mopinion deployment identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Mopinion deployment name."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The domain configured for the deployment."
+              },
+              "org_id": {
+                "type": "integer",
+                "description": "The Mopinion organization identifier."
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One deployment rule."
+                },
+                "description": "The deployment rules returned by Mopinion."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Mopinion deployment object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deployment"
+        ],
+        "description": "The output payload for retrieving one Mopinion deployment."
+      }
+    },
+    {
+      "id": "mopinion.get_report",
+      "service": "mopinion",
+      "name": "get_report",
+      "description": "Fetch basic metadata for one Mopinion report.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion report identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Mopinion report identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The Mopinion report name."
+              },
+              "description": {
+                "type": "string",
+                "description": "The Mopinion report description."
+              },
+              "language": {
+                "type": "string",
+                "description": "The Mopinion report language."
+              },
+              "created": {
+                "type": "string",
+                "description": "The Mopinion report creation date."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Mopinion report object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report"
+        ],
+        "description": "The output payload for retrieving one Mopinion report."
+      }
+    },
+    {
+      "id": "mopinion.get_report_feedback",
+      "service": "mopinion",
+      "name": "get_report_feedback",
+      "description": "Fetch one feedback item from a Mopinion report.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion report identifier."
+          },
+          "feedbackId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion feedback identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "feedbackId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion report feedback item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Mopinion feedback identifier."
+              },
+              "created": {
+                "type": "string",
+                "description": "The feedback creation timestamp."
+              },
+              "report_id": {
+                "type": "integer",
+                "description": "The parent Mopinion report identifier."
+              },
+              "dataset_id": {
+                "type": "integer",
+                "description": "The parent Mopinion dataset identifier."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One feedback tag."
+                },
+                "description": "The tags assigned to the feedback item."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Mopinion feedback object including any dynamic answer fields returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feedback"
+        ],
+        "description": "The output payload for retrieving one Mopinion report feedback item."
+      }
+    },
+    {
+      "id": "mopinion.list_dataset_feedback",
+      "service": "mopinion",
+      "name": "list_dataset_feedback",
+      "description": "List feedback items collected by one Mopinion dataset or feedback form.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion dataset identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number to retrieve."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return in one page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "created",
+              "datetime"
+            ],
+            "description": "The Mopinion feedback sort field."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The Mopinion feedback sort order."
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string feedback filter value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric feedback filter value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean feedback filter value."
+                }
+              ],
+              "description": "A Mopinion feedback filter value."
+            },
+            "description": "Mopinion feedback filters serialized as filter[key]=value query parameters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Input parameters for listing feedback from one Mopinion dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Mopinion feedback identifier."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "The feedback creation timestamp."
+                },
+                "report_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion report identifier."
+                },
+                "dataset_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion dataset identifier."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One feedback tag."
+                  },
+                  "description": "The tags assigned to the feedback item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mopinion feedback object including any dynamic answer fields returned by the API."
+            },
+            "description": "The Mopinion feedback items."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mopinion response metadata when the API includes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feedback",
+          "meta"
+        ],
+        "description": "The output payload for listing Mopinion dataset feedback."
+      }
+    },
+    {
+      "id": "mopinion.list_dataset_fields",
+      "service": "mopinion",
+      "name": "list_dataset_fields",
+      "description": "List the field definitions configured for one Mopinion dataset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion dataset identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "report_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion report identifier."
+                },
+                "dataset_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion dataset identifier."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The Mopinion field label."
+                },
+                "short_label": {
+                  "type": "string",
+                  "description": "The Mopinion field short label."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The Mopinion field key."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Mopinion field type."
+                },
+                "answer_values": {
+                  "anyOf": [
+                    {
+                      "description": "The answer values defined for this field."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The answer values defined for this field."
+                },
+                "answer_options": {
+                  "anyOf": [
+                    {
+                      "description": "The answer options defined for this field."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The answer options defined for this field."
+                },
+                "group_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Mopinion field group key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Mopinion field group key."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mopinion report or dataset field object."
+            },
+            "description": "The Mopinion dataset fields."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mopinion response metadata when the API includes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fields",
+          "meta"
+        ],
+        "description": "The output payload for listing Mopinion dataset fields."
+      }
+    },
+    {
+      "id": "mopinion.list_deployments",
+      "service": "mopinion",
+      "name": "list_deployments",
+      "description": "List Mopinion deployments for the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number to retrieve."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return in one page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for a Mopinion collection endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The Mopinion deployment key."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Mopinion deployment identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Mopinion deployment name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The domain configured for the deployment."
+                },
+                "org_id": {
+                  "type": "integer",
+                  "description": "The Mopinion organization identifier."
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One deployment rule."
+                  },
+                  "description": "The deployment rules returned by Mopinion."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mopinion deployment object."
+            },
+            "description": "The Mopinion deployments."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mopinion response metadata when the API includes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deployments",
+          "meta"
+        ],
+        "description": "The output payload for listing Mopinion deployments."
+      }
+    },
+    {
+      "id": "mopinion.list_report_feedback",
+      "service": "mopinion",
+      "name": "list_report_feedback",
+      "description": "List feedback items available through one Mopinion report.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion report identifier."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The collection page number to retrieve."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return in one page."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "created",
+              "datetime"
+            ],
+            "description": "The Mopinion feedback sort field."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The Mopinion feedback sort order."
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string feedback filter value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric feedback filter value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean feedback filter value."
+                }
+              ],
+              "description": "A Mopinion feedback filter value."
+            },
+            "description": "Mopinion feedback filters serialized as filter[key]=value query parameters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId"
+        ],
+        "description": "Input parameters for listing feedback from one Mopinion report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "feedback": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Mopinion feedback identifier."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "The feedback creation timestamp."
+                },
+                "report_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion report identifier."
+                },
+                "dataset_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion dataset identifier."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One feedback tag."
+                  },
+                  "description": "The tags assigned to the feedback item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mopinion feedback object including any dynamic answer fields returned by the API."
+            },
+            "description": "The Mopinion feedback items."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mopinion response metadata when the API includes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "feedback",
+          "meta"
+        ],
+        "description": "The output payload for listing Mopinion report feedback."
+      }
+    },
+    {
+      "id": "mopinion.list_report_fields",
+      "service": "mopinion",
+      "name": "list_report_fields",
+      "description": "List the field definitions configured for one Mopinion report.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mopinion report identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId"
+        ],
+        "description": "Input parameters for retrieving one Mopinion report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "report_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion report identifier."
+                },
+                "dataset_id": {
+                  "type": "integer",
+                  "description": "The parent Mopinion dataset identifier."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The Mopinion field label."
+                },
+                "short_label": {
+                  "type": "string",
+                  "description": "The Mopinion field short label."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The Mopinion field key."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Mopinion field type."
+                },
+                "answer_values": {
+                  "anyOf": [
+                    {
+                      "description": "The answer values defined for this field."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The answer values defined for this field."
+                },
+                "answer_options": {
+                  "anyOf": [
+                    {
+                      "description": "The answer options defined for this field."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The answer options defined for this field."
+                },
+                "group_key": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Mopinion field group key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Mopinion field group key."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Mopinion report or dataset field object."
+            },
+            "description": "The Mopinion report fields."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The upstream HTTP status code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream status message."
+                  },
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "previous": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no previous page."
+                      }
+                    ],
+                    "description": "The previous page URI or false when there is no previous page."
+                  },
+                  "next": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next page URI."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "False when there is no next page."
+                      }
+                    ],
+                    "description": "The next page URI or false when there is no next page."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "The number of items in the response."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of available items."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Mopinion response metadata when the API includes it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mopinion response metadata when the API includes it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fields",
+          "meta"
+        ],
+        "description": "The output payload for listing Mopinion report fields."
+      }
+    }
+  ]
+}

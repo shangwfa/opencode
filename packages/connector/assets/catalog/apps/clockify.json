@@ -1,0 +1,1099 @@
+{
+  "service": "clockify",
+  "displayName": "Clockify",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "clockify_api_key",
+      "description": "Clockify API key used with the X-Api-Key header. Generate it in Preferences > Advanced > API Key: https://clockify.me/help/troubleshooting/api-key-and-authentication/where-to-generate-api-key-for-account.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://clockify.me",
+  "actions": [
+    {
+      "id": "clockify.create_project",
+      "service": "clockify",
+      "name": "create_project",
+      "description": "Create a new Clockify project in a workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project name to create."
+          },
+          "note": {
+            "type": "string",
+            "description": "The project note."
+          },
+          "color": {
+            "type": "string",
+            "description": "The project color in hexadecimal notation."
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "Whether the created project should be public."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the created project should be billable."
+          },
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client ID associated with the project."
+          },
+          "estimate": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The estimate type accepted by Clockify."
+              },
+              "estimate": {
+                "type": "string",
+                "minLength": 1,
+                "description": "An ISO 8601 duration string."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The project estimate configuration sent to Clockify."
+          },
+          "hourlyRate": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The hourly rate amount in the smallest currency unit."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code for the hourly rate."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The hourly rate configuration sent to Clockify."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "name"
+        ],
+        "description": "The input payload for creating a Clockify project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify project object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Clockify project."
+      },
+      "followUpActions": [
+        "clockify.get_project"
+      ]
+    },
+    {
+      "id": "clockify.create_task",
+      "service": "clockify",
+      "name": "create_task",
+      "description": "Create a new Clockify task inside a project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task name to create."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DONE"
+            ],
+            "description": "The initial task status accepted by Clockify."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the created task should be billable."
+          },
+          "estimate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An ISO 8601 duration string."
+          },
+          "assigneeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The assignee IDs for the created task.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId",
+          "name"
+        ],
+        "description": "The input payload for creating a Clockify task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify task object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Clockify task."
+      }
+    },
+    {
+      "id": "clockify.create_time_entry",
+      "service": "clockify",
+      "name": "create_time_entry",
+      "description": "Create a new Clockify time entry for a user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify user ID."
+          },
+          "start": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The tag IDs attached to the time entry.",
+            "minItems": 1
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify task ID."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the time entry should be billable."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "description": {
+            "type": "string",
+            "description": "The time entry description."
+          },
+          "customFieldValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customFieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Clockify custom field ID."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string custom field value."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "An integer custom field value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric custom field value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean custom field value."
+                    }
+                  ],
+                  "description": "The value assigned to the custom field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A custom field value sent to Clockify."
+            },
+            "description": "The custom field values attached to the time entry.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "userId",
+          "start"
+        ],
+        "description": "The input payload for creating a Clockify time entry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entry": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify time entry object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Clockify time entry."
+      },
+      "followUpActions": [
+        "clockify.list_time_entries"
+      ]
+    },
+    {
+      "id": "clockify.delete_project",
+      "service": "clockify",
+      "name": "delete_project",
+      "description": "Delete a Clockify project by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId"
+        ],
+        "description": "The input payload for deleting a Clockify project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Clockify deleted the requested project."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify project deletion result."
+      }
+    },
+    {
+      "id": "clockify.get_current_user",
+      "service": "clockify",
+      "name": "get_current_user",
+      "description": "Get the currently authenticated Clockify user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Clockify user lookup result."
+      },
+      "followUpActions": [
+        "clockify.list_workspaces",
+        "clockify.list_time_entries"
+      ]
+    },
+    {
+      "id": "clockify.get_project",
+      "service": "clockify",
+      "name": "get_project",
+      "description": "Get a single Clockify project by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "hydrated": {
+            "type": "boolean",
+            "description": "Whether to request a hydrated project object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId"
+        ],
+        "description": "The input payload for retrieving a single Clockify project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify project object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify project lookup result."
+      },
+      "followUpActions": [
+        "clockify.update_project",
+        "clockify.delete_project",
+        "clockify.list_tasks"
+      ]
+    },
+    {
+      "id": "clockify.get_workspace",
+      "service": "clockify",
+      "name": "get_workspace",
+      "description": "Get a single Clockify workspace by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "description": "The input payload for retrieving a single Clockify workspace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify workspace object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify workspace lookup result."
+      },
+      "followUpActions": [
+        "clockify.list_projects"
+      ]
+    },
+    {
+      "id": "clockify.list_projects",
+      "service": "clockify",
+      "name": "list_projects",
+      "description": "List Clockify projects in a workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter projects by a partial project name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "users": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of user IDs used to filter projects."
+          },
+          "clients": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of client IDs used to filter projects."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived projects."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether to return billable projects."
+          },
+          "hydrated": {
+            "type": "boolean",
+            "description": "Whether to request hydrated project objects."
+          },
+          "page-size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          },
+          "sort-order": {
+            "type": "string",
+            "enum": [
+              "ASCENDING",
+              "DESCENDING"
+            ],
+            "description": "The project sort order accepted by Clockify."
+          },
+          "is-template": {
+            "type": "boolean",
+            "description": "Whether to return project templates."
+          },
+          "sort-column": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project sort column accepted by Clockify."
+          },
+          "user-status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user membership status filter accepted by Clockify."
+          },
+          "client-status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client status filter accepted by Clockify."
+          },
+          "contains-users": {
+            "type": "boolean",
+            "description": "Whether to return only projects that already have users assigned."
+          },
+          "contains-client": {
+            "type": "boolean",
+            "description": "Whether to return only projects that already have a client assigned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "description": "The input payload for listing Clockify projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Clockify project object."
+            },
+            "description": "The projects returned by Clockify."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page number requested from Clockify."
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page size requested from Clockify."
+                  },
+                  "last_page": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether Clockify marked the current page as the last page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether Clockify marked the current page as the last page."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination metadata derived from the Clockify request and response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata derived from the Clockify request and response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify project list."
+      }
+    },
+    {
+      "id": "clockify.list_tasks",
+      "service": "clockify",
+      "name": "list_tasks",
+      "description": "List Clockify tasks for a project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter tasks by a partial task name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "is-active": {
+            "type": "boolean",
+            "description": "Whether to return only active tasks."
+          },
+          "page-size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          },
+          "sort-order": {
+            "type": "string",
+            "enum": [
+              "ASCENDING",
+              "DESCENDING"
+            ],
+            "description": "The task sort order accepted by Clockify."
+          },
+          "sort-column": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task sort column accepted by Clockify."
+          },
+          "strict-name-search": {
+            "type": "boolean",
+            "description": "Whether to use strict task name matching."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId"
+        ],
+        "description": "The input payload for listing Clockify tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Clockify task object."
+            },
+            "description": "The tasks returned by Clockify."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page number requested from Clockify."
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page size requested from Clockify."
+                  },
+                  "last_page": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether Clockify marked the current page as the last page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether Clockify marked the current page as the last page."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination metadata derived from the Clockify request and response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata derived from the Clockify request and response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify task list."
+      }
+    },
+    {
+      "id": "clockify.list_time_entries",
+      "service": "clockify",
+      "name": "list_time_entries",
+      "description": "List Clockify time entries for a user in a workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify user ID."
+          },
+          "start": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of tag IDs used to filter time entries."
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify task ID."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "hydrated": {
+            "type": "boolean",
+            "description": "Whether to request hydrated time entry objects."
+          },
+          "page-size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return entries whose description matches this text."
+          },
+          "in-progress": {
+            "type": "boolean",
+            "description": "Whether to return only in-progress time entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "userId"
+        ],
+        "description": "The input payload for listing Clockify time entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "time_entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Clockify time entry object."
+            },
+            "description": "The time entries returned by Clockify."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page number requested from Clockify."
+                  },
+                  "page_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The page size requested from Clockify."
+                  },
+                  "last_page": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether Clockify marked the current page as the last page."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether Clockify marked the current page as the last page."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Pagination metadata derived from the Clockify request and response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata derived from the Clockify request and response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify time entry list."
+      }
+    },
+    {
+      "id": "clockify.list_workspaces",
+      "service": "clockify",
+      "name": "list_workspaces",
+      "description": "List the Clockify workspaces available to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Optional workspace roles used to filter the Clockify response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Clockify workspaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Clockify workspace object."
+            },
+            "description": "The workspaces returned by Clockify."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clockify workspace list."
+      }
+    },
+    {
+      "id": "clockify.update_project",
+      "service": "clockify",
+      "name": "update_project",
+      "description": "Update an existing Clockify project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify workspace ID."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clockify project ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated project name."
+          },
+          "note": {
+            "type": "string",
+            "description": "The updated project note."
+          },
+          "color": {
+            "type": "string",
+            "description": "The updated project color."
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "Whether the updated project should be public."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the updated project should be archived."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the updated project should be billable."
+          },
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated client ID."
+          },
+          "costRate": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The rate amount in the smallest currency unit."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code for the rate."
+              },
+              "since": {
+                "type": "string",
+                "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "amount"
+            ],
+            "description": "A Clockify rate configuration."
+          },
+          "hourlyRate": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The rate amount in the smallest currency unit."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code for the rate."
+              },
+              "since": {
+                "type": "string",
+                "description": "An ISO 8601 date-time string with an explicit UTC offset.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "amount"
+            ],
+            "description": "A Clockify rate configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId"
+        ],
+        "description": "The input payload for updating a Clockify project.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "note"
+            ]
+          },
+          {
+            "required": [
+              "color"
+            ]
+          },
+          {
+            "required": [
+              "isPublic"
+            ]
+          },
+          {
+            "required": [
+              "archived"
+            ]
+          },
+          {
+            "required": [
+              "billable"
+            ]
+          },
+          {
+            "required": [
+              "clientId"
+            ]
+          },
+          {
+            "required": [
+              "costRate"
+            ]
+          },
+          {
+            "required": [
+              "hourlyRate"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Clockify project object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Clockify project."
+      }
+    }
+  ]
+}

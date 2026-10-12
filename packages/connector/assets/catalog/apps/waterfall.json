@@ -1,0 +1,932 @@
+{
+  "service": "waterfall",
+  "displayName": "Waterfall",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WATERFALL_API_KEY",
+      "description": "Waterfall API key sent in the x-api-key header. API keys are provided in your Waterfall contract.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.waterfall.io",
+  "actions": [
+    {
+      "id": "waterfall.check_job_change",
+      "service": "waterfall",
+      "name": "check_job_change",
+      "description": "Check whether a contact changed jobs using Waterfall job change detection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Previous company domain for the contact."
+          },
+          "company_linkedin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Previous company LinkedIn URL or slug."
+          },
+          "contact_linkedin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact LinkedIn URL or slug."
+          },
+          "professional_email": {
+            "type": "string",
+            "description": "Contact professional email address.",
+            "format": "email"
+          },
+          "personal_email": {
+            "type": "string",
+            "description": "Contact personal email address.",
+            "format": "email"
+          },
+          "contact_full_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full name of the contact."
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A custom metadata string."
+                },
+                {
+                  "type": "number",
+                  "description": "A custom metadata number."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A custom metadata boolean."
+                }
+              ],
+              "description": "A custom metadata value."
+            },
+            "description": "Custom metadata to echo back in Waterfall finder responses."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for checking whether a contact changed jobs.",
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "company_domain",
+              "contact_linkedin"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_domain",
+              "professional_email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_domain",
+              "personal_email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_domain",
+              "contact_full_name"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_linkedin",
+              "contact_linkedin"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_linkedin",
+              "professional_email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "company_linkedin",
+              "personal_email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "professional_email",
+              "contact_full_name"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "professional_email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official job change identifier strategy is required."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Waterfall job status."
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "job_id",
+          "status",
+          "raw"
+        ],
+        "description": "Waterfall job envelope."
+      }
+    },
+    {
+      "id": "waterfall.get_account_usage",
+      "service": "waterfall",
+      "name": "get_account_usage",
+      "description": "Get Waterfall usage metrics for the authenticated API key and full account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "minLength": 7,
+            "maxLength": 7,
+            "description": "Optional month in YYYY-MM format used to scope usage counters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for Waterfall account usage reporting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "key_usage": {
+            "type": "object",
+            "properties": {
+              "prospector_requests": {
+                "type": "integer",
+                "description": "Number of Prospector Launcher jobs submitted."
+              },
+              "prospector_persons": {
+                "type": "integer",
+                "description": "Number of contacts returned by Prospector."
+              },
+              "prospector_persons_phones": {
+                "type": "integer",
+                "description": "Phone numbers returned via Prospector."
+              },
+              "enrichment_contact_requests": {
+                "type": "integer",
+                "description": "Number of Contact Enrichment jobs submitted."
+              },
+              "enrichment_contact_persons": {
+                "type": "integer",
+                "description": "Contacts successfully enriched."
+              },
+              "enrichment_contact_persons_phones": {
+                "type": "integer",
+                "description": "Phone numbers returned via Contact Enrichment."
+              },
+              "enrichment_phone_requests": {
+                "type": "integer",
+                "description": "Number of Phone Enrichment jobs submitted."
+              },
+              "enrichment_phone_phones": {
+                "type": "integer",
+                "description": "Phone numbers successfully returned."
+              },
+              "enrichment_company_requests": {
+                "type": "integer",
+                "description": "Number of Company Enrichment jobs submitted."
+              },
+              "enrichment_company_companies": {
+                "type": "integer",
+                "description": "Companies successfully enriched."
+              },
+              "search_contact_requests": {
+                "type": "integer",
+                "description": "Number of Search Contact jobs submitted."
+              },
+              "search_contact_found": {
+                "type": "integer",
+                "description": "Contacts returned by Search Contact."
+              },
+              "verify_email_requests": {
+                "type": "integer",
+                "description": "Number of Email Verifier calls made."
+              },
+              "verify_email_verified": {
+                "type": "integer",
+                "description": "Emails that returned a definitive verification status."
+              },
+              "balance_remaining_usd": {
+                "type": "number",
+                "description": "Remaining account balance in USD."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Usage counters returned by Waterfall."
+          },
+          "account_usage": {
+            "type": "object",
+            "properties": {
+              "prospector_requests": {
+                "type": "integer",
+                "description": "Number of Prospector Launcher jobs submitted."
+              },
+              "prospector_persons": {
+                "type": "integer",
+                "description": "Number of contacts returned by Prospector."
+              },
+              "prospector_persons_phones": {
+                "type": "integer",
+                "description": "Phone numbers returned via Prospector."
+              },
+              "enrichment_contact_requests": {
+                "type": "integer",
+                "description": "Number of Contact Enrichment jobs submitted."
+              },
+              "enrichment_contact_persons": {
+                "type": "integer",
+                "description": "Contacts successfully enriched."
+              },
+              "enrichment_contact_persons_phones": {
+                "type": "integer",
+                "description": "Phone numbers returned via Contact Enrichment."
+              },
+              "enrichment_phone_requests": {
+                "type": "integer",
+                "description": "Number of Phone Enrichment jobs submitted."
+              },
+              "enrichment_phone_phones": {
+                "type": "integer",
+                "description": "Phone numbers successfully returned."
+              },
+              "enrichment_company_requests": {
+                "type": "integer",
+                "description": "Number of Company Enrichment jobs submitted."
+              },
+              "enrichment_company_companies": {
+                "type": "integer",
+                "description": "Companies successfully enriched."
+              },
+              "search_contact_requests": {
+                "type": "integer",
+                "description": "Number of Search Contact jobs submitted."
+              },
+              "search_contact_found": {
+                "type": "integer",
+                "description": "Contacts returned by Search Contact."
+              },
+              "verify_email_requests": {
+                "type": "integer",
+                "description": "Number of Email Verifier calls made."
+              },
+              "verify_email_verified": {
+                "type": "integer",
+                "description": "Emails that returned a definitive verification status."
+              },
+              "balance_remaining_usd": {
+                "type": "number",
+                "description": "Remaining account balance in USD."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Usage counters returned by Waterfall."
+          },
+          "balance_remaining_usd": {
+            "type": "number",
+            "description": "Remaining account balance in USD."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key_usage",
+          "account_usage",
+          "balance_remaining_usd",
+          "raw"
+        ],
+        "description": "The Waterfall account usage response."
+      }
+    },
+    {
+      "id": "waterfall.get_company_enrichment",
+      "service": "waterfall",
+      "name": "get_company_enrichment",
+      "description": "Retrieve Waterfall company enrichment job state and output by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID returned by a launcher action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "job_id"
+        ],
+        "description": "The input payload for retrieving a Waterfall job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Waterfall job status."
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "job_id",
+          "status",
+          "raw"
+        ],
+        "description": "Waterfall job envelope."
+      }
+    },
+    {
+      "id": "waterfall.get_contact_enrichment",
+      "service": "waterfall",
+      "name": "get_contact_enrichment",
+      "description": "Retrieve Waterfall contact enrichment job state and output by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID returned by a launcher action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "job_id"
+        ],
+        "description": "The input payload for retrieving a Waterfall job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Waterfall job status."
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "job_id",
+          "status",
+          "raw"
+        ],
+        "description": "Waterfall job envelope."
+      }
+    },
+    {
+      "id": "waterfall.launch_company_enrichment",
+      "service": "waterfall",
+      "name": "launch_company_enrichment",
+      "description": "Launch a Waterfall company enrichment job and return the job envelope.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain or full URL to enrich."
+          },
+          "linkedin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company LinkedIn URL or slug to enrich."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company name to enrich when domain or LinkedIn is not available."
+          },
+          "webhook_url": {
+            "type": "string",
+            "description": "Webhook URL that Waterfall should call when the job completes.",
+            "format": "uri"
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A custom metadata string."
+                },
+                {
+                  "type": "number",
+                  "description": "A custom metadata number."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A custom metadata boolean."
+                }
+              ],
+              "description": "A custom metadata value."
+            },
+            "description": "Custom metadata to echo back in Waterfall finder responses."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for launching Waterfall company enrichment.",
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "domain"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official company enrichment identifier is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "linkedin"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official company enrichment identifier is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official company enrichment identifier is required."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Waterfall job status."
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "job_id",
+          "status",
+          "raw"
+        ],
+        "description": "Waterfall job envelope."
+      }
+    },
+    {
+      "id": "waterfall.launch_contact_enrichment",
+      "service": "waterfall",
+      "name": "launch_contact_enrichment",
+      "description": "Launch a Waterfall contact enrichment job and return the job envelope.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Professional or personal email address to enrich.",
+            "format": "email"
+          },
+          "linkedin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "LinkedIn profile URL or slug for the contact."
+          },
+          "full_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full name of the contact."
+          },
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "First name of the contact."
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Last name of the contact."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Company domain used with the contact name."
+          },
+          "include_phones": {
+            "type": "boolean",
+            "description": "Whether Waterfall should also run phone enrichment."
+          },
+          "webhook_url": {
+            "type": "string",
+            "description": "Webhook URL that Waterfall should call when the job completes.",
+            "format": "uri"
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A custom metadata string."
+                },
+                {
+                  "type": "number",
+                  "description": "A custom metadata number."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A custom metadata boolean."
+                }
+              ],
+              "description": "A custom metadata value."
+            },
+            "description": "Custom metadata to echo back in Waterfall finder responses."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for launching Waterfall contact enrichment.",
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "email"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official contact enrichment identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "linkedin"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official contact enrichment identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "full_name",
+              "domain"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official contact enrichment identifier strategy is required."
+          },
+          {
+            "type": "object",
+            "required": [
+              "first_name",
+              "last_name",
+              "domain"
+            ],
+            "additionalProperties": true,
+            "description": "At least one official contact enrichment identifier strategy is required."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Waterfall job ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current Waterfall job status."
+          },
+          "input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "job_id",
+          "status",
+          "raw"
+        ],
+        "description": "Waterfall job envelope."
+      }
+    },
+    {
+      "id": "waterfall.verify_email",
+      "service": "waterfall",
+      "name": "verify_email",
+      "description": "Verify one email address with Waterfall and return deliverability status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for Waterfall email verification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "risky",
+              "invalid",
+              "unknown"
+            ],
+            "description": "The Waterfall email deliverability status."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address that Waterfall verified."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional Waterfall reason for the verification status."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "prospector_requests": {
+                    "type": "integer",
+                    "description": "Number of Prospector Launcher jobs submitted."
+                  },
+                  "prospector_persons": {
+                    "type": "integer",
+                    "description": "Number of contacts returned by Prospector."
+                  },
+                  "prospector_persons_phones": {
+                    "type": "integer",
+                    "description": "Phone numbers returned via Prospector."
+                  },
+                  "enrichment_contact_requests": {
+                    "type": "integer",
+                    "description": "Number of Contact Enrichment jobs submitted."
+                  },
+                  "enrichment_contact_persons": {
+                    "type": "integer",
+                    "description": "Contacts successfully enriched."
+                  },
+                  "enrichment_contact_persons_phones": {
+                    "type": "integer",
+                    "description": "Phone numbers returned via Contact Enrichment."
+                  },
+                  "enrichment_phone_requests": {
+                    "type": "integer",
+                    "description": "Number of Phone Enrichment jobs submitted."
+                  },
+                  "enrichment_phone_phones": {
+                    "type": "integer",
+                    "description": "Phone numbers successfully returned."
+                  },
+                  "enrichment_company_requests": {
+                    "type": "integer",
+                    "description": "Number of Company Enrichment jobs submitted."
+                  },
+                  "enrichment_company_companies": {
+                    "type": "integer",
+                    "description": "Companies successfully enriched."
+                  },
+                  "search_contact_requests": {
+                    "type": "integer",
+                    "description": "Number of Search Contact jobs submitted."
+                  },
+                  "search_contact_found": {
+                    "type": "integer",
+                    "description": "Contacts returned by Search Contact."
+                  },
+                  "verify_email_requests": {
+                    "type": "integer",
+                    "description": "Number of Email Verifier calls made."
+                  },
+                  "verify_email_verified": {
+                    "type": "integer",
+                    "description": "Emails that returned a definitive verification status."
+                  },
+                  "balance_remaining_usd": {
+                    "type": "number",
+                    "description": "Remaining account balance in USD."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Usage counters returned by Waterfall."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Usage counters returned by Waterfall."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Waterfall."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "email",
+          "reason",
+          "usage",
+          "raw"
+        ],
+        "description": "The response returned by Waterfall email verification."
+      }
+    }
+  ]
+}

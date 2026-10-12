@@ -1,0 +1,470 @@
+{
+  "service": "baserow",
+  "displayName": "Baserow",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Database Token",
+      "placeholder": "baserow_database_token",
+      "description": "Baserow database token used with the Authorization Token header. Create it in Workspace settings > Database tokens: https://baserow.io/user-docs/personal-api-tokens.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://baserow.io",
+  "actions": [
+    {
+      "id": "baserow.create_table_row",
+      "service": "baserow",
+      "name": "create_table_row",
+      "description": "Create one row in a Baserow table.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          },
+          "userFieldNames": {
+            "type": "boolean",
+            "description": "Whether Baserow should use user-facing field names instead of field IDs."
+          },
+          "row": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Baserow row payload keyed by field name or field ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "row"
+        ],
+        "description": "Input payload for creating one Baserow row."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Baserow row ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Baserow row returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baserow row creation response."
+      },
+      "followUpActions": [
+        "baserow.get_table_row"
+      ]
+    },
+    {
+      "id": "baserow.delete_table_row",
+      "service": "baserow",
+      "name": "delete_table_row",
+      "description": "Delete one Baserow row by row ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          },
+          "rowId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow row ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for deleting one Baserow row."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the row deletion request succeeded."
+          },
+          "rowId": {
+            "type": "integer",
+            "description": "The Baserow row ID that was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baserow row deletion acknowledgement."
+      }
+    },
+    {
+      "id": "baserow.get_table_row",
+      "service": "baserow",
+      "name": "get_table_row",
+      "description": "Read one Baserow row by table ID and row ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          },
+          "rowId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow row ID."
+          },
+          "userFieldNames": {
+            "type": "boolean",
+            "description": "Whether Baserow should use user-facing field names instead of field IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "rowId"
+        ],
+        "description": "Input payload for reading one Baserow row."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Baserow row ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Baserow row returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single Baserow row response."
+      },
+      "followUpActions": [
+        "baserow.update_table_row",
+        "baserow.delete_table_row"
+      ]
+    },
+    {
+      "id": "baserow.list_table_fields",
+      "service": "baserow",
+      "name": "list_table_fields",
+      "description": "List the field definitions for one Baserow table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing Baserow fields for one table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Baserow field ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Baserow field name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Baserow field type."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The field order inside the table."
+                },
+                "primary": {
+                  "type": "boolean",
+                  "description": "Whether the field is the table primary field."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baserow field definition."
+            },
+            "description": "Field definitions returned by Baserow."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baserow field list response."
+      },
+      "followUpActions": [
+        "baserow.list_table_rows"
+      ]
+    },
+    {
+      "id": "baserow.list_table_rows",
+      "service": "baserow",
+      "name": "list_table_rows",
+      "description": "List rows from one Baserow table with optional search, ordering, filters, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          },
+          "userFieldNames": {
+            "type": "boolean",
+            "description": "Whether Baserow should use user-facing field names instead of field IDs."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Free-text search string applied by Baserow when listing rows."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Baserow sort expression, using '-' for descending fields."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Baserow field filters keyed by field name or field ID."
+          },
+          "filterType": {
+            "type": "string",
+            "enum": [
+              "AND",
+              "OR"
+            ],
+            "description": "How multiple Baserow filters should be combined."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to fetch from the paginated Baserow rows endpoint."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of rows to request per page, from 1 to 200."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId"
+        ],
+        "description": "Input payload for listing paginated Baserow rows from one table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Total number of rows that match the current query."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next rows page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next rows page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous rows page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous rows page."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Baserow row ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baserow row returned by the API."
+            },
+            "description": "Rows returned by the current Baserow page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Baserow row list."
+      },
+      "followUpActions": [
+        "baserow.get_table_row",
+        "baserow.update_table_row"
+      ]
+    },
+    {
+      "id": "baserow.list_tables",
+      "service": "baserow",
+      "name": "list_tables",
+      "description": "List the Baserow tables accessible to the authenticated database token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input payload for listing accessible Baserow tables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Baserow table ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Baserow table name."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The table order inside the database."
+                },
+                "database_id": {
+                  "type": "integer",
+                  "description": "The database ID that owns the table."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Baserow table summary."
+            },
+            "description": "Baserow tables accessible to the token."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Accessible Baserow tables."
+      },
+      "followUpActions": [
+        "baserow.list_table_fields",
+        "baserow.list_table_rows"
+      ]
+    },
+    {
+      "id": "baserow.update_table_row",
+      "service": "baserow",
+      "name": "update_table_row",
+      "description": "Update one existing Baserow row.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow table ID."
+          },
+          "rowId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Baserow row ID."
+          },
+          "userFieldNames": {
+            "type": "boolean",
+            "description": "Whether Baserow should use user-facing field names instead of field IDs."
+          },
+          "row": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Baserow row payload keyed by field name or field ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "rowId",
+          "row"
+        ],
+        "description": "Input payload for updating one Baserow row."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Baserow row ID."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Baserow row returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Baserow row update response."
+      },
+      "followUpActions": [
+        "baserow.get_table_row"
+      ]
+    }
+  ]
+}

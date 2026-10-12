@@ -1,0 +1,540 @@
+{
+  "service": "zlibrary",
+  "displayName": "Z-Library",
+  "categories": [
+    "Books",
+    "Reference"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "email",
+          "label": "Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@example.com",
+          "description": "The Z-Library account email used to log in to the EAPI. Login happens lazily, on the first action that needs it."
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "••••••••••••",
+          "description": "The Z-Library account password. Stored as a secret and sent only to the selected EAPI domain."
+        },
+        {
+          "key": "eapiDomain",
+          "label": "EAPI Domain (optional)",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "z-library.ec",
+          "description": "Pin a specific EAPI domain instead of probing the built-in fallback list. Useful when the default domains are behind the DiamWall anti-bot wall."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://z-lib.org",
+  "actions": [
+    {
+      "id": "zlibrary.download_book_to_file",
+      "service": "zlibrary",
+      "name": "download_book_to_file",
+      "description": "Download one book file from Z-Library and upload it to connector transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Z-Library book identifier."
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The book hash used to build the metadata URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "hash"
+        ],
+        "description": "Identify one book on Z-Library."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The file name, sanitized to a safe basename."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The file MIME type."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the file."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "mimetype",
+              "downloadUrl"
+            ],
+            "description": "The downloadable book file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The downloaded book file, uploaded to connector transit storage."
+      }
+    },
+    {
+      "id": "zlibrary.get_book_metadata",
+      "service": "zlibrary",
+      "name": "get_book_metadata",
+      "description": "Retrieve the full metadata record for one Z-Library book by id and hash.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Z-Library book identifier."
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The book hash used to build the metadata URL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "hash"
+        ],
+        "description": "Identify one book on Z-Library."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "book": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Z-Library book identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The book title."
+              },
+              "author": {
+                "type": "string",
+                "description": "The primary author name."
+              },
+              "year": {
+                "type": "string",
+                "description": "The publication year as reported by Z-Library."
+              },
+              "language": {
+                "type": "string",
+                "description": "The book language code."
+              },
+              "extension": {
+                "type": "string",
+                "description": "The file extension, e.g. pdf, epub, mobi."
+              },
+              "size": {
+                "type": "string",
+                "description": "The file size as reported by Z-Library."
+              },
+              "rating": {
+                "type": "string",
+                "description": "The user rating value."
+              },
+              "quality": {
+                "type": "string",
+                "description": "The quality score reported by Z-Library."
+              },
+              "hash": {
+                "type": "string",
+                "description": "The book hash used to build download and metadata URLs."
+              },
+              "pages": {
+                "type": "string",
+                "description": "The page count."
+              },
+              "isbn": {
+                "type": "string",
+                "description": "The ISBN when available."
+              },
+              "publisher": {
+                "type": "string",
+                "description": "The publisher when available."
+              },
+              "url": {
+                "type": "string",
+                "description": "The Z-Library book page URL."
+              },
+              "cover": {
+                "type": "string",
+                "description": "The cover image URL."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "author",
+              "hash"
+            ],
+            "description": "One book record returned by the Z-Library EAPI, normalized to stable field names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "book"
+        ],
+        "description": "The book record returned by Z-Library."
+      }
+    },
+    {
+      "id": "zlibrary.get_download_limits",
+      "service": "zlibrary",
+      "name": "get_download_limits",
+      "description": "Retrieve the daily download quota for the authenticated Z-Library account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving download limits."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "limits": {
+            "type": "object",
+            "properties": {
+              "daily_amount": {
+                "type": "integer",
+                "description": "Downloads already used today."
+              },
+              "daily_allowed": {
+                "type": "integer",
+                "description": "Total downloads allowed per day."
+              },
+              "daily_remaining": {
+                "type": "integer",
+                "description": "Downloads remaining today."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "daily_amount",
+              "daily_allowed",
+              "daily_remaining"
+            ],
+            "description": "Daily download limits reported by the EAPI profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "limits"
+        ],
+        "description": "The daily download quota for the authenticated Z-Library account."
+      }
+    },
+    {
+      "id": "zlibrary.get_recent_books",
+      "service": "zlibrary",
+      "name": "get_recent_books",
+      "description": "List the most recently added books on Z-Library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing recent books."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "books": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Z-Library book identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The book title."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The primary author name."
+                },
+                "year": {
+                  "type": "string",
+                  "description": "The publication year as reported by Z-Library."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The book language code."
+                },
+                "extension": {
+                  "type": "string",
+                  "description": "The file extension, e.g. pdf, epub, mobi."
+                },
+                "size": {
+                  "type": "string",
+                  "description": "The file size as reported by Z-Library."
+                },
+                "rating": {
+                  "type": "string",
+                  "description": "The user rating value."
+                },
+                "quality": {
+                  "type": "string",
+                  "description": "The quality score reported by Z-Library."
+                },
+                "hash": {
+                  "type": "string",
+                  "description": "The book hash used to build download and metadata URLs."
+                },
+                "pages": {
+                  "type": "string",
+                  "description": "The page count."
+                },
+                "isbn": {
+                  "type": "string",
+                  "description": "The ISBN when available."
+                },
+                "publisher": {
+                  "type": "string",
+                  "description": "The publisher when available."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Z-Library book page URL."
+                },
+                "cover": {
+                  "type": "string",
+                  "description": "The cover image URL."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "author",
+                "hash"
+              ],
+              "description": "One book record returned by the Z-Library EAPI, normalized to stable field names."
+            },
+            "description": "The recent books."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "books"
+        ],
+        "description": "The recent books returned by Z-Library."
+      }
+    },
+    {
+      "id": "zlibrary.search_books",
+      "service": "zlibrary",
+      "name": "search_books",
+      "description": "Search books on Z-Library by keyword with optional year, language, format, and sort filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query, e.g. a title or author name."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number, starting at 1."
+          },
+          "yearFrom": {
+            "type": "integer",
+            "description": "Only books published in this year or later."
+          },
+          "yearTo": {
+            "type": "integer",
+            "description": "Only books published in this year or earlier."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One language code, e.g. english."
+            },
+            "description": "Only books in these languages."
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One file extension, e.g. pdf."
+            },
+            "description": "Only books in these file formats."
+          },
+          "exact": {
+            "type": "boolean",
+            "description": "Require exact phrase matching for the query."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "popular",
+              "date_created",
+              "date_updated"
+            ],
+            "description": "Sort order for the results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "The input payload for searching books on Z-Library."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "books": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Z-Library book identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The book title."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The primary author name."
+                },
+                "year": {
+                  "type": "string",
+                  "description": "The publication year as reported by Z-Library."
+                },
+                "language": {
+                  "type": "string",
+                  "description": "The book language code."
+                },
+                "extension": {
+                  "type": "string",
+                  "description": "The file extension, e.g. pdf, epub, mobi."
+                },
+                "size": {
+                  "type": "string",
+                  "description": "The file size as reported by Z-Library."
+                },
+                "rating": {
+                  "type": "string",
+                  "description": "The user rating value."
+                },
+                "quality": {
+                  "type": "string",
+                  "description": "The quality score reported by Z-Library."
+                },
+                "hash": {
+                  "type": "string",
+                  "description": "The book hash used to build download and metadata URLs."
+                },
+                "pages": {
+                  "type": "string",
+                  "description": "The page count."
+                },
+                "isbn": {
+                  "type": "string",
+                  "description": "The ISBN when available."
+                },
+                "publisher": {
+                  "type": "string",
+                  "description": "The publisher when available."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Z-Library book page URL."
+                },
+                "cover": {
+                  "type": "string",
+                  "description": "The cover image URL."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "author",
+                "hash"
+              ],
+              "description": "One book record returned by the Z-Library EAPI, normalized to stable field names."
+            },
+            "description": "The matching books."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching books reported by Z-Library."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "books",
+          "total"
+        ],
+        "description": "The book search results returned by Z-Library."
+      }
+    }
+  ]
+}

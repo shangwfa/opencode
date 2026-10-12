@@ -1,0 +1,660 @@
+{
+  "service": "mojo_helpdesk",
+  "displayName": "Mojo Helpdesk",
+  "description": "Manage Mojo Helpdesk tickets, users, queues, and related records.",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "mojo_helpdesk_api_key",
+      "description": "Mojo Helpdesk agent API key sent in the X-API-KEY header. Generate or copy it under My profile > Dev settings > API keys: https://help.mojohelpdesk.com/help/article/115455."
+    }
+  ],
+  "homepageUrl": "https://www.mojohelpdesk.com/",
+  "actions": [
+    {
+      "id": "mojo_helpdesk.create_comment",
+      "service": "mojo_helpdesk",
+      "name": "create_comment",
+      "description": "Add a public comment to a Mojo Helpdesk ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Mojo Helpdesk ticket ID."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The comment body."
+          },
+          "timeSpent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The time spent on the comment in minutes."
+          },
+          "cc": {
+            "type": "string",
+            "description": "A comma-separated list of email addresses copied on the comment."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The account user ID to attribute the comment to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId",
+          "body"
+        ],
+        "description": "Fields for creating a Mojo Helpdesk ticket comment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Mojo Helpdesk ticket comment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk comment response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.create_ticket",
+      "service": "mojo_helpdesk",
+      "name": "create_ticket",
+      "description": "Create a Mojo Helpdesk ticket without file attachments.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket title."
+          },
+          "description": {
+            "type": "string",
+            "description": "The ticket description or body."
+          },
+          "ticketQueueId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket queue."
+          },
+          "priorityId": {
+            "type": "integer",
+            "enum": [
+              10,
+              20,
+              30,
+              40
+            ],
+            "description": "The ticket priority ID: 10 emergency, 20 urgent, 30 normal, or 40 low."
+          },
+          "statusId": {
+            "type": "integer",
+            "enum": [
+              10,
+              20,
+              30,
+              40,
+              50,
+              60
+            ],
+            "description": "The ticket status ID: 10 new, 20 in progress, 30 on hold, 40 information requested, 50 solved, or 60 closed."
+          },
+          "ticketTypeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket type."
+          },
+          "assignedToId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the assigned user."
+          },
+          "ticketFormId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket form."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who created the ticket."
+          },
+          "userEmail": {
+            "type": "string",
+            "description": "The email address of a new ticket requester.",
+            "format": "email"
+          },
+          "cc": {
+            "type": "string",
+            "description": "A comma-separated list of email addresses copied on ticket notifications."
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "The asset tag associated with the ticket."
+          },
+          "assetId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the asset associated with the ticket."
+          },
+          "dueOn": {
+            "type": "string",
+            "description": "The ticket due date and time.",
+            "format": "date-time"
+          },
+          "scheduledOn": {
+            "type": "string",
+            "description": "The ticket scheduled date and time.",
+            "format": "date-time"
+          },
+          "resolutionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket resolution."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom field value."
+            },
+            "description": "Custom field values keyed by their system key without the custom_field_ prefix."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "ticketQueueId"
+        ],
+        "description": "Fields for creating a Mojo Helpdesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Mojo Helpdesk ticket, including provider-defined related data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.get_ticket",
+      "service": "mojo_helpdesk",
+      "name": "get_ticket",
+      "description": "Get one Mojo Helpdesk ticket and its related data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Mojo Helpdesk ticket ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for getting a Mojo Helpdesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Mojo Helpdesk ticket, including provider-defined related data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.list_comments",
+      "service": "mojo_helpdesk",
+      "name": "list_comments",
+      "description": "List public comments on a Mojo Helpdesk ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Mojo Helpdesk ticket ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Parameters for listing comments on a Mojo Helpdesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Mojo Helpdesk ticket comment."
+            },
+            "description": "The returned ticket comments."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk comment list response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.list_tags",
+      "service": "mojo_helpdesk",
+      "name": "list_tags",
+      "description": "List Mojo Helpdesk ticket tags with optional sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sortBy": {
+            "type": "string",
+            "description": "The tag column used to sort results."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing Mojo Helpdesk ticket tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Mojo Helpdesk ticket tag."
+            },
+            "description": "The returned ticket tags."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk tag list response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.list_ticket_queues",
+      "service": "mojo_helpdesk",
+      "name": "list_ticket_queues",
+      "description": "List Mojo Helpdesk ticket queues available to the connected agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing Mojo Helpdesk ticket queues."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketQueues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Mojo Helpdesk ticket queue."
+            },
+            "description": "The returned ticket queues."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket queue list response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.list_tickets",
+      "service": "mojo_helpdesk",
+      "name": "list_tickets",
+      "description": "List Mojo Helpdesk tickets with pagination and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "id",
+              "title",
+              "description",
+              "user_id",
+              "assigned_to_id",
+              "status_id",
+              "ticket_form_id",
+              "priority_id",
+              "ticket_queue_id",
+              "company_id",
+              "rating",
+              "rated_on",
+              "created_on",
+              "updated_on",
+              "status_changed_on",
+              "solved_on",
+              "assigned_on",
+              "ticket_type_id",
+              "due_on",
+              "scheduled_on"
+            ],
+            "description": "The ticket field used to sort the results."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing Mojo Helpdesk tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Mojo Helpdesk ticket, including provider-defined related data."
+            },
+            "description": "The returned tickets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket list response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.search_tickets",
+      "service": "mojo_helpdesk",
+      "name": "search_tickets",
+      "description": "Search Mojo Helpdesk tickets with the advanced-search query syntax.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The advanced-search query; omit it to return all tickets."
+          },
+          "sortField": {
+            "type": "string",
+            "enum": [
+              "created_on",
+              "due_on",
+              "rated_on",
+              "scheduled_on",
+              "solved_on",
+              "updated_on"
+            ],
+            "description": "The date field used to sort search results."
+          },
+          "reverse": {
+            "type": "boolean",
+            "description": "Whether to sort in descending order."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 10,
+            "description": "The number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for searching Mojo Helpdesk tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Mojo Helpdesk ticket, including provider-defined related data."
+            },
+            "description": "The returned tickets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket list response."
+      }
+    },
+    {
+      "id": "mojo_helpdesk.update_ticket",
+      "service": "mojo_helpdesk",
+      "name": "update_ticket",
+      "description": "Partially update a Mojo Helpdesk ticket without replacing omitted fields.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Mojo Helpdesk ticket ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket title."
+          },
+          "description": {
+            "type": "string",
+            "description": "The ticket description or body."
+          },
+          "ticketQueueId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket queue."
+          },
+          "priorityId": {
+            "type": "integer",
+            "enum": [
+              10,
+              20,
+              30,
+              40
+            ],
+            "description": "The ticket priority ID: 10 emergency, 20 urgent, 30 normal, or 40 low."
+          },
+          "statusId": {
+            "type": "integer",
+            "enum": [
+              10,
+              20,
+              30,
+              40,
+              50,
+              60
+            ],
+            "description": "The ticket status ID: 10 new, 20 in progress, 30 on hold, 40 information requested, 50 solved, or 60 closed."
+          },
+          "ticketTypeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket type."
+          },
+          "assignedToId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the assigned user."
+          },
+          "ticketFormId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket form."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the user who created the ticket."
+          },
+          "userEmail": {
+            "type": "string",
+            "description": "The email address of a new ticket requester.",
+            "format": "email"
+          },
+          "cc": {
+            "type": "string",
+            "description": "A comma-separated list of email addresses copied on ticket notifications."
+          },
+          "assetTag": {
+            "type": "string",
+            "description": "The asset tag associated with the ticket."
+          },
+          "assetId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the asset associated with the ticket."
+          },
+          "dueOn": {
+            "type": "string",
+            "description": "The ticket due date and time.",
+            "format": "date-time"
+          },
+          "scheduledOn": {
+            "type": "string",
+            "description": "The ticket scheduled date and time.",
+            "format": "date-time"
+          },
+          "resolutionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ID of the ticket resolution."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom field value."
+            },
+            "description": "Custom field values keyed by their system key without the custom_field_ prefix."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Fields for partially updating a Mojo Helpdesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Mojo Helpdesk ticket, including provider-defined related data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mojo Helpdesk ticket response."
+      }
+    }
+  ]
+}

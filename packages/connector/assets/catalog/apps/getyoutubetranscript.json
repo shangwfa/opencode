@@ -1,0 +1,415 @@
+{
+  "service": "getyoutubetranscript",
+  "displayName": "GetYouTubeTranscript",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GETYOUTUBETRANSCRIPT_API_KEY",
+      "description": "GetYouTubeTranscript API key sent as a Bearer token. Create a key in your dashboard: https://getyoutubetranscript.com/dashboard"
+    }
+  ],
+  "homepageUrl": "https://getyoutubetranscript.com/",
+  "actions": [
+    {
+      "id": "getyoutubetranscript.get_credits",
+      "service": "getyoutubetranscript",
+      "name": "get_credits",
+      "description": "Check the remaining GetYouTubeTranscript credits, plan, and rate limit. Free.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for checking credits."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan_credits_left": {
+            "type": "number",
+            "description": "Credits left in the current plan period."
+          },
+          "topup_credits_left": {
+            "type": "number",
+            "description": "Credits left from one-time top-ups."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The plan name."
+          },
+          "rate_limit_per_minute": {
+            "type": "number",
+            "description": "Requests allowed per minute."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "plan_credits_left"
+        ],
+        "description": "The credit balance for the API key."
+      }
+    },
+    {
+      "id": "getyoutubetranscript.get_youtube_playlist",
+      "service": "getyoutubetranscript",
+      "name": "get_youtube_playlist",
+      "description": "List the videos in a YouTube playlist, one page at a time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Playlist URL or playlist ID (PL...).",
+            "pattern": "\\S"
+          },
+          "continuation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuationToken from a previous response, to fetch the next page.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing playlist videos. Give list for the first page or continuation for later pages.",
+        "oneOf": [
+          {
+            "required": [
+              "list"
+            ]
+          },
+          {
+            "required": [
+              "continuation"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "playlist_id": {
+            "type": "string",
+            "description": "The playlist ID."
+          },
+          "title": {
+            "type": "string",
+            "description": "The playlist title."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One video."
+            },
+            "description": "The playlist's videos on this page."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more pages exist."
+          },
+          "continuation_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One page of playlist videos."
+      }
+    },
+    {
+      "id": "getyoutubetranscript.get_youtube_transcript",
+      "service": "getyoutubetranscript",
+      "name": "get_youtube_transcript",
+      "description": "Get the transcript of a YouTube video by URL or ID, with title and channel. Set timestamps to also get per-line timing.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "video": {
+            "type": "string",
+            "minLength": 1,
+            "description": "YouTube video URL (watch, youtu.be, Shorts or live) or the 11-character video ID.",
+            "pattern": "\\S"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Caption language code, for example en or es.",
+            "pattern": "\\S"
+          },
+          "timestamps": {
+            "type": "boolean",
+            "description": "Whether to also return one segment per caption line with start and duration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "video"
+        ],
+        "description": "The input payload for getting a YouTube transcript."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "description": "The 11-character YouTube video ID."
+          },
+          "language_code": {
+            "type": "string",
+            "description": "Language code of the returned captions."
+          },
+          "title": {
+            "type": "string",
+            "description": "Video title."
+          },
+          "author_name": {
+            "type": "string",
+            "description": "Channel name."
+          },
+          "author_url": {
+            "type": "string",
+            "description": "Channel URL."
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "description": "Video thumbnail URL."
+          },
+          "transcript": {
+            "type": "string",
+            "description": "The full transcript as plain text."
+          },
+          "word_count": {
+            "type": "number",
+            "description": "Number of words in the transcript."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "number",
+                  "description": "Start time in seconds."
+                },
+                "duration": {
+                  "type": "number",
+                  "description": "Duration in seconds."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Caption text."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One caption line."
+            },
+            "description": "One entry per caption line. Present only when timestamps is true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "video_id",
+          "language_code",
+          "title",
+          "author_name",
+          "author_url",
+          "thumbnail_url",
+          "transcript",
+          "word_count"
+        ],
+        "description": "The YouTube transcript and video details."
+      }
+    },
+    {
+      "id": "getyoutubetranscript.list_youtube_channel_videos",
+      "service": "getyoutubetranscript",
+      "name": "list_youtube_channel_videos",
+      "description": "List a YouTube channel's videos, newest first, one page at a time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Channel @handle, channel URL, or channel ID (UC...).",
+            "pattern": "\\S"
+          },
+          "continuation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuationToken from a previous response, to fetch the next page.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing channel videos. Give channel for the first page or continuation for later pages.",
+        "oneOf": [
+          {
+            "required": [
+              "channel"
+            ]
+          },
+          {
+            "required": [
+              "continuation"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One video."
+            },
+            "description": "The channel's videos on this page."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more pages exist."
+          },
+          "continuation_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One page of channel videos."
+      }
+    },
+    {
+      "id": "getyoutubetranscript.search_youtube",
+      "service": "getyoutubetranscript",
+      "name": "search_youtube",
+      "description": "Search YouTube for videos or channels, one page at a time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube search query.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "video",
+              "channel"
+            ],
+            "description": "The kind of results to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The continuationToken from a previous response, to fetch the next page.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for searching YouTube. Give query for a first page or pageToken for later pages.",
+        "anyOf": [
+          {
+            "required": [
+              "query"
+            ]
+          },
+          {
+            "required": [
+              "pageToken"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          },
+          "video_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One video result."
+            },
+            "description": "Video results when type is video."
+          },
+          "channel_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One channel result."
+            },
+            "description": "Channel results when type is channel."
+          },
+          "continuation_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque token for the next page, or null when there are no more pages. Pass it back unchanged."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The YouTube search results."
+      }
+    }
+  ]
+}

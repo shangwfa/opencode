@@ -1,0 +1,1033 @@
+{
+  "service": "datadog",
+  "displayName": "Datadog",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://app.datadoghq.com/oauth2/v1/authorize",
+      "tokenUrl": "https://api.{site}/oauth2/v1/token",
+      "scopes": [
+        "monitors_read",
+        "timeseries_query",
+        "metrics_read"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationRequestFields": {
+        "scope": false
+      },
+      "clientConfigFields": [
+        {
+          "key": "site",
+          "label": "Site parameter",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "defaultValue": "datadoghq.com",
+          "placeholder": "datadoghq.com",
+          "description": "The Datadog API site parameter, such as datadoghq.com, datadoghq.eu, or us3.datadoghq.com."
+        }
+      ]
+    },
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DATADOG_API_KEY",
+      "description": "Datadog API key used for API requests. Create or view API keys in Organization Settings: https://docs.datadoghq.com/account_management/api-app-keys/",
+      "extraFields": [
+        {
+          "key": "applicationKey",
+          "label": "Application Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "DATADOG_APPLICATION_KEY",
+          "description": "Datadog application key required for read API requests. Create or view application keys in Organization Settings: https://docs.datadoghq.com/account_management/api-app-keys/"
+        },
+        {
+          "key": "site",
+          "label": "Datadog Site",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "us1",
+          "description": "Datadog site for the account. Use one of us1, us3, us5, eu, ap1, ap2, uk1, gov, or gov2."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.datadoghq.com/",
+  "actions": [
+    {
+      "id": "datadog.get_metric_metadata",
+      "service": "datadog",
+      "name": "get_metric_metadata",
+      "description": "Retrieve Datadog metadata for one metric.",
+      "operationType": "read",
+      "requiredScopes": [
+        "metrics_read"
+      ],
+      "providerPermissions": [
+        "metrics_read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metricName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Datadog metric name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metricName"
+        ],
+        "description": "Input for retrieving Datadog metric metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Datadog metric name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Datadog metric name."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Datadog metric type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Datadog metric type."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The metric description when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The metric description when available."
+              },
+              "integration": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The integration that owns the metric when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integration that owns the metric when available."
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The metric unit when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The metric unit when available."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "metric",
+              "type",
+              "description",
+              "integration",
+              "unit"
+            ],
+            "description": "Datadog metric metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metric"
+        ],
+        "description": "Datadog metric metadata response."
+      }
+    },
+    {
+      "id": "datadog.get_monitor",
+      "service": "datadog",
+      "name": "get_monitor",
+      "description": "Retrieve one Datadog monitor by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "monitors_read"
+      ],
+      "providerPermissions": [
+        "monitors_read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "description": "The Datadog monitor ID."
+          },
+          "groupStates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "all",
+                "alert",
+                "warn",
+                "no data",
+                "ok"
+              ],
+              "description": "One Datadog monitor group state."
+            },
+            "description": "Monitor group states to include.",
+            "minItems": 1
+          },
+          "withDowntimes": {
+            "type": "boolean",
+            "description": "Whether to include monitor downtimes in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitorId"
+        ],
+        "description": "Input for retrieving one Datadog monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Datadog monitor ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Datadog monitor ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor name."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor type."
+              },
+              "query": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor query."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor notification message."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor notification message."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Datadog monitor tag."
+                },
+                "description": "The monitor tags returned by Datadog."
+              },
+              "overallState": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The monitor overall_state value returned by Datadog."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor overall_state value returned by Datadog."
+              },
+              "creator": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Datadog API object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw Datadog API object."
+              },
+              "options": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Datadog API object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw Datadog API object."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "type",
+              "query",
+              "message",
+              "tags",
+              "overallState",
+              "creator",
+              "options"
+            ],
+            "description": "A normalized Datadog monitor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitor"
+        ],
+        "description": "Datadog monitor detail response."
+      }
+    },
+    {
+      "id": "datadog.list_metrics",
+      "service": "datadog",
+      "name": "list_metrics",
+      "description": "List Datadog metric names active since a given Unix timestamp.",
+      "operationType": "read",
+      "requiredScopes": [
+        "metrics_read"
+      ],
+      "providerPermissions": [
+        "metrics_read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "Unix timestamp in seconds for the earliest active metric time."
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter metrics by host."
+          },
+          "tagFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter metrics by Datadog tag expression."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from"
+        ],
+        "description": "Input for listing Datadog metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Datadog metric name."
+            },
+            "description": "Metric names returned by Datadog."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Datadog API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metrics",
+          "raw"
+        ],
+        "description": "Datadog metrics list response."
+      }
+    },
+    {
+      "id": "datadog.list_monitors",
+      "service": "datadog",
+      "name": "list_monitors",
+      "description": "List Datadog monitors with optional group state and tag filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "monitors_read"
+      ],
+      "providerPermissions": [
+        "monitors_read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "groupStates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "all",
+                "alert",
+                "warn",
+                "no data",
+                "ok"
+              ],
+              "description": "One Datadog monitor group state."
+            },
+            "description": "Monitor group states to include.",
+            "minItems": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter monitors by name."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Datadog monitor tag."
+            },
+            "description": "Filter monitors by tags.",
+            "minItems": 1
+          },
+          "monitorTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Datadog monitor tag."
+            },
+            "description": "Filter monitors by monitor tags.",
+            "minItems": 1
+          },
+          "withDowntimes": {
+            "type": "boolean",
+            "description": "Whether to include monitor downtimes in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Datadog monitors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Datadog monitor ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Datadog monitor ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor name."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor type."
+                },
+                "query": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor query."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor query."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor notification message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor notification message."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Datadog monitor tag."
+                  },
+                  "description": "The monitor tags returned by Datadog."
+                },
+                "overallState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor overall_state value returned by Datadog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor overall_state value returned by Datadog."
+                },
+                "creator": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw Datadog API object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The raw Datadog API object."
+                },
+                "options": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw Datadog API object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The raw Datadog API object."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type",
+                "query",
+                "message",
+                "tags",
+                "overallState",
+                "creator",
+                "options"
+              ],
+              "description": "A normalized Datadog monitor."
+            },
+            "description": "Monitors returned by Datadog."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw Datadog API object."
+            },
+            "description": "Raw Datadog monitor objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitors",
+          "raw"
+        ],
+        "description": "Datadog monitor list response."
+      }
+    },
+    {
+      "id": "datadog.query_timeseries_points",
+      "service": "datadog",
+      "name": "query_timeseries_points",
+      "description": "Query Datadog timeseries points for a metric expression and time window.",
+      "operationType": "read",
+      "requiredScopes": [
+        "timeseries_query"
+      ],
+      "providerPermissions": [
+        "timeseries_query"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "Unix timestamp in seconds for the query start."
+          },
+          "to": {
+            "type": "integer",
+            "description": "Unix timestamp in seconds for the query end."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datadog metric query expression."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "query"
+        ],
+        "description": "Input for querying Datadog timeseries points."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Datadog query status."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Datadog query status."
+          },
+          "resType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Datadog response type."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Datadog response type."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The metric name for the timeseries."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The metric name for the timeseries."
+                },
+                "scope": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The metric scope returned by Datadog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The metric scope returned by Datadog."
+                },
+                "expression": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The query expression that produced the timeseries."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The query expression that produced the timeseries."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The display name returned by Datadog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The display name returned by Datadog."
+                },
+                "unit": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Datadog API object."
+                  },
+                  "description": "The unit metadata returned by Datadog."
+                },
+                "pointlist": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "A timestamp or value."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A timestamp or value."
+                    },
+                    "description": "One Datadog timestamp-value pair."
+                  },
+                  "description": "The points returned by Datadog as timestamp-value pairs."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "metric",
+                "scope",
+                "expression",
+                "displayName",
+                "unit",
+                "pointlist"
+              ],
+              "description": "A Datadog timeseries returned by the query API."
+            },
+            "description": "Timeseries returned by Datadog."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Datadog API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "resType",
+          "series",
+          "raw"
+        ],
+        "description": "Datadog timeseries query response."
+      }
+    },
+    {
+      "id": "datadog.search_monitors",
+      "service": "datadog",
+      "name": "search_monitors",
+      "description": "Search Datadog monitors by query, page, and sort options.",
+      "operationType": "read",
+      "requiredScopes": [
+        "monitors_read"
+      ],
+      "providerPermissions": [
+        "monitors_read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query for monitors."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Search results page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of monitors per page."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datadog monitor search sort field."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for searching Datadog monitors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Datadog monitor ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Datadog monitor ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor name."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor type."
+                },
+                "query": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor query."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor query."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Datadog monitor tag."
+                  },
+                  "description": "The monitor tags returned by Datadog."
+                },
+                "overallState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The monitor overall_state value returned by Datadog."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The monitor overall_state value returned by Datadog."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type",
+                "query",
+                "tags",
+                "overallState"
+              ],
+              "description": "A Datadog monitor search result."
+            },
+            "description": "Monitor search results returned by Datadog."
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Datadog API object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Datadog API object."
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Datadog API object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Datadog API object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Datadog API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitors",
+          "counts",
+          "metadata",
+          "raw"
+        ],
+        "description": "Datadog monitor search response."
+      }
+    },
+    {
+      "id": "datadog.validate_api_key",
+      "service": "datadog",
+      "name": "validate_api_key",
+      "description": "Validate the configured Datadog API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for validating the configured Datadog API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether Datadog accepted the API key."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Datadog API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "valid",
+          "raw"
+        ],
+        "description": "Datadog API key validation result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,502 @@
+{
+  "service": "winston_ai",
+  "displayName": "Winston AI",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "WINSTON_AI_API_KEY",
+      "description": "Winston AI API key used as a Bearer token in the Authorization header. Create or view API keys in the Winston AI developer dashboard at https://dev.gowinston.ai/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://gowinston.ai",
+  "actions": [
+    {
+      "id": "winston_ai.check_plagiarism",
+      "service": "winston_ai",
+      "name": "check_plagiarism",
+      "description": "Check text, a public document URL, or a public website URL for plagiarism with Winston AI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to scan. Winston AI documents a minimum length for reliable results."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "A publicly accessible PDF, DOC, or DOCX URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "A publicly accessible website URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "language": {
+            "type": "string",
+            "description": "A two-letter language code supported by the endpoint, or auto to let Winston AI detect it."
+          },
+          "excluded_sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A domain or URL to exclude from the plagiarism score."
+            },
+            "description": "Domains or URLs to exclude from the plagiarism score."
+          },
+          "country": {
+            "type": "string",
+            "description": "The country code of the country where the text was written."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for checking content plagiarism with Winston AI. Provide one of text, fileUrl, or websiteUrl."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "number",
+            "description": "The HTTP status code reported by Winston AI."
+          },
+          "scanInformation": {
+            "type": "object",
+            "properties": {
+              "service": {
+                "type": "string",
+                "description": "The Winston AI service name used for the request."
+              },
+              "scanTime": {
+                "type": "string",
+                "description": "The timestamp when the scan was conducted."
+              },
+              "inputType": {
+                "type": "string",
+                "description": "The input type scanned by Winston AI, such as text, file, or website."
+              },
+              "language": {
+                "type": "string",
+                "description": "The language detected for the scanned text."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Basic metadata about a Winston AI plagiarism scan."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number",
+                "description": "The percentage of plagiarized content in the scanned text."
+              },
+              "sourceCounts": {
+                "type": "number",
+                "description": "The number of sources containing matching content."
+              },
+              "textWordCounts": {
+                "type": "number",
+                "description": "The total number of words in the scanned text."
+              },
+              "totalPlagiarismWords": {
+                "type": "number",
+                "description": "The total number of words identified as plagiarized."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Summary scores from a Winston AI plagiarism scan."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A matched source."
+            },
+            "description": "Sources matched during the plagiarism scan."
+          },
+          "attackDetected": {
+            "type": "object",
+            "properties": {
+              "zero_width_space": {
+                "type": "boolean",
+                "description": "Whether zero-width spaces were detected."
+              },
+              "homoglyph_attack": {
+                "type": "boolean",
+                "description": "Whether homoglyph attacks were detected."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Signals for zero-width space or homoglyph attacks detected in scanned text."
+          },
+          "text": {
+            "type": "string",
+            "description": "The input text used for the plagiarism scan."
+          },
+          "similarWords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A similar word match."
+            },
+            "description": "Similar words found in the input text."
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A cited source URL."
+            },
+            "description": "Sources cited in the provided text."
+          },
+          "indexes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startIndex": {
+                  "type": "number",
+                  "description": "The starting index of the plagiarized sequence."
+                },
+                "endIndex": {
+                  "type": "number",
+                  "description": "The ending index of the plagiarized sequence."
+                },
+                "sequence": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The plagiarized text sequence."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The plagiarized text sequence."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A plagiarized text sequence location."
+            },
+            "description": "Plagiarism sequences found in the input text."
+          },
+          "credits_used": {
+            "type": "integer",
+            "description": "The number of Winston AI credits used by the request."
+          },
+          "credits_remaining": {
+            "type": "integer",
+            "description": "The number of Winston AI credits remaining after the request."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Winston AI plagiarism response."
+      }
+    },
+    {
+      "id": "winston_ai.compare_texts",
+      "service": "winston_ai",
+      "name": "compare_texts",
+      "description": "Compare two texts and return similarity signals from Winston AI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "first_text": {
+            "type": "string",
+            "maxLength": 120000,
+            "description": "The first text to compare."
+          },
+          "second_text": {
+            "type": "string",
+            "maxLength": 120000,
+            "description": "The second text to compare against the first text."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "first_text",
+          "second_text"
+        ],
+        "description": "Input for comparing two texts with Winston AI."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code reported by Winston AI."
+          },
+          "similarity_score": {
+            "type": "number",
+            "description": "Overall similarity score from 0 to 100 between the two texts."
+          },
+          "first_text": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Similarity details for the first compared text."
+          },
+          "second_text": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Similarity details for the second compared text."
+          },
+          "credits_used": {
+            "type": "integer",
+            "description": "The number of Winston AI credits used by the request."
+          },
+          "credits_remaining": {
+            "type": "integer",
+            "description": "The number of Winston AI credits remaining after the request."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Winston AI text comparison response."
+      }
+    },
+    {
+      "id": "winston_ai.detect_ai_text",
+      "service": "winston_ai",
+      "name": "detect_ai_text",
+      "description": "Detect whether text, a public document URL, or a public website URL was likely generated by AI with Winston AI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to scan. Winston AI documents a minimum length for reliable results."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "A publicly accessible PDF, DOC, or DOCX URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "A publicly accessible website URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "language": {
+            "type": "string",
+            "description": "A two-letter language code supported by the endpoint, or auto to let Winston AI detect it."
+          },
+          "version": {
+            "type": "string",
+            "description": "The Winston AI model version to use, such as 4.14 or latest."
+          },
+          "sentences": {
+            "type": "boolean",
+            "description": "Whether Winston AI should include sentence-level scores."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for detecting whether content was likely generated by AI with Winston AI. Provide one of text, fileUrl, or websiteUrl."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code reported by Winston AI."
+          },
+          "score": {
+            "type": "integer",
+            "description": "Human score from 0 to 100. Lower values indicate AI-like text and higher values indicate human-like text."
+          },
+          "sentences": {
+            "description": "Sentence-level score details returned by Winston AI."
+          },
+          "input": {
+            "type": "string",
+            "description": "The input type scanned by Winston AI, such as text, file, or website."
+          },
+          "attack_detected": {
+            "type": "object",
+            "properties": {
+              "zero_width_space": {
+                "type": "boolean",
+                "description": "Whether zero-width spaces were detected."
+              },
+              "homoglyph_attack": {
+                "type": "boolean",
+                "description": "Whether homoglyph attacks were detected."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Signals for zero-width space or homoglyph attacks detected in scanned text."
+          },
+          "readability_score": {
+            "type": "integer",
+            "description": "Readability score from 0 to 100."
+          },
+          "credits_used": {
+            "type": "integer",
+            "description": "The number of Winston AI credits used by the request."
+          },
+          "credits_remaining": {
+            "type": "integer",
+            "description": "The number of Winston AI credits remaining after the request."
+          },
+          "version": {
+            "type": "string",
+            "description": "The Winston AI model version used for the prediction."
+          },
+          "language": {
+            "type": "string",
+            "description": "The detected or specified language code."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Winston AI AI text detection response."
+      }
+    },
+    {
+      "id": "winston_ai.fact_check",
+      "service": "winston_ai",
+      "name": "fact_check",
+      "description": "Verify claims in text, a public document URL, or a public website URL with Winston AI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The text to scan. Winston AI documents a minimum length for reliable results."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "A publicly accessible PDF, DOC, or DOCX URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "websiteUrl": {
+            "type": "string",
+            "description": "A publicly accessible website URL for Winston AI to scan.",
+            "format": "uri"
+          },
+          "language": {
+            "type": "string",
+            "description": "A two-letter language code supported by the endpoint, or auto to let Winston AI detect it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for fact-checking content with Winston AI. Provide one of text, fileUrl, or websiteUrl."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code reported by Winston AI."
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique identifier of the input sentence."
+                },
+                "sentence": {
+                  "type": "string",
+                  "description": "The exact input sentence from which the claim was extracted."
+                },
+                "claim": {
+                  "type": "string",
+                  "description": "The distinct claim checked by Winston AI."
+                },
+                "verdict": {
+                  "type": "string",
+                  "description": "The fact-checking verdict for the claim."
+                },
+                "score": {
+                  "type": "integer",
+                  "description": "The confidence score from 0 to 100 for the verdict."
+                },
+                "explanation": {
+                  "type": "string",
+                  "description": "The explanation for the verdict."
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A supporting reference."
+                  },
+                  "description": "Sources supporting the claim result."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A fact-check result for a claim in the input text."
+            },
+            "description": "Claims detected in the text with fact-checking results."
+          },
+          "score": {
+            "type": "integer",
+            "description": "Overall confidence score from 0 to 100 that the provided text is accurate."
+          },
+          "claimsCount": {
+            "type": "integer",
+            "description": "The number of claims extracted from the text."
+          },
+          "text": {
+            "type": "string",
+            "description": "The full original text that was analyzed."
+          },
+          "sentences": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "An extracted sentence."
+            },
+            "description": "Sentences from the analyzed text."
+          },
+          "input": {
+            "type": "string",
+            "description": "The input type scanned by Winston AI, such as text, file, or website."
+          },
+          "language": {
+            "type": "string",
+            "description": "The detected or specified input language."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The number of credits used to process the request."
+          },
+          "creditsRemaining": {
+            "type": "integer",
+            "description": "The number of credits remaining for the account."
+          },
+          "wordCount": {
+            "type": "integer",
+            "description": "The word count of the input text."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Winston AI fact-check response."
+      }
+    }
+  ]
+}

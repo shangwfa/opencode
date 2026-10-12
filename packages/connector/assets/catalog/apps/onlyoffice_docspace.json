@@ -1,0 +1,424 @@
+{
+  "service": "onlyoffice_docspace",
+  "displayName": "ONLYOFFICE DocSpace",
+  "categories": [
+    "Productivity",
+    "Storage"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ONLYOFFICE_API_KEY",
+      "description": "Create an API key in DocSpace under Settings > Developer Tools > API keys.",
+      "extraFields": [
+        {
+          "key": "portalUrl",
+          "label": "Portal URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://yourportal.onlyoffice.com",
+          "description": "The HTTPS root URL of your ONLYOFFICE DocSpace portal. Private-network portals require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK in self-hosted deployments."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.onlyoffice.com/docspace.aspx",
+  "actions": [
+    {
+      "id": "onlyoffice_docspace.get_current_user",
+      "service": "onlyoffice_docspace",
+      "name": "get_current_user",
+      "description": "Get the current user associated with the connected ONLYOFFICE DocSpace API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving the current DocSpace user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A resource returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current ONLYOFFICE DocSpace user."
+      }
+    },
+    {
+      "id": "onlyoffice_docspace.get_folder_contents",
+      "service": "onlyoffice_docspace",
+      "name": "get_folder_contents",
+      "description": "List file and subfolder metadata in an ONLYOFFICE DocSpace folder or room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric folder or room ID to inspect."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of entries to return."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based index from which to start returning entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folderId"
+        ],
+        "description": "The folder lookup and pagination filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A resource returned by ONLYOFFICE DocSpace."
+            },
+            "description": "File metadata returned for the folder."
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A resource returned by ONLYOFFICE DocSpace."
+            },
+            "description": "Subfolder metadata returned for the folder."
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A resource returned by ONLYOFFICE DocSpace."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A resource returned by ONLYOFFICE DocSpace."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of resources in this response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of resources in this response."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of matching resources when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of matching resources when reported."
+              },
+              "startIndex": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Start index used for this response when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Start index used for this response when reported."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ONLYOFFICE DocSpace folder contents."
+      }
+    },
+    {
+      "id": "onlyoffice_docspace.get_room",
+      "service": "onlyoffice_docspace",
+      "name": "get_room",
+      "description": "Get information about one ONLYOFFICE DocSpace room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric room ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ONLYOFFICE DocSpace room lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A resource returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested ONLYOFFICE DocSpace room."
+      },
+      "followUpActions": [
+        "onlyoffice_docspace.get_folder_contents"
+      ]
+    },
+    {
+      "id": "onlyoffice_docspace.get_user",
+      "service": "onlyoffice_docspace",
+      "name": "get_user",
+      "description": "Get one ONLYOFFICE DocSpace user by user ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ONLYOFFICE DocSpace user lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A resource returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested ONLYOFFICE DocSpace user."
+      }
+    },
+    {
+      "id": "onlyoffice_docspace.list_rooms",
+      "service": "onlyoffice_docspace",
+      "name": "list_rooms",
+      "description": "List rooms available to the connected ONLYOFFICE DocSpace API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of resources to return."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based index from which to start returning resources."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text used to filter matching resources."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and search filters for an ONLYOFFICE DocSpace list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A resource returned by ONLYOFFICE DocSpace."
+            },
+            "description": "Rooms returned by ONLYOFFICE DocSpace."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of resources in this response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of resources in this response."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of matching resources when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of matching resources when reported."
+              },
+              "startIndex": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Start index used for this response when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Start index used for this response when reported."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ONLYOFFICE DocSpace room list."
+      },
+      "followUpActions": [
+        "onlyoffice_docspace.get_room"
+      ]
+    },
+    {
+      "id": "onlyoffice_docspace.list_users",
+      "service": "onlyoffice_docspace",
+      "name": "list_users",
+      "description": "List users in the connected ONLYOFFICE DocSpace portal.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing ONLYOFFICE DocSpace users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A resource returned by ONLYOFFICE DocSpace."
+            },
+            "description": "Users returned by ONLYOFFICE DocSpace."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of resources in this response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of resources in this response."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of matching resources when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of matching resources when reported."
+              },
+              "startIndex": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Start index used for this response when reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Start index used for this response when reported."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by ONLYOFFICE DocSpace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ONLYOFFICE DocSpace user list."
+      },
+      "followUpActions": [
+        "onlyoffice_docspace.get_user"
+      ]
+    }
+  ]
+}

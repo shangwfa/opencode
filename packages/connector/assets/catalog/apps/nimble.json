@@ -1,0 +1,378 @@
+{
+  "service": "nimble",
+  "displayName": "Nimble",
+  "description": "List, search, create, and update contacts in Nimble CRM.",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "nimble_api_key",
+      "description": "Nimble API key sent as a Bearer token. Account administrators can generate it in Nimble under Settings > API Token: https://support.nimble.com/en/articles/822159-generate-an-api-key-to-access-the-nimble-api"
+    }
+  ],
+  "homepageUrl": "https://www.nimble.com/",
+  "actions": [
+    {
+      "id": "nimble.create_contact",
+      "service": "nimble",
+      "name": "create_contact",
+      "description": "Create a person or company contact in Nimble using native contact fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "description": "The contact field value accepted by Nimble."
+                  },
+                  "modifier": {
+                    "type": "string",
+                    "description": "The Nimble modifier for the field value, such as work, home, or mobile."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "value"
+                ],
+                "description": "One value for a Nimble contact field."
+              },
+              "description": "The values assigned to one Nimble contact field.",
+              "minItems": 1
+            },
+            "description": "Contact fields keyed by their Nimble field names, such as first name, last name, email, or company name.",
+            "minProperties": 1
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Nimble user ID that should own the contact, or null to leave it unassigned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Nimble user ID that should own the contact, or null to leave it unassigned."
+          },
+          "avatarUrl": {
+            "type": "string",
+            "description": "The avatar URL stored on the contact.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fields"
+        ],
+        "description": "The Nimble contact to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique Nimble contact ID."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The contact fields keyed by their Nimble field names."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A contact resource returned by Nimble."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The contact created by Nimble."
+      }
+    },
+    {
+      "id": "nimble.get_contact",
+      "service": "nimble",
+      "name": "get_contact",
+      "description": "Retrieve one Nimble contact by its contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Nimble contact ID."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Nimble contact field name."
+            },
+            "description": "The Nimble contact field names to include.",
+            "minItems": 1
+          },
+          "includeTags": {
+            "type": "boolean",
+            "description": "Whether Nimble should include tags in the contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactId"
+        ],
+        "description": "The contact lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique Nimble contact ID."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The contact fields keyed by their Nimble field names."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A contact resource returned by Nimble."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Nimble contact."
+      }
+    },
+    {
+      "id": "nimble.list_contacts",
+      "service": "nimble",
+      "name": "list_contacts",
+      "description": "List or search Nimble contacts with pagination and optional field selection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword to search across indexed contact fields."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Nimble contact field name."
+            },
+            "description": "The Nimble contact field names to include in each result.",
+            "minItems": 1
+          },
+          "recordType": {
+            "type": "string",
+            "enum": [
+              "person",
+              "company",
+              "all"
+            ],
+            "description": "The contact record type to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of contacts to return per page."
+          },
+          "includeTags": {
+            "type": "boolean",
+            "description": "Whether Nimble should include tags in each contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Nimble contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Nimble contact ID."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The contact fields keyed by their Nimble field names."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A contact resource returned by Nimble."
+            },
+            "description": "The contacts returned by Nimble."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current result page."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "The number of contacts requested per page."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of matching contacts."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Nimble."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Nimble contacts."
+      }
+    },
+    {
+      "id": "nimble.update_contact",
+      "service": "nimble",
+      "name": "update_contact",
+      "description": "Update fields, importance, or avatar information on a Nimble contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Nimble contact ID."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "description": "The contact field value accepted by Nimble."
+                  },
+                  "modifier": {
+                    "type": "string",
+                    "description": "The Nimble modifier for the field value, such as work, home, or mobile."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "value"
+                ],
+                "description": "One value for a Nimble contact field."
+              },
+              "description": "The values assigned to one Nimble contact field.",
+              "minItems": 1
+            },
+            "description": "Contact fields keyed by their Nimble field names, such as first name, last name, email, or company name.",
+            "minProperties": 1
+          },
+          "avatarUrl": {
+            "type": "string",
+            "description": "The replacement avatar URL stored on the contact.",
+            "format": "uri"
+          },
+          "isImportant": {
+            "type": "boolean",
+            "description": "Whether the contact should be marked as important."
+          },
+          "replaceFields": {
+            "type": "boolean",
+            "description": "Whether supplied fields should replace existing values instead of extending them."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactId"
+        ],
+        "description": "The Nimble contact update.",
+        "anyOf": [
+          {
+            "required": [
+              "fields"
+            ]
+          },
+          {
+            "required": [
+              "avatarUrl"
+            ]
+          },
+          {
+            "required": [
+              "isImportant"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique Nimble contact ID."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The contact fields keyed by their Nimble field names."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A contact resource returned by Nimble."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The contact updated by Nimble."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1035 @@
+{
+  "service": "clicksend",
+  "displayName": "ClickSend",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CLICKSEND_API_KEY",
+      "description": "ClickSend API key used as the Basic Auth password. Find or create it in the ClickSend Dashboard under Credentials: https://dashboard.clicksend.com/#/account/subaccount.",
+      "extraFields": [
+        {
+          "key": "username",
+          "label": "API Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "CLICKSEND_USERNAME",
+          "description": "ClickSend API username used as the Basic Auth username. Copy it from the ClickSend Dashboard Credentials page: https://dashboard.clicksend.com/#/account/subaccount."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.clicksend.com/",
+  "actions": [
+    {
+      "id": "clicksend.calculate_sms_price",
+      "service": "clicksend",
+      "name": "calculate_sms_price",
+      "description": "Calculate the ClickSend price for one or more SMS messages without sending them.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "body": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SMS body to send."
+                },
+                "to": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient phone number in E.164 format."
+                },
+                "list_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ClickSend contact list ID to send to."
+                },
+                "from": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sender ID, dedicated number, own number, or alpha tag."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source application name passed to ClickSend."
+                },
+                "schedule": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when ClickSend should send the SMS."
+                },
+                "custom_string": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A custom string returned by ClickSend with message callbacks."
+                },
+                "contact_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ClickSend contact ID associated with the recipient."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter destination country code."
+                },
+                "from_email": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email address that should receive SMS replies."
+                },
+                "exclude_no_sender_id_recipients": {
+                  "type": "boolean",
+                  "description": "Whether ClickSend should exclude recipients that cannot receive this sender ID."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "body"
+              ],
+              "description": "One SMS message to send through ClickSend."
+            },
+            "description": "SMS messages to send or price.",
+            "minItems": 1
+          },
+          "shorten_urls": {
+            "type": "boolean",
+            "description": "Whether ClickSend should shorten URLs in the SMS body."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The SMS payload accepted by ClickSend send and price endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.create_contact",
+      "service": "clicksend",
+      "name": "create_contact",
+      "description": "Create a contact in a ClickSend contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "contact": {
+            "type": "object",
+            "properties": {
+              "phone_number": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact phone number."
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact email address."
+              },
+              "fax_number": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact fax number."
+              },
+              "first_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact first name."
+              },
+              "last_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact last name."
+              },
+              "organization_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact organization name."
+              },
+              "address_line_1": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The first line of the contact postal address."
+              },
+              "address_line_2": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The second line of the contact postal address."
+              },
+              "address_city": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact city."
+              },
+              "address_state": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact state or region."
+              },
+              "address_postal_code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact postal code."
+              },
+              "address_country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact country code."
+              },
+              "custom_1": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The first custom contact field."
+              },
+              "custom_2": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The second custom contact field."
+              },
+              "custom_3": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The third custom contact field."
+              },
+              "custom_4": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The fourth custom contact field."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A ClickSend contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "contact"
+        ],
+        "description": "Input for creating a ClickSend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.create_contact_list",
+      "service": "clicksend",
+      "name": "create_contact_list",
+      "description": "Create a ClickSend contact list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickSend contact list name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_name"
+        ],
+        "description": "Input for creating a ClickSend contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.delete_contact",
+      "service": "clicksend",
+      "name": "delete_contact",
+      "description": "Delete a ClickSend contact by list ID and contact ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "description": "Input for deleting a ClickSend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.delete_contact_list",
+      "service": "clicksend",
+      "name": "delete_contact_list",
+      "description": "Delete a ClickSend contact list by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Input for deleting a ClickSend contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.get_account",
+      "service": "clicksend",
+      "name": "get_account",
+      "description": "Get the ClickSend account profile associated with the configured credentials.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for getting the current ClickSend account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.get_contact",
+      "service": "clicksend",
+      "name": "get_contact",
+      "description": "Get one ClickSend contact by list ID and contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "contact_id"
+        ],
+        "description": "Input for getting a ClickSend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.get_contact_list",
+      "service": "clicksend",
+      "name": "get_contact_list",
+      "description": "Get one ClickSend contact list by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Input for getting a ClickSend contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.list_contact_lists",
+      "service": "clicksend",
+      "name": "list_contact_lists",
+      "description": "List ClickSend contact lists with pagination controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request from ClickSend."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination controls accepted by ClickSend list endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.list_contacts",
+      "service": "clicksend",
+      "name": "list_contacts",
+      "description": "List contacts in a ClickSend contact list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request from ClickSend."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of contacts to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id"
+        ],
+        "description": "Input for listing ClickSend contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.send_sms",
+      "service": "clicksend",
+      "name": "send_sms",
+      "description": "Send one or more SMS messages through ClickSend.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "body": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SMS body to send."
+                },
+                "to": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient phone number in E.164 format."
+                },
+                "list_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ClickSend contact list ID to send to."
+                },
+                "from": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sender ID, dedicated number, own number, or alpha tag."
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source application name passed to ClickSend."
+                },
+                "schedule": {
+                  "type": "integer",
+                  "description": "The Unix timestamp when ClickSend should send the SMS."
+                },
+                "custom_string": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A custom string returned by ClickSend with message callbacks."
+                },
+                "contact_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ClickSend contact ID associated with the recipient."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter destination country code."
+                },
+                "from_email": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The email address that should receive SMS replies."
+                },
+                "exclude_no_sender_id_recipients": {
+                  "type": "boolean",
+                  "description": "Whether ClickSend should exclude recipients that cannot receive this sender ID."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "body"
+              ],
+              "description": "One SMS message to send through ClickSend."
+            },
+            "description": "SMS messages to send or price.",
+            "minItems": 1
+          },
+          "shorten_urls": {
+            "type": "boolean",
+            "description": "Whether ClickSend should shorten URLs in the SMS body."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The SMS payload accepted by ClickSend send and price endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.update_contact",
+      "service": "clicksend",
+      "name": "update_contact",
+      "description": "Update a ClickSend contact by list ID and contact ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact ID."
+          },
+          "contact": {
+            "type": "object",
+            "properties": {
+              "phone_number": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact phone number."
+              },
+              "email": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact email address."
+              },
+              "fax_number": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact fax number."
+              },
+              "first_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact first name."
+              },
+              "last_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact last name."
+              },
+              "organization_name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact organization name."
+              },
+              "address_line_1": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The first line of the contact postal address."
+              },
+              "address_line_2": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The second line of the contact postal address."
+              },
+              "address_city": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact city."
+              },
+              "address_state": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact state or region."
+              },
+              "address_postal_code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact postal code."
+              },
+              "address_country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The contact country code."
+              },
+              "custom_1": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The first custom contact field."
+              },
+              "custom_2": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The second custom contact field."
+              },
+              "custom_3": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The third custom contact field."
+              },
+              "custom_4": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The fourth custom contact field."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A ClickSend contact payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "contact_id",
+          "contact"
+        ],
+        "description": "Input for updating a ClickSend contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    },
+    {
+      "id": "clicksend.update_contact_list",
+      "service": "clicksend",
+      "name": "update_contact_list",
+      "description": "Update a ClickSend contact list name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The ClickSend contact list ID."
+          },
+          "list_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new ClickSend contact list name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "list_id",
+          "list_name"
+        ],
+        "description": "Input for updating a ClickSend contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseCode": {
+            "type": "string",
+            "description": "The response code returned by ClickSend."
+          },
+          "responseMessage": {
+            "type": "string",
+            "description": "The response message returned by ClickSend."
+          },
+          "data": {
+            "description": "The data payload returned by ClickSend."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickSend response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "A normalized ClickSend API response envelope."
+      }
+    }
+  ]
+}

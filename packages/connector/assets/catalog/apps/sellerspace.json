@@ -1,0 +1,1226 @@
+{
+  "service": "sellerspace",
+  "displayName": "SellerSpace",
+  "categories": [
+    "Productivity",
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "MCP Key",
+      "placeholder": "sk-ss-...",
+      "description": "SellerSpace MCP key sent in the x-api-key header. Create it by following https://www.sellerspace.com/help/doc/how-to-get-your-sellerspace-mcp-key ."
+    }
+  ],
+  "homepageUrl": "https://www.sellerspace.com/",
+  "actions": [
+    {
+      "id": "sellerspace.call_tool",
+      "service": "sellerspace",
+      "name": "call_tool",
+      "description": "Call an explicitly approved SellerSpace MCP read tool with JSON arguments after discovering its live schema. Write, export, and browser-task tools are unavailable through this action.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current SellerSpace MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.list_tools"
+      ]
+    },
+    {
+      "id": "sellerspace.discover_fields",
+      "service": "sellerspace",
+      "name": "discover_fields",
+      "description": "Discover current SellerSpace fields for advanced selection, filtering, sorting, or output interpretation in a supported data domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "enum": [
+              "ads",
+              "product",
+              "website",
+              "stores"
+            ],
+            "description": "The SellerSpace field domain."
+          },
+          "entity": {
+            "type": "string",
+            "description": "An optional entity context such as campaign, product, market, or store."
+          },
+          "query": {
+            "type": "string",
+            "description": "A field name, keyword, or business meaning to search for."
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "select",
+              "include",
+              "sort",
+              "filter",
+              "output"
+            ],
+            "description": "The intended field usage."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A SellerSpace field catalog search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.query_ads",
+        "sellerspace.query_products",
+        "sellerspace.query_store_performance"
+      ]
+    },
+    {
+      "id": "sellerspace.get_ad_metric_history",
+      "service": "sellerspace",
+      "name": "get_ad_metric_history",
+      "description": "Get time-series or placement-level metrics for one SellerSpace advertising campaign, ad group, promoted product, keyword, target, or search term.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sellerId": {
+            "type": "integer",
+            "description": "The SellerSpace seller ID returned by list_stores."
+          },
+          "marketplace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The marketplace code returned by list_stores."
+          },
+          "adDataType": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "adGroup",
+              "productAd",
+              "keyword",
+              "target",
+              "searchTerm"
+            ],
+            "description": "The advertising entity type."
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The advertising entity or composite search-term ID."
+              },
+              {
+                "type": "number",
+                "description": "The numeric advertising entity ID."
+              }
+            ],
+            "description": "The entity ID returned by query_ads; use a string for large IDs."
+          },
+          "fromDateStr": {
+            "type": "string",
+            "description": "The query start date.",
+            "format": "date"
+          },
+          "toDateStr": {
+            "type": "string",
+            "description": "The query end date.",
+            "format": "date"
+          },
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "time",
+              "placement"
+            ],
+            "description": "Whether to split metrics by time or advertising placement.",
+            "default": "time"
+          },
+          "timeType": {
+            "type": "string",
+            "enum": [
+              "DAILY",
+              "WEEKLY",
+              "WEEK",
+              "MONTHLY",
+              "HOURLY"
+            ],
+            "description": "The time aggregation used when dimension is time.",
+            "default": "DAILY"
+          },
+          "placementBusiness": {
+            "type": "string",
+            "enum": [
+              "Y",
+              "N"
+            ],
+            "description": "Whether placement results should use Amazon Business placements.",
+            "default": "N"
+          },
+          "dateType": {
+            "type": "string",
+            "enum": [
+              "TD",
+              "YD",
+              "WD",
+              "LW",
+              "MO",
+              "LM",
+              "SD",
+              "HD",
+              "NM",
+              "CU"
+            ],
+            "description": "The SellerSpace date preset: TD today, YD yesterday, WD this week, LW last week, MO this month, LM last month, SD trailing 7 days, HD trailing 15 days, NM trailing 30 days, or CU custom dates."
+          },
+          "includeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional history fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact history fields to return."
+          },
+          "includeSummary": {
+            "type": "boolean",
+            "description": "Whether to retain the summary when selectFields requests a narrow field set."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sellerId",
+          "marketplace",
+          "adDataType",
+          "id",
+          "fromDateStr",
+          "toDateStr"
+        ],
+        "description": "A metric history query for one SellerSpace advertising entity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.query_ads"
+      ]
+    },
+    {
+      "id": "sellerspace.list_fba_shipments",
+      "service": "sellerspace",
+      "name": "list_fba_shipments",
+      "description": "List SellerSpace FBA inbound shipments with status, warehouse, quantities, and SKU-level receiving differences for one Amazon store and marketplace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sellerId": {
+            "type": "integer",
+            "description": "The SellerSpace seller ID returned by list_stores."
+          },
+          "marketplace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The marketplace code returned by list_stores."
+          },
+          "merchantId": {
+            "type": "string",
+            "description": "The optional Amazon merchant ID."
+          },
+          "shipmentId": {
+            "type": "string",
+            "description": "An exact FBA shipment ID."
+          },
+          "shipmentStatus": {
+            "type": "string",
+            "enum": [
+              "WORKING",
+              "SHIPPED",
+              "RECEIVING",
+              "CANCELLED",
+              "DELETED",
+              "CLOSED",
+              "ERROR",
+              "IN_TRANSIT",
+              "DELIVERED",
+              "CHECKED_IN"
+            ],
+            "description": "The FBA shipment status."
+          },
+          "amazonReferenceId": {
+            "type": "string",
+            "description": "An Amazon shipment reference ID."
+          },
+          "sellerSku": {
+            "type": "string",
+            "description": "A seller SKU contained in the shipment."
+          },
+          "fnSku": {
+            "type": "string",
+            "description": "An Amazon fulfillment network SKU contained in the shipment."
+          },
+          "fromDateStr": {
+            "type": "string",
+            "description": "The shipment creation date range start.",
+            "format": "date"
+          },
+          "toDateStr": {
+            "type": "string",
+            "description": "The shipment creation date range end.",
+            "format": "date"
+          },
+          "page": {
+            "type": "integer",
+            "description": "The one-based page number.",
+            "default": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of shipments requested per page.",
+            "default": 30
+          },
+          "includeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional shipment fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact shipment fields to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sellerId",
+          "marketplace"
+        ],
+        "description": "Filters and pagination for SellerSpace FBA inbound shipments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      }
+    },
+    {
+      "id": "sellerspace.list_stores",
+      "service": "sellerspace",
+      "name": "list_stores",
+      "description": "List Amazon stores and marketplaces authorized in SellerSpace so their seller IDs and marketplace codes can be used in subsequent queries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "refresh": {
+            "type": "boolean",
+            "description": "Whether to bypass the SellerSpace store cache.",
+            "default": false
+          },
+          "keywords": {
+            "type": "string",
+            "description": "A store name or seller ID search term."
+          },
+          "sellingRegion": {
+            "type": "string",
+            "description": "An Amazon selling region such as NA, EU, or FE."
+          },
+          "authAvailable": {
+            "type": "string",
+            "description": "The SP-API authorization availability filter."
+          },
+          "mwsAvailable": {
+            "type": "string",
+            "description": "The MWS authorization availability filter."
+          },
+          "includeFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional store fields to include."
+          },
+          "includeMarketFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional marketplace fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact store fields to return."
+          },
+          "selectMarketFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact marketplace fields to return."
+          },
+          "includeFieldMeta": {
+            "type": "boolean",
+            "description": "Whether to include store and marketplace field metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters and field selection for SellerSpace stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.query_store_performance",
+        "sellerspace.query_ads",
+        "sellerspace.query_products",
+        "sellerspace.list_fba_shipments"
+      ]
+    },
+    {
+      "id": "sellerspace.list_tools",
+      "service": "sellerspace",
+      "name": "list_tools",
+      "description": "Discover SellerSpace tools approved by Connector for read-only dynamic calls, including their live input schemas and behavior annotations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact SellerSpace MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by SellerSpace MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify SellerSpace data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive updates."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to have no additional effect."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with external entities."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "MCP hints supplied by SellerSpace about the tool's behavior."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by SellerSpace MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected SellerSpace MCP account."
+            },
+            "description": "Approved read-only tools currently exposed to the connected SellerSpace account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The approved read-only SellerSpace MCP tool catalog."
+      },
+      "followUpActions": [
+        "sellerspace.call_tool"
+      ]
+    },
+    {
+      "id": "sellerspace.query_ads",
+      "service": "sellerspace",
+      "name": "query_ads",
+      "description": "Query SellerSpace Amazon advertising campaigns, ad groups, promoted products, keywords, targets, search terms, or negative targeting with filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "adGroup",
+              "productAds",
+              "keywords",
+              "targets",
+              "searchQuery",
+              "searchTermFrequency",
+              "negativeKeywords",
+              "negativeTargets"
+            ],
+            "description": "The advertising entity to query."
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "sellerId": {
+                "type": "integer",
+                "description": "The SellerSpace seller ID returned by list_stores."
+              },
+              "marketplace": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The marketplace code returned by list_stores, such as US."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One SellerSpace store and Amazon marketplace to query."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "TD",
+                  "YD",
+                  "WD",
+                  "LW",
+                  "MO",
+                  "LM",
+                  "SD",
+                  "HD",
+                  "NM",
+                  "CU"
+                ],
+                "description": "The SellerSpace date preset: TD today, YD yesterday, WD this week, LW last week, MO this month, LM last month, SD trailing 7 days, HD trailing 15 days, NM trailing 30 days, or CU custom dates.",
+                "default": "SD"
+              },
+              "text": {
+                "type": "string",
+                "description": "The user's original time expression, such as `last month` or `trailing 30 days`, for SellerSpace to normalize."
+              },
+              "from": {
+                "type": "string",
+                "description": "The custom start date when preset is CU.",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "description": "The custom end date when preset is CU.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The reporting period for the query."
+          },
+          "name": {
+            "type": "string",
+            "description": "A name or text search applied to the selected advertising entity."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "enabled",
+              "paused",
+              "notArchived"
+            ],
+            "description": "The SellerSpace advertising entity status."
+          },
+          "campaignStatus": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "enabled",
+              "paused",
+              "notArchived"
+            ],
+            "description": "The SellerSpace advertising entity status."
+          },
+          "adGroupStatus": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "enabled",
+              "paused",
+              "notArchived"
+            ],
+            "description": "The SellerSpace advertising entity status."
+          },
+          "criteria": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Entity-specific SellerSpace advertising criteria."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SellerSpace metric field to filter."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "gt",
+                    "gte",
+                    "eq",
+                    "lt",
+                    "lte"
+                  ],
+                  "description": "The comparison operator."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string comparison value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric comparison value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean comparison value."
+                    }
+                  ],
+                  "description": "The value to compare against the selected field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One metric filter applied by SellerSpace."
+            },
+            "description": "Metric filters applied to the advertising query."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional SellerSpace result fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact SellerSpace result fields to return."
+          },
+          "includeSummary": {
+            "type": "boolean",
+            "description": "Whether to retain summary data when selectFields requests a narrow field set."
+          },
+          "includeFieldMeta": {
+            "type": "boolean",
+            "description": "Whether to include contextual metadata for returned fields."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The SellerSpace field to sort by."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The sort direction.",
+                "default": "desc"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "The result ordering requested from SellerSpace."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "description": "The one-based page number.",
+                    "default": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "description": "The number of records requested per page.",
+                    "default": 20
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Page-number pagination for a SellerSpace query."
+              },
+              {
+                "type": "integer",
+                "description": "The one-based page number."
+              }
+            ],
+            "description": "Pagination as a one-based page number or a page configuration object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity",
+          "scope"
+        ],
+        "description": "An advertising entity query for one SellerSpace store and marketplace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.get_ad_metric_history",
+        "sellerspace.discover_fields"
+      ]
+    },
+    {
+      "id": "sellerspace.query_products",
+      "service": "sellerspace",
+      "name": "query_products",
+      "description": "Query SellerSpace product performance or long-term storage fee data across one or more Amazon store-marketplace stations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "stations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A store-marketplace station, such as `60123-US`."
+                },
+                "description": "Store-marketplace identifiers in `sellerId-marketplace` form.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "One or more SellerSpace store-marketplace stations."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "TD",
+                  "YD",
+                  "WD",
+                  "LW",
+                  "MO",
+                  "LM",
+                  "SD",
+                  "HD",
+                  "NM",
+                  "CU"
+                ],
+                "description": "The SellerSpace date preset: TD today, YD yesterday, WD this week, LW last week, MO this month, LM last month, SD trailing 7 days, HD trailing 15 days, NM trailing 30 days, or CU custom dates.",
+                "default": "SD"
+              },
+              "text": {
+                "type": "string",
+                "description": "The user's original time expression for SellerSpace to normalize."
+              },
+              "from": {
+                "type": "string",
+                "description": "The custom start date when preset is CU.",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "description": "The custom end date when preset is CU.",
+                "format": "date"
+              },
+              "compare": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether to include comparison data.",
+                    "default": false
+                  },
+                  "from": {
+                    "type": "string",
+                    "description": "The comparison start date.",
+                    "format": "date"
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The comparison end date.",
+                    "format": "date"
+                  },
+                  "lastYear": {
+                    "type": "boolean",
+                    "description": "Whether to compare with the same period last year."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Optional comparison period for the requested business data."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The reporting period and optional comparison for the query."
+          },
+          "criteria": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Dataset-specific SellerSpace product criteria."
+          },
+          "view": {
+            "type": "object",
+            "properties": {
+              "dataset": {
+                "type": "string",
+                "enum": [
+                  "performance",
+                  "longTermStorageFees"
+                ],
+                "description": "The SellerSpace product dataset.",
+                "default": "performance"
+              },
+              "groupBy": {
+                "type": "string",
+                "enum": [
+                  "ASIN",
+                  "SKU",
+                  "PARENT_ASIN",
+                  "SELLER",
+                  "NO_MARKET_ASIN",
+                  "NO_MARKET_SKU",
+                  "NO_MARKET_PARENT_ASIN"
+                ],
+                "description": "The product grouping dimension.",
+                "default": "SKU"
+              },
+              "summary": {
+                "type": "string",
+                "enum": [
+                  "SUMMARY",
+                  "MONTHLY",
+                  "WEEKLY",
+                  "WEEK",
+                  "DAILY",
+                  "HOURLY",
+                  "ASIN_DAILY",
+                  "SKU_DAILY",
+                  "ASIN"
+                ],
+                "description": "The product summary granularity.",
+                "default": "SUMMARY"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The product dataset and grouping to return."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional SellerSpace result fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact SellerSpace result fields to return."
+          },
+          "includeSummary": {
+            "type": "boolean",
+            "description": "Whether to retain summary data when selectFields requests a narrow field set."
+          },
+          "includeFieldMeta": {
+            "type": "boolean",
+            "description": "Whether to include contextual metadata for returned fields."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The SellerSpace field to sort by."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The sort direction.",
+                "default": "desc"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "field"
+            ],
+            "description": "The result ordering requested from SellerSpace."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "description": "The one-based page number.",
+                    "default": 1
+                  },
+                  "size": {
+                    "type": "integer",
+                    "description": "The number of records requested per page.",
+                    "default": 20
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Page-number pagination for a SellerSpace query."
+              },
+              {
+                "type": "integer",
+                "description": "The one-based page number."
+              }
+            ],
+            "description": "Pagination as a one-based page number or a page configuration object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scope"
+        ],
+        "description": "A SellerSpace product dataset query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.discover_fields"
+      ]
+    },
+    {
+      "id": "sellerspace.query_store_performance",
+      "service": "sellerspace",
+      "name": "query_store_performance",
+      "description": "Query SellerSpace store or marketplace performance, including orders, revenue, profit, refunds, advertising spend, FBA fees, ROI, and ACoS.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "stations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A store-marketplace station, such as `60123-US`."
+                },
+                "description": "Store-marketplace identifiers in `sellerId-marketplace` form.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "One or more SellerSpace store-marketplace stations."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "TD",
+                  "YD",
+                  "WD",
+                  "LW",
+                  "MO",
+                  "LM",
+                  "SD",
+                  "HD",
+                  "NM",
+                  "CU"
+                ],
+                "description": "The SellerSpace date preset: TD today, YD yesterday, WD this week, LW last week, MO this month, LM last month, SD trailing 7 days, HD trailing 15 days, NM trailing 30 days, or CU custom dates.",
+                "default": "SD"
+              },
+              "text": {
+                "type": "string",
+                "description": "The user's original time expression for SellerSpace to normalize."
+              },
+              "from": {
+                "type": "string",
+                "description": "The custom start date when preset is CU.",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "description": "The custom end date when preset is CU.",
+                "format": "date"
+              },
+              "compare": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether to include comparison data.",
+                    "default": false
+                  },
+                  "from": {
+                    "type": "string",
+                    "description": "The comparison start date.",
+                    "format": "date"
+                  },
+                  "to": {
+                    "type": "string",
+                    "description": "The comparison end date.",
+                    "format": "date"
+                  },
+                  "lastYear": {
+                    "type": "boolean",
+                    "description": "Whether to compare with the same period last year."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Optional comparison period for the requested business data."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The reporting period and optional comparison for the query."
+          },
+          "criteria": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "SellerSpace store query controls passed to the upstream API."
+          },
+          "view": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "type": "string",
+                "enum": [
+                  "market",
+                  "store"
+                ],
+                "description": "Whether to aggregate by marketplace or store.",
+                "default": "market"
+              },
+              "chainType": {
+                "type": "string",
+                "enum": [
+                  "HOURLY",
+                  "DAILY",
+                  "WEEKLY",
+                  "MONTHLY"
+                ],
+                "description": "The period-over-period granularity.",
+                "default": "HOURLY"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The aggregation dimension and comparison granularity."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional SellerSpace result fields to include."
+          },
+          "selectFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The exact SellerSpace result fields to return."
+          },
+          "includeSummary": {
+            "type": "boolean",
+            "description": "Whether to retain summary data when selectFields requests a narrow field set."
+          },
+          "includeFieldMeta": {
+            "type": "boolean",
+            "description": "Whether to include contextual metadata for returned fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scope"
+        ],
+        "description": "A SellerSpace store performance query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The SellerSpace result payload. Its nested fields vary with the selected entity, dataset, and field selection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result returned by the SellerSpace MCP tool."
+      },
+      "followUpActions": [
+        "sellerspace.discover_fields"
+      ]
+    }
+  ]
+}

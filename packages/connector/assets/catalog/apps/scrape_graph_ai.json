@@ -1,0 +1,775 @@
+{
+  "service": "scrape_graph_ai",
+  "displayName": "ScrapeGraphAI",
+  "categories": [
+    "AI",
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sgai-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "description": "ScrapeGraphAI API key sent in the SGAI-APIKEY header.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://scrapegraphai.com",
+  "actions": [
+    {
+      "id": "scrape_graph_ai.extract",
+      "service": "scrape_graph_ai",
+      "name": "extract",
+      "description": "Extract structured JSON from a URL, raw HTML, or markdown with a natural-language prompt.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public URL to extract from.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML content to extract from."
+          },
+          "markdown": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Markdown content to extract from."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language description of what to extract."
+          },
+          "schema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "reader",
+              "prune"
+            ],
+            "description": "The HTML pre-processing mode."
+          },
+          "fetchConfig": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "fast",
+                  "js"
+                ],
+                "description": "The fetch mode used by ScrapeGraphAI."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether ScrapeGraphAI should use residential proxy and anti-bot headers."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One custom HTTP header value."
+                },
+                "description": "Custom HTTP headers ScrapeGraphAI should send while fetching the target page."
+              },
+              "cookies": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One cookie value."
+                },
+                "description": "Cookies ScrapeGraphAI should send while fetching the target page."
+              },
+              "scrolls": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of scrolls for infinite-scroll pages."
+              },
+              "wait": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 30000,
+                "description": "The milliseconds to wait after page load."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 60000,
+                "description": "The page fetch timeout in milliseconds."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code for geo-targeted proxy use."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Fetch-time options used when ScrapeGraphAI retrieves a page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "The input payload for extracting structured data with ScrapeGraphAI.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "html"
+            ]
+          },
+          {
+            "required": [
+              "markdown"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ScrapeGraphAI request ID."
+          },
+          "json": {
+            "description": "The structured JSON output returned by ScrapeGraphAI."
+          },
+          "raw": {
+            "description": "The raw model output returned by ScrapeGraphAI, when available."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "promptTokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens used by the request."
+              },
+              "completionTokens": {
+                "type": "integer",
+                "description": "The number of completion tokens used by the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage or accounting data returned by ScrapeGraphAI."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by ScrapeGraphAI."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The output payload for a ScrapeGraphAI extract request."
+      }
+    },
+    {
+      "id": "scrape_graph_ai.get_credits",
+      "service": "scrape_graph_ai",
+      "name": "get_credits",
+      "description": "Check ScrapeGraphAI remaining credits, plan, and job quotas.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "remaining": {
+            "type": "integer",
+            "description": "The available credits for request-based endpoints."
+          },
+          "used": {
+            "type": "integer",
+            "description": "The credits consumed in the current billing cycle."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The active subscription plan name."
+          },
+          "jobs": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Current crawl and monitor job quotas."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The output payload for ScrapeGraphAI account credits."
+      }
+    },
+    {
+      "id": "scrape_graph_ai.get_history",
+      "service": "scrape_graph_ai",
+      "name": "get_history",
+      "description": "Retrieve one ScrapeGraphAI history entry by request ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The UUID of the ScrapeGraphAI history entry to retrieve.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one history entry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ScrapeGraphAI history entry ID."
+          },
+          "userId": {
+            "type": "string",
+            "description": "The ScrapeGraphAI user ID that issued the request."
+          },
+          "service": {
+            "type": "string",
+            "description": "The ScrapeGraphAI service that produced the entry."
+          },
+          "status": {
+            "type": "string",
+            "description": "The lifecycle status of the entry."
+          },
+          "params": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The original request parameters."
+          },
+          "result": {
+            "description": "The full result payload for the entry."
+          },
+          "error": {
+            "description": "The error payload when the entry failed."
+          },
+          "elapsedMs": {
+            "type": "integer",
+            "description": "The elapsed time in milliseconds."
+          },
+          "requestParentId": {
+            "description": "The parent request ID when this entry was created by another job."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 creation timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "One ScrapeGraphAI history entry."
+      }
+    },
+    {
+      "id": "scrape_graph_ai.list_history",
+      "service": "scrape_graph_ai",
+      "name": "list_history",
+      "description": "List recent ScrapeGraphAI request history entries with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-indexed history page number to fetch."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of history entries to return per page."
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "scrape",
+              "extract",
+              "search",
+              "monitor",
+              "crawl",
+              "schema"
+            ],
+            "description": "The ScrapeGraphAI service type to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing recent ScrapeGraphAI history entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The ScrapeGraphAI history entry ID."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The ScrapeGraphAI user ID that issued the request."
+                },
+                "service": {
+                  "type": "string",
+                  "description": "The ScrapeGraphAI service that produced the entry."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The lifecycle status of the entry."
+                },
+                "params": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The original request parameters."
+                },
+                "result": {
+                  "description": "The full result payload for the entry."
+                },
+                "error": {
+                  "description": "The error payload when the entry failed."
+                },
+                "elapsedMs": {
+                  "type": "integer",
+                  "description": "The elapsed time in milliseconds."
+                },
+                "requestParentId": {
+                  "description": "The parent request ID when this entry was created by another job."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 creation timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "One ScrapeGraphAI history entry."
+            },
+            "description": "The history entries returned by ScrapeGraphAI."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The returned page number."
+              },
+              "limit": {
+                "type": "integer",
+                "description": "The returned page size."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of matching entries."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The history pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing ScrapeGraphAI history entries."
+      }
+    },
+    {
+      "id": "scrape_graph_ai.scrape",
+      "service": "scrape_graph_ai",
+      "name": "scrape",
+      "description": "Fetch a public URL with ScrapeGraphAI and return one or more content formats.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public URL to fetch.",
+            "format": "uri"
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "links",
+                    "images",
+                    "summary",
+                    "json",
+                    "branding",
+                    "screenshot"
+                  ],
+                  "description": "The output format type to return."
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "normal",
+                    "reader",
+                    "prune"
+                  ],
+                  "description": "The markdown or HTML processing mode for this format."
+                },
+                "prompt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The extraction prompt used when type is json."
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                },
+                "fullPage": {
+                  "type": "boolean",
+                  "description": "Whether screenshot output should capture the full page."
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The screenshot viewport width in pixels."
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The screenshot viewport height in pixels."
+                },
+                "quality": {
+                  "type": "integer",
+                  "description": "The screenshot image quality requested from ScrapeGraphAI."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "One ScrapeGraphAI scrape output format descriptor."
+            },
+            "description": "The output formats to return from ScrapeGraphAI.",
+            "minItems": 1
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The content type override, such as text/html or application/pdf."
+          },
+          "fetchConfig": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "fast",
+                  "js"
+                ],
+                "description": "The fetch mode used by ScrapeGraphAI."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether ScrapeGraphAI should use residential proxy and anti-bot headers."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One custom HTTP header value."
+                },
+                "description": "Custom HTTP headers ScrapeGraphAI should send while fetching the target page."
+              },
+              "cookies": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One cookie value."
+                },
+                "description": "Cookies ScrapeGraphAI should send while fetching the target page."
+              },
+              "scrolls": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of scrolls for infinite-scroll pages."
+              },
+              "wait": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 30000,
+                "description": "The milliseconds to wait after page load."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 60000,
+                "description": "The page fetch timeout in milliseconds."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code for geo-targeted proxy use."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Fetch-time options used when ScrapeGraphAI retrieves a page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "formats"
+        ],
+        "description": "The input payload for scraping a public URL with ScrapeGraphAI."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ScrapeGraphAI request ID."
+          },
+          "results": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The result object keyed by requested output format."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by ScrapeGraphAI."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The output payload for a ScrapeGraphAI scrape request."
+      }
+    },
+    {
+      "id": "scrape_graph_ai.search",
+      "service": "scrape_graph_ai",
+      "name": "search",
+      "description": "Run a web search with ScrapeGraphAI, fetch the top results, and optionally extract JSON from them.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query."
+          },
+          "numResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of search results to return and fetch."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional extraction prompt to apply across the fetched search results."
+          },
+          "schema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html"
+            ],
+            "description": "The inline content format for each search result."
+          },
+          "timeRange": {
+            "type": "string",
+            "enum": [
+              "past_hour",
+              "past_24_hours",
+              "past_week",
+              "past_month",
+              "past_year"
+            ],
+            "description": "The recency filter for search results."
+          },
+          "locationGeoCode": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code used to localize search results."
+          },
+          "fetchConfig": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "fast",
+                  "js"
+                ],
+                "description": "The fetch mode used by ScrapeGraphAI."
+              },
+              "stealth": {
+                "type": "boolean",
+                "description": "Whether ScrapeGraphAI should use residential proxy and anti-bot headers."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One custom HTTP header value."
+                },
+                "description": "Custom HTTP headers ScrapeGraphAI should send while fetching the target page."
+              },
+              "cookies": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One cookie value."
+                },
+                "description": "Cookies ScrapeGraphAI should send while fetching the target page."
+              },
+              "scrolls": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of scrolls for infinite-scroll pages."
+              },
+              "wait": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 30000,
+                "description": "The milliseconds to wait after page load."
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 60000,
+                "description": "The page fetch timeout in milliseconds."
+              },
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code for geo-targeted proxy use."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Fetch-time options used when ScrapeGraphAI retrieves a page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching the web with ScrapeGraphAI."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The ScrapeGraphAI request ID."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The result URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The inline page content in the requested format."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One search result returned by ScrapeGraphAI."
+            },
+            "description": "The ordered fetched search results."
+          },
+          "json": {
+            "description": "The structured JSON output when an extraction prompt was supplied."
+          },
+          "raw": {
+            "description": "The raw model output when an extraction prompt was supplied."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "promptTokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens used by the request."
+              },
+              "completionTokens": {
+                "type": "integer",
+                "description": "The number of completion tokens used by the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage or accounting data returned by ScrapeGraphAI."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata returned by ScrapeGraphAI."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The output payload for a ScrapeGraphAI search request."
+      }
+    }
+  ]
+}

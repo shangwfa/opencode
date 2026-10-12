@@ -1,0 +1,1107 @@
+{
+  "service": "starton",
+  "displayName": "Starton",
+  "categories": [
+    "Storage",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "starton_api_key",
+      "description": "Starton API key sent with the x-api-key header. Create it in Starton project developer settings: https://app.starton.com/projects/default/developer.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://starton.com",
+  "actions": [
+    {
+      "id": "starton.create_json_pin",
+      "service": "starton",
+      "name": "create_json_pin",
+      "description": "Upload JSON content to Starton IPFS and create a new pin.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name recorded for the uploaded JSON file."
+          },
+          "content": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The JSON content that Starton should upload."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional metadata stored alongside the uploaded JSON file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "content"
+        ],
+        "description": "Input for uploading JSON content to Starton IPFS."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique Starton pin identifier."
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Starton project identifier that owns the pin."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "pinning",
+                  "pinned",
+                  "failed",
+                  "deleted"
+                ],
+                "description": "The Starton pin status returned by the API."
+              },
+              "cid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CID assigned to the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CID assigned to the pinned content."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The display name recorded for the pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The display name recorded for the pin."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "directory",
+                      "file"
+                    ],
+                    "description": "The Starton pin type returned by the API."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Starton pin type returned by the API."
+              },
+              "size": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The size in bytes of the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The size in bytes of the pinned content."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton created this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton created this pin."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton last updated this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton last updated this pin."
+              },
+              "delegates": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The delegate nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The delegate nodes attached to this pin."
+              },
+              "origins": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The origin nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The origin nodes attached to this pin."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Arbitrary metadata attached to the Starton pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Arbitrary metadata attached to the Starton pin."
+              },
+              "directoryContent": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The CID of the nested directory entry."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The file or directory name of the nested entry."
+                        },
+                        "size": {
+                          "type": "number",
+                          "description": "The size in bytes of the nested directory entry."
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "directory",
+                            "file"
+                          ],
+                          "description": "The Starton directory entry type returned by the API."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "cid",
+                        "name",
+                        "size",
+                        "type"
+                      ],
+                      "description": "A single file or directory entry returned by Starton."
+                    },
+                    "description": "The nested directory content returned for a directory pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The nested directory content returned for a directory pin."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "projectId",
+              "status"
+            ],
+            "description": "A Starton IPFS pin resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pin"
+        ],
+        "description": "The Starton JSON upload response."
+      }
+    },
+    {
+      "id": "starton.delete_pin",
+      "service": "starton",
+      "name": "delete_pin",
+      "description": "Delete a Starton pin by pin identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Starton pin identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for actions that target a single Starton pin."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Starton confirmed the pin deletion request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The Starton pin deletion response."
+      }
+    },
+    {
+      "id": "starton.get_pin",
+      "service": "starton",
+      "name": "get_pin",
+      "description": "Read one IPFS pin from Starton by pin identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Starton pin identifier."
+          },
+          "includeDirectoryContent": {
+            "type": "boolean",
+            "description": "Whether Starton should include nested directory content in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input for reading a single Starton pin, with optional directory expansion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique Starton pin identifier."
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Starton project identifier that owns the pin."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "pinning",
+                  "pinned",
+                  "failed",
+                  "deleted"
+                ],
+                "description": "The Starton pin status returned by the API."
+              },
+              "cid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CID assigned to the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CID assigned to the pinned content."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The display name recorded for the pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The display name recorded for the pin."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "directory",
+                      "file"
+                    ],
+                    "description": "The Starton pin type returned by the API."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Starton pin type returned by the API."
+              },
+              "size": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The size in bytes of the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The size in bytes of the pinned content."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton created this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton created this pin."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton last updated this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton last updated this pin."
+              },
+              "delegates": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The delegate nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The delegate nodes attached to this pin."
+              },
+              "origins": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The origin nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The origin nodes attached to this pin."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Arbitrary metadata attached to the Starton pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Arbitrary metadata attached to the Starton pin."
+              },
+              "directoryContent": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The CID of the nested directory entry."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The file or directory name of the nested entry."
+                        },
+                        "size": {
+                          "type": "number",
+                          "description": "The size in bytes of the nested directory entry."
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "directory",
+                            "file"
+                          ],
+                          "description": "The Starton directory entry type returned by the API."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "cid",
+                        "name",
+                        "size",
+                        "type"
+                      ],
+                      "description": "A single file or directory entry returned by Starton."
+                    },
+                    "description": "The nested directory content returned for a directory pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The nested directory content returned for a directory pin."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "projectId",
+              "status"
+            ],
+            "description": "A Starton IPFS pin resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pin"
+        ],
+        "description": "The Starton single pin response."
+      }
+    },
+    {
+      "id": "starton.list_pins",
+      "service": "starton",
+      "name": "list_pins",
+      "description": "List IPFS pins from the current Starton project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter pins by CID."
+          },
+          "includeDirectoryContent": {
+            "type": "boolean",
+            "description": "Whether Starton should include directory entries inside directory pin results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of entities returned on each page."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter pins by pin name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number returned by Starton."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "pinning",
+              "pinned",
+              "failed",
+              "deleted"
+            ],
+            "description": "The Starton pin status returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Starton IPFS pins."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique Starton pin identifier."
+                },
+                "projectId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Starton project identifier that owns the pin."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "pinning",
+                    "pinned",
+                    "failed",
+                    "deleted"
+                  ],
+                  "description": "The Starton pin status returned by the API."
+                },
+                "cid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The CID assigned to the pinned content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The CID assigned to the pinned content."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The display name recorded for the pin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The display name recorded for the pin."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "directory",
+                        "file"
+                      ],
+                      "description": "The Starton pin type returned by the API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Starton pin type returned by the API."
+                },
+                "size": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The size in bytes of the pinned content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The size in bytes of the pinned content."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Starton created this pin.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Starton created this pin."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Starton last updated this pin.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Starton last updated this pin."
+                },
+                "delegates": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The delegate nodes attached to this pin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The delegate nodes attached to this pin."
+                },
+                "origins": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The origin nodes attached to this pin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The origin nodes attached to this pin."
+                },
+                "metadata": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Arbitrary metadata attached to the Starton pin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Arbitrary metadata attached to the Starton pin."
+                },
+                "directoryContent": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cid": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The CID of the nested directory entry."
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The file or directory name of the nested entry."
+                          },
+                          "size": {
+                            "type": "number",
+                            "description": "The size in bytes of the nested directory entry."
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "directory",
+                              "file"
+                            ],
+                            "description": "The Starton directory entry type returned by the API."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "cid",
+                          "name",
+                          "size",
+                          "type"
+                        ],
+                        "description": "A single file or directory entry returned by Starton."
+                      },
+                      "description": "The nested directory content returned for a directory pin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The nested directory content returned for a directory pin."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "projectId",
+                "status"
+              ],
+              "description": "A Starton IPFS pin resource."
+            },
+            "description": "The pins returned by Starton for this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "number",
+                "description": "The current result page returned by Starton."
+              },
+              "itemCount": {
+                "type": "number",
+                "description": "The number of items returned in this page."
+              },
+              "itemsPerPage": {
+                "type": "number",
+                "description": "The configured page size used by Starton."
+              },
+              "totalItems": {
+                "type": "number",
+                "description": "The total number of matching items across all pages."
+              },
+              "totalPages": {
+                "type": "number",
+                "description": "The total number of available pages."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "currentPage",
+              "itemCount",
+              "itemsPerPage",
+              "totalItems",
+              "totalPages"
+            ],
+            "description": "Pagination data returned by Starton list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pins",
+          "pagination"
+        ],
+        "description": "The Starton pin list response."
+      }
+    },
+    {
+      "id": "starton.pin_existing_file",
+      "service": "starton",
+      "name": "pin_existing_file",
+      "description": "Create a Starton pin for an existing IPFS CID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The existing IPFS CID that Starton should pin."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional display name recorded for the new pin."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional metadata stored alongside the new pin."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cid"
+        ],
+        "description": "Input for pinning an existing IPFS CID in Starton."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique Starton pin identifier."
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Starton project identifier that owns the pin."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "pinning",
+                  "pinned",
+                  "failed",
+                  "deleted"
+                ],
+                "description": "The Starton pin status returned by the API."
+              },
+              "cid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CID assigned to the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CID assigned to the pinned content."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The display name recorded for the pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The display name recorded for the pin."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "directory",
+                      "file"
+                    ],
+                    "description": "The Starton pin type returned by the API."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Starton pin type returned by the API."
+              },
+              "size": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The size in bytes of the pinned content."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The size in bytes of the pinned content."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton created this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton created this pin."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When Starton last updated this pin.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Starton last updated this pin."
+              },
+              "delegates": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The delegate nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The delegate nodes attached to this pin."
+              },
+              "origins": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The origin nodes attached to this pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The origin nodes attached to this pin."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Arbitrary metadata attached to the Starton pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Arbitrary metadata attached to the Starton pin."
+              },
+              "directoryContent": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The CID of the nested directory entry."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The file or directory name of the nested entry."
+                        },
+                        "size": {
+                          "type": "number",
+                          "description": "The size in bytes of the nested directory entry."
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "directory",
+                            "file"
+                          ],
+                          "description": "The Starton directory entry type returned by the API."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "cid",
+                        "name",
+                        "size",
+                        "type"
+                      ],
+                      "description": "A single file or directory entry returned by Starton."
+                    },
+                    "description": "The nested directory content returned for a directory pin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The nested directory content returned for a directory pin."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "projectId",
+              "status"
+            ],
+            "description": "A Starton IPFS pin resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pin"
+        ],
+        "description": "The Starton existing-file pin response."
+      }
+    }
+  ]
+}

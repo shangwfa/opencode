@@ -1,0 +1,1878 @@
+{
+  "service": "timecamp",
+  "displayName": "TimeCamp",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "timecamp_api_token",
+      "description": "TimeCamp API token used with the Authorization: Bearer <token> header. Copy it from the TimeCamp user settings page: https://app.timecamp.com/app#/settings/users/me."
+    }
+  ],
+  "homepageUrl": "https://www.timecamp.com",
+  "actions": [
+    {
+      "id": "timecamp.create_time_entry",
+      "service": "timecamp",
+      "name": "create_time_entry",
+      "description": "Create a TimeCamp time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The date for the time entry in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entry start time accepted by TimeCamp, such as HH:mm:ss or a full timestamp."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entry end time accepted by TimeCamp, such as HH:mm:ss or a full timestamp."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The entry duration in seconds."
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The user ID for which TimeCamp should create the entry as a string."
+              },
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The user ID for which TimeCamp should create the entry as a positive integer."
+              }
+            ],
+            "description": "The user ID for which TimeCamp should create the entry"
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The task ID associated with the new entry."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A TimeCamp tag ID."
+            },
+            "description": "Tag IDs to attach to the new entry.",
+            "minItems": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note to attach to the new time entry."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The description to attach to the new time entry."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should mark the entry as billable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date"
+        ],
+        "description": "The input payload for creating a TimeCamp time entry.",
+        "anyOf": [
+          {
+            "required": [
+              "duration"
+            ]
+          },
+          {
+            "required": [
+              "startTime",
+              "endTime"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ID of the created TimeCamp time entry."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ID of the created TimeCamp time entry."
+          },
+          "raw": {
+            "description": "The raw TimeCamp response payload for this item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entryId",
+          "raw"
+        ],
+        "description": "The response returned after creating a TimeCamp time entry."
+      }
+    },
+    {
+      "id": "timecamp.get_current_user",
+      "service": "timecamp",
+      "name": "get_current_user",
+      "description": "Get the TimeCamp user associated with the current API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the current TimeCamp user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TimeCamp user ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TimeCamp user ID."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's email address."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's display name."
+              },
+              "groupId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The group ID associated with the user when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group ID associated with the user when returned."
+              },
+              "rootGroupId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's root group ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's root group ID when returned."
+              },
+              "registerTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user registration timestamp returned by TimeCamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user registration timestamp returned by TimeCamp."
+              },
+              "loginTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's last login timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's last login timestamp when returned."
+              },
+              "syncTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's last desktop sync timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's last desktop sync timestamp when returned."
+              },
+              "permissions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The permission flags returned by TimeCamp for this user."
+              },
+              "raw": {
+                "description": "The raw TimeCamp response payload for this item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized TimeCamp user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The response returned when retrieving the current TimeCamp user."
+      }
+    },
+    {
+      "id": "timecamp.get_timer_status",
+      "service": "timecamp",
+      "name": "get_timer_status",
+      "description": "Get the current TimeCamp timer status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the TimeCamp timer status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "isTimerRunning": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp reports an active timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp reports an active timer."
+              },
+              "elapsed": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Elapsed timer seconds when TimeCamp returns them."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Elapsed timer seconds when TimeCamp returns them."
+              },
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID associated with the timer response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The entry ID associated with the timer response."
+              },
+              "timerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The active timer ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The active timer ID when returned."
+              },
+              "newTimerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The new timer ID returned after starting a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The new timer ID returned after starting a timer."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timer start timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timer start timestamp when returned."
+              },
+              "entryTime": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The saved entry duration after stopping a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The saved entry duration after stopping a timer."
+              },
+              "raw": {
+                "description": "The raw TimeCamp response payload for this item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized TimeCamp timer response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timer"
+        ],
+        "description": "The response returned when reading the TimeCamp timer status."
+      }
+    },
+    {
+      "id": "timecamp.list_tasks",
+      "service": "timecamp",
+      "name": "list_tasks",
+      "description": "List TimeCamp tasks or projects with optional task and status filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A TimeCamp task ID as a string."
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A TimeCamp task ID as a positive integer."
+                }
+              ],
+              "description": "A TimeCamp task ID"
+            },
+            "description": "Specific TimeCamp task IDs to request. Multiple values are sent as a comma-separated task_id query.",
+            "minItems": 1
+          },
+          "externalTaskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A TimeCamp external task ID to request."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "create_subtask",
+                "edit_task_settings",
+                "track_time",
+                "view_detailed_data"
+              ],
+              "description": "A TimeCamp task permission filter."
+            },
+            "description": "Permission names used by TimeCamp to filter tasks.",
+            "minItems": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived",
+              "all"
+            ],
+            "description": "The TimeCamp task status filter."
+          },
+          "minimal": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should return minimal task information."
+          },
+          "ignoreAdminRights": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should ignore admin rights while filtering accessible tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TimeCamp tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "taskId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp task ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp task ID."
+                },
+                "parentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent task ID, or null for root-level projects."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent task ID, or null for root-level projects."
+                },
+                "assignedBy": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user ID that assigned this task when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user ID that assigned this task when returned."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task or project name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task or project name."
+                },
+                "externalTaskId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The external task ID when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The external task ID when configured."
+                },
+                "externalParentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The external parent task ID when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The external parent task ID when configured."
+                },
+                "level": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The task tree level when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task tree level when returned."
+                },
+                "archived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether TimeCamp marks the task as archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether TimeCamp marks the task as archived."
+                },
+                "billable": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether TimeCamp marks the task as billable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether TimeCamp marks the task as billable."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task color returned by TimeCamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task color returned by TimeCamp."
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task note returned by TimeCamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task note returned by TimeCamp."
+                },
+                "addDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task creation timestamp returned by TimeCamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task creation timestamp returned by TimeCamp."
+                },
+                "modifyTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task modification timestamp returned by TimeCamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task modification timestamp returned by TimeCamp."
+                },
+                "users": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The TimeCamp users assigned to this task keyed by user ID."
+                },
+                "raw": {
+                  "description": "The raw TimeCamp response payload for this item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized TimeCamp task or project."
+            },
+            "description": "The TimeCamp tasks returned by the API."
+          },
+          "raw": {
+            "description": "The raw TimeCamp tasks response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks",
+          "raw"
+        ],
+        "description": "The response returned when listing TimeCamp tasks."
+      }
+    },
+    {
+      "id": "timecamp.list_time_entries",
+      "service": "timecamp",
+      "name": "list_time_entries",
+      "description": "List TimeCamp time entries for a date or modification range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "The start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "The end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should return only billable entries."
+          },
+          "modifyFrom": {
+            "type": "string",
+            "description": "The minimal latest modification date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "modifyTo": {
+            "type": "string",
+            "description": "The maximal latest modification date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A TimeCamp tag ID as a string."
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A TimeCamp tag ID as a positive integer."
+                }
+              ],
+              "description": "A TimeCamp tag ID"
+            },
+            "description": "Tag IDs used to filter entries. TimeCamp receives one repeated tags_filter item per tag.",
+            "minItems": 1
+          },
+          "approvalMode": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should apply approval-mode permissions."
+          },
+          "optionalFields": {
+            "type": "string",
+            "enum": [
+              "tags",
+              "breadcrumps"
+            ],
+            "description": "Extra fields TimeCamp should include in the response."
+          },
+          "includeProject": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should include project or task information."
+          },
+          "includeRates": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should include rate information."
+          },
+          "withSubtasks": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should include subtasks."
+          },
+          "ignoreInvoiced": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should ignore invoiced entries."
+          },
+          "roundDuration": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should round entry durations."
+          },
+          "activeOnly": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should return only active entries."
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A TimeCamp user ID or the value me."
+            },
+            "description": "User IDs to include. Use me for entries owned by the current user.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TimeCamp time entries.",
+        "anyOf": [
+          {
+            "required": [
+              "from",
+              "to"
+            ]
+          },
+          {
+            "required": [
+              "modifyFrom",
+              "modifyTo"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entryId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp time entry ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp time entry ID."
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The time entry duration in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry duration in seconds."
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp user ID associated with the entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp user ID associated with the entry."
+                },
+                "userName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp user name associated with the entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp user name associated with the entry."
+                },
+                "taskId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task ID associated with the entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task ID associated with the entry."
+                },
+                "taskName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task name associated with the entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task name associated with the entry."
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time entry date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry date."
+                },
+                "startTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time entry start time."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry start time."
+                },
+                "endTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time entry end time."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry end time."
+                },
+                "lastModify": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp modification timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp modification timestamp."
+                },
+                "locked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether TimeCamp marks the entry as locked."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether TimeCamp marks the entry as locked."
+                },
+                "billable": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether TimeCamp marks the entry as billable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether TimeCamp marks the entry as billable."
+                },
+                "invoiceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The invoice ID associated with the entry when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The invoice ID associated with the entry when returned."
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time entry note or description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry note or description."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The time entry color when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The time entry color when returned."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tagListName": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The TimeCamp tag list name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The TimeCamp tag list name."
+                      },
+                      "tagListId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The TimeCamp tag list ID."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The TimeCamp tag list ID."
+                      },
+                      "tagId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The TimeCamp tag ID."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The TimeCamp tag ID."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The tag name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The tag name."
+                      },
+                      "mandatory": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether TimeCamp marks the tag as mandatory."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether TimeCamp marks the tag as mandatory."
+                      },
+                      "raw": {
+                        "description": "The raw TimeCamp response payload for this item."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized tag attached to a TimeCamp time entry."
+                  },
+                  "description": "The tags attached to the time entry."
+                },
+                "hasEntryLocationHistory": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether TimeCamp reports location history for this entry."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether TimeCamp reports location history for this entry."
+                },
+                "raw": {
+                  "description": "The raw TimeCamp response payload for this item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized TimeCamp time entry."
+            },
+            "description": "The TimeCamp time entries returned by the API."
+          },
+          "raw": {
+            "description": "The raw TimeCamp time entries response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntries",
+          "raw"
+        ],
+        "description": "The response returned when listing TimeCamp time entries."
+      }
+    },
+    {
+      "id": "timecamp.list_users",
+      "service": "timecamp",
+      "name": "list_users",
+      "description": "List users in the connected TimeCamp account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activeOnly": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should return only active users."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TimeCamp users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The TimeCamp user ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The TimeCamp user ID."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's email address."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's display name."
+                },
+                "groupId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The group ID associated with the user when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The group ID associated with the user when returned."
+                },
+                "rootGroupId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's root group ID when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's root group ID when returned."
+                },
+                "registerTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user registration timestamp returned by TimeCamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user registration timestamp returned by TimeCamp."
+                },
+                "loginTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's last login timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's last login timestamp when returned."
+                },
+                "syncTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user's last desktop sync timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user's last desktop sync timestamp when returned."
+                },
+                "permissions": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The permission flags returned by TimeCamp for this user."
+                },
+                "raw": {
+                  "description": "The raw TimeCamp response payload for this item."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized TimeCamp user."
+            },
+            "description": "The TimeCamp users returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users"
+        ],
+        "description": "The response returned when listing TimeCamp users."
+      }
+    },
+    {
+      "id": "timecamp.start_timer",
+      "service": "timecamp",
+      "name": "start_timer",
+      "description": "Start a TimeCamp timer, optionally attached to a task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The task ID to track time against."
+          },
+          "startedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timestamp from which TimeCamp should start the timer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for starting a TimeCamp timer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "isTimerRunning": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp reports an active timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp reports an active timer."
+              },
+              "elapsed": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Elapsed timer seconds when TimeCamp returns them."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Elapsed timer seconds when TimeCamp returns them."
+              },
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID associated with the timer response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The entry ID associated with the timer response."
+              },
+              "timerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The active timer ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The active timer ID when returned."
+              },
+              "newTimerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The new timer ID returned after starting a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The new timer ID returned after starting a timer."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timer start timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timer start timestamp when returned."
+              },
+              "entryTime": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The saved entry duration after stopping a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The saved entry duration after stopping a timer."
+              },
+              "raw": {
+                "description": "The raw TimeCamp response payload for this item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized TimeCamp timer response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timer"
+        ],
+        "description": "The response returned after starting a TimeCamp timer."
+      }
+    },
+    {
+      "id": "timecamp.stop_timer",
+      "service": "timecamp",
+      "name": "stop_timer",
+      "description": "Stop the current TimeCamp timer and save the tracked time.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "stoppedAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timestamp at which TimeCamp should stop the timer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for stopping a TimeCamp timer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "type": "object",
+            "properties": {
+              "isTimerRunning": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp reports an active timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp reports an active timer."
+              },
+              "elapsed": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Elapsed timer seconds when TimeCamp returns them."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Elapsed timer seconds when TimeCamp returns them."
+              },
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID associated with the timer response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The entry ID associated with the timer response."
+              },
+              "timerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The active timer ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The active timer ID when returned."
+              },
+              "newTimerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The new timer ID returned after starting a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The new timer ID returned after starting a timer."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timer start timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timer start timestamp when returned."
+              },
+              "entryTime": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The saved entry duration after stopping a timer."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The saved entry duration after stopping a timer."
+              },
+              "raw": {
+                "description": "The raw TimeCamp response payload for this item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized TimeCamp timer response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timer"
+        ],
+        "description": "The response returned after stopping a TimeCamp timer."
+      }
+    },
+    {
+      "id": "timecamp.update_time_entry",
+      "service": "timecamp",
+      "name": "update_time_entry",
+      "description": "Update an existing TimeCamp time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The TimeCamp time entry ID to update."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated entry start time accepted by TimeCamp."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated entry end time accepted by TimeCamp."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated entry duration in seconds."
+          },
+          "date": {
+            "type": "string",
+            "description": "The updated entry date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated note for the time entry."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated description for the time entry."
+          },
+          "invoiceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated invoice ID associated with the entry."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated task ID associated with the entry."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether TimeCamp should mark the entry as billable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entryId"
+        ],
+        "description": "The input payload for updating a TimeCamp time entry.",
+        "anyOf": [
+          {
+            "required": [
+              "startTime"
+            ]
+          },
+          {
+            "required": [
+              "endTime"
+            ]
+          },
+          {
+            "required": [
+              "duration"
+            ]
+          },
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "note"
+            ]
+          },
+          {
+            "required": [
+              "description"
+            ]
+          },
+          {
+            "required": [
+              "invoiceId"
+            ]
+          },
+          {
+            "required": [
+              "taskId"
+            ]
+          },
+          {
+            "required": [
+              "billable"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntry": {
+            "type": "object",
+            "properties": {
+              "entryId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TimeCamp time entry ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TimeCamp time entry ID."
+              },
+              "duration": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The time entry duration in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry duration in seconds."
+              },
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TimeCamp user ID associated with the entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TimeCamp user ID associated with the entry."
+              },
+              "userName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TimeCamp user name associated with the entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TimeCamp user name associated with the entry."
+              },
+              "taskId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task ID associated with the entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task ID associated with the entry."
+              },
+              "taskName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task name associated with the entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task name associated with the entry."
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The time entry date."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry date."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The time entry start time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry start time."
+              },
+              "endTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The time entry end time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry end time."
+              },
+              "lastModify": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The TimeCamp modification timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The TimeCamp modification timestamp."
+              },
+              "locked": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp marks the entry as locked."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp marks the entry as locked."
+              },
+              "billable": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp marks the entry as billable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp marks the entry as billable."
+              },
+              "invoiceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice ID associated with the entry when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice ID associated with the entry when returned."
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The time entry note or description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry note or description."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The time entry color when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The time entry color when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tagListName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The TimeCamp tag list name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The TimeCamp tag list name."
+                    },
+                    "tagListId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The TimeCamp tag list ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The TimeCamp tag list ID."
+                    },
+                    "tagId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The TimeCamp tag ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The TimeCamp tag ID."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The tag name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The tag name."
+                    },
+                    "mandatory": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether TimeCamp marks the tag as mandatory."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether TimeCamp marks the tag as mandatory."
+                    },
+                    "raw": {
+                      "description": "The raw TimeCamp response payload for this item."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A normalized tag attached to a TimeCamp time entry."
+                },
+                "description": "The tags attached to the time entry."
+              },
+              "hasEntryLocationHistory": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether TimeCamp reports location history for this entry."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether TimeCamp reports location history for this entry."
+              },
+              "raw": {
+                "description": "The raw TimeCamp response payload for this item."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized TimeCamp time entry."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntry"
+        ],
+        "description": "The response returned after updating a TimeCamp time entry."
+      }
+    }
+  ]
+}

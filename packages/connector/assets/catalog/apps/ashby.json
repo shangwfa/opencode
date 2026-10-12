@@ -1,0 +1,375 @@
+{
+  "service": "ashby",
+  "displayName": "Ashby",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ASHBY_API_KEY",
+      "description": "Ashby API key used as the Basic Auth username. Create or manage API keys in Ashby Admin > Integrations > API Keys: https://app.ashbyhq.com/admin/api/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.ashbyhq.com",
+  "actions": [
+    {
+      "id": "ashby.api_key_info",
+      "service": "ashby",
+      "name": "api_key_info",
+      "description": "Retrieve information about the Ashby API key used for this connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input payload for retrieving Ashby API key information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The name of the API key."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The name of the API key."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The API key creation timestamp returned by Ashby."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The API key creation timestamp returned by Ashby."
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One API key scope."
+                },
+                "description": "Permission scopes authorized for the API key."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Ashby."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Information about the Ashby API key."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ashby API key information response."
+      }
+    },
+    {
+      "id": "ashby.list_candidates",
+      "service": "ashby",
+      "name": "list_candidates",
+      "description": "List Ashby candidates with optional pagination and incremental sync filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "candidatesRead"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "createdAfter": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor indicating which page of Ashby results to fetch."
+          },
+          "syncToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque token representing the last successful Ashby incremental sync."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return. The maximum is 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common Ashby paginated list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "moreDataAvailable": {
+                "type": "boolean",
+                "description": "Whether another page of data is available."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor to use for the next page when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor to use for the next page when available."
+              },
+              "syncToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The sync token returned after a completed sync when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The sync token returned after a completed sync when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination and sync metadata returned by Ashby."
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Ashby."
+            },
+            "description": "Candidates returned by Ashby."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ashby candidate list response."
+      }
+    },
+    {
+      "id": "ashby.list_jobs",
+      "service": "ashby",
+      "name": "list_jobs",
+      "description": "List Ashby jobs with optional status, timestamp, expansion, pagination, and sync filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "jobsRead"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "createdAfter": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor indicating which page of Ashby results to fetch."
+          },
+          "syncToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque token representing the last successful Ashby incremental sync."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return. The maximum is 100."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Draft",
+                "Open",
+                "Closed",
+                "Archived"
+              ],
+              "description": "One Ashby job status."
+            },
+            "description": "When supplied, only jobs with the provided status values are returned.",
+            "minItems": 1
+          },
+          "openedAfter": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "openedBefore": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "closedAfter": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "closedBefore": {
+            "type": "integer",
+            "description": "A timestamp in milliseconds since the Unix epoch."
+          },
+          "includeUnpublishedJobPostingsIds": {
+            "type": "boolean",
+            "description": "Whether to include unpublished job posting IDs."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "location",
+                "openings"
+              ],
+              "description": "One supported Ashby job expansion."
+            },
+            "description": "Related job objects to expand in Ashby's response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing Ashby jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "moreDataAvailable": {
+                "type": "boolean",
+                "description": "Whether another page of data is available."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor to use for the next page when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor to use for the next page when available."
+              },
+              "syncToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The sync token returned after a completed sync when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The sync token returned after a completed sync when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination and sync metadata returned by Ashby."
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Ashby."
+            },
+            "description": "Jobs returned by Ashby."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ashby job list response."
+      }
+    },
+    {
+      "id": "ashby.search_candidates",
+      "service": "ashby",
+      "name": "search_candidates",
+      "description": "Search Ashby candidates by email and/or name for small result sets such as autocomplete.",
+      "operationType": "read",
+      "requiredScopes": [
+        "candidatesRead"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The candidate email address to search for.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The candidate name to search for."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for searching Ashby candidates.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "name"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by Ashby."
+            },
+            "description": "Candidates matching the search parameters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ashby candidate search response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,763 @@
+{
+  "service": "census_bureau",
+  "displayName": "Census Bureau",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CENSUS_API_KEY",
+      "description": "Census Data API key passed as the key query parameter. Request or manage keys at https://api.census.gov/data/key_signup.html."
+    }
+  ],
+  "homepageUrl": "https://www.census.gov",
+  "actions": [
+    {
+      "id": "census_bureau.get_group",
+      "service": "census_bureau",
+      "name": "get_group",
+      "description": "Get one Census Data API variable group and its variables.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Census dataset path after /data, for example 2022/acs/acs5."
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Census variable group name, for example B01001."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting a Census dataset group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The group name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The group description when provided."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group description when provided."
+              },
+              "variables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The Census variable name."
+                    },
+                    "label": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The variable label returned by Census metadata."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The variable label returned by Census metadata."
+                    },
+                    "concept": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The variable concept returned by Census metadata."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The variable concept returned by Census metadata."
+                    },
+                    "predicateType": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The variable predicate type when provided."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The variable predicate type when provided."
+                    },
+                    "group": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The variable group name when provided."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The variable group name when provided."
+                    },
+                    "limit": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The variable limit value when provided."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The variable limit value when provided."
+                    },
+                    "predicateOnly": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the variable is predicate-only when indicated."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the variable is predicate-only when indicated."
+                    },
+                    "required": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether Census marks the variable as required."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether Census marks the variable as required."
+                    },
+                    "attributes": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The attributes string returned for the variable."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The attributes string returned for the variable."
+                    },
+                    "values": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "The enumerated values object for the variable."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The enumerated values object for the variable."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw object returned by the Census Data API."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Census variable metadata entry."
+                },
+                "description": "The variables in the group."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the Census Data API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The requested Census variable group."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting a Census dataset group."
+      }
+    },
+    {
+      "id": "census_bureau.list_datasets",
+      "service": "census_bureau",
+      "name": "list_datasets",
+      "description": "List Census Data API datasets with optional client-side search, vintage, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Case-insensitive text used to filter dataset title or description."
+          },
+          "vintage": {
+            "type": "integer",
+            "description": "The dataset vintage year used to filter Census metadata."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Maximum number of matched datasets to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset into the matched dataset list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Census Data API datasets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The dataset title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The dataset description when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The dataset description when provided."
+                },
+                "vintage": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The dataset vintage year when published in metadata."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The dataset vintage year when published in metadata."
+                },
+                "datasetPath": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized Census API dataset path when derivable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized Census API dataset path when derivable."
+                },
+                "identifier": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One dataset identifier component."
+                  },
+                  "description": "The dataset identifier components returned by Census metadata."
+                },
+                "distributionUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The first dataset access URL when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The first dataset access URL when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Census Data API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Census API dataset summary."
+            },
+            "description": "The matched Census datasets."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of datasets returned in this page."
+          },
+          "totalMatched": {
+            "type": "integer",
+            "description": "The total number of datasets matched before pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Census datasets."
+      }
+    },
+    {
+      "id": "census_bureau.list_groups",
+      "service": "census_bureau",
+      "name": "list_groups",
+      "description": "List variable groups for a Census Data API dataset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Census dataset path after /data, for example 2022/acs/acs5."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Census dataset groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The group name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The group description when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The group description when provided."
+                },
+                "variablesUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official variables URL for the group when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official variables URL for the group when provided."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Census Data API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Census variable group summary."
+            },
+            "description": "The groups returned for the dataset."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of groups returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Census Data API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Census dataset groups."
+      }
+    },
+    {
+      "id": "census_bureau.list_variables",
+      "service": "census_bureau",
+      "name": "list_variables",
+      "description": "List variables for a Census Data API dataset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Census dataset path after /data, for example 2022/acs/acs5."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Census dataset variables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The Census variable name."
+                },
+                "label": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The variable label returned by Census metadata."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The variable label returned by Census metadata."
+                },
+                "concept": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The variable concept returned by Census metadata."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The variable concept returned by Census metadata."
+                },
+                "predicateType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The variable predicate type when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The variable predicate type when provided."
+                },
+                "group": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The variable group name when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The variable group name when provided."
+                },
+                "limit": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The variable limit value when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The variable limit value when provided."
+                },
+                "predicateOnly": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the variable is predicate-only when indicated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the variable is predicate-only when indicated."
+                },
+                "required": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Census marks the variable as required."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Census marks the variable as required."
+                },
+                "attributes": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The attributes string returned for the variable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The attributes string returned for the variable."
+                },
+                "values": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The enumerated values object for the variable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enumerated values object for the variable."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Census Data API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Census variable metadata entry."
+            },
+            "description": "The variables returned for the dataset."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of variables returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Census Data API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Census dataset variables."
+      }
+    },
+    {
+      "id": "census_bureau.query_dataset",
+      "service": "census_bureau",
+      "name": "query_dataset",
+      "description": "Query a Census Data API dataset with variables, geography predicates, and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Census dataset path after /data, for example 2022/acs/acs5."
+          },
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Census variable name such as NAME or B01001_001E."
+            },
+            "description": "The Census variables to request through the get parameter.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "for": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official Census for predicate, for example state:*."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A single Census in predicate."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Census in predicate fragment."
+                },
+                "description": "Multiple Census in predicate fragments joined with plus signs.",
+                "minItems": 1
+              }
+            ],
+            "description": "The optional official Census in predicate value or values."
+          },
+          "predicates": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string predicate value."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric predicate value."
+                    },
+                    {
+                      "type": "boolean",
+                      "description": "A boolean predicate value."
+                    }
+                  ],
+                  "description": "A scalar Census query predicate value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string predicate value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric predicate value."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "A boolean predicate value."
+                      }
+                    ],
+                    "description": "A scalar Census query predicate value."
+                  },
+                  "description": "Multiple values for the same Census query predicate, sent as repeated query parameters.",
+                  "minItems": 1
+                }
+              ],
+              "description": "A Census query predicate value."
+            },
+            "description": "Additional Census query predicates besides get, for, in, and key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetPath",
+          "variables",
+          "for"
+        ],
+        "description": "The input payload for querying a Census dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One response column name."
+            },
+            "description": "The Census response column names."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "One Census response cell value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One Census response cell value."
+              },
+              "description": "A Census response row keyed by response column name."
+            },
+            "description": "The Census response rows normalized as objects keyed by column name."
+          },
+          "rawRows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "One Census response cell."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One Census response cell."
+              },
+              "description": "A raw Census response row."
+            },
+            "description": "The raw Census response rows, including the header row as the first entry."
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "The number of data rows returned, excluding the header row."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized response returned when querying a Census dataset."
+      }
+    }
+  ]
+}

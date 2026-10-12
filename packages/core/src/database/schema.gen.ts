@@ -91,6 +91,86 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`connector_connection\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`engine_connection_id\` text NOT NULL,
+          \`engine_connection_name\` text NOT NULL,
+          \`service\` text NOT NULL,
+          \`alias\` text NOT NULL,
+          \`auth_type\` text NOT NULL,
+          \`status\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`connector_oauth_request\` (
+          \`connection_request_id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`service\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`alias\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`connector_trigger_event\` (
+          \`id\` text PRIMARY KEY,
+          \`schedule_id\` text NOT NULL,
+          \`delivery_key\` text NOT NULL,
+          \`payload_json\` text NOT NULL,
+          \`delivered_at\` integer,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`connector_trigger_receipt\` (
+          \`id\` text PRIMARY KEY,
+          \`schedule_id\` text NOT NULL,
+          \`received_at\` integer NOT NULL,
+          \`dedup_key\` text NOT NULL,
+          \`body_base64\` text NOT NULL,
+          \`headers_json\` text NOT NULL,
+          \`state\` text NOT NULL,
+          \`engine_result_json\` text,
+          \`checkpoint_json\` text,
+          \`attempts\` integer DEFAULT 0 NOT NULL,
+          \`next_retry_at\` integer NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`connector_trigger_schedule\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`service\` text NOT NULL,
+          \`trigger_id\` text NOT NULL,
+          \`engine_connection_id\` text NOT NULL,
+          \`endpoint_url\` text NOT NULL,
+          \`engine_subscription_id\` text,
+          \`engine_token_id\` text,
+          \`engine_token\` text,
+          \`engine_token_encrypted\` text,
+          \`token_state\` text DEFAULT 'active' NOT NULL,
+          \`config_json\` text DEFAULT '{}' NOT NULL,
+          \`checkpoint_json\` text,
+          \`checkpoint_revision\` integer DEFAULT 0 NOT NULL,
+          \`next_run_at\` integer NOT NULL,
+          \`lease_epoch\` integer DEFAULT 0 NOT NULL,
+          \`lease_until\` integer DEFAULT 0 NOT NULL,
+          \`status\` text NOT NULL,
+          \`wake_seq\` integer DEFAULT 0 NOT NULL,
+          \`poll_attempts\` integer DEFAULT 0 NOT NULL,
+          \`last_result_json\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`credential\` (
           \`id\` text PRIMARY KEY,
           \`integration_id\` text,
@@ -478,6 +558,31 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`snapshot_refresh_operation_active_uniq\` ON \`snapshot_refresh_operation\` (\`session_id\`,\`sandbox_id\`,\`kind\`) WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`connector_connection_engine_id_uq\` ON \`connector_connection\` (\`engine_connection_id\`);`,
+      )
+      yield* tx.run(`CREATE INDEX \`connector_connection_session_idx\` ON \`connector_connection\` (\`session_id\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`connector_oauth_request_session_idx\` ON \`connector_oauth_request\` (\`session_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`connector_trigger_event_delivery_uq\` ON \`connector_trigger_event\` (\`schedule_id\`,\`delivery_key\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`connector_trigger_event_schedule_idx\` ON \`connector_trigger_event\` (\`schedule_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`connector_trigger_receipt_dedup_uq\` ON \`connector_trigger_receipt\` (\`schedule_id\`,\`dedup_key\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`connector_trigger_receipt_retry_idx\` ON \`connector_trigger_receipt\` (\`state\`,\`next_retry_at\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`connector_trigger_schedule_session_idx\` ON \`connector_trigger_schedule\` (\`session_id\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`connector_trigger_schedule_due_idx\` ON \`connector_trigger_schedule\` (\`next_run_at\`);`,
       )
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)

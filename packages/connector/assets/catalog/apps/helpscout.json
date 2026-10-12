@@ -1,0 +1,1690 @@
+{
+  "service": "helpscout",
+  "displayName": "Help Scout",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://secure.helpscout.net/authentication/authorizeClientApplication",
+      "tokenUrl": "https://api.helpscout.net/v2/oauth2/token",
+      "scopes": [],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://www.helpscout.com",
+  "actions": [
+    {
+      "id": "helpscout.assign_conversation",
+      "service": "helpscout",
+      "name": "assign_conversation",
+      "description": "Assign a Help Scout conversation to a user or leave it unassigned.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "assignedUserId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Help Scout user ID, or null to leave the conversation unassigned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Help Scout user ID, or null to leave the conversation unassigned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for assigning a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the assignment update."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated Help Scout conversation ID."
+          },
+          "assignedUserId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The assigned Help Scout user ID, or null when unassigned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The assigned Help Scout user ID, or null when unassigned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation assignment result."
+      }
+    },
+    {
+      "id": "helpscout.create_conversation",
+      "service": "helpscout",
+      "name": "create_conversation",
+      "description": "Create a Help Scout conversation with one initial text thread.",
+      "operationType": "write",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The conversation subject."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout inbox where the conversation is created."
+          },
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The existing Help Scout customer ID."
+          },
+          "customerEmail": {
+            "type": "string",
+            "description": "The customer email address used to find or create the customer.",
+            "format": "email"
+          },
+          "customerFirstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "The first name used when a new customer is created."
+          },
+          "customerLastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "The last name used when a new customer is created."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "email",
+              "phone"
+            ],
+            "description": "The conversation channel type.",
+            "default": "email"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "pending"
+            ],
+            "description": "The initial Help Scout conversation status.",
+            "default": "active"
+          },
+          "threadType": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "note",
+              "reply"
+            ],
+            "description": "The type of the initial conversation thread.",
+            "default": "customer"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML-supported text of the initial thread."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout user creating the conversation and thread."
+          },
+          "assignedUserId": {
+            "type": "integer",
+            "exclusiveMinimum": 1,
+            "description": "The Help Scout user assigned to the new conversation; Help Scout requires an ID greater than 1."
+          },
+          "autoReply": {
+            "type": "boolean",
+            "description": "Whether Help Scout should send the configured automatic reply."
+          },
+          "tagNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Help Scout tag name."
+            },
+            "description": "The tags applied to the new conversation."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Help Scout custom field ID."
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 15000,
+                  "description": "The field value; use an option ID for dropdown fields and YYYY-MM-DD for date fields."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Help Scout custom field value."
+            },
+            "description": "The complete set of custom fields to apply; omitted existing fields are removed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "inboxId",
+          "text"
+        ],
+        "description": "Input parameters for creating a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the conversation creation."
+          },
+          "conversationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The created Help Scout conversation ID, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The created Help Scout conversation ID, or null."
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The API location of the created conversation, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The API location of the created conversation, or null."
+          },
+          "webLocation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Help Scout web URL of the conversation, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Help Scout web URL of the conversation, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation creation result."
+      }
+    },
+    {
+      "id": "helpscout.create_customer",
+      "service": "helpscout",
+      "name": "create_customer",
+      "description": "Create a Help Scout customer with a primary email address.",
+      "operationType": "write",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The customer's primary email address.",
+            "format": "email"
+          },
+          "emailType": {
+            "type": "string",
+            "enum": [
+              "home",
+              "other",
+              "work"
+            ],
+            "description": "The category assigned to the customer email address.",
+            "default": "work"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "The customer's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "The customer's last name."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The customer's phone number."
+          },
+          "jobTitle": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "The customer's job title."
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 60,
+            "description": "The customer's location."
+          },
+          "background": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Internal background information about the customer."
+          },
+          "organizationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout organization ID linked to the customer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input parameters for creating a Help Scout customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the customer creation."
+          },
+          "customerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The created Help Scout customer ID, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The created Help Scout customer ID, or null."
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The API location of the created customer, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The API location of the created customer, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout customer creation result."
+      }
+    },
+    {
+      "id": "helpscout.create_note",
+      "service": "helpscout",
+      "name": "create_note",
+      "description": "Add an internal note to a Help Scout conversation.",
+      "operationType": "write",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML-supported internal note text."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout user adding the note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId",
+          "text"
+        ],
+        "description": "Input parameters for adding a Help Scout conversation note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the note creation."
+          },
+          "threadId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The created Help Scout thread ID, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The created Help Scout thread ID, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout note creation result."
+      }
+    },
+    {
+      "id": "helpscout.create_reply",
+      "service": "helpscout",
+      "name": "create_reply",
+      "description": "Add a published reply or draft reply to a Help Scout conversation.",
+      "operationType": "write",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout customer receiving the reply."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HTML-supported reply text."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "Whether to save the reply as a draft instead of publishing it."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout user adding the reply."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One CC email address.",
+              "format": "email"
+            },
+            "description": "The email addresses copied on the reply."
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One BCC email address.",
+              "format": "email"
+            },
+            "description": "The email addresses blind-copied on the reply."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId",
+          "customerId",
+          "text"
+        ],
+        "description": "Input parameters for replying to a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the reply creation."
+          },
+          "threadId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The created Help Scout thread ID, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The created Help Scout thread ID, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout reply creation result."
+      }
+    },
+    {
+      "id": "helpscout.get_conversation",
+      "service": "helpscout",
+      "name": "get_conversation",
+      "description": "Get one Help Scout conversation by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "embedThreads": {
+            "type": "boolean",
+            "description": "Whether to embed thread previews in the conversation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId"
+        ],
+        "description": "Input parameters for getting a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Help Scout conversation object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Help Scout conversation."
+      }
+    },
+    {
+      "id": "helpscout.get_customer",
+      "service": "helpscout",
+      "name": "get_customer",
+      "description": "Get one Help Scout customer by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout customer ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a Help Scout customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Help Scout customer object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Help Scout customer."
+      }
+    },
+    {
+      "id": "helpscout.get_saved_reply",
+      "service": "helpscout",
+      "name": "get_saved_reply",
+      "description": "Get the complete email and chat content of a Help Scout saved reply.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout inbox ID containing the saved reply."
+          },
+          "savedReplyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout saved reply ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a Help Scout saved reply."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedReply": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Help Scout saved reply object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Help Scout saved reply."
+      }
+    },
+    {
+      "id": "helpscout.list_conversations",
+      "service": "helpscout",
+      "name": "list_conversations",
+      "description": "List and filter conversations in the connected Help Scout account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          },
+          "inboxIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Help Scout inbox ID."
+            },
+            "description": "The Help Scout inbox IDs whose conversations should be returned.",
+            "minItems": 1
+          },
+          "folderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout folder ID used to filter conversations."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "all",
+              "closed",
+              "open",
+              "pending",
+              "spam"
+            ],
+            "description": "The Help Scout conversation status filter."
+          },
+          "tagNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Help Scout tag name."
+            },
+            "description": "The tag names used to filter conversations.",
+            "minItems": 1
+          },
+          "assignedUserId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout user ID assigned to the conversations."
+          },
+          "conversationNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The human-facing Help Scout conversation number."
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Return conversations modified after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Help Scout conversation search query."
+          },
+          "sortField": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "customerEmail",
+              "customerName",
+              "mailboxid",
+              "modifiedAt",
+              "number",
+              "score",
+              "status",
+              "subject",
+              "waitingSince"
+            ],
+            "description": "The field used to sort conversations."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The conversation sort direction."
+          },
+          "embedThreads": {
+            "type": "boolean",
+            "description": "Whether to embed thread previews in each returned conversation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout conversations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout conversations collection."
+            },
+            "description": "The Help Scout conversations returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout conversations."
+      }
+    },
+    {
+      "id": "helpscout.list_customers",
+      "service": "helpscout",
+      "name": "list_customers",
+      "description": "List and filter customers in the connected Help Scout account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return customers associated with this Help Scout inbox."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return customers with this first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return customers with this last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Return customers matching this email address.",
+            "format": "email"
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Return customers modified after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "sortField": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "firstName",
+              "lastName",
+              "modifiedAt"
+            ],
+            "description": "The field used to sort customers."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The customer sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout customers collection."
+            },
+            "description": "The Help Scout customers returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout customers."
+      }
+    },
+    {
+      "id": "helpscout.list_inbox_custom_fields",
+      "service": "helpscout",
+      "name": "list_inbox_custom_fields",
+      "description": "List the custom field definitions and dropdown options for a Help Scout inbox.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout inbox custom fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout custom fields collection."
+            },
+            "description": "The Help Scout custom fields returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout custom fields."
+      }
+    },
+    {
+      "id": "helpscout.list_inbox_folders",
+      "service": "helpscout",
+      "name": "list_inbox_folders",
+      "description": "List the folders and conversation counts in a Help Scout inbox.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout inbox ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout inbox folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout folders collection."
+            },
+            "description": "The Help Scout folders returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout folders."
+      }
+    },
+    {
+      "id": "helpscout.list_inboxes",
+      "service": "helpscout",
+      "name": "list_inboxes",
+      "description": "List the Help Scout inboxes available to the connected user.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout inboxes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout inboxes collection."
+            },
+            "description": "The Help Scout inboxes returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout inboxes."
+      }
+    },
+    {
+      "id": "helpscout.list_saved_replies",
+      "service": "helpscout",
+      "name": "list_saved_replies",
+      "description": "List the approved saved reply templates available in a Help Scout inbox.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout inbox ID."
+          },
+          "includeChatReplies": {
+            "type": "boolean",
+            "description": "Whether chat-only saved replies should also be returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inboxId"
+        ],
+        "description": "Input parameters for listing Help Scout saved replies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedReplies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Help Scout saved reply summary."
+            },
+            "description": "The saved reply summaries returned by Help Scout."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The saved replies available in the Help Scout inbox."
+      }
+    },
+    {
+      "id": "helpscout.list_tags",
+      "service": "helpscout",
+      "name": "list_tags",
+      "description": "List tags used across the connected Help Scout account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout tags collection."
+            },
+            "description": "The Help Scout tags returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout tags."
+      }
+    },
+    {
+      "id": "helpscout.list_threads",
+      "service": "helpscout",
+      "name": "list_threads",
+      "description": "List the complete threads belonging to a Help Scout conversation.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversationId"
+        ],
+        "description": "Input parameters for listing conversation threads."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout threads collection."
+            },
+            "description": "The Help Scout threads returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout threads."
+      }
+    },
+    {
+      "id": "helpscout.list_users",
+      "service": "helpscout",
+      "name": "list_users",
+      "description": "List Help Scout users, optionally filtered by email or inbox.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Return the Help Scout user with this exact email address.",
+            "format": "email"
+          },
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return users who have access to this Help Scout inbox."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout users collection."
+            },
+            "description": "The Help Scout users returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout users."
+      }
+    },
+    {
+      "id": "helpscout.list_workflows",
+      "service": "helpscout",
+      "name": "list_workflows",
+      "description": "List Help Scout workflows, including the manual automations that can be run.",
+      "operationType": "read",
+      "requiredScopes": [
+        "helpscout.inbox.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inboxId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Return workflows associated with this Help Scout inbox."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "description": "The Help Scout workflow type."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Help Scout workflows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One object from the Help Scout workflows collection."
+            },
+            "description": "The Help Scout workflows returned on this page."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Help Scout pagination metadata, or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Help Scout pagination metadata, or null."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One page of Help Scout workflows."
+      }
+    },
+    {
+      "id": "helpscout.replace_conversation_custom_fields",
+      "service": "helpscout",
+      "name": "replace_conversation_custom_fields",
+      "description": "Replace the complete custom field state of a Help Scout conversation.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Help Scout custom field ID."
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 15000,
+                  "description": "The field value; use an option ID for dropdown fields and YYYY-MM-DD for date fields."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Help Scout custom field value."
+            },
+            "description": "The complete set of custom fields to apply; omitted existing fields are removed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for replacing conversation custom fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the custom field replacement."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated Help Scout conversation ID."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Help Scout custom field ID."
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 15000,
+                  "description": "The field value; use an option ID for dropdown fields and YYYY-MM-DD for date fields."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Help Scout custom field value."
+            },
+            "description": "The complete set of custom fields to apply; omitted existing fields are removed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout custom field replacement result."
+      }
+    },
+    {
+      "id": "helpscout.replace_conversation_tags",
+      "service": "helpscout",
+      "name": "replace_conversation_tags",
+      "description": "Replace the complete tag list on a Help Scout conversation.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "tagNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Help Scout tag name."
+            },
+            "description": "The complete tag list to keep on the conversation; use an empty list to remove all tags."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for replacing conversation tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the tag replacement."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated Help Scout conversation ID."
+          },
+          "tagNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Help Scout tag name."
+            },
+            "description": "The complete tag list sent to Help Scout."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation tag replacement result."
+      }
+    },
+    {
+      "id": "helpscout.run_manual_workflow",
+      "service": "helpscout",
+      "name": "run_manual_workflow",
+      "description": "Run a configured Help Scout manual workflow on up to 50 conversations.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout manual workflow ID."
+          },
+          "conversationIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Help Scout conversation ID."
+            },
+            "description": "The conversations to which the workflow should be applied; all must be in its inbox.",
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for running a Help Scout manual workflow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "executed": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the workflow execution."
+          },
+          "workflowId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The executed Help Scout workflow ID."
+          },
+          "conversationIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One Help Scout conversation ID."
+            },
+            "description": "The Help Scout conversations sent to the workflow."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout manual workflow execution result."
+      }
+    },
+    {
+      "id": "helpscout.set_conversation_status",
+      "service": "helpscout",
+      "name": "set_conversation_status",
+      "description": "Replace the status of a Help Scout conversation.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "open",
+              "pending",
+              "spam"
+            ],
+            "description": "The Help Scout conversation status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for replacing a conversation status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the status update."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The updated Help Scout conversation ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "closed",
+              "open",
+              "pending",
+              "spam"
+            ],
+            "description": "The Help Scout conversation status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation status update result."
+      }
+    },
+    {
+      "id": "helpscout.snooze_conversation",
+      "service": "helpscout",
+      "name": "snooze_conversation",
+      "description": "Snooze a Help Scout conversation until a specific future time.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          },
+          "snoozedUntil": {
+            "type": "string",
+            "description": "The future ISO 8601 time when the conversation should return.",
+            "format": "date-time"
+          },
+          "unsnoozeOnCustomerReply": {
+            "type": "boolean",
+            "description": "Whether a new customer reply should immediately unsnooze the conversation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for snoozing a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the snooze setting."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The snoozed Help Scout conversation ID."
+          },
+          "snoozedUntil": {
+            "type": "string",
+            "description": "The requested ISO 8601 time for the conversation to return.",
+            "format": "date-time"
+          },
+          "unsnoozeOnCustomerReply": {
+            "type": "boolean",
+            "description": "Whether a new customer reply will immediately unsnooze the conversation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation snooze result."
+      }
+    },
+    {
+      "id": "helpscout.unsnooze_conversation",
+      "service": "helpscout",
+      "name": "unsnooze_conversation",
+      "description": "Remove the snooze from a Help Scout conversation and return it to its queue.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "helpscout.inbox.write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Help Scout conversation ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for unsnoozing a Help Scout conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Help Scout accepted the snooze removal."
+          },
+          "conversationId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unsnoozed Help Scout conversation ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Help Scout conversation unsnooze result."
+      }
+    }
+  ]
+}

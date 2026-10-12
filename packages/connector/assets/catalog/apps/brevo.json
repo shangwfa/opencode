@@ -1,0 +1,1136 @@
+{
+  "service": "brevo",
+  "displayName": "Brevo",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "xkeysib_...",
+      "description": "Brevo API key sent with the api-key header. Create or copy API keys in Brevo under SMTP & API > API Keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.brevo.com",
+  "actions": [
+    {
+      "id": "brevo.add_contacts_to_list",
+      "service": "brevo",
+      "name": "add_contacts_to_list",
+      "description": "Add contacts to one Brevo contact list using exactly one official selector.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The non-empty string array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "emails"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One positive integer item."
+                },
+                "description": "The non-empty positive integer array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "ids"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "extIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The non-empty string array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "extIds"
+            ]
+          }
+        ],
+        "description": "The path and selector payload for mutating Brevo list membership."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One numeric contact identifier returned by Brevo."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string contact identifier returned by Brevo."
+                    }
+                  ],
+                  "description": "One membership mutation result item returned by Brevo."
+                },
+                "description": "The contacts successfully processed by Brevo."
+              },
+              "failure": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One numeric contact identifier returned by Brevo."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string contact identifier returned by Brevo."
+                    }
+                  ],
+                  "description": "One membership mutation result item returned by Brevo."
+                },
+                "description": "The contacts that Brevo could not process."
+              },
+              "processId": {
+                "type": "number",
+                "description": "The Brevo async process ID, when returned."
+              },
+              "total": {
+                "type": "number",
+                "description": "The total number of contacts processed."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "success",
+              "failure",
+              "processId",
+              "total"
+            ],
+            "description": "The nested contact membership mutation result."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contacts"
+        ],
+        "description": "The Brevo list membership mutation result."
+      }
+    },
+    {
+      "id": "brevo.create_contact",
+      "service": "brevo",
+      "name": "create_contact",
+      "description": "Create one Brevo contact with the official contact creation payload.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address for the new contact.",
+            "format": "email"
+          },
+          "extId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional external identifier attached to the contact."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One positive integer item."
+            },
+            "description": "The non-empty positive integer array accepted by Brevo.",
+            "minItems": 1
+          },
+          "emailBlacklisted": {
+            "type": "boolean",
+            "description": "Whether the contact should be email blacklisted."
+          },
+          "smsBlacklisted": {
+            "type": "boolean",
+            "description": "Whether the contact should be SMS blacklisted."
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The flexible Brevo contact attributes object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The request payload for creating a Brevo contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The numeric identifier returned by Brevo."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "The entity creation result returned by Brevo."
+      }
+    },
+    {
+      "id": "brevo.create_contact_list",
+      "service": "brevo",
+      "name": "create_contact_list",
+      "description": "Create one Brevo contact list inside the specified Brevo folder.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Brevo contact list name."
+          },
+          "folderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Brevo folder ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "folderId"
+        ],
+        "description": "The request payload for creating a Brevo contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The numeric identifier returned by Brevo."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "The entity creation result returned by Brevo."
+      }
+    },
+    {
+      "id": "brevo.delete_contact",
+      "service": "brevo",
+      "name": "delete_contact",
+      "description": "Delete one Brevo contact by identifier and optional identifier type.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Brevo contact identifier value used in the request path."
+          },
+          "identifierType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Brevo identifier type used to interpret the identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The path and query parameters for retrieving one Brevo contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the requested Brevo mutation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The generic success result returned by the connector."
+      }
+    },
+    {
+      "id": "brevo.get_account",
+      "service": "brevo",
+      "name": "get_account",
+      "description": "Retrieve the current Brevo account profile and plan information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty input payload for retrieving the current Brevo account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Brevo plan type."
+                },
+                "credits": {
+                  "type": "number",
+                  "description": "The available credits for this plan."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "credits"
+              ],
+              "description": "One plan object returned by the Brevo account endpoint."
+            },
+            "description": "The Brevo plans attached to the account."
+          },
+          "relay": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A flexible object returned by Brevo."
+          },
+          "organization_id": {
+            "type": "number",
+            "description": "The Brevo organization identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the connected Brevo account.",
+            "format": "email"
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company name returned by Brevo."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The account first name returned by Brevo."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The account last name returned by Brevo."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "plan",
+          "relay",
+          "organization_id",
+          "email",
+          "companyName",
+          "firstName",
+          "lastName"
+        ],
+        "description": "The account payload returned by the official Brevo account endpoint."
+      }
+    },
+    {
+      "id": "brevo.get_contact",
+      "service": "brevo",
+      "name": "get_contact",
+      "description": "Retrieve one Brevo contact by identifier and optional identifier type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Brevo contact identifier value used in the request path."
+          },
+          "identifierType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Brevo identifier type used to interpret the identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The path and query parameters for retrieving one Brevo contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "The Brevo contact ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The primary email address of the contact.",
+            "format": "email"
+          },
+          "ext_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The external identifier returned by Brevo."
+          },
+          "listIds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "description": "One Brevo contact list ID."
+            },
+            "description": "The Brevo contact lists linked to this contact."
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The flexible Brevo contact attributes object."
+          },
+          "emailBlacklisted": {
+            "type": "boolean",
+            "description": "Whether the contact is email blacklisted."
+          },
+          "smsBlacklisted": {
+            "type": "boolean",
+            "description": "Whether the contact is SMS blacklisted."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The contact creation timestamp.",
+            "format": "date-time"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "description": "The contact last update timestamp.",
+            "format": "date-time"
+          },
+          "statistics": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The flexible Brevo contact statistics object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "email",
+          "ext_id",
+          "listIds",
+          "attributes",
+          "emailBlacklisted",
+          "smsBlacklisted",
+          "createdAt",
+          "modifiedAt",
+          "statistics"
+        ],
+        "description": "One Brevo contact object."
+      }
+    },
+    {
+      "id": "brevo.list_contact_folders",
+      "service": "brevo",
+      "name": "list_contact_folders",
+      "description": "List Brevo contact folders with the official pagination parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction accepted by the official Brevo API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query parameters for listing Brevo contact folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "The total number of folders returned by Brevo."
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "description": "The Brevo folder ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Brevo folder name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "One Brevo contact folder object."
+            },
+            "description": "The Brevo contact folders returned for this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "folders"
+        ],
+        "description": "The paginated Brevo folder list response."
+      }
+    },
+    {
+      "id": "brevo.list_contact_lists",
+      "service": "brevo",
+      "name": "list_contact_lists",
+      "description": "List Brevo contact lists with the official pagination parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction accepted by the official Brevo API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query parameters for listing Brevo contact lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "The total number of lists returned by Brevo."
+          },
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "description": "The Brevo list ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Brevo list name."
+                },
+                "folderId": {
+                  "type": "number",
+                  "description": "The folder ID that owns this list."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "folderId"
+              ],
+              "description": "One Brevo contact list object."
+            },
+            "description": "The Brevo contact lists returned for this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "lists"
+        ],
+        "description": "The paginated Brevo contact list response."
+      }
+    },
+    {
+      "id": "brevo.list_contacts",
+      "service": "brevo",
+      "name": "list_contacts",
+      "description": "List Brevo contacts with pagination and timestamp filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction accepted by the official Brevo API."
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Only return records modified after this ISO-8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdSince": {
+            "type": "string",
+            "description": "Only return records created after this ISO-8601 timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query parameters for listing Brevo contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "The total number of contacts returned by Brevo."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "description": "The Brevo contact ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The primary email address of the contact.",
+                  "format": "email"
+                },
+                "ext_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The external identifier returned by Brevo."
+                },
+                "listIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One Brevo contact list ID."
+                  },
+                  "description": "The Brevo contact lists linked to this contact."
+                },
+                "attributes": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The flexible Brevo contact attributes object."
+                },
+                "emailBlacklisted": {
+                  "type": "boolean",
+                  "description": "Whether the contact is email blacklisted."
+                },
+                "smsBlacklisted": {
+                  "type": "boolean",
+                  "description": "Whether the contact is SMS blacklisted."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The contact creation timestamp.",
+                  "format": "date-time"
+                },
+                "modifiedAt": {
+                  "type": "string",
+                  "description": "The contact last update timestamp.",
+                  "format": "date-time"
+                },
+                "statistics": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The flexible Brevo contact statistics object."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "email",
+                "ext_id",
+                "listIds",
+                "attributes",
+                "emailBlacklisted",
+                "smsBlacklisted",
+                "createdAt",
+                "modifiedAt",
+                "statistics"
+              ],
+              "description": "One Brevo contact object."
+            },
+            "description": "The Brevo contacts returned for this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "contacts"
+        ],
+        "description": "The paginated Brevo contact list response."
+      }
+    },
+    {
+      "id": "brevo.list_contacts_in_list",
+      "service": "brevo",
+      "name": "list_contacts_in_list",
+      "description": "List the Brevo contacts currently linked to one Brevo contact list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Brevo contact list ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of items to skip before returning results."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction accepted by the official Brevo API."
+          },
+          "modifiedSince": {
+            "type": "string",
+            "description": "Only return records modified after this ISO-8601 timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "The path and query parameters for listing contacts inside one Brevo list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "description": "The Brevo contact ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The primary email address of the contact.",
+                  "format": "email"
+                },
+                "ext_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The external identifier returned by Brevo."
+                },
+                "listIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One Brevo contact list ID."
+                  },
+                  "description": "The Brevo contact lists linked to this contact."
+                },
+                "attributes": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The flexible Brevo contact attributes object."
+                },
+                "emailBlacklisted": {
+                  "type": "boolean",
+                  "description": "Whether the contact is email blacklisted."
+                },
+                "smsBlacklisted": {
+                  "type": "boolean",
+                  "description": "Whether the contact is SMS blacklisted."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The contact creation timestamp.",
+                  "format": "date-time"
+                },
+                "modifiedAt": {
+                  "type": "string",
+                  "description": "The contact last update timestamp.",
+                  "format": "date-time"
+                },
+                "statistics": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The flexible Brevo contact statistics object."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "email",
+                "ext_id",
+                "listIds",
+                "attributes",
+                "emailBlacklisted",
+                "smsBlacklisted",
+                "createdAt",
+                "modifiedAt",
+                "statistics"
+              ],
+              "description": "One Brevo contact object."
+            },
+            "description": "The Brevo contacts linked to the list."
+          },
+          "count": {
+            "type": "number",
+            "description": "The total number of contacts linked to the list."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contacts",
+          "count"
+        ],
+        "description": "The paginated list-member response returned by Brevo."
+      }
+    },
+    {
+      "id": "brevo.remove_contacts_from_list",
+      "service": "brevo",
+      "name": "remove_contacts_from_list",
+      "description": "Remove contacts from one Brevo contact list using exactly one official selector.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The non-empty string array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "emails"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One positive integer item."
+                },
+                "description": "The non-empty positive integer array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "ids"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Brevo contact list ID."
+              },
+              "extIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The non-empty string array accepted by Brevo.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "listId",
+              "extIds"
+            ]
+          }
+        ],
+        "description": "The path and selector payload for mutating Brevo list membership."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One numeric contact identifier returned by Brevo."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string contact identifier returned by Brevo."
+                    }
+                  ],
+                  "description": "One membership mutation result item returned by Brevo."
+                },
+                "description": "The contacts successfully processed by Brevo."
+              },
+              "failure": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "One numeric contact identifier returned by Brevo."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string contact identifier returned by Brevo."
+                    }
+                  ],
+                  "description": "One membership mutation result item returned by Brevo."
+                },
+                "description": "The contacts that Brevo could not process."
+              },
+              "processId": {
+                "type": "number",
+                "description": "The Brevo async process ID, when returned."
+              },
+              "total": {
+                "type": "number",
+                "description": "The total number of contacts processed."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "success",
+              "failure",
+              "processId",
+              "total"
+            ],
+            "description": "The nested contact membership mutation result."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "contacts"
+        ],
+        "description": "The Brevo list membership mutation result."
+      }
+    },
+    {
+      "id": "brevo.update_contact_list",
+      "service": "brevo",
+      "name": "update_contact_list",
+      "description": "Update one Brevo contact list by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Brevo contact list ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated Brevo contact list name."
+          },
+          "folderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Brevo folder ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ],
+        "description": "The path and body payload for updating a Brevo contact list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the requested Brevo mutation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The generic success result returned by the connector."
+      }
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "service": "mautic",
+  "displayName": "Mautic",
+  "categories": [
+    "Marketing"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "required": true,
+          "inputType": "text",
+          "secret": false,
+          "placeholder": "https://mautic.example.com"
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "required": true,
+          "inputType": "text",
+          "secret": false
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "required": true,
+          "inputType": "password",
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://mautic.org",
+  "actions": [
+    {
+      "id": "mautic.add_contact_to_segment",
+      "service": "mautic",
+      "name": "add_contact_to_segment",
+      "description": "Manually add a Mautic contact to a segment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic segment ID."
+          },
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mautic contact and segment membership operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Mautic completed the segment membership operation."
+          },
+          "segmentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic segment ID."
+          },
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The segment membership operation result."
+      }
+    },
+    {
+      "id": "mautic.create_contact",
+      "service": "mautic",
+      "name": "create_contact",
+      "description": "Create a Mautic contact using standard or instance-specific custom contact field aliases.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Contact field values keyed by Mautic field alias, such as email, firstname, lastname, company, or a custom field alias.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Values used to create a Mautic contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Mautic contact ID."
+              },
+              "isPublished": {
+                "type": "boolean",
+                "description": "Whether the contact is published."
+              },
+              "points": {
+                "type": "integer",
+                "description": "The contact's current points total."
+              },
+              "dateAdded": {
+                "type": "string",
+                "description": "The date and time when the contact was created."
+              },
+              "dateModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date and time when the contact was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date and time when the contact was last modified."
+              },
+              "fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Contact fields grouped and returned by Mautic."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Mautic tag."
+                },
+                "description": "Tags associated with the contact."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Mautic contact data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Mautic contact."
+      },
+      "followUpActions": [
+        "mautic.get_contact",
+        "mautic.add_contact_to_segment"
+      ]
+    },
+    {
+      "id": "mautic.delete_contact",
+      "service": "mautic",
+      "name": "delete_contact",
+      "description": "Delete a Mautic contact by numeric contact ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mautic contact to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Mautic contact ID."
+              },
+              "isPublished": {
+                "type": "boolean",
+                "description": "Whether the contact is published."
+              },
+              "points": {
+                "type": "integer",
+                "description": "The contact's current points total."
+              },
+              "dateAdded": {
+                "type": "string",
+                "description": "The date and time when the contact was created."
+              },
+              "dateModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date and time when the contact was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date and time when the contact was last modified."
+              },
+              "fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Contact fields grouped and returned by Mautic."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Mautic tag."
+                },
+                "description": "Tags associated with the contact."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Mautic contact data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deleted Mautic contact."
+      }
+    },
+    {
+      "id": "mautic.get_contact",
+      "service": "mautic",
+      "name": "get_contact",
+      "description": "Get a Mautic contact by numeric contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mautic contact to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Mautic contact ID."
+              },
+              "isPublished": {
+                "type": "boolean",
+                "description": "Whether the contact is published."
+              },
+              "points": {
+                "type": "integer",
+                "description": "The contact's current points total."
+              },
+              "dateAdded": {
+                "type": "string",
+                "description": "The date and time when the contact was created."
+              },
+              "dateModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date and time when the contact was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date and time when the contact was last modified."
+              },
+              "fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Contact fields grouped and returned by Mautic."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Mautic tag."
+                },
+                "description": "Tags associated with the contact."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Mautic contact data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Mautic contact."
+      }
+    },
+    {
+      "id": "mautic.list_contacts",
+      "service": "mautic",
+      "name": "list_contacts",
+      "description": "List Mautic contacts with optional search, pagination, and ordering controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Mautic search expression or text filter applied to the collection."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based starting row for the returned collection."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mautic field used to order results, such as date_added or lastname."
+          },
+          "orderByDir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result ordering direction."
+          },
+          "publishedOnly": {
+            "type": "boolean",
+            "description": "Whether to return only published records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination, search, and ordering parameters for a Mautic collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Mautic contact ID."
+                },
+                "isPublished": {
+                  "type": "boolean",
+                  "description": "Whether the contact is published."
+                },
+                "points": {
+                  "type": "integer",
+                  "description": "The contact's current points total."
+                },
+                "dateAdded": {
+                  "type": "string",
+                  "description": "The date and time when the contact was created."
+                },
+                "dateModified": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date and time when the contact was last modified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date and time when the contact was last modified."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Contact fields grouped and returned by Mautic."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Mautic tag."
+                  },
+                  "description": "Tags associated with the contact."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Mautic contact data."
+            },
+            "description": "Contacts returned by Mautic."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching contacts reported by Mautic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized list of Mautic contacts."
+      },
+      "followUpActions": [
+        "mautic.get_contact"
+      ]
+    },
+    {
+      "id": "mautic.list_segments",
+      "service": "mautic",
+      "name": "list_segments",
+      "description": "List Mautic segments with optional search, pagination, and ordering controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Mautic search expression or text filter applied to the collection."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based starting row for the returned collection."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mautic field used to order results, such as date_added or lastname."
+          },
+          "orderByDir": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result ordering direction."
+          },
+          "publishedOnly": {
+            "type": "boolean",
+            "description": "Whether to return only published records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination, search, and ordering parameters for a Mautic collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Mautic segment ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The segment name."
+                },
+                "publicName": {
+                  "type": "string",
+                  "description": "The segment name displayed to contacts."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "The segment alias or slug."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The segment description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The segment description."
+                },
+                "isPublished": {
+                  "type": "boolean",
+                  "description": "Whether the segment is published."
+                },
+                "isGlobal": {
+                  "type": "boolean",
+                  "description": "Whether the segment is available to all Mautic users."
+                },
+                "isPreferenceCenter": {
+                  "type": "boolean",
+                  "description": "Whether the segment is shown in preference centers."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Mautic segment data."
+            },
+            "description": "Segments returned by Mautic."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching segments reported by Mautic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized list of Mautic segments."
+      }
+    },
+    {
+      "id": "mautic.remove_contact_from_segment",
+      "service": "mautic",
+      "name": "remove_contact_from_segment",
+      "description": "Manually remove a Mautic contact from a segment.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic segment ID."
+          },
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Mautic contact and segment membership operation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Mautic completed the segment membership operation."
+          },
+          "segmentId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic segment ID."
+          },
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The segment membership operation result."
+      }
+    },
+    {
+      "id": "mautic.update_contact",
+      "service": "mautic",
+      "name": "update_contact",
+      "description": "Update selected fields on an existing Mautic contact without creating a missing contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Mautic contact ID."
+          },
+          "fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Contact field values keyed by Mautic field alias, such as email, firstname, lastname, company, or a custom field alias.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mautic contact and field values to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric Mautic contact ID."
+              },
+              "isPublished": {
+                "type": "boolean",
+                "description": "Whether the contact is published."
+              },
+              "points": {
+                "type": "integer",
+                "description": "The contact's current points total."
+              },
+              "dateAdded": {
+                "type": "string",
+                "description": "The date and time when the contact was created."
+              },
+              "dateModified": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The date and time when the contact was last modified."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The date and time when the contact was last modified."
+              },
+              "fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Contact fields grouped and returned by Mautic."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Mautic tag."
+                },
+                "description": "Tags associated with the contact."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Mautic contact data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Mautic contact."
+      },
+      "followUpActions": [
+        "mautic.get_contact"
+      ]
+    }
+  ]
+}

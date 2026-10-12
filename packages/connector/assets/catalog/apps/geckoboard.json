@@ -1,0 +1,250 @@
+{
+  "service": "geckoboard",
+  "displayName": "Geckoboard",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GECKOBOARD_API_KEY",
+      "description": "Geckoboard API key used as the HTTP Basic username. Find it in Geckoboard Account details under API Key: https://developer.geckoboard.com/#find-your-api-key"
+    }
+  ],
+  "homepageUrl": "https://www.geckoboard.com/",
+  "actions": [
+    {
+      "id": "geckoboard.append_dataset_data",
+      "service": "geckoboard",
+      "name": "append_dataset_data",
+      "description": "Append records to a Geckoboard dataset, updating existing rows when unique_by fields match.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Geckoboard dataset identifier, such as sales.by_day.",
+            "pattern": "\\S"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record whose keys match the dataset fields. Values must match the field types declared in Geckoboard."
+            },
+            "description": "Dataset records to write to Geckoboard.",
+            "maxItems": 500
+          },
+          "deleteBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A date or datetime field name Geckoboard should use when truncating old records.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "records"
+        ],
+        "description": "Input parameters for appending records to a Geckoboard dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty object returned by Geckoboard for this request."
+      }
+    },
+    {
+      "id": "geckoboard.delete_dataset",
+      "service": "geckoboard",
+      "name": "delete_dataset",
+      "description": "Delete a Geckoboard dataset by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Geckoboard dataset identifier, such as sales.by_day.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Input parameters for deleting a Geckoboard dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty object returned by Geckoboard for this request."
+      }
+    },
+    {
+      "id": "geckoboard.find_or_create_dataset",
+      "service": "geckoboard",
+      "name": "find_or_create_dataset",
+      "description": "Find or create a Geckoboard dataset with a declared field schema.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Geckoboard dataset identifier, such as sales.by_day.",
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Geckoboard dataset field definition. Include the documented type, name, optional flag, and type-specific options such as currency_code or time_unit."
+            },
+            "description": "The dataset fields keyed by column name. Each field describes a Geckoboard column."
+          },
+          "uniqueBy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A field name included in the dataset fields object."
+            },
+            "description": "Field names whose values uniquely identify records in the dataset.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "fields"
+        ],
+        "description": "Input parameters for finding or creating a Geckoboard dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Geckoboard dataset identifier."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Geckoboard dataset field definition. Include the documented type, name, optional flag, and type-specific options such as currency_code or time_unit."
+                },
+                "description": "The dataset fields keyed by column name. Each field describes a Geckoboard column."
+              },
+              "unique_by": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The unique field names returned by Geckoboard when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique field names returned by Geckoboard when configured."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw dataset object returned by Geckoboard."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "fields",
+              "unique_by",
+              "raw"
+            ],
+            "description": "A Geckoboard dataset definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "The dataset definition returned by Geckoboard."
+      }
+    },
+    {
+      "id": "geckoboard.replace_dataset_data",
+      "service": "geckoboard",
+      "name": "replace_dataset_data",
+      "description": "Replace all records in a Geckoboard dataset with the supplied records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Geckoboard dataset identifier, such as sales.by_day.",
+            "pattern": "\\S"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record whose keys match the dataset fields. Values must match the field types declared in Geckoboard."
+            },
+            "description": "Dataset records to write to Geckoboard.",
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "records"
+        ],
+        "description": "Input parameters for replacing records in a Geckoboard dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty object returned by Geckoboard for this request."
+      }
+    }
+  ]
+}

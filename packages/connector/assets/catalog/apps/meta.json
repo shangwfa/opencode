@@ -1,0 +1,935 @@
+{
+  "service": "meta",
+  "displayName": "Meta",
+  "categories": [
+    "Marketing",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "EAAG...",
+      "description": "Meta access token used with the Authorization: Bearer header. Create or view system user and app tokens in Meta Business Settings: https://business.facebook.com/latest/settings. The read-only Ads actions usually require permissions such as ads_read."
+    }
+  ],
+  "homepageUrl": "https://business.meta.com/",
+  "actions": [
+    {
+      "id": "meta.get_current_user",
+      "service": "meta",
+      "name": "get_current_user",
+      "description": "Retrieve the current Meta Graph API user for the connected access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the current Meta user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Meta Graph API object identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Meta profile name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Meta profile name when returned."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Meta user object returned by the Graph API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Meta Graph API user or system user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving the current Meta user."
+      }
+    },
+    {
+      "id": "meta.get_insights",
+      "service": "meta",
+      "name": "get_insights",
+      "description": "Retrieve Meta Ads insights for an ad account, campaign, ad set, or ad object.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Meta Graph API object identifier."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "account",
+              "campaign",
+              "adset",
+              "ad"
+            ],
+            "description": "The Meta insights aggregation level."
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A comma-separated Meta fields string."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Meta field name."
+                },
+                "description": "A list of Meta field names.",
+                "minItems": 1
+              }
+            ],
+            "description": "The comma-separated Meta fields or list of fields to request."
+          },
+          "datePreset": {
+            "type": "string",
+            "enum": [
+              "today",
+              "yesterday",
+              "this_month",
+              "last_month",
+              "this_quarter",
+              "maximum",
+              "last_3d",
+              "last_7d",
+              "last_14d",
+              "last_28d",
+              "last_30d",
+              "last_90d",
+              "last_week_mon_sun",
+              "last_week_sun_sat",
+              "last_quarter",
+              "last_year",
+              "this_week_mon_today",
+              "this_week_sun_today",
+              "this_year"
+            ],
+            "description": "The Meta insights date preset."
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "since": {
+                "type": "string",
+                "description": "The inclusive start date in YYYY-MM-DD format.",
+                "format": "date"
+              },
+              "until": {
+                "type": "string",
+                "description": "The inclusive end date in YYYY-MM-DD format.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The custom Meta insights date range."
+          },
+          "breakdowns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string value."
+            },
+            "description": "A list of string values.",
+            "minItems": 1
+          },
+          "filtering": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One Meta insights filtering expression."
+            },
+            "description": "Meta insights filtering expressions forwarded to the Graph API."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string value."
+            },
+            "description": "A list of string values.",
+            "minItems": 1
+          },
+          "actionAttributionWindows": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string value."
+            },
+            "description": "A list of string values.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records Meta should return."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API after cursor for requesting the next page."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API before cursor for requesting the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectId"
+        ],
+        "description": "The input payload for retrieving Meta insights.",
+        "not": {
+          "required": [
+            "datePreset",
+            "timeRange"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "insights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campaignId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign ID when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign ID when returned for the selected level."
+                },
+                "campaignName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign name when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign name when returned for the selected level."
+                },
+                "adsetId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad set ID when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad set ID when returned for the selected level."
+                },
+                "adsetName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad set name when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad set name when returned for the selected level."
+                },
+                "adId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad ID when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad ID when returned for the selected level."
+                },
+                "adName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad name when returned for the selected level."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad name when returned for the selected level."
+                },
+                "impressions": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The impressions metric as returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The impressions metric as returned by Meta."
+                },
+                "clicks": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The clicks metric as returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The clicks metric as returned by Meta."
+                },
+                "spend": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The spend metric as returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The spend metric as returned by Meta."
+                },
+                "dateStart": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The report start date returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The report start date returned by Meta."
+                },
+                "dateStop": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The report stop date returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The report stop date returned by Meta."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Meta insights row returned by the Graph API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Meta insights row."
+            },
+            "description": "The Meta insights rows returned by the Graph API."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The previous-page cursor when present."
+                  },
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next-page cursor when present."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The before and after cursor values returned by Meta."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page URL returned by Meta when present."
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The previous page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page URL returned by Meta when present."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized Meta Graph API paging metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving Meta insights."
+      }
+    },
+    {
+      "id": "meta.list_ad_accounts",
+      "service": "meta",
+      "name": "list_ad_accounts",
+      "description": "List Meta ad accounts available to the connected access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A comma-separated Meta fields string."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Meta field name."
+                },
+                "description": "A list of Meta field names.",
+                "minItems": 1
+              }
+            ],
+            "description": "The comma-separated Meta fields or list of fields to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records Meta should return."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API after cursor for requesting the next page."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API before cursor for requesting the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Meta ad accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "adAccounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Meta Graph API object identifier."
+                },
+                "accountId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The numeric Meta ad account ID without the act_ prefix."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The numeric Meta ad account ID without the act_ prefix."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad account name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad account name."
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad account currency code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad account currency code."
+                },
+                "timezoneName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ad account timezone name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ad account timezone name."
+                },
+                "accountStatus": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The numeric Meta ad account status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The numeric Meta ad account status."
+                },
+                "businessName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The business name attached to the ad account."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The business name attached to the ad account."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Meta ad account object returned by the Graph API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Meta ad account."
+            },
+            "description": "The Meta ad accounts returned by the Graph API."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The previous-page cursor when present."
+                  },
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next-page cursor when present."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The before and after cursor values returned by Meta."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page URL returned by Meta when present."
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The previous page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page URL returned by Meta when present."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized Meta Graph API paging metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Meta ad accounts."
+      }
+    },
+    {
+      "id": "meta.list_campaigns",
+      "service": "meta",
+      "name": "list_campaigns",
+      "description": "List campaigns under one Meta ad account with optional delivery status filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "adAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Meta ad account ID, with or without the act_ prefix."
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A comma-separated Meta fields string."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Meta field name."
+                },
+                "description": "A list of Meta field names.",
+                "minItems": 1
+              }
+            ],
+            "description": "The comma-separated Meta fields or list of fields to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of records Meta should return."
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API after cursor for requesting the next page."
+          },
+          "before": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Graph API before cursor for requesting the previous page."
+          },
+          "effectiveStatus": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "PAUSED",
+                "DELETED",
+                "ARCHIVED",
+                "IN_PROCESS",
+                "WITH_ISSUES"
+              ],
+              "description": "A Meta configured or effective delivery status."
+            },
+            "description": "A list of Meta delivery statuses.",
+            "minItems": 1
+          },
+          "configuredStatus": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "PAUSED",
+                "DELETED",
+                "ARCHIVED",
+                "IN_PROCESS",
+                "WITH_ISSUES"
+              ],
+              "description": "A Meta configured or effective delivery status."
+            },
+            "description": "A list of Meta delivery statuses.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adAccountId"
+        ],
+        "description": "The input payload for listing Meta campaigns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Meta Graph API object identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign name."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The configured campaign status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The configured campaign status."
+                },
+                "effectiveStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The effective campaign delivery status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The effective campaign delivery status."
+                },
+                "objective": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign objective."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign objective."
+                },
+                "buyingType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign buying type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign buying type."
+                },
+                "createdTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign creation timestamp returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign creation timestamp returned by Meta."
+                },
+                "updatedTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign update timestamp returned by Meta."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign update timestamp returned by Meta."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Meta campaign object returned by the Graph API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Meta campaign."
+            },
+            "description": "The Meta campaigns returned by the Graph API."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "cursors": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The previous-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The previous-page cursor when present."
+                  },
+                  "after": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next-page cursor when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next-page cursor when present."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The before and after cursor values returned by Meta."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page URL returned by Meta when present."
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The previous page URL returned by Meta when present.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page URL returned by Meta when present."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized Meta Graph API paging metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Meta campaigns."
+      }
+    }
+  ]
+}

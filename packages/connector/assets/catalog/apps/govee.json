@@ -1,0 +1,522 @@
+{
+  "service": "govee",
+  "displayName": "Govee",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Govee API Key",
+      "placeholder": "GOVEE_API_KEY",
+      "description": "Govee API key sent with the Govee-API-Key header. Apply for a key in the Govee Home app from Settings > Apply for API Key: https://developer.govee.com/reference/apply-you-govee-api-key."
+    }
+  ],
+  "homepageUrl": "https://www.govee.com",
+  "actions": [
+    {
+      "id": "govee.control_capability",
+      "service": "govee",
+      "name": "control_capability",
+      "description": "Send one documented Govee capability value to a device, such as power, brightness, color, mode, or temperature.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee product model, such as `H605C`.",
+            "pattern": "\\S"
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee device id returned by list_devices.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee capability type, such as `devices.capabilities.on_off`.",
+            "pattern": "\\S"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee capability instance, such as `powerSwitch`.",
+            "pattern": "\\S"
+          },
+          "value": {
+            "description": "The value to send for this capability, as documented in list_devices."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "A caller-supplied request id. When omitted, the provider generates a UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "device",
+          "type",
+          "instance",
+          "value"
+        ],
+        "description": "Input parameters for controlling a Govee capability."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The request id echoed by Govee, when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The request id echoed by Govee, when returned."
+              },
+              "code": {
+                "type": "integer",
+                "description": "The numeric Govee response code."
+              },
+              "message": {
+                "type": "string",
+                "description": "The Govee response message."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requestId",
+              "code",
+              "message"
+            ],
+            "description": "The normalized Govee API response envelope."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Govee response envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result",
+          "raw"
+        ],
+        "description": "The Govee control response."
+      }
+    },
+    {
+      "id": "govee.get_device_state",
+      "service": "govee",
+      "name": "get_device_state",
+      "description": "Get the current state for one Govee device by sku and device id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee product model, such as `H605C`.",
+            "pattern": "\\S"
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee device id returned by list_devices.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "device"
+        ],
+        "description": "Input parameters identifying one Govee device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "The Govee product model."
+              },
+              "device": {
+                "type": "string",
+                "description": "The Govee device id."
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The Govee capability type."
+                    },
+                    "instance": {
+                      "type": "string",
+                      "description": "The Govee capability instance."
+                    },
+                    "state": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The current state for the capability."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Govee capability state returned for a device."
+                },
+                "description": "The capability states returned by Govee."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Govee device state payload."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Govee response envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "raw"
+        ],
+        "description": "The current Govee device state."
+      }
+    },
+    {
+      "id": "govee.list_devices",
+      "service": "govee",
+      "name": "list_devices",
+      "description": "List Govee devices visible to the API key, including each device's supported capabilities.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Govee devices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string",
+                  "description": "The Govee product model."
+                },
+                "device": {
+                  "type": "string",
+                  "description": "The Govee device id."
+                },
+                "deviceName": {
+                  "type": "string",
+                  "description": "The user-visible Govee device name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Govee device type."
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "description": "The Govee capability type."
+                      },
+                      "instance": {
+                        "type": "string",
+                        "description": "The Govee capability instance."
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The Govee capability parameters that describe valid values for this capability."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Govee device capability."
+                  },
+                  "description": "The capabilities supported by the device."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Govee device returned by the Discover Devices endpoint."
+            },
+            "description": "The discovered Govee devices."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Govee response envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "devices",
+          "raw"
+        ],
+        "description": "The Govee devices visible to the API key."
+      }
+    },
+    {
+      "id": "govee.list_diy_scenes",
+      "service": "govee",
+      "name": "list_diy_scenes",
+      "description": "List dynamic DIY scenes available for one Govee device.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee product model, such as `H605C`.",
+            "pattern": "\\S"
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee device id returned by list_devices.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "device"
+        ],
+        "description": "Input parameters identifying one Govee device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "The Govee product model."
+              },
+              "device": {
+                "type": "string",
+                "description": "The Govee device id."
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The Govee capability type."
+                    },
+                    "instance": {
+                      "type": "string",
+                      "description": "The Govee capability instance."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "dataType": {
+                          "type": "string",
+                          "description": "The parameter data type returned by Govee."
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "The scene name."
+                              },
+                              "value": {
+                                "description": "The value Govee expects when activating this scene capability."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A Govee dynamic scene option."
+                          },
+                          "description": "The available dynamic scene options."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "The scene capability parameters."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Govee dynamic scene capability."
+                },
+                "description": "The dynamic scene capabilities returned by Govee."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Govee dynamic scene payload."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Govee response envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes",
+          "raw"
+        ],
+        "description": "The dynamic DIY scenes available for the Govee device."
+      }
+    },
+    {
+      "id": "govee.list_light_scenes",
+      "service": "govee",
+      "name": "list_light_scenes",
+      "description": "List dynamic light scenes available for one Govee device.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee product model, such as `H605C`.",
+            "pattern": "\\S"
+          },
+          "device": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Govee device id returned by list_devices.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "device"
+        ],
+        "description": "Input parameters identifying one Govee device."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "object",
+            "properties": {
+              "sku": {
+                "type": "string",
+                "description": "The Govee product model."
+              },
+              "device": {
+                "type": "string",
+                "description": "The Govee device id."
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The Govee capability type."
+                    },
+                    "instance": {
+                      "type": "string",
+                      "description": "The Govee capability instance."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "dataType": {
+                          "type": "string",
+                          "description": "The parameter data type returned by Govee."
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "The scene name."
+                              },
+                              "value": {
+                                "description": "The value Govee expects when activating this scene capability."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "A Govee dynamic scene option."
+                          },
+                          "description": "The available dynamic scene options."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "The scene capability parameters."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Govee dynamic scene capability."
+                },
+                "description": "The dynamic scene capabilities returned by Govee."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Govee dynamic scene payload."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Govee response envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes",
+          "raw"
+        ],
+        "description": "The dynamic light scenes available for the Govee device."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1257 @@
+{
+  "service": "slickdeals",
+  "displayName": "Slickdeals",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Syndication Token",
+      "placeholder": "Enter your Slickdeals token",
+      "description": "Bearer token issued by Slickdeals for the Syndication API. Request partner access from https://corp-site.slickdeals.net/api-sales/."
+    }
+  ],
+  "homepageUrl": "https://slickdeals.net/",
+  "actions": [
+    {
+      "id": "slickdeals.list_articles",
+      "service": "slickdeals",
+      "name": "list_articles",
+      "description": "List Slickdeals shopping articles with optional store, sorting, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "created",
+              "modified"
+            ],
+            "description": "The article field used for sorting."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order used to sort results."
+          },
+          "storeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Slickdeals store ID used to filter results."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UTM campaign value added to links returned by Slickdeals.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Slickdeals articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals article ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "subtitle": {
+                  "type": "string",
+                  "description": "The article subtitle."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The article author."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the article was published.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the article was published."
+                },
+                "modifiedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the article was last modified.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the article was last modified."
+                },
+                "featuredImage": {
+                  "type": "string",
+                  "description": "The featured image URL.",
+                  "format": "uri"
+                },
+                "internalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals article URL.",
+                  "format": "uri"
+                },
+                "excerpt": {
+                  "type": "string",
+                  "description": "A short article excerpt."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The article content."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An article returned by Slickdeals."
+            },
+            "description": "The articles returned by Slickdeals."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current result page."
+              },
+              "perPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested number of results per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information for the returned collection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals article collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_brands",
+      "service": "slickdeals",
+      "name": "list_brands",
+      "description": "List Slickdeals brands that can be used to filter deals.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Slickdeals brands."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals brand ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The brand name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A brand returned by Slickdeals."
+            },
+            "description": "The brands returned by Slickdeals."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals brand collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_categories",
+      "service": "slickdeals",
+      "name": "list_categories",
+      "description": "List Slickdeals categories that can be used to filter deals and coupons.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Slickdeals categories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals category ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The category name."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The full category hierarchy path."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A category returned by Slickdeals."
+            },
+            "description": "The categories returned by Slickdeals."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals category collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_coupons",
+      "service": "slickdeals",
+      "name": "list_coupons",
+      "description": "List Slickdeals coupons with store, category, country, state, and sorting filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Slickdeals category ID used to filter coupons."
+          },
+          "storeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Slickdeals store ID used to filter results."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "code",
+              "discount",
+              "print"
+            ],
+            "description": "The coupon type to return."
+          },
+          "monetizedOnly": {
+            "type": "boolean",
+            "description": "Whether to return coupons only from monetized stores."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "created",
+              "modified",
+              "expired",
+              "redemptions"
+            ],
+            "description": "The coupon field used for sorting."
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "US",
+              "UK",
+              "CA",
+              "AU"
+            ],
+            "description": "The store country used to filter results."
+          },
+          "sitewide": {
+            "type": "boolean",
+            "description": "Whether to return only sitewide coupons."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order used to sort results."
+          },
+          "expired": {
+            "type": "boolean",
+            "description": "Whether to return expired instead of active coupons."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UTM campaign value added to links returned by Slickdeals.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Slickdeals coupons."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "coupons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals coupon ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The coupon title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The coupon description and restrictions."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The coupon code when one is required."
+                },
+                "internalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals coupon URL.",
+                  "format": "uri"
+                },
+                "externalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals redirect URL for the coupon.",
+                  "format": "uri"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The coupon type returned by Slickdeals."
+                },
+                "store": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The Slickdeals store ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The store name."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The store domain."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The store country code."
+                    },
+                    "internalLink": {
+                      "type": "string",
+                      "description": "The Slickdeals page for the store.",
+                      "format": "uri"
+                    },
+                    "monetized": {
+                      "type": "boolean",
+                      "description": "Whether Slickdeals monetizes links for this store."
+                    },
+                    "externalLink": {
+                      "type": "string",
+                      "description": "The Slickdeals redirect URL for the store.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A store returned by Slickdeals."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The Slickdeals category ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The category name."
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "The full category hierarchy path."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A category returned by Slickdeals."
+                  },
+                  "description": "Categories associated with the coupon."
+                },
+                "startAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the coupon becomes active.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the coupon becomes active."
+                },
+                "expireAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the coupon expires.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the coupon expires."
+                },
+                "modifiedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the coupon was last modified.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the coupon was last modified."
+                },
+                "percentOff": {
+                  "type": "string",
+                  "description": "The percentage discount represented as text."
+                },
+                "dollarsOff": {
+                  "type": "string",
+                  "description": "The fixed discount represented as text."
+                },
+                "redemptions": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The total redemption count."
+                },
+                "redemptions_24hrs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The redemption count during the last 24 hours."
+                },
+                "exclusive": {
+                  "type": "boolean",
+                  "description": "Whether the coupon is exclusive to Slickdeals."
+                },
+                "sitewide": {
+                  "type": "boolean",
+                  "description": "Whether the coupon applies store-wide."
+                },
+                "verified": {
+                  "type": "boolean",
+                  "description": "Whether Slickdeals has verified the coupon."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A coupon returned by Slickdeals."
+            },
+            "description": "The coupons returned by Slickdeals."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current result page."
+              },
+              "perPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested number of results per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information for the returned collection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals coupon collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_deals",
+      "service": "slickdeals",
+      "name": "list_deals",
+      "description": "List Slickdeals deals with store, category, brand, popularity, and date filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeStoreIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The Slickdeals store ID used to filter results."
+            },
+            "description": "Store IDs whose deals should be returned.",
+            "minItems": 1
+          },
+          "includeCategoryIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Slickdeals category ID."
+            },
+            "description": "Category IDs whose deals should be returned.",
+            "minItems": 1
+          },
+          "includeBrandIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A Slickdeals brand ID."
+            },
+            "description": "Brand IDs whose deals should be returned.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "popularOrBetter",
+              "frontpage"
+            ],
+            "description": "The minimum deal popularity to return."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Return only deals created after this date.",
+            "format": "date"
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order used to sort results."
+          },
+          "expired": {
+            "type": "boolean",
+            "description": "Whether to return expired instead of active deals."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          },
+          "utmCampaign": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UTM campaign value added to links returned by Slickdeals.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Slickdeals deals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals deal ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The deal title."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The deal content, which may contain HTML."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The Slickdeals user who posted the deal."
+                },
+                "authorAvatars": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Author avatar URLs keyed by image size."
+                },
+                "internalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals deal URL.",
+                  "format": "uri"
+                },
+                "externalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals redirect URL for the deal.",
+                  "format": "uri"
+                },
+                "comments": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of deal comments."
+                },
+                "views": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of deal views."
+                },
+                "score": {
+                  "type": "integer",
+                  "description": "The Slickdeals community score."
+                },
+                "thumbs": {
+                  "type": "integer",
+                  "description": "The Slickdeals community thumbs score."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The deal type returned by Slickdeals."
+                },
+                "fireDeal": {
+                  "type": "boolean",
+                  "description": "Whether Slickdeals marks this as a fire deal."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the deal was created.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the deal was created."
+                },
+                "modifiedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the deal was last modified.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the deal was last modified."
+                },
+                "expiredAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "When the deal expired as a Unix timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the deal expired as a Unix timestamp."
+                },
+                "listPrice": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The original list price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original list price."
+                },
+                "finalPrice": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The final deal price."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The final deal price."
+                },
+                "featuredImage": {
+                  "type": "string",
+                  "description": "The featured deal image URL.",
+                  "format": "uri"
+                },
+                "primaryCategory": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The Slickdeals category ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The category name."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "The full category hierarchy path."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A category returned by Slickdeals."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The Slickdeals category ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The category name."
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "The full category hierarchy path."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A category returned by Slickdeals."
+                  },
+                  "description": "Categories associated with the deal."
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "primary": {
+                        "type": "boolean",
+                        "description": "Whether this is the primary deal image."
+                      },
+                      "urls": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "An image rendition URL.",
+                          "format": "uri"
+                        },
+                        "description": "Image URLs keyed by rendition size."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "An image attachment returned with a deal."
+                  },
+                  "description": "Image attachments associated with the deal."
+                },
+                "primaryStore": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The Slickdeals store ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The store name."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The store domain."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The store country code."
+                    },
+                    "internalLink": {
+                      "type": "string",
+                      "description": "The Slickdeals page for the store.",
+                      "format": "uri"
+                    },
+                    "monetized": {
+                      "type": "boolean",
+                      "description": "Whether Slickdeals monetizes links for this store."
+                    },
+                    "externalLink": {
+                      "type": "string",
+                      "description": "The Slickdeals redirect URL for the store.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A store returned by Slickdeals."
+                },
+                "stores": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The Slickdeals store ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The store name."
+                      },
+                      "domain": {
+                        "type": "string",
+                        "description": "The store domain."
+                      },
+                      "country": {
+                        "type": "string",
+                        "description": "The store country code."
+                      },
+                      "internalLink": {
+                        "type": "string",
+                        "description": "The Slickdeals page for the store.",
+                        "format": "uri"
+                      },
+                      "monetized": {
+                        "type": "boolean",
+                        "description": "Whether Slickdeals monetizes links for this store."
+                      },
+                      "externalLink": {
+                        "type": "string",
+                        "description": "The Slickdeals redirect URL for the store.",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A store returned by Slickdeals."
+                  },
+                  "description": "Stores associated with the deal."
+                },
+                "coupons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "The Slickdeals coupon ID."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "The coupon title."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "The coupon description and restrictions."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "The coupon code when one is required."
+                      },
+                      "internalLink": {
+                        "type": "string",
+                        "description": "The Slickdeals coupon URL.",
+                        "format": "uri"
+                      },
+                      "externalLink": {
+                        "type": "string",
+                        "description": "The Slickdeals redirect URL for the coupon.",
+                        "format": "uri"
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The coupon type returned by Slickdeals."
+                      },
+                      "store": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "The Slickdeals store ID."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The store name."
+                          },
+                          "domain": {
+                            "type": "string",
+                            "description": "The store domain."
+                          },
+                          "country": {
+                            "type": "string",
+                            "description": "The store country code."
+                          },
+                          "internalLink": {
+                            "type": "string",
+                            "description": "The Slickdeals page for the store.",
+                            "format": "uri"
+                          },
+                          "monetized": {
+                            "type": "boolean",
+                            "description": "Whether Slickdeals monetizes links for this store."
+                          },
+                          "externalLink": {
+                            "type": "string",
+                            "description": "The Slickdeals redirect URL for the store.",
+                            "format": "uri"
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A store returned by Slickdeals."
+                      },
+                      "categories": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "description": "The Slickdeals category ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The category name."
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "The full category hierarchy path."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "A category returned by Slickdeals."
+                        },
+                        "description": "Categories associated with the coupon."
+                      },
+                      "startAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "When the coupon becomes active.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "When the coupon becomes active."
+                      },
+                      "expireAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "When the coupon expires.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "When the coupon expires."
+                      },
+                      "modifiedAt": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "When the coupon was last modified.",
+                            "format": "date-time"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "When the coupon was last modified."
+                      },
+                      "percentOff": {
+                        "type": "string",
+                        "description": "The percentage discount represented as text."
+                      },
+                      "dollarsOff": {
+                        "type": "string",
+                        "description": "The fixed discount represented as text."
+                      },
+                      "redemptions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The total redemption count."
+                      },
+                      "redemptions_24hrs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The redemption count during the last 24 hours."
+                      },
+                      "exclusive": {
+                        "type": "boolean",
+                        "description": "Whether the coupon is exclusive to Slickdeals."
+                      },
+                      "sitewide": {
+                        "type": "boolean",
+                        "description": "Whether the coupon applies store-wide."
+                      },
+                      "verified": {
+                        "type": "boolean",
+                        "description": "Whether Slickdeals has verified the coupon."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A coupon returned by Slickdeals."
+                  },
+                  "description": "Coupons associated with the deal."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A deal returned by Slickdeals."
+            },
+            "description": "The deals returned by Slickdeals."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current result page."
+              },
+              "perPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested number of results per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information for the returned collection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals deal collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_stores",
+      "service": "slickdeals",
+      "name": "list_stores",
+      "description": "List Slickdeals stores with optional name, monetization, country, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact store name to retrieve.",
+            "pattern": "\\S"
+          },
+          "monetizedOnly": {
+            "type": "boolean",
+            "description": "Whether to return only monetized stores."
+          },
+          "country": {
+            "type": "string",
+            "enum": [
+              "US",
+              "UK",
+              "CA",
+              "AU"
+            ],
+            "description": "The store country used to filter results."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to retrieve."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "description": "The number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Slickdeals stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Slickdeals store ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The store name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The store domain."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The store country code."
+                },
+                "internalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals page for the store.",
+                  "format": "uri"
+                },
+                "monetized": {
+                  "type": "boolean",
+                  "description": "Whether Slickdeals monetizes links for this store."
+                },
+                "externalLink": {
+                  "type": "string",
+                  "description": "The Slickdeals redirect URL for the store.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A store returned by Slickdeals."
+            },
+            "description": "The stores returned by Slickdeals."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The current result page."
+              },
+              "perPage": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested number of results per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information for the returned collection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized Slickdeals store collection."
+      }
+    },
+    {
+      "id": "slickdeals.list_types",
+      "service": "slickdeals",
+      "name": "list_types",
+      "description": "List the coupon and deal type values supported by the Slickdeals Syndication API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Slickdeals content types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "couponTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The supported coupon types."
+          },
+          "dealTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The supported deal types."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The content type values supported by Slickdeals."
+      }
+    }
+  ]
+}

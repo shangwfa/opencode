@@ -1,0 +1,248 @@
+{
+  "service": "appstle_subscriptions",
+  "displayName": "Appstle Subscriptions",
+  "categories": [
+    "Productivity",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "apst_...",
+      "description": "Appstle API key sent with the X-API-Key header. Create it in your Appstle admin panel under Settings > API Key Management: https://developers.appstle.com/subscription/authentication"
+    }
+  ],
+  "homepageUrl": "https://appstle.com",
+  "actions": [
+    {
+      "id": "appstle_subscriptions.get_customer_with_subscriptions",
+      "service": "appstle_subscriptions",
+      "name": "get_customer_with_subscriptions",
+      "description": "Retrieve Appstle customer details including subscription contract information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Shopify customer ID, without a gid:// prefix."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Appstle for subscription contracts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Customer lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Appstle customer detail object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Appstle customer detail object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Customer details with subscription contracts."
+      }
+    },
+    {
+      "id": "appstle_subscriptions.get_valid_subscription_contract_ids",
+      "service": "appstle_subscriptions",
+      "name": "get_valid_subscription_contract_ids",
+      "description": "Return valid Appstle subscription contract IDs for a Shopify customer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Shopify customer ID, without a gid:// prefix."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Customer identifier for valid subscription contract ID lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contractIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Numeric Shopify subscription contract ID."
+            },
+            "description": "Numeric Shopify subscription contract IDs returned by Appstle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Valid subscription contract IDs for the customer."
+      }
+    },
+    {
+      "id": "appstle_subscriptions.list_customer_subscription_details",
+      "service": "appstle_subscriptions",
+      "name": "list_customer_subscription_details",
+      "description": "List detailed Appstle subscription contract records for a Shopify customer.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Numeric Shopify customer ID, without a gid:// prefix."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "Customer identifier for detailed subscription lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Appstle subscription detail object."
+            },
+            "description": "Detailed Appstle subscription contract objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed subscription contracts for the customer."
+      }
+    },
+    {
+      "id": "appstle_subscriptions.list_customers_with_subscriptions",
+      "service": "appstle_subscriptions",
+      "name": "list_customers_with_subscriptions",
+      "description": "List customers who have Appstle subscription contracts with optional filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter customers by name. Partial matches are supported."
+          },
+          "email": {
+            "type": "string",
+            "description": "Filter customers by exact email address.",
+            "format": "email"
+          },
+          "activeMoreThanOneSubscription": {
+            "type": "boolean",
+            "description": "Whether to return only customers with more than one active subscription."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based page number to request from Appstle."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page size for the customer list."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One sort directive accepted by Appstle."
+            },
+            "description": "Spring pageable sort directives such as id,desc."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing customers with subscriptions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customerId": {
+                  "type": "integer",
+                  "description": "Numeric Shopify customer ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Customer name returned by Appstle."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Customer email address returned by Appstle."
+                },
+                "activeSubscriptions": {
+                  "type": "integer",
+                  "description": "Number of active subscriptions for the customer."
+                },
+                "inActiveSubscriptions": {
+                  "type": "integer",
+                  "description": "Number of inactive subscriptions for the customer."
+                },
+                "lifetimeValue": {
+                  "type": "number",
+                  "description": "Customer lifetime value returned by Appstle."
+                },
+                "nextOrderDate": {
+                  "type": "string",
+                  "description": "Next subscription order timestamp, when present.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Appstle customer subscription summary."
+            },
+            "description": "Customers returned by Appstle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Customers with subscription summaries."
+      }
+    }
+  ]
+}

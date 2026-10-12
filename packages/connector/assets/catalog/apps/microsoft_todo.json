@@ -1,0 +1,2717 @@
+{
+  "service": "microsoft_todo",
+  "displayName": "Microsoft To Do",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "scopes": [
+        "User.Read",
+        "Tasks.ReadWrite",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "response_mode": "query"
+      },
+      "clientConfigFields": [
+        {
+          "key": "tenant",
+          "label": "Tenant",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "defaultValue": "common",
+          "placeholder": "common",
+          "description": "The Microsoft identity platform tenant segment to use, such as common, organizations, consumers, or a specific tenant ID."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://to-do.office.com",
+  "actions": [
+    {
+      "id": "microsoft_todo.create_checklist_item",
+      "service": "microsoft_todo",
+      "name": "create_checklist_item",
+      "description": "Add a checklist item to a Microsoft To Do task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the checklist item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId",
+          "displayName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Checklist item ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the checklist item."
+          },
+          "isChecked": {
+            "type": "boolean",
+            "description": "Whether the checklist item is checked."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "When the checklist item was created.",
+            "format": "date-time"
+          },
+          "checkedDateTime": {
+            "type": "string",
+            "description": "When the checklist item was checked.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do checklist item resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.create_task",
+      "service": "microsoft_todo",
+      "name": "create_task",
+      "description": "Create a new task in a Microsoft To Do task list.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task title."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "Body content."
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Body content type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "The body content of a task."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "notStarted",
+              "inProgress",
+              "completed",
+              "waitingOnOthers",
+              "deferred"
+            ],
+            "description": "State or progress of the task."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ],
+            "description": "Importance of the task."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Categories to associate with the task."
+          },
+          "dueDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time the task is due."
+          },
+          "startDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time the task is scheduled to start."
+          },
+          "isReminderOn": {
+            "type": "boolean",
+            "description": "Whether to alert the user with a reminder. Set reminderDateTime as well, otherwise no alert fires."
+          },
+          "reminderDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time to alert the user with a reminder."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "absoluteMonthly",
+                      "relativeMonthly",
+                      "absoluteYearly",
+                      "relativeYearly"
+                    ],
+                    "description": "Recurrence pattern type."
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of units between occurrences."
+                  },
+                  "month": {
+                    "type": "integer",
+                    "description": "Month of the year for yearly recurrences."
+                  },
+                  "dayOfMonth": {
+                    "type": "integer",
+                    "description": "Day of the month for monthly recurrences."
+                  },
+                  "daysOfWeek": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ],
+                      "description": "Day of the week."
+                    },
+                    "description": "Days of the week for weekly or monthly recurrences."
+                  },
+                  "firstDayOfWeek": {
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ],
+                    "description": "Day of the week."
+                  },
+                  "index": {
+                    "type": "string",
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "interval"
+                ],
+                "description": "The frequency of a task recurrence."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "endDate",
+                      "noEnd",
+                      "numbered"
+                    ],
+                    "description": "Recurrence range type."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "recurrenceTimeZone": {
+                    "type": "string",
+                    "description": "Time zone for startDate and endDate."
+                  },
+                  "numberOfOccurrences": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of occurrences for a numbered recurrence range."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "startDate"
+                ],
+                "description": "The date range over which a task recurrence repeats."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pattern",
+              "range"
+            ],
+            "description": "A recurrence pattern and range for a task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "title"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task title."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "Body content."
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Body content type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "The body content of a task."
+          },
+          "bodyLastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task body was last modified.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "notStarted",
+              "inProgress",
+              "completed",
+              "waitingOnOthers",
+              "deferred"
+            ],
+            "description": "State or progress of the task."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ],
+            "description": "Importance of the task."
+          },
+          "isReminderOn": {
+            "type": "boolean",
+            "description": "Whether a reminder alert is set for the task."
+          },
+          "reminderDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "absoluteMonthly",
+                      "relativeMonthly",
+                      "absoluteYearly",
+                      "relativeYearly"
+                    ],
+                    "description": "Recurrence pattern type."
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of units between occurrences."
+                  },
+                  "month": {
+                    "type": "integer",
+                    "description": "Month of the year for yearly recurrences."
+                  },
+                  "dayOfMonth": {
+                    "type": "integer",
+                    "description": "Day of the month for monthly recurrences."
+                  },
+                  "daysOfWeek": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ],
+                      "description": "Day of the week."
+                    },
+                    "description": "Days of the week for weekly or monthly recurrences."
+                  },
+                  "firstDayOfWeek": {
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ],
+                    "description": "Day of the week."
+                  },
+                  "index": {
+                    "type": "string",
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "interval"
+                ],
+                "description": "The frequency of a task recurrence."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "endDate",
+                      "noEnd",
+                      "numbered"
+                    ],
+                    "description": "Recurrence range type."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "recurrenceTimeZone": {
+                    "type": "string",
+                    "description": "Time zone for startDate and endDate."
+                  },
+                  "numberOfOccurrences": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of occurrences for a numbered recurrence range."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "startDate"
+                ],
+                "description": "The date range over which a task recurrence repeats."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pattern",
+              "range"
+            ],
+            "description": "A recurrence pattern and range for a task."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Categories associated with the task."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "When the task was created.",
+            "format": "date-time"
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task was last modified.",
+            "format": "date-time"
+          },
+          "dueDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "startDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "completedDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "hasAttachments": {
+            "type": "boolean",
+            "description": "Whether the task has attachments."
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Checklist item ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name of the checklist item."
+                },
+                "isChecked": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item is checked."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was created.",
+                  "format": "date-time"
+                },
+                "checkedDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was checked.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do checklist item resource."
+            },
+            "description": "Checklist items linked to the task."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.create_task_list",
+      "service": "microsoft_todo",
+      "name": "create_task_list",
+      "description": "Create a new Microsoft To Do task list.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the new task list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "displayName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task list ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the task list."
+          },
+          "isOwner": {
+            "type": "boolean",
+            "description": "Whether the current user owns the task list."
+          },
+          "isShared": {
+            "type": "boolean",
+            "description": "Whether the task list is shared."
+          },
+          "wellknownListName": {
+            "type": "string",
+            "enum": [
+              "none",
+              "defaultList",
+              "flaggedEmails",
+              "unknownFutureValue"
+            ],
+            "description": "Well-known list identifier when the list is a built-in list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task list resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.delete_checklist_item",
+      "service": "microsoft_todo",
+      "name": "delete_checklist_item",
+      "description": "Delete a checklist item from a Microsoft To Do task.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          },
+          "checklistItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do checklist item ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId",
+          "checklistItemId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the deleted resource."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "deleted"
+        ],
+        "description": "Confirmation that the checklist item was deleted."
+      }
+    },
+    {
+      "id": "microsoft_todo.delete_task",
+      "service": "microsoft_todo",
+      "name": "delete_task",
+      "description": "Delete a task from a Microsoft To Do task list.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the deleted resource."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "deleted"
+        ],
+        "description": "Confirmation that the task was deleted."
+      }
+    },
+    {
+      "id": "microsoft_todo.delete_task_list",
+      "service": "microsoft_todo",
+      "name": "delete_task_list",
+      "description": "Delete a Microsoft To Do task list and all of its tasks.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ID of the deleted resource."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "deleted"
+        ],
+        "description": "Confirmation that the task list was deleted."
+      }
+    },
+    {
+      "id": "microsoft_todo.get_task",
+      "service": "microsoft_todo",
+      "name": "get_task",
+      "description": "Get one task from a Microsoft To Do task list.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Tasks.Read"
+      ],
+      "providerPermissions": [
+        "Tasks.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task title."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "Body content."
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Body content type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "The body content of a task."
+          },
+          "bodyLastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task body was last modified.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "notStarted",
+              "inProgress",
+              "completed",
+              "waitingOnOthers",
+              "deferred"
+            ],
+            "description": "State or progress of the task."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ],
+            "description": "Importance of the task."
+          },
+          "isReminderOn": {
+            "type": "boolean",
+            "description": "Whether a reminder alert is set for the task."
+          },
+          "reminderDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "absoluteMonthly",
+                      "relativeMonthly",
+                      "absoluteYearly",
+                      "relativeYearly"
+                    ],
+                    "description": "Recurrence pattern type."
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of units between occurrences."
+                  },
+                  "month": {
+                    "type": "integer",
+                    "description": "Month of the year for yearly recurrences."
+                  },
+                  "dayOfMonth": {
+                    "type": "integer",
+                    "description": "Day of the month for monthly recurrences."
+                  },
+                  "daysOfWeek": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ],
+                      "description": "Day of the week."
+                    },
+                    "description": "Days of the week for weekly or monthly recurrences."
+                  },
+                  "firstDayOfWeek": {
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ],
+                    "description": "Day of the week."
+                  },
+                  "index": {
+                    "type": "string",
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "interval"
+                ],
+                "description": "The frequency of a task recurrence."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "endDate",
+                      "noEnd",
+                      "numbered"
+                    ],
+                    "description": "Recurrence range type."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "recurrenceTimeZone": {
+                    "type": "string",
+                    "description": "Time zone for startDate and endDate."
+                  },
+                  "numberOfOccurrences": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of occurrences for a numbered recurrence range."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "startDate"
+                ],
+                "description": "The date range over which a task recurrence repeats."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pattern",
+              "range"
+            ],
+            "description": "A recurrence pattern and range for a task."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Categories associated with the task."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "When the task was created.",
+            "format": "date-time"
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task was last modified.",
+            "format": "date-time"
+          },
+          "dueDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "startDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "completedDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "hasAttachments": {
+            "type": "boolean",
+            "description": "Whether the task has attachments."
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Checklist item ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name of the checklist item."
+                },
+                "isChecked": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item is checked."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was created.",
+                  "format": "date-time"
+                },
+                "checkedDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was checked.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do checklist item resource."
+            },
+            "description": "Checklist items linked to the task."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.get_task_list",
+      "service": "microsoft_todo",
+      "name": "get_task_list",
+      "description": "Get one Microsoft To Do task list by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Tasks.Read"
+      ],
+      "providerPermissions": [
+        "Tasks.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task list ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the task list."
+          },
+          "isOwner": {
+            "type": "boolean",
+            "description": "Whether the current user owns the task list."
+          },
+          "isShared": {
+            "type": "boolean",
+            "description": "Whether the task list is shared."
+          },
+          "wellknownListName": {
+            "type": "string",
+            "enum": [
+              "none",
+              "defaultList",
+              "flaggedEmails",
+              "unknownFutureValue"
+            ],
+            "description": "Well-known list identifier when the list is a built-in list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task list resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.list_checklist_items",
+      "service": "microsoft_todo",
+      "name": "list_checklist_items",
+      "description": "List checklist items on a Microsoft To Do task.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Tasks.Read"
+      ],
+      "providerPermissions": [
+        "Tasks.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Checklist item ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name of the checklist item."
+                },
+                "isChecked": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item is checked."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was created.",
+                  "format": "date-time"
+                },
+                "checkedDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was checked.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do checklist item resource."
+            },
+            "description": "Checklist items in this page."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "description": "A page of Microsoft To Do checklist items."
+      }
+    },
+    {
+      "id": "microsoft_todo.list_task_lists",
+      "service": "microsoft_todo",
+      "name": "list_task_lists",
+      "description": "List the current user's Microsoft To Do task lists.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Tasks.Read"
+      ],
+      "providerPermissions": [
+        "Tasks.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of items to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip."
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData $filter expression."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "OData $orderby expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Task list ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name for the task list."
+                },
+                "isOwner": {
+                  "type": "boolean",
+                  "description": "Whether the current user owns the task list."
+                },
+                "isShared": {
+                  "type": "boolean",
+                  "description": "Whether the task list is shared."
+                },
+                "wellknownListName": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "defaultList",
+                    "flaggedEmails",
+                    "unknownFutureValue"
+                  ],
+                  "description": "Well-known list identifier when the list is a built-in list."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do task list resource."
+            },
+            "description": "Task lists in this page."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "description": "A page of Microsoft To Do task lists."
+      }
+    },
+    {
+      "id": "microsoft_todo.list_tasks",
+      "service": "microsoft_todo",
+      "name": "list_tasks",
+      "description": "List tasks in a Microsoft To Do task list.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Tasks.Read"
+      ],
+      "providerPermissions": [
+        "Tasks.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "expandChecklistItems": {
+            "type": "boolean",
+            "description": "Include checklist items for each task."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of items to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip."
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData $filter expression."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "OData $orderby expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Task ID."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Task title."
+                },
+                "body": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "description": "Body content."
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "html"
+                      ],
+                      "description": "Body content type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "content"
+                  ],
+                  "description": "The body content of a task."
+                },
+                "bodyLastModifiedDateTime": {
+                  "type": "string",
+                  "description": "When the task body was last modified.",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "notStarted",
+                    "inProgress",
+                    "completed",
+                    "waitingOnOthers",
+                    "deferred"
+                  ],
+                  "description": "State or progress of the task."
+                },
+                "importance": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "normal",
+                    "high"
+                  ],
+                  "description": "Importance of the task."
+                },
+                "isReminderOn": {
+                  "type": "boolean",
+                  "description": "Whether a reminder alert is set for the task."
+                },
+                "reminderDateTime": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date and time value, for example 2026-08-07T09:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime"
+                  ],
+                  "description": "A date and time with an explicit time zone."
+                },
+                "recurrence": {
+                  "type": "object",
+                  "properties": {
+                    "pattern": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "daily",
+                            "weekly",
+                            "absoluteMonthly",
+                            "relativeMonthly",
+                            "absoluteYearly",
+                            "relativeYearly"
+                          ],
+                          "description": "Recurrence pattern type."
+                        },
+                        "interval": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "Number of units between occurrences."
+                        },
+                        "month": {
+                          "type": "integer",
+                          "description": "Month of the year for yearly recurrences."
+                        },
+                        "dayOfMonth": {
+                          "type": "integer",
+                          "description": "Day of the month for monthly recurrences."
+                        },
+                        "daysOfWeek": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "sunday",
+                              "monday",
+                              "tuesday",
+                              "wednesday",
+                              "thursday",
+                              "friday",
+                              "saturday"
+                            ],
+                            "description": "Day of the week."
+                          },
+                          "description": "Days of the week for weekly or monthly recurrences."
+                        },
+                        "firstDayOfWeek": {
+                          "type": "string",
+                          "enum": [
+                            "sunday",
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                            "saturday"
+                          ],
+                          "description": "Day of the week."
+                        },
+                        "index": {
+                          "type": "string",
+                          "enum": [
+                            "first",
+                            "second",
+                            "third",
+                            "fourth",
+                            "last"
+                          ],
+                          "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "interval"
+                      ],
+                      "description": "The frequency of a task recurrence."
+                    },
+                    "range": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "endDate",
+                            "noEnd",
+                            "numbered"
+                          ],
+                          "description": "Recurrence range type."
+                        },
+                        "startDate": {
+                          "type": "string",
+                          "description": "Start date of the recurrence range.",
+                          "format": "date"
+                        },
+                        "endDate": {
+                          "type": "string",
+                          "description": "End date of the recurrence range.",
+                          "format": "date"
+                        },
+                        "recurrenceTimeZone": {
+                          "type": "string",
+                          "description": "Time zone for startDate and endDate."
+                        },
+                        "numberOfOccurrences": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Number of occurrences for a numbered recurrence range."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "startDate"
+                      ],
+                      "description": "The date range over which a task recurrence repeats."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "pattern",
+                    "range"
+                  ],
+                  "description": "A recurrence pattern and range for a task."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Categories associated with the task."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "When the task was created.",
+                  "format": "date-time"
+                },
+                "lastModifiedDateTime": {
+                  "type": "string",
+                  "description": "When the task was last modified.",
+                  "format": "date-time"
+                },
+                "dueDateTime": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date and time value, for example 2026-08-07T09:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime"
+                  ],
+                  "description": "A date and time with an explicit time zone."
+                },
+                "startDateTime": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date and time value, for example 2026-08-07T09:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime"
+                  ],
+                  "description": "A date and time with an explicit time zone."
+                },
+                "completedDateTime": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date and time value, for example 2026-08-07T09:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime"
+                  ],
+                  "description": "A date and time with an explicit time zone."
+                },
+                "hasAttachments": {
+                  "type": "boolean",
+                  "description": "Whether the task has attachments."
+                },
+                "checklistItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Checklist item ID."
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Display name of the checklist item."
+                      },
+                      "isChecked": {
+                        "type": "boolean",
+                        "description": "Whether the checklist item is checked."
+                      },
+                      "createdDateTime": {
+                        "type": "string",
+                        "description": "When the checklist item was created.",
+                        "format": "date-time"
+                      },
+                      "checkedDateTime": {
+                        "type": "string",
+                        "description": "When the checklist item was checked.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Microsoft To Do checklist item resource."
+                  },
+                  "description": "Checklist items linked to the task."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do task resource."
+            },
+            "description": "Tasks in this page."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque pagination URL returned by a previous Microsoft To Do response (@odata.nextLink).",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "description": "A page of Microsoft To Do tasks."
+      }
+    },
+    {
+      "id": "microsoft_todo.update_checklist_item",
+      "service": "microsoft_todo",
+      "name": "update_checklist_item",
+      "description": "Update a checklist item on a Microsoft To Do task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          },
+          "checklistItemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do checklist item ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated display name for the checklist item."
+          },
+          "isChecked": {
+            "type": "boolean",
+            "description": "Whether the checklist item is checked."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId",
+          "checklistItemId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Checklist item ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the checklist item."
+          },
+          "isChecked": {
+            "type": "boolean",
+            "description": "Whether the checklist item is checked."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "When the checklist item was created.",
+            "format": "date-time"
+          },
+          "checkedDateTime": {
+            "type": "string",
+            "description": "When the checklist item was checked.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do checklist item resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.update_task",
+      "service": "microsoft_todo",
+      "name": "update_task",
+      "description": "Update fields on an existing Microsoft To Do task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated task title."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "Body content."
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Body content type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "The body content of a task."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "notStarted",
+              "inProgress",
+              "completed",
+              "waitingOnOthers",
+              "deferred"
+            ],
+            "description": "State or progress of the task."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ],
+            "description": "Importance of the task."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Updated categories for the task."
+          },
+          "dueDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time the task is due."
+          },
+          "startDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time the task is scheduled to start."
+          },
+          "completedDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "isReminderOn": {
+            "type": "boolean",
+            "description": "Whether to alert the user with a reminder. Set reminderDateTime as well, otherwise no alert fires."
+          },
+          "reminderDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "Date and time to alert the user with a reminder."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "absoluteMonthly",
+                      "relativeMonthly",
+                      "absoluteYearly",
+                      "relativeYearly"
+                    ],
+                    "description": "Recurrence pattern type."
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of units between occurrences."
+                  },
+                  "month": {
+                    "type": "integer",
+                    "description": "Month of the year for yearly recurrences."
+                  },
+                  "dayOfMonth": {
+                    "type": "integer",
+                    "description": "Day of the month for monthly recurrences."
+                  },
+                  "daysOfWeek": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ],
+                      "description": "Day of the week."
+                    },
+                    "description": "Days of the week for weekly or monthly recurrences."
+                  },
+                  "firstDayOfWeek": {
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ],
+                    "description": "Day of the week."
+                  },
+                  "index": {
+                    "type": "string",
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "interval"
+                ],
+                "description": "The frequency of a task recurrence."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "endDate",
+                      "noEnd",
+                      "numbered"
+                    ],
+                    "description": "Recurrence range type."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "recurrenceTimeZone": {
+                    "type": "string",
+                    "description": "Time zone for startDate and endDate."
+                  },
+                  "numberOfOccurrences": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of occurrences for a numbered recurrence range."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "startDate"
+                ],
+                "description": "The date range over which a task recurrence repeats."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pattern",
+              "range"
+            ],
+            "description": "A recurrence pattern and range for a task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "taskId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task title."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "description": "Body content."
+              },
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Body content type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "The body content of a task."
+          },
+          "bodyLastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task body was last modified.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "notStarted",
+              "inProgress",
+              "completed",
+              "waitingOnOthers",
+              "deferred"
+            ],
+            "description": "State or progress of the task."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high"
+            ],
+            "description": "Importance of the task."
+          },
+          "isReminderOn": {
+            "type": "boolean",
+            "description": "Whether a reminder alert is set for the task."
+          },
+          "reminderDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "absoluteMonthly",
+                      "relativeMonthly",
+                      "absoluteYearly",
+                      "relativeYearly"
+                    ],
+                    "description": "Recurrence pattern type."
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of units between occurrences."
+                  },
+                  "month": {
+                    "type": "integer",
+                    "description": "Month of the year for yearly recurrences."
+                  },
+                  "dayOfMonth": {
+                    "type": "integer",
+                    "description": "Day of the month for monthly recurrences."
+                  },
+                  "daysOfWeek": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sunday",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday"
+                      ],
+                      "description": "Day of the week."
+                    },
+                    "description": "Days of the week for weekly or monthly recurrences."
+                  },
+                  "firstDayOfWeek": {
+                    "type": "string",
+                    "enum": [
+                      "sunday",
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday"
+                    ],
+                    "description": "Day of the week."
+                  },
+                  "index": {
+                    "type": "string",
+                    "enum": [
+                      "first",
+                      "second",
+                      "third",
+                      "fourth",
+                      "last"
+                    ],
+                    "description": "Which week the recurrence falls on for relative monthly/yearly recurrences."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "interval"
+                ],
+                "description": "The frequency of a task recurrence."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "endDate",
+                      "noEnd",
+                      "numbered"
+                    ],
+                    "description": "Recurrence range type."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date of the recurrence range.",
+                    "format": "date"
+                  },
+                  "recurrenceTimeZone": {
+                    "type": "string",
+                    "description": "Time zone for startDate and endDate."
+                  },
+                  "numberOfOccurrences": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of occurrences for a numbered recurrence range."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "startDate"
+                ],
+                "description": "The date range over which a task recurrence repeats."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pattern",
+              "range"
+            ],
+            "description": "A recurrence pattern and range for a task."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Categories associated with the task."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "When the task was created.",
+            "format": "date-time"
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "When the task was last modified.",
+            "format": "date-time"
+          },
+          "dueDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "startDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "completedDateTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Date and time value, for example 2026-08-07T09:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "description": "Time zone for dateTime, for example UTC. Defaults to UTC when omitted."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime"
+            ],
+            "description": "A date and time with an explicit time zone."
+          },
+          "hasAttachments": {
+            "type": "boolean",
+            "description": "Whether the task has attachments."
+          },
+          "checklistItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Checklist item ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name of the checklist item."
+                },
+                "isChecked": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item is checked."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was created.",
+                  "format": "date-time"
+                },
+                "checkedDateTime": {
+                  "type": "string",
+                  "description": "When the checklist item was checked.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft To Do checklist item resource."
+            },
+            "description": "Checklist items linked to the task."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task resource."
+      }
+    },
+    {
+      "id": "microsoft_todo.update_task_list",
+      "service": "microsoft_todo",
+      "name": "update_task_list",
+      "description": "Rename a Microsoft To Do task list.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Tasks.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Tasks.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft To Do task list ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated display name for the task list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "displayName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Task list ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the task list."
+          },
+          "isOwner": {
+            "type": "boolean",
+            "description": "Whether the current user owns the task list."
+          },
+          "isShared": {
+            "type": "boolean",
+            "description": "Whether the task list is shared."
+          },
+          "wellknownListName": {
+            "type": "string",
+            "enum": [
+              "none",
+              "defaultList",
+              "flaggedEmails",
+              "unknownFutureValue"
+            ],
+            "description": "Well-known list identifier when the list is a built-in list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft To Do task list resource."
+      }
+    }
+  ]
+}

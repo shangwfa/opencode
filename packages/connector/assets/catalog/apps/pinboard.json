@@ -1,0 +1,455 @@
+{
+  "service": "pinboard",
+  "displayName": "Pinboard",
+  "description": "Read, create, delete, and organize bookmarks in Pinboard.",
+  "categories": [
+    "Productivity",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "username:TOKEN",
+      "description": "Pinboard API token in username:TOKEN form, sent as the auth_token query parameter. Find it on the Pinboard password settings page: https://pinboard.in/settings/password"
+    }
+  ],
+  "homepageUrl": "https://pinboard.in/",
+  "actions": [
+    {
+      "id": "pinboard.add_bookmark",
+      "service": "pinboard",
+      "name": "add_bookmark",
+      "description": "Add or replace a Pinboard bookmark.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to bookmark.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The bookmark title. Pinboard calls this field description."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 65536,
+            "description": "The optional bookmark description or extended text."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "A Pinboard tag. Tags may not contain commas or whitespace."
+            },
+            "description": "Pinboard tags to match or attach. Multiple tags are joined with spaces for the upstream API.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The bookmark creation time in UTC.",
+            "format": "date-time"
+          },
+          "replace": {
+            "type": "boolean",
+            "description": "Whether to replace an existing bookmark for the same URL."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether to make the bookmark public."
+          },
+          "toRead": {
+            "type": "boolean",
+            "description": "Whether to mark the bookmark as unread."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "title"
+        ],
+        "description": "Input parameters for adding a Pinboard bookmark."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resultCode": {
+            "type": "string",
+            "description": "The result code returned by Pinboard."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resultCode"
+        ],
+        "description": "The Pinboard mutation result."
+      }
+    },
+    {
+      "id": "pinboard.delete_bookmark",
+      "service": "pinboard",
+      "name": "delete_bookmark",
+      "description": "Delete a Pinboard bookmark by URL.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The bookmarked URL to delete.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input parameters for deleting a Pinboard bookmark."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resultCode": {
+            "type": "string",
+            "description": "The result code returned by Pinboard."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resultCode"
+        ],
+        "description": "The Pinboard mutation result."
+      }
+    },
+    {
+      "id": "pinboard.get_bookmarks",
+      "service": "pinboard",
+      "name": "get_bookmarks",
+      "description": "Get Pinboard bookmarks for a URL, date, or up to three tags using the posts/get endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Return the bookmark for this exact URL.",
+            "format": "uri"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "A Pinboard tag. Tags may not contain commas or whitespace."
+            },
+            "description": "Up to three tags to filter by. Pinboard treats multiple tags as a combined tag filter.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "date": {
+            "type": "string",
+            "description": "Return bookmarks created on this UTC date.",
+            "format": "date"
+          },
+          "includeMeta": {
+            "type": "boolean",
+            "description": "Whether to include Pinboard change detection signatures."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting Pinboard bookmarks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bookmarks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The bookmarked URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The bookmark title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The optional bookmark description or extended text."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "A Pinboard tag. Tags may not contain commas or whitespace."
+                  },
+                  "description": "The bookmark tags."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The bookmark creation time returned by Pinboard.",
+                  "format": "date-time"
+                },
+                "hash": {
+                  "type": "string",
+                  "description": "The Pinboard bookmark hash."
+                },
+                "meta": {
+                  "type": "string",
+                  "description": "The optional Pinboard change detection signature."
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is public."
+                },
+                "toRead": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is marked as unread."
+                },
+                "others": {
+                  "type": "integer",
+                  "description": "The number of other Pinboard users who saved the same URL."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url",
+                "title",
+                "tags"
+              ],
+              "description": "A normalized Pinboard bookmark."
+            },
+            "description": "The Pinboard bookmarks returned by the endpoint."
+          },
+          "date": {
+            "type": "string",
+            "description": "The Pinboard response date or timestamp for this list."
+          },
+          "user": {
+            "type": "string",
+            "description": "The Pinboard username associated with the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bookmarks"
+        ],
+        "description": "The wrapped Pinboard bookmark list output."
+      }
+    },
+    {
+      "id": "pinboard.get_last_update",
+      "service": "pinboard",
+      "name": "get_last_update",
+      "description": "Get the most recent time a Pinboard bookmark was added, updated, or deleted.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for checking the Pinboard update timestamp."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updateTime": {
+            "type": "string",
+            "description": "The most recent bookmark update time returned by Pinboard.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updateTime"
+        ],
+        "description": "The wrapped Pinboard update timestamp output."
+      }
+    },
+    {
+      "id": "pinboard.list_recent_bookmarks",
+      "service": "pinboard",
+      "name": "list_recent_bookmarks",
+      "description": "List the user's most recent Pinboard bookmarks, optionally filtered by one tag.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "A tag to filter by."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of bookmarks to return. Pinboard allows up to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing recent Pinboard bookmarks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bookmarks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The bookmarked URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The bookmark title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The optional bookmark description or extended text."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "A Pinboard tag. Tags may not contain commas or whitespace."
+                  },
+                  "description": "The bookmark tags."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The bookmark creation time returned by Pinboard.",
+                  "format": "date-time"
+                },
+                "hash": {
+                  "type": "string",
+                  "description": "The Pinboard bookmark hash."
+                },
+                "meta": {
+                  "type": "string",
+                  "description": "The optional Pinboard change detection signature."
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is public."
+                },
+                "toRead": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is marked as unread."
+                },
+                "others": {
+                  "type": "integer",
+                  "description": "The number of other Pinboard users who saved the same URL."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url",
+                "title",
+                "tags"
+              ],
+              "description": "A normalized Pinboard bookmark."
+            },
+            "description": "The Pinboard bookmarks returned by the endpoint."
+          },
+          "date": {
+            "type": "string",
+            "description": "The Pinboard response date or timestamp for this list."
+          },
+          "user": {
+            "type": "string",
+            "description": "The Pinboard username associated with the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bookmarks"
+        ],
+        "description": "The wrapped Pinboard bookmark list output."
+      }
+    },
+    {
+      "id": "pinboard.list_tags",
+      "service": "pinboard",
+      "name": "list_tags",
+      "description": "List the user's Pinboard tags and bookmark counts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Pinboard tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "description": "A Pinboard tag. Tags may not contain commas or whitespace."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of bookmarks using this tag."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "tag",
+                "count"
+              ],
+              "description": "A Pinboard tag and its bookmark count."
+            },
+            "description": "The Pinboard tags returned by the account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tags"
+        ],
+        "description": "The wrapped Pinboard tag list output."
+      }
+    }
+  ]
+}

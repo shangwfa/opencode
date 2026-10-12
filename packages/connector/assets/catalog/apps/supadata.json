@@ -1,0 +1,619 @@
+{
+  "service": "supadata",
+  "displayName": "Supadata",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SUPADATA_API_KEY",
+      "description": "Supadata API key sent in the x-api-key header. Create or view keys in your Supadata dashboard: https://dash.supadata.ai"
+    }
+  ],
+  "homepageUrl": "https://supadata.ai/",
+  "actions": [
+    {
+      "id": "supadata.get_account",
+      "service": "supadata",
+      "name": "get_account",
+      "description": "Retrieve Supadata organization, plan, and credit usage details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Supadata account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "description": "The Supadata organization ID."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The subscription plan name."
+          },
+          "maxCredits": {
+            "type": "number",
+            "description": "The maximum credits for the current billing period."
+          },
+          "usedCredits": {
+            "type": "number",
+            "description": "The used credits for the current billing period."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Supadata account information response."
+      }
+    },
+    {
+      "id": "supadata.get_youtube_channel",
+      "service": "supadata",
+      "name": "get_youtube_channel",
+      "description": "Get metadata for a YouTube channel by URL, handle, or ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube URL, handle, playlist ID, channel ID, video ID, or supported identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting YouTube channel metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Metadata returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.get_youtube_playlist",
+      "service": "supadata",
+      "name": "get_youtube_playlist",
+      "description": "Get metadata for a YouTube playlist by URL or ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube URL, handle, playlist ID, channel ID, video ID, or supported identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting YouTube playlist metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Metadata returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.get_youtube_transcript",
+      "service": "supadata",
+      "name": "get_youtube_transcript",
+      "description": "Get a YouTube transcript by video URL or ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The YouTube video URL.",
+                "format": "uri"
+              },
+              "text": {
+                "type": "boolean",
+                "description": "Whether Supadata should return plain text transcript content."
+              },
+              "chunkSize": {
+                "type": "number",
+                "minimum": 50,
+                "maximum": 10000,
+                "description": "Maximum characters per transcript chunk when text is false."
+              },
+              "lang": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Preferred ISO 639-1 language code.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "url"
+            ],
+            "description": "Transcript lookup by URL."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "videoId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The YouTube video ID. Alternative to url.",
+                "pattern": "\\S"
+              },
+              "text": {
+                "type": "boolean",
+                "description": "Whether Supadata should return plain text transcript content."
+              },
+              "chunkSize": {
+                "type": "number",
+                "minimum": 50,
+                "maximum": 10000,
+                "description": "Maximum characters per transcript chunk when text is false."
+              },
+              "lang": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Preferred ISO 639-1 language code.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "videoId"
+            ],
+            "description": "Transcript lookup by video ID."
+          }
+        ],
+        "description": "Provide exactly one of url or videoId."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain transcript text."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A timed transcript segment."
+                },
+                "description": "Timed transcript chunks."
+              }
+            ],
+            "description": "The transcript content as plain text or timed chunks."
+          },
+          "lang": {
+            "type": "string",
+            "description": "The language code of the returned transcript."
+          },
+          "availableLangs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "Available transcript language codes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The YouTube transcript returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.get_youtube_video",
+      "service": "supadata",
+      "name": "get_youtube_video",
+      "description": "Get metadata for a YouTube video by URL or ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube URL, handle, playlist ID, channel ID, video ID, or supported identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting YouTube video metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Metadata returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.list_youtube_channel_videos",
+      "service": "supadata",
+      "name": "list_youtube_channel_videos",
+      "description": "List video IDs from a YouTube channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube URL, handle, playlist ID, channel ID, video ID, or supported identifier.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of items to return."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "video",
+              "short",
+              "live"
+            ],
+            "description": "The type of channel videos to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for listing YouTube channel video IDs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "Standard video IDs."
+          },
+          "shortIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "YouTube Shorts video IDs."
+          },
+          "liveIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "Live video IDs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The video IDs returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.list_youtube_playlist_videos",
+      "service": "supadata",
+      "name": "list_youtube_playlist_videos",
+      "description": "List video IDs from a YouTube playlist.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube URL, handle, playlist ID, channel ID, video ID, or supported identifier.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of items to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for listing YouTube playlist video IDs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "Standard video IDs."
+          },
+          "shortIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "YouTube Shorts video IDs."
+          },
+          "liveIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "Live video IDs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The video IDs returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.map_web_links",
+      "service": "supadata",
+      "name": "map_web_links",
+      "description": "Extract links found on a website.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL to process with Supadata.",
+            "format": "uri"
+          },
+          "noLinks": {
+            "type": "boolean",
+            "description": "Whether to remove Markdown links from scraped source content."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred ISO 639-1 language code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for mapping website links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One string value returned by Supadata."
+            },
+            "description": "URLs found on the website."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The web link map returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.scrape_web_page",
+      "service": "supadata",
+      "name": "scrape_web_page",
+      "description": "Extract Markdown content from a web page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL to process with Supadata.",
+            "format": "uri"
+          },
+          "noLinks": {
+            "type": "boolean",
+            "description": "Whether to remove Markdown links from the extracted content."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Preferred ISO 639-1 language code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for scraping a web page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The scraped web page returned by Supadata."
+      }
+    },
+    {
+      "id": "supadata.search_youtube",
+      "service": "supadata",
+      "name": "search_youtube",
+      "description": "Search YouTube videos, channels, and playlists through Supadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The YouTube search query.",
+            "pattern": "\\S"
+          },
+          "uploadDate": {
+            "type": "string",
+            "enum": [
+              "all",
+              "hour",
+              "today",
+              "week",
+              "month",
+              "year"
+            ],
+            "description": "Filter by upload date."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "video",
+              "channel",
+              "playlist",
+              "movie"
+            ],
+            "description": "Filter by result type."
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "all",
+              "short",
+              "medium",
+              "long"
+            ],
+            "description": "Filter by video duration."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "rating",
+              "date",
+              "views"
+            ],
+            "description": "The search result sort order."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hd",
+                "subtitles",
+                "creative-commons",
+                "3d",
+                "live",
+                "4k",
+                "360",
+                "location",
+                "hdr",
+                "vr180"
+              ],
+              "description": "One YouTube feature filter."
+            },
+            "description": "Special video features to filter by.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of items to return."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token for fetching the next search results page.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching YouTube."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query that Supadata executed."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One YouTube search result."
+            },
+            "description": "The YouTube search results."
+          },
+          "totalResults": {
+            "type": "number",
+            "description": "Estimated total result count."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "description": "Token for fetching the next result page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "results"
+        ],
+        "description": "The YouTube search response returned by Supadata."
+      }
+    }
+  ]
+}

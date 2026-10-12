@@ -1,0 +1,580 @@
+{
+  "service": "mailbluster",
+  "displayName": "MailBluster",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MAILBLUSTER_API_KEY",
+      "description": "MailBluster API key sent in the Authorization header. Create it from Brand Settings > API keys in MailBluster after signing in: https://app.mailbluster.com/api-doc/getting-started."
+    }
+  ],
+  "homepageUrl": "https://mailbluster.com",
+  "actions": [
+    {
+      "id": "mailbluster.create_lead",
+      "service": "mailbluster",
+      "name": "create_lead",
+      "description": "Create a MailBluster lead with optional custom fields, metadata, tags, subscription state, and double opt-in settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The lead's email address.",
+            "format": "email"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's timezone, such as America/Los_Angeles."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's IP address."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether the lead should be subscribed."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON value for one custom field."
+            },
+            "description": "Custom fields keyed by MailBluster field merge tag."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional MailBluster lead metadata such as company, role, source, or geolocation values."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One MailBluster tag name."
+            },
+            "description": "MailBluster tags associated with the lead."
+          },
+          "doubleOptIn": {
+            "type": "boolean",
+            "description": "Whether MailBluster should require double opt-in for this lead."
+          },
+          "overrideExisting": {
+            "type": "boolean",
+            "description": "Whether MailBluster should update the existing lead when the email already exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "subscribed"
+        ],
+        "description": "Request body for creating a MailBluster lead."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The MailBluster response message."
+          },
+          "lead": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The MailBluster lead identifier."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The lead's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The lead's last name."
+              },
+              "fullName": {
+                "type": "string",
+                "description": "The lead's full name."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A JSON value for one custom field."
+                },
+                "description": "Custom fields keyed by MailBluster field merge tag."
+              },
+              "email": {
+                "type": "string",
+                "description": "The lead's email address.",
+                "format": "email"
+              },
+              "timezone": {
+                "type": "string",
+                "description": "The lead's timezone."
+              },
+              "ipAddress": {
+                "type": "string",
+                "description": "The lead's IP address."
+              },
+              "subscribed": {
+                "type": "boolean",
+                "description": "Whether the lead is subscribed."
+              },
+              "optInStatus": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The lead's opt-in status, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The lead's opt-in status, or null when unavailable."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional MailBluster lead metadata such as company, role, source, or geolocation values."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One MailBluster tag name."
+                },
+                "description": "MailBluster tags associated with the lead."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the lead was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The timestamp when the lead was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A MailBluster lead object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The MailBluster create lead response."
+      }
+    },
+    {
+      "id": "mailbluster.delete_lead",
+      "service": "mailbluster",
+      "name": "delete_lead",
+      "description": "Delete one MailBluster lead by the MD5 hash of the lead email address.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lead_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MD5 hash of the lead email address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a MailBluster lead action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The MailBluster response message."
+          },
+          "leadHash": {
+            "type": "string",
+            "description": "The MD5 hash of the deleted lead email address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The MailBluster delete lead response."
+      }
+    },
+    {
+      "id": "mailbluster.get_lead",
+      "service": "mailbluster",
+      "name": "get_lead",
+      "description": "Get one MailBluster lead by the MD5 hash of the lead email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lead_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MD5 hash of the lead email address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a MailBluster lead action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The MailBluster lead identifier."
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The lead's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The lead's last name."
+          },
+          "fullName": {
+            "type": "string",
+            "description": "The lead's full name."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON value for one custom field."
+            },
+            "description": "Custom fields keyed by MailBluster field merge tag."
+          },
+          "email": {
+            "type": "string",
+            "description": "The lead's email address.",
+            "format": "email"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The lead's timezone."
+          },
+          "ipAddress": {
+            "type": "string",
+            "description": "The lead's IP address."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether the lead is subscribed."
+          },
+          "optInStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The lead's opt-in status, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The lead's opt-in status, or null when unavailable."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional MailBluster lead metadata such as company, role, source, or geolocation values."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One MailBluster tag name."
+            },
+            "description": "MailBluster tags associated with the lead."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The timestamp when the lead was created.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The timestamp when the lead was last updated.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "A MailBluster lead object."
+      }
+    },
+    {
+      "id": "mailbluster.list_fields",
+      "service": "mailbluster",
+      "name": "list_fields",
+      "description": "List all MailBluster custom fields configured for the current brand.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The MailBluster field identifier."
+                },
+                "fieldLabel": {
+                  "type": "string",
+                  "description": "The display label of the custom field."
+                },
+                "fieldMergeTag": {
+                  "type": "string",
+                  "description": "The merge tag used as the custom field key."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the field was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The timestamp when the field was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A MailBluster custom field object."
+            },
+            "description": "The custom fields returned by MailBluster."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The MailBluster custom field list response."
+      }
+    },
+    {
+      "id": "mailbluster.update_lead",
+      "service": "mailbluster",
+      "name": "update_lead",
+      "description": "Update one MailBluster lead by lead hash, including custom fields, metadata, subscription state, and tag changes.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lead_hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MD5 hash of the lead email address to update."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The lead's email address.",
+            "format": "email"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's timezone, such as America/Los_Angeles."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lead's IP address."
+          },
+          "subscribed": {
+            "type": "boolean",
+            "description": "Whether the lead should be subscribed."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON value for one custom field."
+            },
+            "description": "Custom fields keyed by MailBluster field merge tag."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional MailBluster lead metadata such as company, role, source, or geolocation values."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One MailBluster tag name."
+            },
+            "description": "MailBluster tags associated with the lead."
+          },
+          "addTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One MailBluster tag name."
+            },
+            "description": "MailBluster tags associated with the lead."
+          },
+          "removeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One MailBluster tag name."
+            },
+            "description": "MailBluster tags associated with the lead."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lead_hash"
+        ],
+        "description": "Path parameter and request body for updating a MailBluster lead."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The MailBluster response message."
+          },
+          "lead": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The MailBluster lead identifier."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The lead's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The lead's last name."
+              },
+              "fullName": {
+                "type": "string",
+                "description": "The lead's full name."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A JSON value for one custom field."
+                },
+                "description": "Custom fields keyed by MailBluster field merge tag."
+              },
+              "email": {
+                "type": "string",
+                "description": "The lead's email address.",
+                "format": "email"
+              },
+              "timezone": {
+                "type": "string",
+                "description": "The lead's timezone."
+              },
+              "ipAddress": {
+                "type": "string",
+                "description": "The lead's IP address."
+              },
+              "subscribed": {
+                "type": "boolean",
+                "description": "Whether the lead is subscribed."
+              },
+              "optInStatus": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The lead's opt-in status, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The lead's opt-in status, or null when unavailable."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional MailBluster lead metadata such as company, role, source, or geolocation values."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One MailBluster tag name."
+                },
+                "description": "MailBluster tags associated with the lead."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the lead was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The timestamp when the lead was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A MailBluster lead object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The MailBluster update lead response."
+      }
+    }
+  ]
+}

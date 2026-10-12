@@ -1,0 +1,140 @@
+{
+  "service": "huodingdong_mcp",
+  "displayName": "Huodingdong ERP MCP",
+  "homepageUrl": "https://www.huodingdong.com",
+  "iconUrl": "https://imghdd.huohanhan.com/common/1015607879169744896.png",
+  "categories": [
+    "Cross-border E-commerce",
+    "Data & Analytics",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "X-Mcp-Key",
+      "placeholder": "Paste your Huodingdong MCP access key",
+      "description": "Sign in at https://www.huodingdong.com/login, open System > Open Platform > MCP Management, and copy the access key. The key is bound to your Huodingdong account and inherits its shop and data permissions. Revoke and reissue an exposed key in MCP Management."
+    }
+  ],
+  "actions": [
+    {
+      "id": "huodingdong_mcp.call_tool",
+      "service": "huodingdong_mcp",
+      "name": "call_tool",
+      "description": "Call a current Huodingdong ERP MCP tool after discovering its schema with list_tools. Product import creates an asynchronous task; query its task status and distinguish collection success from shop claim success. Pricing simulation requires an explicit region even if the live schema omits that requirement. Inventory is an ERP snapshot, not live platform sellable stock. Inspect tool behavior before calling: this generic entry point also permits future tools that may change or delete business data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the selected tool's live schema. Use platform shop IDs, preserve explicit shop and date filters, and supply region for pricing simulation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Invoke a discovered Huodingdong ERP MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured content when supplied; otherwise the complete MCP content envelope. Preserve warnings and missing-data indicators. An accepted import task or successful collection does not guarantee shop claim or publication success."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized Huodingdong ERP MCP tool response."
+      },
+      "followUpActions": [
+        "huodingdong_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "huodingdong_mcp.list_tools",
+      "service": "huodingdong_mcp",
+      "name": "list_tools",
+      "description": "Discover the connected Huodingdong ERP account's current MCP tools, live argument and result schemas, and behavior annotations for Shopee and TikTok Shop products, inventory, orders, fulfillment, marketing, advertising, profit, business reporting, and product import tasks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current official tool description."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Official MCP hints about the tool's behavior."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The live JSON Schema for the tool's arguments."
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The live JSON Schema for the tool's result, if supplied."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "One tool currently exposed by Huodingdong ERP MCP."
+            },
+            "description": "Tools available within the connected account's permissions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The live Huodingdong ERP MCP tool catalog."
+      },
+      "followUpActions": [
+        "huodingdong_mcp.call_tool"
+      ]
+    }
+  ]
+}

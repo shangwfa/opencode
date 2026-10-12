@@ -1,0 +1,398 @@
+{
+  "service": "walmart_marketplace",
+  "displayName": "Walmart Marketplace",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "inputType": "text",
+          "label": "Client ID",
+          "required": true,
+          "secret": false,
+          "placeholder": "Walmart Marketplace Client ID",
+          "description": "The Client ID for a seller-owned Walmart Marketplace application: https://developer.walmart.com/"
+        },
+        {
+          "key": "clientSecret",
+          "inputType": "password",
+          "label": "Client Secret",
+          "required": true,
+          "secret": true,
+          "placeholder": "Walmart Marketplace Client Secret",
+          "description": "The Client Secret paired with the seller application Client ID."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://marketplace.walmart.com",
+  "actions": [
+    {
+      "id": "walmart_marketplace.get_inventory",
+      "service": "walmart_marketplace",
+      "name": "get_inventory",
+      "description": "Get the current Walmart Marketplace inventory for one seller SKU.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller-assigned SKU."
+          },
+          "shipNode": {
+            "type": "string",
+            "description": "The fulfillment-center ID; omit it to use the default ship node."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku"
+        ],
+        "description": "The seller SKU and optional fulfillment center to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inventory": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Walmart Marketplace inventory response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Inventory state returned by Walmart Marketplace."
+      }
+    },
+    {
+      "id": "walmart_marketplace.get_item",
+      "service": "walmart_marketplace",
+      "name": "get_item",
+      "description": "Get one Walmart Marketplace seller item by product identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SKU, item ID, GTIN, UPC, EAN, or ISBN to retrieve."
+          },
+          "productIdType": {
+            "type": "string",
+            "enum": [
+              "SKU",
+              "ITEM_ID",
+              "GTIN",
+              "UPC",
+              "EAN",
+              "ISBN"
+            ],
+            "description": "How Walmart should interpret productId."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The Walmart Marketplace item identifier and identifier type."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The item returned by Walmart Marketplace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One Walmart Marketplace catalog item."
+      }
+    },
+    {
+      "id": "walmart_marketplace.get_order",
+      "service": "walmart_marketplace",
+      "name": "get_order",
+      "description": "Get one Walmart Marketplace purchase order by purchase order ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purchaseOrderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Walmart purchase order ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Walmart Marketplace purchase order to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The purchase order returned by Walmart Marketplace."
+          }
+        },
+        "additionalProperties": false,
+        "description": "One Walmart Marketplace purchase order."
+      }
+    },
+    {
+      "id": "walmart_marketplace.list_items",
+      "service": "walmart_marketplace",
+      "name": "list_items",
+      "description": "List items in the connected Walmart Marketplace seller catalog.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor returned by a previous list-items response."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The zero-based result offset, up to 10000."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of items to return, from 1 through 1000."
+          },
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A seller-assigned SKU to match."
+          },
+          "gtin": {
+            "type": "string",
+            "minLength": 14,
+            "maxLength": 14,
+            "description": "A 14-digit Global Trade Item Number to match."
+          },
+          "lifecycleStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED",
+              "RETIRED"
+            ],
+            "description": "The item lifecycle status to match."
+          },
+          "publishedStatus": {
+            "type": "string",
+            "enum": [
+              "PUBLISHED",
+              "UNPUBLISHED"
+            ],
+            "description": "The item publication status to match."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for Walmart Marketplace seller items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A seller catalog item."
+            },
+            "description": "The seller items on this page."
+          },
+          "totalItems": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching item count when Walmart provides it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching item count when Walmart provides it."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor to send for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor to send for the next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Walmart Marketplace seller items."
+      }
+    },
+    {
+      "id": "walmart_marketplace.list_orders",
+      "service": "walmart_marketplace",
+      "name": "list_orders",
+      "description": "List recent Walmart Marketplace purchase orders with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "createdStartDate": {
+            "type": "string",
+            "description": "Return orders created on or after this UTC or ISO-8601 date."
+          },
+          "createdEndDate": {
+            "type": "string",
+            "description": "Return orders created on or before this UTC or ISO-8601 date."
+          },
+          "lastModifiedStartDate": {
+            "type": "string",
+            "description": "Return orders modified on or after this UTC or ISO-8601 date."
+          },
+          "lastModifiedEndDate": {
+            "type": "string",
+            "description": "Return orders modified on or before this UTC or ISO-8601 date."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Created",
+              "Acknowledged",
+              "Shipped",
+              "Delivered",
+              "Cancelled"
+            ],
+            "description": "The purchase-order line status to match."
+          },
+          "sku": {
+            "type": "string",
+            "description": "A seller SKU to match."
+          },
+          "customerOrderId": {
+            "type": "string",
+            "description": "A Walmart customer order ID to match."
+          },
+          "purchaseOrderId": {
+            "type": "string",
+            "description": "A Walmart purchase order ID to match."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of orders to return, from 1 through 200."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The complete query string returned as nextCursor in Walmart order metadata, beginning with ?. Provide it without other inputs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for Walmart Marketplace purchase orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A purchase order."
+            },
+            "description": "The purchase orders on this page."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Walmart pagination and response metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Walmart Marketplace purchase orders."
+      }
+    },
+    {
+      "id": "walmart_marketplace.update_inventory",
+      "service": "walmart_marketplace",
+      "name": "update_inventory",
+      "description": "Replace the Walmart Marketplace inventory amount for one seller SKU.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller-assigned SKU."
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The replacement number of units available to sell."
+          },
+          "shipNode": {
+            "type": "string",
+            "description": "The fulfillment-center ID; omit it to use the default ship node."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku",
+          "amount"
+        ],
+        "description": "The seller SKU, replacement amount, and optional fulfillment center."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inventory": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Walmart Marketplace inventory response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Inventory state returned by Walmart Marketplace."
+      }
+    }
+  ]
+}

@@ -1,0 +1,672 @@
+{
+  "service": "fxmacrodata",
+  "displayName": "FXMacroData",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FXMACRODATA_API_KEY",
+      "description": "FXMacroData API key sent in the X-API-Key header. USD releases, the USD release calendar and the indicator catalogue work without a key; other currencies, FX rates and COT positioning need one. Get a key at https://fxmacrodata.com/subscribe?utm_source=github&utm_medium=referral&utm_campaign=open-connector&utm_content=subscribe."
+    }
+  ],
+  "homepageUrl": "https://fxmacrodata.com",
+  "actions": [
+    {
+      "id": "fxmacrodata.get_announcements",
+      "service": "fxmacrodata",
+      "name": "get_announcements",
+      "description": "Get the official release history of one macroeconomic indicator for a currency, such as US CPI or the ECB deposit rate. Each row carries the reference period, the value and the time the publisher released it. USD works without an API key with limited recent history.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Three-letter currency code, such as usd, eur, gbp or jpy. Case-insensitive.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "indicator": {
+            "type": "string",
+            "description": "Indicator slug, such as inflation, policy_rate, unemployment or gdp. get_data_catalogue lists every slug served for a currency.",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Earliest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Latest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of rows to return. Defaults to 20; at most 100.",
+            "default": 20
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of rows to skip. Use pagination.next_offset to read the next page.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "currency",
+          "indicator"
+        ],
+        "description": "The currency, indicator, optional date window and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "The currency code."
+          },
+          "indicator": {
+            "type": "string",
+            "description": "The indicator slug."
+          },
+          "name": {
+            "type": "string",
+            "description": "The indicator name."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "description": "The reference period the value describes, as YYYY-MM-DD."
+                },
+                "val": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The released value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The released value."
+                },
+                "announcement_datetime": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "When the publisher released the value, as Unix seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the publisher released the value, as Unix seconds."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "The publisher of the value."
+                },
+                "source_url": {
+                  "type": "string",
+                  "description": "The publisher page the value was read from."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One official release."
+            },
+            "description": "Releases, newest first."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The requested page size."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested page size."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows skipped."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows skipped."
+              },
+              "returned_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows in this page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows in this page."
+              },
+              "total_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total rows in the requested date window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total rows in the requested date window."
+              },
+              "has_more": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether another page is available."
+              },
+              "next_offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Offset for the next page, or null when there are no more rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Offset for the next page, or null when there are no more rows."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Page information. Continue with next_offset while has_more is true."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The release history of the indicator."
+      }
+    },
+    {
+      "id": "fxmacrodata.get_cot",
+      "service": "fxmacrodata",
+      "name": "get_cot",
+      "description": "Get weekly CFTC Commitments of Traders positioning for a currency's futures. USD supports limited keyless history; other currencies require an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Three-letter currency code, such as usd, eur, gbp or jpy. Case-insensitive.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Earliest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Latest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of rows to return. Defaults to 20; at most 100.",
+            "default": 20
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of rows to skip. Use pagination.next_offset to read the next page.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "currency"
+        ],
+        "description": "The currency, optional date window and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One weekly report."
+            },
+            "description": "Weekly reports."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The requested page size."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested page size."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows skipped."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows skipped."
+              },
+              "returned_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows in this page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows in this page."
+              },
+              "total_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total rows in the requested date window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total rows in the requested date window."
+              },
+              "has_more": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether another page is available."
+              },
+              "next_offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Offset for the next page, or null when there are no more rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Offset for the next page, or null when there are no more rows."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Page information. Continue with next_offset while has_more is true."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Weekly positioning reports."
+      }
+    },
+    {
+      "id": "fxmacrodata.get_data_catalogue",
+      "service": "fxmacrodata",
+      "name": "get_data_catalogue",
+      "description": "List the indicators served for a currency, keyed by indicator slug, with name, unit, frequency, publisher and coverage. Works without an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Three-letter currency code, such as usd, eur, gbp or jpy. Case-insensitive.",
+            "pattern": "^[A-Za-z]{3}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "currency"
+        ],
+        "description": "The currency to list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Indicator metadata keyed by indicator slug."
+      }
+    },
+    {
+      "id": "fxmacrodata.get_forex",
+      "service": "fxmacrodata",
+      "name": "get_forex",
+      "description": "Get daily FX spot rates for a currency pair, such as EUR/USD. Requires an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "Base currency code, such as eur.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "quote": {
+            "type": "string",
+            "description": "Quote currency code, such as usd.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Earliest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Latest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of rows to return. Defaults to 20; at most 100.",
+            "default": 20
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of rows to skip. Use pagination.next_offset to read the next page.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "base",
+          "quote"
+        ],
+        "description": "The currency pair, optional date window and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One daily rate."
+            },
+            "description": "Daily rates."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The requested page size."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested page size."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows skipped."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows skipped."
+              },
+              "returned_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of rows in this page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of rows in this page."
+              },
+              "total_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total rows in the requested date window."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total rows in the requested date window."
+              },
+              "has_more": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether another page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether another page is available."
+              },
+              "next_offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Offset for the next page, or null when there are no more rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Offset for the next page, or null when there are no more rows."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Page information. Continue with next_offset while has_more is true."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Daily rates for the pair."
+      }
+    },
+    {
+      "id": "fxmacrodata.get_latest_announcements",
+      "service": "fxmacrodata",
+      "name": "get_latest_announcements",
+      "description": "Get the most recent official release of every indicator for a currency in one call. USD works without an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Three-letter currency code, such as usd, eur, gbp or jpy. Case-insensitive.",
+            "pattern": "^[A-Za-z]{3}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "currency"
+        ],
+        "description": "The currency to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "The currency code."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of indicators returned."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "The latest release of one indicator."
+            },
+            "description": "One latest release per indicator."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The latest release per indicator."
+      }
+    },
+    {
+      "id": "fxmacrodata.get_release_calendar",
+      "service": "fxmacrodata",
+      "name": "get_release_calendar",
+      "description": "Get scheduled official release times for a currency, such as the next CPI, payrolls or central bank decision. Calendars work without an API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Three-letter currency code, such as usd, eur, gbp or jpy. Case-insensitive.",
+            "pattern": "^[A-Za-z]{3}$"
+          },
+          "indicator": {
+            "type": "string",
+            "description": "Indicator slug, such as inflation, policy_rate, unemployment or gdp. get_data_catalogue lists every slug served for a currency.",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Earliest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Latest date to return, as YYYY-MM-DD.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "currency"
+        ],
+        "description": "The currency and optional indicator and date window."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "The currency code."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The publisher's local timezone."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": "string",
+                  "description": "The indicator slug being released."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The release name."
+                },
+                "announcement_datetime": {
+                  "type": "integer",
+                  "description": "Scheduled release time as Unix seconds."
+                },
+                "announcement_datetime_utc": {
+                  "type": "string",
+                  "description": "Scheduled release time in UTC, ISO 8601."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One scheduled release."
+            },
+            "description": "Scheduled releases in time order."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Scheduled releases."
+      }
+    }
+  ]
+}

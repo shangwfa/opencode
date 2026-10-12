@@ -1,0 +1,1961 @@
+{
+  "service": "helpdesk",
+  "displayName": "HelpDesk",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "HELPDESK_PERSONAL_ACCESS_TOKEN",
+      "description": "HelpDesk Personal Access Token used as the HTTP Basic Auth password. Create one under Tools > Personal Access Tokens in the Developers Console: https://developers.livechat.com/console/.",
+      "extraFields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "HELPDESK_ACCOUNT_ID",
+          "description": "HelpDesk account ID used as the HTTP Basic Auth username."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.helpdesk.com",
+  "actions": [
+    {
+      "id": "helpdesk.create_ticket",
+      "service": "helpdesk",
+      "name": "create_ticket",
+      "description": "Create a HelpDesk ticket with a requester and plain-text first message; attachment transactions are intentionally excluded.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "onhold",
+              "solved",
+              "closed"
+            ],
+            "description": "The HelpDesk ticket status."
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": -10,
+                "type": "number",
+                "description": "Low priority."
+              },
+              {
+                "const": 0,
+                "type": "number",
+                "description": "Medium priority."
+              },
+              {
+                "const": 10,
+                "type": "number",
+                "description": "High priority."
+              },
+              {
+                "const": 20,
+                "type": "number",
+                "description": "Urgent priority."
+              }
+            ],
+            "description": "The HelpDesk ticket priority."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket subject."
+          },
+          "teamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk team UUID.",
+              "format": "uuid"
+            },
+            "description": "The teams that can access the ticket."
+          },
+          "requester": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The requester email address.",
+                "format": "email"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The requester display name."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "email"
+            ],
+            "description": "The person requesting support."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The copied person's email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The copied person's display name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "A person copied on ticket messages."
+            },
+            "description": "The people copied on ticket messages."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk tag UUID.",
+              "format": "uuid"
+            },
+            "description": "The tags to attach to the ticket."
+          },
+          "followerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk agent UUID.",
+              "format": "uuid"
+            },
+            "description": "The agents that should follow the ticket."
+          },
+          "assignment": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "description": "The HelpDesk team UUID.",
+                "format": "uuid"
+              },
+              "agentId": {
+                "type": "string",
+                "description": "The HelpDesk agent UUID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "description": "A ticket assignment to a HelpDesk team, agent, or both."
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The plain-text message content."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "A plain-text ticket message."
+          },
+          "isPrivate": {
+            "type": "boolean",
+            "description": "Whether the new message is private to agents."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A value accepted by the configured HelpDesk custom field."
+            },
+            "description": "Custom field values keyed by the HelpDesk custom field API key."
+          },
+          "authorType": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "client"
+            ],
+            "description": "The actor type attributed to this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requester",
+          "message"
+        ],
+        "description": "Input for creating a HelpDesk ticket with a plain-text first message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "ID": {
+                "type": "string",
+                "description": "The unique ticket identifier.",
+                "format": "uuid"
+              },
+              "licenseID": {
+                "type": "integer",
+                "description": "The HelpDesk account identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The time the ticket was created.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "string",
+                "description": "The identifier that created the ticket.",
+                "format": "uuid"
+              },
+              "createdByType": {
+                "type": "string",
+                "description": "The type of actor that created the ticket."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The time the ticket was last updated.",
+                "format": "date-time"
+              },
+              "updatedBy": {
+                "type": "string",
+                "description": "The identifier that last updated the ticket.",
+                "format": "uuid"
+              },
+              "shortID": {
+                "type": "string",
+                "description": "The human-readable short ticket identifier."
+              },
+              "lastMessageAt": {
+                "type": "string",
+                "description": "The time of the last public message.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "pending",
+                  "onhold",
+                  "solved",
+                  "closed"
+                ],
+                "description": "The HelpDesk ticket status."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "const": -10,
+                    "type": "number",
+                    "description": "Low priority."
+                  },
+                  {
+                    "const": 0,
+                    "type": "number",
+                    "description": "Medium priority."
+                  },
+                  {
+                    "const": 10,
+                    "type": "number",
+                    "description": "High priority."
+                  },
+                  {
+                    "const": 20,
+                    "type": "number",
+                    "description": "Urgent priority."
+                  }
+                ],
+                "description": "The HelpDesk ticket priority."
+              },
+              "subject": {
+                "type": "string",
+                "description": "The ticket subject."
+              },
+              "teamIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk team UUID.",
+                  "format": "uuid"
+                },
+                "description": "The teams that can access the ticket."
+              },
+              "requester": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The requester email address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The requester display name."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "email",
+                  "name"
+                ],
+                "description": "The requester returned with a HelpDesk ticket."
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The requester email address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The requester display name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "email",
+                    "name"
+                  ],
+                  "description": "The requester returned with a HelpDesk ticket."
+                },
+                "description": "The people copied on ticket messages."
+              },
+              "tagIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk tag UUID.",
+                  "format": "uuid"
+                },
+                "description": "The tags attached to the ticket."
+              },
+              "followers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk agent UUID.",
+                  "format": "uuid"
+                },
+                "description": "The agents following the ticket."
+              },
+              "assignment": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The current team and agent assignment."
+              },
+              "customFields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The ticket custom field values."
+              },
+              "silo": {
+                "type": "string",
+                "enum": [
+                  "tickets",
+                  "archive",
+                  "trash",
+                  "spam"
+                ],
+                "description": "The HelpDesk ticket silo."
+              },
+              "source": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The source from which the ticket originated."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A HelpDesk ticket event."
+                },
+                "description": "The ticket event history returned by HelpDesk."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ID",
+              "licenseID",
+              "createdAt",
+              "createdBy",
+              "createdByType",
+              "updatedAt",
+              "updatedBy",
+              "shortID",
+              "lastMessageAt",
+              "status",
+              "priority",
+              "subject",
+              "teamIDs",
+              "requester",
+              "cc",
+              "tagIDs",
+              "followers",
+              "assignment",
+              "customFields",
+              "silo",
+              "source",
+              "events"
+            ],
+            "description": "A HelpDesk ticket returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The ticket created by HelpDesk."
+      }
+    },
+    {
+      "id": "helpdesk.delete_ticket",
+      "service": "helpdesk",
+      "name": "delete_ticket",
+      "description": "Delete a HelpDesk ticket by UUID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "description": "The HelpDesk ticket UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input for deleting one HelpDesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether HelpDesk returned its documented OK acknowledgement."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The HelpDesk delete acknowledgement."
+      }
+    },
+    {
+      "id": "helpdesk.get_ticket",
+      "service": "helpdesk",
+      "name": "get_ticket",
+      "description": "Get one HelpDesk ticket by UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "description": "The HelpDesk ticket UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input for selecting one HelpDesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "ID": {
+                "type": "string",
+                "description": "The unique ticket identifier.",
+                "format": "uuid"
+              },
+              "licenseID": {
+                "type": "integer",
+                "description": "The HelpDesk account identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The time the ticket was created.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "string",
+                "description": "The identifier that created the ticket.",
+                "format": "uuid"
+              },
+              "createdByType": {
+                "type": "string",
+                "description": "The type of actor that created the ticket."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The time the ticket was last updated.",
+                "format": "date-time"
+              },
+              "updatedBy": {
+                "type": "string",
+                "description": "The identifier that last updated the ticket.",
+                "format": "uuid"
+              },
+              "shortID": {
+                "type": "string",
+                "description": "The human-readable short ticket identifier."
+              },
+              "lastMessageAt": {
+                "type": "string",
+                "description": "The time of the last public message.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "pending",
+                  "onhold",
+                  "solved",
+                  "closed"
+                ],
+                "description": "The HelpDesk ticket status."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "const": -10,
+                    "type": "number",
+                    "description": "Low priority."
+                  },
+                  {
+                    "const": 0,
+                    "type": "number",
+                    "description": "Medium priority."
+                  },
+                  {
+                    "const": 10,
+                    "type": "number",
+                    "description": "High priority."
+                  },
+                  {
+                    "const": 20,
+                    "type": "number",
+                    "description": "Urgent priority."
+                  }
+                ],
+                "description": "The HelpDesk ticket priority."
+              },
+              "subject": {
+                "type": "string",
+                "description": "The ticket subject."
+              },
+              "teamIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk team UUID.",
+                  "format": "uuid"
+                },
+                "description": "The teams that can access the ticket."
+              },
+              "requester": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The requester email address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The requester display name."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "email",
+                  "name"
+                ],
+                "description": "The requester returned with a HelpDesk ticket."
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The requester email address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The requester display name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "email",
+                    "name"
+                  ],
+                  "description": "The requester returned with a HelpDesk ticket."
+                },
+                "description": "The people copied on ticket messages."
+              },
+              "tagIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk tag UUID.",
+                  "format": "uuid"
+                },
+                "description": "The tags attached to the ticket."
+              },
+              "followers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk agent UUID.",
+                  "format": "uuid"
+                },
+                "description": "The agents following the ticket."
+              },
+              "assignment": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The current team and agent assignment."
+              },
+              "customFields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The ticket custom field values."
+              },
+              "silo": {
+                "type": "string",
+                "enum": [
+                  "tickets",
+                  "archive",
+                  "trash",
+                  "spam"
+                ],
+                "description": "The HelpDesk ticket silo."
+              },
+              "source": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The source from which the ticket originated."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A HelpDesk ticket event."
+                },
+                "description": "The ticket event history returned by HelpDesk."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ID",
+              "licenseID",
+              "createdAt",
+              "createdBy",
+              "createdByType",
+              "updatedAt",
+              "updatedBy",
+              "shortID",
+              "lastMessageAt",
+              "status",
+              "priority",
+              "subject",
+              "teamIDs",
+              "requester",
+              "cc",
+              "tagIDs",
+              "followers",
+              "assignment",
+              "customFields",
+              "silo",
+              "source",
+              "events"
+            ],
+            "description": "A HelpDesk ticket returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The HelpDesk ticket response."
+      }
+    },
+    {
+      "id": "helpdesk.list_agents",
+      "service": "helpdesk",
+      "name": "list_agents",
+      "description": "List HelpDesk agents available for ticket assignment and following.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing HelpDesk agents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ID": {
+                  "type": "string",
+                  "description": "The HelpDesk agent UUID.",
+                  "format": "uuid"
+                },
+                "licenseID": {
+                  "type": "integer",
+                  "description": "The HelpDesk account identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The time the agent was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The time the agent was last updated.",
+                  "format": "date-time"
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The agent email address."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The agent full name."
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A HelpDesk agent role."
+                  },
+                  "description": "The roles assigned to the agent."
+                },
+                "teamIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "The HelpDesk team UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "The teams to which the agent belongs."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The agent account status."
+                },
+                "avatar": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The agent avatar URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The agent avatar URL."
+                },
+                "jobTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The agent job title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The agent job title."
+                },
+                "autoassignment": {
+                  "type": "boolean",
+                  "description": "Whether auto-assignment is enabled for the agent."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "ID",
+                "licenseID",
+                "createdAt",
+                "updatedAt",
+                "email",
+                "name",
+                "roles",
+                "teamIDs",
+                "status",
+                "avatar",
+                "jobTitle",
+                "autoassignment"
+              ],
+              "description": "A HelpDesk agent returned by the API."
+            },
+            "description": "The agents returned by HelpDesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agents"
+        ],
+        "description": "The HelpDesk agent list."
+      }
+    },
+    {
+      "id": "helpdesk.list_teams",
+      "service": "helpdesk",
+      "name": "list_teams",
+      "description": "List HelpDesk teams available for ticket assignment and visibility.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing HelpDesk teams."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ID": {
+                  "type": "string",
+                  "description": "The HelpDesk team UUID.",
+                  "format": "uuid"
+                },
+                "licenseID": {
+                  "type": "integer",
+                  "description": "The HelpDesk account identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The time the team was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The time the team was last updated.",
+                  "format": "date-time"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The team name."
+                },
+                "replyAddressID": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reply address used by the team.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reply address used by the team."
+                },
+                "replyName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The sender name used for team replies."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The sender name used for team replies."
+                },
+                "templateID": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email template used by the team.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email template used by the team."
+                },
+                "settings": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The team notification and routing settings."
+                },
+                "integrations": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The team's external integration settings."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "ID",
+                "licenseID",
+                "createdAt",
+                "updatedAt",
+                "name",
+                "replyAddressID",
+                "replyName",
+                "templateID",
+                "settings",
+                "integrations"
+              ],
+              "description": "A HelpDesk team returned by the API."
+            },
+            "description": "The teams returned by HelpDesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teams"
+        ],
+        "description": "The HelpDesk team list."
+      }
+    },
+    {
+      "id": "helpdesk.list_tickets",
+      "service": "helpdesk",
+      "name": "list_tickets",
+      "description": "List and search HelpDesk tickets with documented filters and composite cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "onhold",
+              "solved",
+              "closed"
+            ],
+            "description": "The HelpDesk ticket status."
+          },
+          "silo": {
+            "type": "string",
+            "enum": [
+              "tickets",
+              "archive",
+              "trash",
+              "spam"
+            ],
+            "description": "The HelpDesk ticket silo."
+          },
+          "spam": {
+            "type": "boolean",
+            "description": "Whether to include tickets marked as spam."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A ticket subject filter."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A full-text ticket search query."
+          },
+          "shortId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A human-readable HelpDesk short ticket identifier."
+          },
+          "teamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk team UUID.",
+              "format": "uuid"
+            },
+            "description": "The teams whose visible tickets should be returned.",
+            "minItems": 1
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk tag UUID.",
+              "format": "uuid"
+            },
+            "description": "The tags that returned tickets must have.",
+            "minItems": 1
+          },
+          "hasAssignee": {
+            "type": "boolean",
+            "description": "Whether returned tickets must have an assigned agent."
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": -10,
+                "type": "number",
+                "description": "Low priority."
+              },
+              {
+                "const": 0,
+                "type": "number",
+                "description": "Medium priority."
+              },
+              {
+                "const": 10,
+                "type": "number",
+                "description": "High priority."
+              },
+              {
+                "const": 20,
+                "type": "number",
+                "description": "Urgent priority."
+              }
+            ],
+            "description": "The HelpDesk ticket priority."
+          },
+          "createdDateFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive creation-time lower bound as an ISO timestamp or HelpDesk relative date."
+          },
+          "createdDateTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive creation-time upper bound as an ISO timestamp or HelpDesk relative date."
+          },
+          "updatedDateFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive update-time lower bound as an ISO timestamp or HelpDesk relative date."
+          },
+          "updatedDateTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inclusive update-time upper bound as an ISO timestamp or HelpDesk relative date."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of tickets to return."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The ticket sort direction."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "updatedAt",
+              "lastMessageAt"
+            ],
+            "description": "The ticket field used for cursor sorting."
+          },
+          "next": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "description": "The timestamp value of the selected sort field.",
+                "format": "date-time"
+              },
+              "ID": {
+                "type": "string",
+                "description": "The HelpDesk ticket UUID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "ID"
+            ],
+            "description": "A HelpDesk ticket pagination cursor."
+          },
+          "prev": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "description": "The timestamp value of the selected sort field.",
+                "format": "date-time"
+              },
+              "ID": {
+                "type": "string",
+                "description": "The HelpDesk ticket UUID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "ID"
+            ],
+            "description": "A HelpDesk ticket pagination cursor."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing and searching HelpDesk tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ID": {
+                  "type": "string",
+                  "description": "The unique ticket identifier.",
+                  "format": "uuid"
+                },
+                "licenseID": {
+                  "type": "integer",
+                  "description": "The HelpDesk account identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The time the ticket was created.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "string",
+                  "description": "The identifier that created the ticket.",
+                  "format": "uuid"
+                },
+                "createdByType": {
+                  "type": "string",
+                  "description": "The type of actor that created the ticket."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The time the ticket was last updated.",
+                  "format": "date-time"
+                },
+                "updatedBy": {
+                  "type": "string",
+                  "description": "The identifier that last updated the ticket.",
+                  "format": "uuid"
+                },
+                "shortID": {
+                  "type": "string",
+                  "description": "The human-readable short ticket identifier."
+                },
+                "lastMessageAt": {
+                  "type": "string",
+                  "description": "The time of the last public message.",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "pending",
+                    "onhold",
+                    "solved",
+                    "closed"
+                  ],
+                  "description": "The HelpDesk ticket status."
+                },
+                "priority": {
+                  "anyOf": [
+                    {
+                      "const": -10,
+                      "type": "number",
+                      "description": "Low priority."
+                    },
+                    {
+                      "const": 0,
+                      "type": "number",
+                      "description": "Medium priority."
+                    },
+                    {
+                      "const": 10,
+                      "type": "number",
+                      "description": "High priority."
+                    },
+                    {
+                      "const": 20,
+                      "type": "number",
+                      "description": "Urgent priority."
+                    }
+                  ],
+                  "description": "The HelpDesk ticket priority."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "The ticket subject."
+                },
+                "teamIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "The HelpDesk team UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "The teams that can access the ticket."
+                },
+                "requester": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The requester email address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The requester display name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "email",
+                    "name"
+                  ],
+                  "description": "The requester returned with a HelpDesk ticket."
+                },
+                "cc": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "description": "The requester email address."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The requester display name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "email",
+                      "name"
+                    ],
+                    "description": "The requester returned with a HelpDesk ticket."
+                  },
+                  "description": "The people copied on ticket messages."
+                },
+                "tagIDs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "The HelpDesk tag UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "The tags attached to the ticket."
+                },
+                "followers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "The HelpDesk agent UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "The agents following the ticket."
+                },
+                "assignment": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current team and agent assignment."
+                },
+                "customFields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The ticket custom field values."
+                },
+                "silo": {
+                  "type": "string",
+                  "enum": [
+                    "tickets",
+                    "archive",
+                    "trash",
+                    "spam"
+                  ],
+                  "description": "The HelpDesk ticket silo."
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The source from which the ticket originated."
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A HelpDesk ticket event."
+                  },
+                  "description": "The ticket event history returned by HelpDesk."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "ID",
+                "licenseID",
+                "createdAt",
+                "createdBy",
+                "createdByType",
+                "updatedAt",
+                "updatedBy",
+                "shortID",
+                "lastMessageAt",
+                "status",
+                "priority",
+                "subject",
+                "teamIDs",
+                "requester",
+                "cc",
+                "tagIDs",
+                "followers",
+                "assignment",
+                "customFields",
+                "silo",
+                "source",
+                "events"
+              ],
+              "description": "A HelpDesk ticket returned by the API."
+            },
+            "description": "The tickets returned by HelpDesk."
+          },
+          "totalPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages reported by HelpDesk."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages reported by HelpDesk."
+          },
+          "totalResults": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching tickets."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching tickets."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "description": "The timestamp value of the selected sort field.",
+                    "format": "date-time"
+                  },
+                  "ID": {
+                    "type": "string",
+                    "description": "The HelpDesk ticket UUID.",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "value",
+                  "ID"
+                ],
+                "description": "A HelpDesk ticket pagination cursor."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A HelpDesk ticket pagination cursor."
+          },
+          "prevCursor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "description": "The timestamp value of the selected sort field.",
+                    "format": "date-time"
+                  },
+                  "ID": {
+                    "type": "string",
+                    "description": "The HelpDesk ticket UUID.",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "value",
+                  "ID"
+                ],
+                "description": "A HelpDesk ticket pagination cursor."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A HelpDesk ticket pagination cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tickets",
+          "totalPages",
+          "totalResults",
+          "nextCursor",
+          "prevCursor"
+        ],
+        "description": "A page of HelpDesk tickets and cursor metadata."
+      }
+    },
+    {
+      "id": "helpdesk.move_ticket_to_silo",
+      "service": "helpdesk",
+      "name": "move_ticket_to_silo",
+      "description": "Move a HelpDesk ticket between the active, archive, trash, or spam silos.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "description": "The HelpDesk ticket UUID.",
+            "format": "uuid"
+          },
+          "silo": {
+            "type": "string",
+            "enum": [
+              "tickets",
+              "archive",
+              "trash",
+              "spam"
+            ],
+            "description": "The HelpDesk ticket silo."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId",
+          "silo"
+        ],
+        "description": "Input for moving one HelpDesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether HelpDesk returned its documented OK acknowledgement."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The HelpDesk silo-move acknowledgement."
+      }
+    },
+    {
+      "id": "helpdesk.update_ticket",
+      "service": "helpdesk",
+      "name": "update_ticket",
+      "description": "Partially update a HelpDesk ticket and optionally add one plain-text public or private message.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "description": "The HelpDesk ticket UUID.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "onhold",
+              "solved",
+              "closed"
+            ],
+            "description": "The HelpDesk ticket status."
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": -10,
+                "type": "number",
+                "description": "Low priority."
+              },
+              {
+                "const": 0,
+                "type": "number",
+                "description": "Medium priority."
+              },
+              {
+                "const": 10,
+                "type": "number",
+                "description": "High priority."
+              },
+              {
+                "const": 20,
+                "type": "number",
+                "description": "Urgent priority."
+              }
+            ],
+            "description": "The HelpDesk ticket priority."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket subject."
+          },
+          "teamIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk team UUID.",
+              "format": "uuid"
+            },
+            "description": "The teams that can access the ticket."
+          },
+          "requester": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The requester email address.",
+                "format": "email"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The requester display name."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "email"
+            ],
+            "description": "The person requesting support."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The copied person's email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The copied person's display name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "A person copied on ticket messages."
+            },
+            "description": "The people copied on ticket messages."
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk tag UUID.",
+              "format": "uuid"
+            },
+            "description": "The tags to attach to the ticket."
+          },
+          "followerIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The HelpDesk agent UUID.",
+              "format": "uuid"
+            },
+            "description": "The agents that should follow the ticket."
+          },
+          "assignment": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "description": "The HelpDesk team UUID.",
+                "format": "uuid"
+              },
+              "agentId": {
+                "type": "string",
+                "description": "The HelpDesk agent UUID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "description": "A ticket assignment to a HelpDesk team, agent, or both."
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The plain-text message content."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "A plain-text ticket message."
+          },
+          "isPrivate": {
+            "type": "boolean",
+            "description": "Whether the new message is private to agents."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A value accepted by the configured HelpDesk custom field."
+            },
+            "description": "Custom field values keyed by the HelpDesk custom field API key."
+          },
+          "authorType": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "client"
+            ],
+            "description": "The actor type attributed to this change."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticketId"
+        ],
+        "description": "Input for partially updating a HelpDesk ticket."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "ID": {
+                "type": "string",
+                "description": "The unique ticket identifier.",
+                "format": "uuid"
+              },
+              "licenseID": {
+                "type": "integer",
+                "description": "The HelpDesk account identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The time the ticket was created.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "string",
+                "description": "The identifier that created the ticket.",
+                "format": "uuid"
+              },
+              "createdByType": {
+                "type": "string",
+                "description": "The type of actor that created the ticket."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The time the ticket was last updated.",
+                "format": "date-time"
+              },
+              "updatedBy": {
+                "type": "string",
+                "description": "The identifier that last updated the ticket.",
+                "format": "uuid"
+              },
+              "shortID": {
+                "type": "string",
+                "description": "The human-readable short ticket identifier."
+              },
+              "lastMessageAt": {
+                "type": "string",
+                "description": "The time of the last public message.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "pending",
+                  "onhold",
+                  "solved",
+                  "closed"
+                ],
+                "description": "The HelpDesk ticket status."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "const": -10,
+                    "type": "number",
+                    "description": "Low priority."
+                  },
+                  {
+                    "const": 0,
+                    "type": "number",
+                    "description": "Medium priority."
+                  },
+                  {
+                    "const": 10,
+                    "type": "number",
+                    "description": "High priority."
+                  },
+                  {
+                    "const": 20,
+                    "type": "number",
+                    "description": "Urgent priority."
+                  }
+                ],
+                "description": "The HelpDesk ticket priority."
+              },
+              "subject": {
+                "type": "string",
+                "description": "The ticket subject."
+              },
+              "teamIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk team UUID.",
+                  "format": "uuid"
+                },
+                "description": "The teams that can access the ticket."
+              },
+              "requester": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The requester email address."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The requester display name."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "email",
+                  "name"
+                ],
+                "description": "The requester returned with a HelpDesk ticket."
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The requester email address."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The requester display name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "email",
+                    "name"
+                  ],
+                  "description": "The requester returned with a HelpDesk ticket."
+                },
+                "description": "The people copied on ticket messages."
+              },
+              "tagIDs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk tag UUID.",
+                  "format": "uuid"
+                },
+                "description": "The tags attached to the ticket."
+              },
+              "followers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The HelpDesk agent UUID.",
+                  "format": "uuid"
+                },
+                "description": "The agents following the ticket."
+              },
+              "assignment": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The current team and agent assignment."
+              },
+              "customFields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The ticket custom field values."
+              },
+              "silo": {
+                "type": "string",
+                "enum": [
+                  "tickets",
+                  "archive",
+                  "trash",
+                  "spam"
+                ],
+                "description": "The HelpDesk ticket silo."
+              },
+              "source": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The source from which the ticket originated."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A HelpDesk ticket event."
+                },
+                "description": "The ticket event history returned by HelpDesk."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ID",
+              "licenseID",
+              "createdAt",
+              "createdBy",
+              "createdByType",
+              "updatedAt",
+              "updatedBy",
+              "shortID",
+              "lastMessageAt",
+              "status",
+              "priority",
+              "subject",
+              "teamIDs",
+              "requester",
+              "cc",
+              "tagIDs",
+              "followers",
+              "assignment",
+              "customFields",
+              "silo",
+              "source",
+              "events"
+            ],
+            "description": "A HelpDesk ticket returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The ticket updated by HelpDesk."
+      }
+    }
+  ]
+}

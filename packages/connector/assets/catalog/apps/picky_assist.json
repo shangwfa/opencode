@@ -1,0 +1,189 @@
+{
+  "service": "picky_assist",
+  "displayName": "Picky Assist",
+  "homepageUrl": "https://pickyassist.com/",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "description": "Picky Assist V4 project API token. Create a token under Settings > Developers > API: https://app.pickyassist.com/settings/developers/api. Your plan must include API access."
+    }
+  ],
+  "actions": [
+    {
+      "id": "picky_assist.get_balance",
+      "service": "picky_assist",
+      "name": "get_balance",
+      "description": "Get the Picky Assist account balance using the connected project API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Provider business status; 100 indicates success."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          },
+          "balance": {
+            "type": "number",
+            "description": "Available account balance reported by Picky Assist."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Picky Assist account balance response."
+      }
+    },
+    {
+      "id": "picky_assist.send_messages",
+      "service": "picky_assist",
+      "name": "send_messages",
+      "description": "Submit text or public-URL media messages to one or more Picky Assist recipients. Success means accepted for processing, not delivered. WhatsApp session and channel restrictions still apply.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "application": {
+            "type": "integer",
+            "description": "Channel ID from https://app.pickyassist.com/settings/channels; use 5 for Facebook Messenger."
+          },
+          "globalmessage": {
+            "type": "string",
+            "description": "Shared text or image/video caption, used when a recipient message is empty."
+          },
+          "globalmedia": {
+            "type": "string",
+            "description": "Public media URL fetched by Picky Assist, not by Connector. Media limits depend on the channel and file type.",
+            "format": "uri"
+          },
+          "media_name": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "Display filename for PDFs and documents; unsupported by Phone Automation."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Queue priority: 0 for low (default), 1 for high."
+          },
+          "createcontact": {
+            "const": 1,
+            "type": "number",
+            "description": "Set to 1 to create contacts against the channel."
+          },
+          "voice": {
+            "const": 1,
+            "type": "number",
+            "description": "Set to 1 to send audio as a voice note on WhatsApp Web Automation."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "description": "Phone number with country code, without a leading zero, plus sign, or spaces.",
+                  "pattern": "^[1-9][0-9]{4,}$"
+                },
+                "messenger_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Facebook Messenger recipient ID; use with application 5 instead of number."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Personalized text or image/video caption; falls back to globalmessage when empty."
+                },
+                "media": {
+                  "type": "string",
+                  "description": "Public media URL for this recipient; supported by WhatsApp Official and Shared Numbers.",
+                  "format": "uri"
+                },
+                "reference_number": {
+                  "type": "string",
+                  "description": "Your reference returned in delivery webhooks; not an idempotency key."
+                },
+                "quoted": {
+                  "type": "string",
+                  "description": "Message ID to quote in a reply on WhatsApp Web Automation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One recipient and optional personalized message or media."
+            },
+            "description": "Recipients with optional personalized content. Each needs text or media, either shared or individual.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "application",
+          "data"
+        ],
+        "description": "Text or media messages for a connected channel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Provider business status; 100 indicates acceptance."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          },
+          "push_id": {
+            "type": "string",
+            "description": "Batch submission ID."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "msg_id": {
+                  "type": "string",
+                  "description": "Message ID allocated by Picky Assist."
+                },
+                "number": {
+                  "type": "string",
+                  "description": "Recipient phone number."
+                },
+                "credit": {
+                  "type": "string",
+                  "description": "Credit charged as reported by the provider."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One recipient result, including any additional provider fields."
+            },
+            "description": "Per-recipient submission results."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Submission response; use delivery webhooks to determine final delivery."
+      }
+    }
+  ]
+}

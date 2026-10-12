@@ -1,0 +1,2145 @@
+{
+  "service": "pubmed",
+  "displayName": "PubMed",
+  "description": "Search, retrieve, match, and trace biomedical literature through official NCBI APIs. NCBI disclaimer and copyright information: https://www.ncbi.nlm.nih.gov/home/about/policies/",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "NCBI API Key",
+      "placeholder": "NCBI_API_KEY",
+      "description": "Optional NCBI API key passed as the api_key query parameter. Create one from your NCBI account settings to raise the default E-utilities rate limit from 3 to 10 requests per second."
+    }
+  ],
+  "homepageUrl": "https://pubmed.ncbi.nlm.nih.gov/",
+  "actions": [
+    {
+      "id": "pubmed.convert_article_ids",
+      "service": "pubmed",
+      "name": "convert_article_ids",
+      "description": "Convert PMID, PMCID, DOI, or author manuscript identifiers with the PMC ID Converter. Complete mappings are available only for articles represented in PubMed Central.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One PMID, PMCID, DOI, or author manuscript identifier."
+            },
+            "description": "The article identifiers to convert. Every identifier must have the same idType.",
+            "minItems": 1,
+            "maxItems": 200
+          },
+          "idType": {
+            "type": "string",
+            "enum": [
+              "pmid",
+              "pmcid",
+              "doi",
+              "mid"
+            ],
+            "description": "The type shared by every input article identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for converting article identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestedId": {
+                  "type": "string",
+                  "description": "The original identifier from the request."
+                },
+                "pmid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed identifier when the article has one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed identifier when the article has one."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when the article is represented in PMC."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when the article is represented in PMC."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DOI when PMC reports one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DOI when PMC reports one."
+                },
+                "mid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author manuscript identifier when PMC reports one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author manuscript identifier when PMC reports one."
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PMC ID Converter error when the requested identifier could not be resolved."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PMC ID Converter error when the requested identifier could not be resolved."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The available identifiers for one requested article."
+            },
+            "description": "One conversion result for each identifier returned by PMC."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The available identifier mappings returned by PMC."
+      }
+    },
+    {
+      "id": "pubmed.find_related_articles",
+      "service": "pubmed",
+      "name": "find_related_articles",
+      "description": "Find normalized PubMed articles related to one source PMID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of articles to return.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pmid"
+        ],
+        "description": "Input parameters for finding related PubMed articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourcePmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The normalized related PubMed articles."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The related PubMed articles returned for one source record."
+      }
+    },
+    {
+      "id": "pubmed.get_article",
+      "service": "pubmed",
+      "name": "get_article",
+      "description": "Get one normalized PubMed article by PMID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting one PubMed article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "description": "Whether PubMed returned the requested record."
+          },
+          "article": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pmid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The numeric PubMed identifier (PMID).",
+                    "pattern": "^[0-9]+$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "The article title."
+                  },
+                  "abstract": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The structured abstract section label when present."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The structured abstract section label when present."
+                        },
+                        "text": {
+                          "type": "string",
+                          "description": "The normalized abstract section text."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "One section of a PubMed abstract."
+                    },
+                    "description": "The structured or unstructured abstract sections."
+                  },
+                  "authors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The author or collective author name."
+                        },
+                        "orcid": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The author's ORCID when present."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The author's ORCID when present."
+                        },
+                        "affiliations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One affiliation."
+                          },
+                          "description": "The author's affiliations."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A normalized PubMed author or author group."
+                    },
+                    "description": "The article authors."
+                  },
+                  "journal": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The full journal title."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The full journal title."
+                      },
+                      "abbreviation": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The NLM journal abbreviation."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The NLM journal abbreviation."
+                      },
+                      "issn": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The journal ISSN returned by PubMed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The journal ISSN returned by PubMed."
+                      },
+                      "volume": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The journal volume."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The journal volume."
+                      },
+                      "issue": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The journal issue."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The journal issue."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The journal information attached to a PubMed record."
+                  },
+                  "publicationDate": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The publication date or source Medline date."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The publication date or source Medline date."
+                  },
+                  "publicationTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One publication type."
+                    },
+                    "description": "The PubMed publication types."
+                  },
+                  "meshTerms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One MeSH descriptor."
+                    },
+                    "description": "The assigned Medical Subject Headings."
+                  },
+                  "keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One keyword."
+                    },
+                    "description": "The keywords attached to the PubMed record."
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One language code."
+                    },
+                    "description": "The article language codes returned by PubMed."
+                  },
+                  "doi": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The article DOI when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The article DOI when present."
+                  },
+                  "pmcid": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The PubMed Central identifier when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The PubMed Central identifier when present."
+                  },
+                  "pubmedUrl": {
+                    "type": "string",
+                    "description": "The canonical PubMed record URL.",
+                    "format": "uri"
+                  },
+                  "pmcUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The PubMed Central article URL when available.",
+                        "format": "uri"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The PubMed Central article URL when available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A normalized PubMed article record."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A normalized PubMed article record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of retrieving one PubMed article."
+      }
+    },
+    {
+      "id": "pubmed.get_article_references",
+      "service": "pubmed",
+      "name": "get_article_references",
+      "description": "Get normalized PubMed references for one source PMID. References are available only when supplied by publishers or recoverable from PMC data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of articles to return.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pmid"
+        ],
+        "description": "Input parameters for getting references from a source PubMed record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourcePmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The normalized PubMed articles referenced by the source record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The PubMed references returned for one source record."
+      }
+    },
+    {
+      "id": "pubmed.get_articles",
+      "service": "pubmed",
+      "name": "get_articles",
+      "description": "Get multiple normalized PubMed articles by PMID in one request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pmids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The numeric PubMed identifier (PMID).",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "The PubMed identifiers to retrieve.",
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting multiple PubMed articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The PubMed records that were found."
+          },
+          "notFoundPmids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The numeric PubMed identifier (PMID).",
+              "pattern": "^[0-9]+$"
+            },
+            "description": "The requested PMIDs that PubMed did not return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of retrieving multiple PubMed articles."
+      }
+    },
+    {
+      "id": "pubmed.get_citing_articles",
+      "service": "pubmed",
+      "name": "get_citing_articles",
+      "description": "Get normalized PubMed articles known to cite one source PMID. PubMed citation coverage depends on data supplied by publishers and NCBI sources and may be incomplete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of articles to return.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pmid"
+        ],
+        "description": "Input parameters for getting articles that cite a source PubMed record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sourcePmid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric PubMed identifier (PMID).",
+            "pattern": "^[0-9]+$"
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The normalized articles known to cite the source record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The citing PubMed articles returned for one source record."
+      }
+    },
+    {
+      "id": "pubmed.match_citation",
+      "service": "pubmed",
+      "name": "match_citation",
+      "description": "Match one raw biomedical citation to PubMed and return normalized candidate articles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "citation": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The citation text to match, such as an article title followed by its journal, year, volume, and pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for matching one citation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "boolean",
+            "description": "Whether PubMed returned at least one candidate article."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The normalized candidate articles returned by PubMed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The PubMed articles matched from the citation text."
+      }
+    },
+    {
+      "id": "pubmed.search_articles",
+      "service": "pubmed",
+      "name": "search_articles",
+      "description": "Search PubMed with the official query syntax and return normalized article records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PubMed query, including optional official field tags and Boolean operators such as cancer[Title] AND 2025[pdat]."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "The zero-based search result offset.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of articles to return.",
+            "default": 10
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "publication_date",
+              "first_author",
+              "journal"
+            ],
+            "description": "The PubMed result sort order."
+          },
+          "publicationDateRange": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "The earliest publication date to include.",
+                "format": "date"
+              },
+              "to": {
+                "type": "string",
+                "description": "The latest publication date to include.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive PubMed publication date range."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching PubMed articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching PubMed records."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested page size."
+          },
+          "queryTranslation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The query translation reported by PubMed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The query translation reported by PubMed."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pmid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The numeric PubMed identifier (PMID).",
+                  "pattern": "^[0-9]+$"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "abstract": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The structured abstract section label when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The structured abstract section label when present."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The normalized abstract section text."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One section of a PubMed abstract."
+                  },
+                  "description": "The structured or unstructured abstract sections."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The author or collective author name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The author's ORCID when present."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The author's ORCID when present."
+                      },
+                      "affiliations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One affiliation."
+                        },
+                        "description": "The author's affiliations."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized PubMed author or author group."
+                  },
+                  "description": "The article authors."
+                },
+                "journal": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The full journal title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The full journal title."
+                    },
+                    "abbreviation": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The NLM journal abbreviation."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The NLM journal abbreviation."
+                    },
+                    "issn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal ISSN returned by PubMed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal ISSN returned by PubMed."
+                    },
+                    "volume": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal volume."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal volume."
+                    },
+                    "issue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The journal issue."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The journal issue."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The journal information attached to a PubMed record."
+                },
+                "publicationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication date or source Medline date."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication date or source Medline date."
+                },
+                "publicationTypes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One publication type."
+                  },
+                  "description": "The PubMed publication types."
+                },
+                "meshTerms": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One MeSH descriptor."
+                  },
+                  "description": "The assigned Medical Subject Headings."
+                },
+                "keywords": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One keyword."
+                  },
+                  "description": "The keywords attached to the PubMed record."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One language code."
+                  },
+                  "description": "The article language codes returned by PubMed."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The article DOI when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The article DOI when present."
+                },
+                "pmcid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central identifier when present."
+                },
+                "pubmedUrl": {
+                  "type": "string",
+                  "description": "The canonical PubMed record URL.",
+                  "format": "uri"
+                },
+                "pmcUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The PubMed Central article URL when available.",
+                      "format": "uri"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The PubMed Central article URL when available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized PubMed article record."
+            },
+            "description": "The normalized articles in this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of normalized PubMed search results."
+      }
+    }
+  ]
+}

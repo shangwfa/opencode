@@ -1,0 +1,1134 @@
+{
+  "service": "zep",
+  "displayName": "Zep",
+  "description": "Manage Zep users, conversation threads, messages, and graph context.",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_ZEP_API_KEY",
+      "description": "Zep API key sent as Authorization: Api-Key <api_key>. Create or copy a key from your Zep project's settings after signing in at https://app.getzep.com."
+    }
+  ],
+  "homepageUrl": "https://www.getzep.com",
+  "actions": [
+    {
+      "id": "zep.add_thread_messages",
+      "service": "zep",
+      "name": "add_thread_messages",
+      "description": "Add chat messages to a Zep thread, ingest them into the user's graph, and optionally return current context.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The unique identifier of the target thread."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "maxLength": 4096,
+                  "description": "The message content, limited to 4,096 characters."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "norole",
+                    "system",
+                    "assistant",
+                    "user",
+                    "function",
+                    "tool"
+                  ],
+                  "description": "The role of the message sender."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the message was created."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata attached to a Zep resource."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The customizable name of the message sender."
+                },
+                "processed": {
+                  "type": "boolean",
+                  "description": "Whether Zep has processed the message."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The unique identifier of the message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "content",
+                "role"
+              ],
+              "description": "A message to add to a Zep conversation thread."
+            },
+            "description": "The messages to add in chronological order.",
+            "minItems": 1,
+            "maxItems": 30
+          },
+          "ignore_roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "norole",
+                "system",
+                "assistant",
+                "user",
+                "function",
+                "tool"
+              ],
+              "description": "The role of the message sender."
+            },
+            "description": "The roles to retain as messages but ignore for graph-memory extraction."
+          },
+          "return_context": {
+            "type": "boolean",
+            "description": "Whether to return context relevant to the most recent messages."
+          },
+          "strict_ontology": {
+            "type": "boolean",
+            "description": "Whether to prevent extraction of generic entities that do not match the configured ontology."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thread_id",
+          "messages"
+        ],
+        "description": "The input for adding messages to a Zep thread and its user graph."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "string",
+            "description": "The context relevant to the most recent messages, when requested."
+          },
+          "message_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A message unique identifier."
+            },
+            "description": "The unique identifiers assigned to the added messages."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "The identifier of the upstream graph-processing task."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The result of adding messages to a Zep thread."
+      }
+    },
+    {
+      "id": "zep.create_thread",
+      "service": "zep",
+      "name": "create_thread",
+      "description": "Create a conversation thread for an existing Zep user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the thread."
+          },
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The identifier of the existing user associated with the thread."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thread_id",
+          "user_id"
+        ],
+        "description": "The input for creating a Zep thread."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the thread was created."
+          },
+          "project_uuid": {
+            "type": "string",
+            "description": "The unique identifier of the thread's Zep project."
+          },
+          "thread_id": {
+            "type": "string",
+            "description": "The application-defined unique identifier of the thread."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The application-defined identifier of the associated user."
+          },
+          "user_uuid": {
+            "type": "string",
+            "description": "The opaque identifier of the associated user."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "The opaque unique identifier of the thread."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zep conversation thread."
+      }
+    },
+    {
+      "id": "zep.create_user",
+      "service": "zep",
+      "name": "create_user",
+      "description": "Create a Zep user that can own conversation threads and graph memory.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the user."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the user."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name of the user."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name of the user."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary metadata attached to a Zep resource."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The user's IANA time zone. Null leaves it unset at creation or clears it on update."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's IANA time zone. Null leaves it unset at creation or clears it on update."
+          },
+          "disable_default_ontology": {
+            "type": "boolean",
+            "description": "Whether to disable the default ontology for the user's graph."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "The input for creating a Zep user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the user was created."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the user was deleted, or null for an active user."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the user was deleted, or null for an active user."
+          },
+          "disable_default_ontology": {
+            "type": "boolean",
+            "description": "Whether the default ontology is disabled for the user's graph."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's email address."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The user's first name."
+          },
+          "id": {
+            "type": "integer",
+            "description": "The internal numeric identifier of the user."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The user's last name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary metadata attached to a Zep resource."
+          },
+          "project_uuid": {
+            "type": "string",
+            "description": "The unique identifier of the user's Zep project."
+          },
+          "session_count": {
+            "type": "integer",
+            "description": "The deprecated session count returned by Zep when present."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The IANA time zone, or null when no time zone is set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IANA time zone, or null when no time zone is set."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The deprecated user update timestamp returned by Zep when present."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The application-defined unique identifier of the user."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "The opaque unique identifier of the user."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zep user."
+      }
+    },
+    {
+      "id": "zep.delete_thread",
+      "service": "zep",
+      "name": "delete_thread",
+      "description": "Delete a Zep conversation thread and its thread-specific memory.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the thread."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thread_id"
+        ],
+        "description": "The input identifying a Zep thread."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The acknowledgement message returned by Zep."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The acknowledgement returned by Zep."
+      }
+    },
+    {
+      "id": "zep.delete_user",
+      "service": "zep",
+      "name": "delete_user",
+      "description": "Delete a Zep user and the threads and graph artifacts associated with that user.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "The input identifying a Zep user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The acknowledgement message returned by Zep."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The acknowledgement returned by Zep."
+      }
+    },
+    {
+      "id": "zep.get_project",
+      "service": "zep",
+      "name": "get_project",
+      "description": "Retrieve the Zep project associated with the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "description": "The timestamp when the project was created."
+              },
+              "default_time_zone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The IANA time zone, or null when no time zone is set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The IANA time zone, or null when no time zone is set."
+              },
+              "description": {
+                "type": "string",
+                "description": "The project description."
+              },
+              "name": {
+                "type": "string",
+                "description": "The project name."
+              },
+              "uuid": {
+                "type": "string",
+                "description": "The unique identifier of the project."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Zep project."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "project"
+        ],
+        "description": "The Zep project information response."
+      }
+    },
+    {
+      "id": "zep.get_thread_context",
+      "service": "zep",
+      "name": "get_thread_context",
+      "description": "Retrieve the most relevant context from a user's graph for the current Zep thread.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The unique identifier of the current thread."
+          },
+          "template_id": {
+            "type": "string",
+            "description": "The optional context template identifier used for rendering."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thread_id"
+        ],
+        "description": "The input for retrieving assembled user context for a Zep thread."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "string",
+            "description": "The context block containing relevant facts, entities, and messages from the user graph."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "context"
+        ],
+        "description": "The assembled Zep context response."
+      }
+    },
+    {
+      "id": "zep.get_thread_messages",
+      "service": "zep",
+      "name": "get_thread_messages",
+      "description": "Retrieve messages from a Zep thread with cursor or recent-message controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The unique identifier of the target thread."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of messages to return."
+          },
+          "cursor": {
+            "type": "integer",
+            "description": "The pagination cursor."
+          },
+          "lastn": {
+            "type": "integer",
+            "description": "The number of most recent messages to return, overriding limit and cursor."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thread_id"
+        ],
+        "description": "The input for retrieving messages from a Zep thread."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The message content."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "norole",
+                    "system",
+                    "assistant",
+                    "user",
+                    "function",
+                    "tool"
+                  ],
+                  "description": "The role of the message sender."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the message was created."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata attached to a Zep resource."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The customizable name of the message sender."
+                },
+                "processed": {
+                  "type": "boolean",
+                  "description": "Whether Zep has processed the message."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The unique identifier of the message."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "content",
+                "role"
+              ],
+              "description": "A message in a Zep conversation thread."
+            },
+            "description": "The messages returned for the thread."
+          },
+          "row_count": {
+            "type": "integer",
+            "description": "The number of messages returned."
+          },
+          "thread_created_at": {
+            "type": "string",
+            "description": "The thread creation timestamp."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "The total number of messages in the thread."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The application-defined identifier of the thread's user."
+          },
+          "user_uuid": {
+            "type": "string",
+            "description": "The opaque identifier of the thread's user."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A paginated Zep thread message response."
+      }
+    },
+    {
+      "id": "zep.get_user",
+      "service": "zep",
+      "name": "get_user",
+      "description": "Retrieve one Zep user by its application-defined identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "The input identifying a Zep user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the user was created."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the user was deleted, or null for an active user."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the user was deleted, or null for an active user."
+          },
+          "disable_default_ontology": {
+            "type": "boolean",
+            "description": "Whether the default ontology is disabled for the user's graph."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's email address."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The user's first name."
+          },
+          "id": {
+            "type": "integer",
+            "description": "The internal numeric identifier of the user."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The user's last name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary metadata attached to a Zep resource."
+          },
+          "project_uuid": {
+            "type": "string",
+            "description": "The unique identifier of the user's Zep project."
+          },
+          "session_count": {
+            "type": "integer",
+            "description": "The deprecated session count returned by Zep when present."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The IANA time zone, or null when no time zone is set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IANA time zone, or null when no time zone is set."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The deprecated user update timestamp returned by Zep when present."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The application-defined unique identifier of the user."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "The opaque unique identifier of the user."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zep user."
+      }
+    },
+    {
+      "id": "zep.list_threads",
+      "service": "zep",
+      "name": "list_threads",
+      "description": "List Zep conversation threads with pagination and ordering controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number for pagination, starting from 1."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The number of threads to retrieve per page."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "updated_at",
+              "user_id",
+              "thread_id"
+            ],
+            "description": "The field used to order threads."
+          },
+          "asc": {
+            "type": "boolean",
+            "description": "Whether to sort results in ascending order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pagination and sorting options for listing Zep threads."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response_count": {
+            "type": "integer",
+            "description": "The number of threads returned in this page."
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the thread was created."
+                },
+                "project_uuid": {
+                  "type": "string",
+                  "description": "The unique identifier of the thread's Zep project."
+                },
+                "thread_id": {
+                  "type": "string",
+                  "description": "The application-defined unique identifier of the thread."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "The application-defined identifier of the associated user."
+                },
+                "user_uuid": {
+                  "type": "string",
+                  "description": "The opaque identifier of the associated user."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The opaque unique identifier of the thread."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zep conversation thread."
+            },
+            "description": "The threads in this page."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "The total number of threads."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "response_count",
+          "threads",
+          "total_count"
+        ],
+        "description": "A paginated Zep thread response."
+      }
+    },
+    {
+      "id": "zep.list_users",
+      "service": "zep",
+      "name": "list_users",
+      "description": "List Zep users with pagination, search, and ordering controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number for pagination, starting from 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of users to retrieve per page."
+          },
+          "search": {
+            "type": "string",
+            "description": "The term used to filter users by user ID, name, or email."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "user_id",
+              "email"
+            ],
+            "description": "The field used to order users."
+          },
+          "asc": {
+            "type": "boolean",
+            "description": "Whether to sort results in ascending order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters and pagination options for listing Zep users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row_count": {
+            "type": "integer",
+            "description": "The number of users returned in this page."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "The total number of users."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the user was created."
+                },
+                "deleted_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the user was deleted, or null for an active user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the user was deleted, or null for an active user."
+                },
+                "disable_default_ontology": {
+                  "type": "boolean",
+                  "description": "Whether the default ontology is disabled for the user's graph."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address."
+                },
+                "first_name": {
+                  "type": "string",
+                  "description": "The user's first name."
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "The internal numeric identifier of the user."
+                },
+                "last_name": {
+                  "type": "string",
+                  "description": "The user's last name."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata attached to a Zep resource."
+                },
+                "project_uuid": {
+                  "type": "string",
+                  "description": "The unique identifier of the user's Zep project."
+                },
+                "session_count": {
+                  "type": "integer",
+                  "description": "The deprecated session count returned by Zep when present."
+                },
+                "time_zone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The IANA time zone, or null when no time zone is set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The IANA time zone, or null when no time zone is set."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The deprecated user update timestamp returned by Zep when present."
+                },
+                "user_id": {
+                  "type": "string",
+                  "description": "The application-defined unique identifier of the user."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The opaque unique identifier of the user."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zep user."
+            },
+            "description": "The users in this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "row_count",
+          "total_count",
+          "users"
+        ],
+        "description": "A paginated Zep user response."
+      }
+    },
+    {
+      "id": "zep.update_user",
+      "service": "zep",
+      "name": "update_user",
+      "description": "Update the profile, metadata, time zone, or ontology setting of a Zep user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The application-defined unique identifier of the user."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address of the user."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The first name of the user."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The last name of the user."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary metadata attached to a Zep resource."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The user's IANA time zone. Null leaves it unset at creation or clears it on update."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's IANA time zone. Null leaves it unset at creation or clears it on update."
+          },
+          "disable_default_ontology": {
+            "type": "boolean",
+            "description": "Whether to disable the default ontology for the user's graph."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "The input for updating a Zep user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "description": "The timestamp when the user was created."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the user was deleted, or null for an active user."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the user was deleted, or null for an active user."
+          },
+          "disable_default_ontology": {
+            "type": "boolean",
+            "description": "Whether the default ontology is disabled for the user's graph."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's email address."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The user's first name."
+          },
+          "id": {
+            "type": "integer",
+            "description": "The internal numeric identifier of the user."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The user's last name."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Arbitrary metadata attached to a Zep resource."
+          },
+          "project_uuid": {
+            "type": "string",
+            "description": "The unique identifier of the user's Zep project."
+          },
+          "session_count": {
+            "type": "integer",
+            "description": "The deprecated session count returned by Zep when present."
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The IANA time zone, or null when no time zone is set."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IANA time zone, or null when no time zone is set."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The deprecated user update timestamp returned by Zep when present."
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The application-defined unique identifier of the user."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "The opaque unique identifier of the user."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zep user."
+      }
+    }
+  ]
+}

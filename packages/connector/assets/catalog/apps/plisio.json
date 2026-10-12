@@ -1,0 +1,1329 @@
+{
+  "service": "plisio",
+  "displayName": "Plisio",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "SECRET_KEY",
+      "description": "Plisio secret key passed as the api_key query parameter. Generate or view it in API settings at https://plisio.net/account/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://plisio.net",
+  "actions": [
+    {
+      "id": "plisio.create_invoice",
+      "service": "plisio",
+      "name": "create_invoice",
+      "description": "Create a hosted Plisio invoice for one merchant order using either a crypto amount or a fiat amount that Plisio converts.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Plisio cryptocurrency identifier chosen from the supported cryptocurrencies appendix."
+          },
+          "order_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Merchant internal order name shown on the invoice."
+          },
+          "order_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A non-empty merchant identifier string."
+              },
+              {
+                "type": "integer",
+                "description": "A merchant identifier integer."
+              }
+            ],
+            "description": "A merchant-supplied identifier that Plisio accepts as either a string or an integer."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Invoice amount in cryptocurrency when no fiat conversion is needed."
+          },
+          "source_currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source fiat currency code used when Plisio should convert a fiat amount."
+          },
+          "source_amount": {
+            "type": "number",
+            "description": "Source fiat amount used when Plisio should convert an invoice."
+          },
+          "allowed_psys_cids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated list of cryptocurrency identifiers allowed for payment."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Merchant invoice description shown by Plisio."
+          },
+          "callback_url": {
+            "type": "string",
+            "description": "Merchant callback URL that receives invoice updates from Plisio.",
+            "format": "uri"
+          },
+          "success_callback_url": {
+            "type": "string",
+            "description": "Merchant callback URL that receives successful invoice redirects or JSON callbacks.",
+            "format": "uri"
+          },
+          "fail_callback_url": {
+            "type": "string",
+            "description": "Merchant callback URL that receives failed invoice redirects or JSON callbacks.",
+            "format": "uri"
+          },
+          "success_invoice_url": {
+            "type": "string",
+            "description": "Button URL shown to the buyer after the invoice succeeds.",
+            "format": "uri"
+          },
+          "fail_invoice_url": {
+            "type": "string",
+            "description": "Button URL shown to the buyer after the invoice fails.",
+            "format": "uri"
+          },
+          "email": {
+            "type": "string",
+            "description": "Buyer email address that Plisio can reuse instead of prompting again.",
+            "format": "email"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en_US"
+            ],
+            "description": "Language locale supported by the Plisio invoice page for this endpoint."
+          },
+          "expire_min": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Invoice expiration interval in minutes."
+          },
+          "return_existing": {
+            "type": "boolean",
+            "description": "Whether Plisio should return an existing invoice instead of raising a duplicate error."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "order_name",
+          "order_number"
+        ],
+        "description": "Input parameters for creating one Plisio invoice."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "txn_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Plisio internal invoice transaction identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plisio internal invoice transaction identifier."
+              },
+              "invoice_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Hosted invoice URL returned by Plisio.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Hosted invoice URL returned by Plisio."
+              },
+              "invoice_total_sum": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Total amount due on the invoice, including commission when applicable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total amount due on the invoice, including commission when applicable."
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Invoice amount in the selected cryptocurrency."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Invoice amount in the selected cryptocurrency."
+              },
+              "pending_amount": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Remaining unpaid amount in the selected cryptocurrency when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Remaining unpaid amount in the selected cryptocurrency when returned."
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Selected cryptocurrency code for the invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Selected cryptocurrency code for the invoice."
+              },
+              "source_currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Original fiat or source currency used to price the invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Original fiat or source currency used to price the invoice."
+              },
+              "source_amount": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Original fiat or source amount used to price the invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Original fiat or source amount used to price the invoice."
+              },
+              "invoice_sum": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Invoice subtotal after Plisio commission rules are applied."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Invoice subtotal after Plisio commission rules are applied."
+              },
+              "invoice_commission": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Plisio commission charged for the invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plisio commission charged for the invoice."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Additional invoice parameters returned by Plisio for white-label invoice responses."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional invoice parameters returned by Plisio for white-label invoice responses."
+              },
+              "qr_code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Invoice QR code image in base64 format when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Invoice QR code image in base64 format when returned."
+              },
+              "verify_hash": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Verification hash returned by Plisio when white-label invoice data is enabled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Verification hash returned by Plisio when white-label invoice data is enabled."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized invoice object returned by Plisio."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when Plisio creates an invoice."
+      }
+    },
+    {
+      "id": "plisio.get_balance",
+      "service": "plisio",
+      "name": "get_balance",
+      "description": "Fetch the current Plisio balance for one supported cryptocurrency identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "psys_cid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plisio cryptocurrency identifier chosen from the supported cryptocurrencies appendix."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching one Plisio cryptocurrency balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string",
+                "description": "Cryptocurrency identifier used to query the balance."
+              },
+              "balance": {
+                "type": "string",
+                "description": "Available cryptocurrency balance returned by Plisio."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Plisio cryptocurrency balance snapshot."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Plisio balance."
+      }
+    },
+    {
+      "id": "plisio.get_operation",
+      "service": "plisio",
+      "name": "get_operation",
+      "description": "Fetch one Plisio operation or invoice by its official operation identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plisio operation identifier returned by list_operations or another flow."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching one Plisio operation by id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Profile identifier that owns the operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Profile identifier that owns the operation."
+              },
+              "shop_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Shop identifier associated with the operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shop identifier associated with the operation."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Operation type returned by Plisio."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Operation type returned by Plisio."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Operation status returned by Plisio."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Operation status returned by Plisio."
+              },
+              "pending_sum": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Unconfirmed incoming amount when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Unconfirmed incoming amount when returned."
+              },
+              "psys_cid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Plisio cryptocurrency identifier for the operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plisio cryptocurrency identifier for the operation."
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cryptocurrency code for the operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cryptocurrency code for the operation."
+              },
+              "source_currency": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Source fiat currency for invoice-style operations."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Source fiat currency for invoice-style operations."
+              },
+              "source_rate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Exchange rate from the cryptocurrency to the source currency."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Exchange rate from the cryptocurrency to the source currency."
+              },
+              "fee": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Network fee configured on the transfer when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Network fee configured on the transfer when returned."
+              },
+              "wallet_hash": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Destination hash or invoice hash returned by Plisio."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Destination hash or invoice hash returned by Plisio."
+              },
+              "sendmany": {
+                "anyOf": [
+                  {
+                    "description": "Mass payout recipient pairs when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Mass payout recipient pairs when returned."
+              },
+              "expire_at_utc": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Expiration timestamp in UTC when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Expiration timestamp in UTC when returned."
+              },
+              "created_at_utc": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Creation timestamp in UTC."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Creation timestamp in UTC."
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Amount received or transferred by the operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Amount received or transferred by the operation."
+              },
+              "sum": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Operation total including commission rules when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Operation total including commission rules when returned."
+              },
+              "commission": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Plisio commission amount when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plisio commission amount when returned."
+              },
+              "actual_sum": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Actual incoming amount received by the invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Actual incoming amount received by the invoice."
+              },
+              "actual_commission": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Actual Plisio commission charged on the completed invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Actual Plisio commission charged on the completed invoice."
+              },
+              "actual_fee": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Actual network fee charged to move invoice funds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Actual network fee charged to move invoice funds."
+              },
+              "actual_invoice_sum": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Actual net amount credited to the invoice after fees and commission."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Actual net amount credited to the invoice after fees and commission."
+              },
+              "tx_id": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "One upstream string value."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One upstream string value."
+                        },
+                        "description": "A list of upstream string values."
+                      }
+                    ],
+                    "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+              },
+              "tx_url": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "One upstream string value."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "One upstream string value."
+                        },
+                        "description": "A list of upstream string values."
+                      }
+                    ],
+                    "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+              },
+              "confirmations": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Blockchain confirmations counted by Plisio."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Blockchain confirmations counted by Plisio."
+              },
+              "status_code": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Numeric Plisio status code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Numeric Plisio status code."
+              },
+              "parent_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Original invoice identifier for duplicate invoice flows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Original invoice identifier for duplicate invoice flows."
+              },
+              "child_ids": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One duplicate child invoice identifier."
+                    },
+                    "description": "Duplicate child invoice identifiers returned for the original invoice."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Duplicate child invoice identifiers returned for the original invoice."
+              },
+              "params": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Additional invoice or transfer parameters attached to one Plisio operation."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional invoice or transfer parameters attached to one Plisio operation."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Plisio operation identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plisio operation identifier."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Plisio operation record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Plisio operation."
+      }
+    },
+    {
+      "id": "plisio.list_operations",
+      "service": "plisio",
+      "name": "list_operations",
+      "description": "List Plisio operations and invoices with official pagination, type, status, currency, and search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from Plisio."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of operations to return on one page."
+          },
+          "shop_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Plisio shop identifier used to filter operations."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cash_in",
+              "cash_out",
+              "mass_cash_out",
+              "invoice",
+              "pay_in"
+            ],
+            "description": "Operation type filter supported by Plisio."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "pending",
+              "pending internal",
+              "expired",
+              "completed",
+              "mismatch",
+              "error",
+              "cancelled"
+            ],
+            "description": "Operation status filter supported by Plisio."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cryptocurrency identifier used to filter operations."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Full-text search over transaction id, invoice order number, or invoice customer email."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Plisio operations and invoices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Profile identifier that owns the operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Profile identifier that owns the operation."
+                },
+                "shop_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Shop identifier associated with the operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Shop identifier associated with the operation."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Operation type returned by Plisio."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Operation type returned by Plisio."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Operation status returned by Plisio."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Operation status returned by Plisio."
+                },
+                "pending_sum": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Unconfirmed incoming amount when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Unconfirmed incoming amount when returned."
+                },
+                "psys_cid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plisio cryptocurrency identifier for the operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Plisio cryptocurrency identifier for the operation."
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Cryptocurrency code for the operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Cryptocurrency code for the operation."
+                },
+                "source_currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Source fiat currency for invoice-style operations."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Source fiat currency for invoice-style operations."
+                },
+                "source_rate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Exchange rate from the cryptocurrency to the source currency."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Exchange rate from the cryptocurrency to the source currency."
+                },
+                "fee": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Network fee configured on the transfer when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Network fee configured on the transfer when returned."
+                },
+                "wallet_hash": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Destination hash or invoice hash returned by Plisio."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Destination hash or invoice hash returned by Plisio."
+                },
+                "sendmany": {
+                  "anyOf": [
+                    {
+                      "description": "Mass payout recipient pairs when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Mass payout recipient pairs when returned."
+                },
+                "expire_at_utc": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Expiration timestamp in UTC when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Expiration timestamp in UTC when returned."
+                },
+                "created_at_utc": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Creation timestamp in UTC."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Creation timestamp in UTC."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Amount received or transferred by the operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Amount received or transferred by the operation."
+                },
+                "sum": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Operation total including commission rules when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Operation total including commission rules when returned."
+                },
+                "commission": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plisio commission amount when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Plisio commission amount when returned."
+                },
+                "actual_sum": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Actual incoming amount received by the invoice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Actual incoming amount received by the invoice."
+                },
+                "actual_commission": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Actual Plisio commission charged on the completed invoice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Actual Plisio commission charged on the completed invoice."
+                },
+                "actual_fee": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Actual network fee charged to move invoice funds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Actual network fee charged to move invoice funds."
+                },
+                "actual_invoice_sum": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Actual net amount credited to the invoice after fees and commission."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Actual net amount credited to the invoice after fees and commission."
+                },
+                "tx_id": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "One upstream string value."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One upstream string value."
+                          },
+                          "description": "A list of upstream string values."
+                        }
+                      ],
+                      "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                },
+                "tx_url": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "One upstream string value."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "One upstream string value."
+                          },
+                          "description": "A list of upstream string values."
+                        }
+                      ],
+                      "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A Plisio field that may return one string or an array of strings depending on the endpoint."
+                },
+                "confirmations": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Blockchain confirmations counted by Plisio."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Blockchain confirmations counted by Plisio."
+                },
+                "status_code": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Numeric Plisio status code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Numeric Plisio status code."
+                },
+                "parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Original invoice identifier for duplicate invoice flows."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Original invoice identifier for duplicate invoice flows."
+                },
+                "child_ids": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "One duplicate child invoice identifier."
+                      },
+                      "description": "Duplicate child invoice identifiers returned for the original invoice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Duplicate child invoice identifiers returned for the original invoice."
+                },
+                "params": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Additional invoice or transfer parameters attached to one Plisio operation."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Additional invoice or transfer parameters attached to one Plisio operation."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plisio operation identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Plisio operation identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Plisio operation record."
+            },
+            "description": "Operations returned by Plisio for the requested page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of operations matching the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of operations matching the query."
+              },
+              "pageCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total number of available pages."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total number of available pages."
+              },
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Current page number returned by Plisio."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page number returned by Plisio."
+              },
+              "perPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Number of operations returned per page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of operations returned per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by the operations list endpoint."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Current page URL returned by Plisio.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Current page URL returned by Plisio."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Next page URL returned by Plisio when another page exists.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Next page URL returned by Plisio when another page exists."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Previous page URL returned by Plisio when one exists.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Previous page URL returned by Plisio when one exists."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination links returned by the operations list endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Plisio operations."
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import { Bus } from "@opencode/core/bus"
 import { EventLogger } from "@opencode/core/event-logger"
 import { FileSystemSearch } from "@opencode/core/filesystem/search"
 import { Credential } from "@opencode/core/credential"
+import { ConnectorNode } from "@opencode/core/connector/node"
 import { Log } from "@opencode/core/log"
 import { Config } from "@opencode/core/config"
 import { PermissionSaved } from "@opencode/core/permission/saved"
@@ -71,6 +72,10 @@ const applicationServiceNodes = [
   PtyTicket.node,
   PersistentPty.node,
   Credential.node,
+  ConnectorNode.node,
+  ConnectorNode.engineNode,
+  ConnectorNode.cleanupNode,
+  ConnectorNode.schedulerNode,
   WellKnown.node,
   PtyEnvironment.node,
   LocationServiceMap.node,

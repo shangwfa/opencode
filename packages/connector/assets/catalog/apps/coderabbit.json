@@ -1,0 +1,1586 @@
+{
+  "service": "coderabbit",
+  "displayName": "CodeRabbit",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "cr-xxxxxxxxxx",
+      "description": "CodeRabbit API key sent with the x-coderabbitai-api-key header. Create or view API keys from the CodeRabbit dashboard, then confirm the REST API authentication contract in the official API docs: https://docs.coderabbit.ai/api-reference/users-list"
+    }
+  ],
+  "homepageUrl": "https://www.coderabbit.ai",
+  "actions": [
+    {
+      "id": "coderabbit.change_roles",
+      "service": "coderabbit",
+      "name": "change_roles",
+      "description": "Bulk change CodeRabbit organization roles for up to 500 users.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "cr_admin",
+              "cr_member"
+            ],
+            "description": "The CodeRabbit user role."
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One provider user identifier."
+            },
+            "description": "The provider user identifiers to assign the role to.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "userIds"
+        ],
+        "description": "The input payload for changing CodeRabbit user roles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial_success",
+              "failure"
+            ],
+            "description": "The bulk operation status."
+          },
+          "succeeded": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One successful user identifier."
+            },
+            "description": "The user identifiers that were successfully processed."
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user identifier that failed."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The CodeRabbit error code for this failed item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A failed CodeRabbit bulk operation item."
+            },
+            "description": "The failed user operations."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned by a CodeRabbit bulk user operation."
+      }
+    },
+    {
+      "id": "coderabbit.create_role",
+      "service": "coderabbit",
+      "name": "create_role",
+      "description": "Create a CodeRabbit Enterprise custom role.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the custom role."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The description of the custom role."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The description of the custom role."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether the new role should become the subscription default."
+          },
+          "duplicateFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The role ID to copy permissions from."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The CodeRabbit permission resource identifier."
+                },
+                "access_type": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "delete"
+                  ],
+                  "description": "The CodeRabbit role permission access type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "access_type"
+              ],
+              "description": "A CodeRabbit role permission."
+            },
+            "description": "The permissions to assign to the custom role."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for creating a CodeRabbit custom role."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The CodeRabbit role identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The CodeRabbit role name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CodeRabbit role description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CodeRabbit role description."
+              },
+              "is_default": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this role is the organization default role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this role is the organization default role."
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "resource_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The CodeRabbit permission resource identifier."
+                    },
+                    "access_type": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "delete"
+                      ],
+                      "description": "The CodeRabbit role permission access type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "resource_id",
+                    "access_type"
+                  ],
+                  "description": "A CodeRabbit role permission."
+                },
+                "description": "The permissions attached to this role."
+              },
+              "user_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of users assigned to this role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of users assigned to this role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A CodeRabbit role."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with a CodeRabbit role."
+      }
+    },
+    {
+      "id": "coderabbit.delete_role",
+      "service": "coderabbit",
+      "name": "delete_role",
+      "description": "Delete a CodeRabbit Enterprise custom role when it is not assigned to users.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roleId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CodeRabbit role identifier."
+          },
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roleId"
+        ],
+        "description": "The input payload for deleting a CodeRabbit custom role."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the CodeRabbit role was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting a CodeRabbit custom role."
+      }
+    },
+    {
+      "id": "coderabbit.get_review_metrics",
+      "service": "coderabbit",
+      "name": "get_review_metrics",
+      "description": "Get CodeRabbit merged pull request review metrics for a date range with optional organization, repository, and user filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "description": "The start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "organizationIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One organization Git provider ID."
+            },
+            "description": "The organization Git provider IDs to filter by, up to 10 values.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "repositoryIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One repository Git provider ID."
+            },
+            "description": "The repository Git provider IDs to filter by, up to 10 values.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One author Git provider ID."
+            },
+            "description": "The author Git provider IDs to filter by, up to 10 values.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of metric records to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor for fetching the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "The input payload for getting CodeRabbit review metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pr_url": {
+                  "type": "string",
+                  "description": "The full URL to the pull request."
+                },
+                "author_id": {
+                  "type": "string",
+                  "description": "The unique author identifier assigned by the Git provider."
+                },
+                "author_username": {
+                  "type": "string",
+                  "description": "The pull request author's username."
+                },
+                "organization_id": {
+                  "type": "string",
+                  "description": "The unique organization identifier assigned by the Git provider."
+                },
+                "organization_name": {
+                  "type": "string",
+                  "description": "The organization name."
+                },
+                "repository_id": {
+                  "type": "string",
+                  "description": "The unique repository identifier assigned by the Git provider."
+                },
+                "repository_name": {
+                  "type": "string",
+                  "description": "The repository name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the pull request was created."
+                },
+                "ready_for_review_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the pull request became ready for review."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the pull request became ready for review."
+                },
+                "first_human_review_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the first human review was submitted."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the first human review was submitted."
+                },
+                "last_commit_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the last commit was pushed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the last commit was pushed."
+                },
+                "merged_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the pull request was merged."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the pull request was merged."
+                },
+                "estimated_complexity": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The estimated review complexity score."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated review complexity score."
+                },
+                "estimated_review_minutes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The estimated time to review the pull request in minutes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated time to review the pull request in minutes."
+                },
+                "coderabbit_comments": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "posted": {
+                          "type": "integer",
+                          "description": "The number of comments posted."
+                        },
+                        "accepted": {
+                          "type": "integer",
+                          "description": "The number of comments accepted."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A CodeRabbit comment count bucket."
+                    },
+                    "severity": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The CodeRabbit comment metrics grouped by severity."
+                    },
+                    "category": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The CodeRabbit comment metrics grouped by category."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The CodeRabbit comment metrics."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A CodeRabbit pull request review metric."
+            },
+            "description": "The CodeRabbit review metric records."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for fetching the next page of results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for fetching the next page of results."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with CodeRabbit review metrics."
+      }
+    },
+    {
+      "id": "coderabbit.get_role",
+      "service": "coderabbit",
+      "name": "get_role",
+      "description": "Get details for one CodeRabbit built-in or Enterprise custom role.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roleId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CodeRabbit role identifier."
+          },
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          },
+          "includePermissions": {
+            "type": "boolean",
+            "description": "Whether to include permissions for the role."
+          },
+          "includeUserCount": {
+            "type": "boolean",
+            "description": "Whether to include assigned user count for the role."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roleId"
+        ],
+        "description": "The input payload for getting a CodeRabbit role."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The CodeRabbit role identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The CodeRabbit role name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CodeRabbit role description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CodeRabbit role description."
+              },
+              "is_default": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this role is the organization default role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this role is the organization default role."
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "resource_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The CodeRabbit permission resource identifier."
+                    },
+                    "access_type": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "delete"
+                      ],
+                      "description": "The CodeRabbit role permission access type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "resource_id",
+                    "access_type"
+                  ],
+                  "description": "A CodeRabbit role permission."
+                },
+                "description": "The permissions attached to this role."
+              },
+              "user_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of users assigned to this role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of users assigned to this role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A CodeRabbit role."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with a CodeRabbit role."
+      }
+    },
+    {
+      "id": "coderabbit.get_seat_assignment_mode",
+      "service": "coderabbit",
+      "name": "get_seat_assignment_mode",
+      "description": "Retrieve the current CodeRabbit seat assignment mode for a self-hosted Enterprise organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting CodeRabbit seat assignment mode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "description": "The CodeRabbit seat assignment mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with the CodeRabbit seat assignment mode."
+      }
+    },
+    {
+      "id": "coderabbit.list_audit_logs",
+      "service": "coderabbit",
+      "name": "list_audit_logs",
+      "description": "List CodeRabbit organization audit log entries with optional actor, action, resource type, date, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Case-insensitive partial match on actor name."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One audit log action key."
+            },
+            "description": "The audit log action keys to filter by, up to 50 values.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One audit log resource type key."
+            },
+            "description": "The audit log resource type keys to filter by, up to 50 values.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "The inclusive lower timestamp bound in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "The inclusive upper timestamp bound in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing CodeRabbit audit logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The audit log entry identifier."
+                },
+                "action": {
+                  "type": "string",
+                  "description": "The audit log action key."
+                },
+                "actionLabel": {
+                  "type": "string",
+                  "description": "The human-readable action label."
+                },
+                "resourceType": {
+                  "type": "string",
+                  "description": "The affected resource type key."
+                },
+                "resourceTypeLabel": {
+                  "type": "string",
+                  "description": "The human-readable resource type label."
+                },
+                "resourceSummary": {
+                  "type": "string",
+                  "description": "The short description of the affected resource."
+                },
+                "actor": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the actor."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "The actor role label or actor type."
+                    },
+                    "isBot": {
+                      "type": "boolean",
+                      "description": "Whether the actor is a bot."
+                    },
+                    "avatarUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The actor avatar URL when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The actor avatar URL when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The actor that performed an audit log action."
+                },
+                "metadata": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A CodeRabbit object returned by the API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A CodeRabbit object returned by the API."
+                },
+                "ipAddress": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The IP address that triggered the action."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The IP address that triggered the action."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the action occurred."
+                },
+                "relativeTime": {
+                  "type": "string",
+                  "description": "The human-readable relative event time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A CodeRabbit organization audit log entry."
+            },
+            "description": "The audit log entries returned by CodeRabbit."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "page_size": {
+                "type": "integer",
+                "description": "The number of results per page."
+              },
+              "total_count": {
+                "type": "integer",
+                "description": "The total number of matching entries."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              },
+              "has_next_page": {
+                "type": "boolean",
+                "description": "Whether a next page is available."
+              },
+              "has_previous_page": {
+                "type": "boolean",
+                "description": "Whether a previous page is available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The CodeRabbit pagination metadata."
+          },
+          "filterOptions": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The filter option value."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "The filter option label."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "The number of entries matching this option."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A CodeRabbit audit log filter option."
+                },
+                "description": "The available audit log action filters."
+              },
+              "resource_types": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The filter option value."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "The filter option label."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "The number of entries matching this option."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A CodeRabbit audit log filter option."
+                },
+                "description": "The available audit log resource type filters."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The available CodeRabbit audit log filter options."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing CodeRabbit audit logs."
+      }
+    },
+    {
+      "id": "coderabbit.list_role_permissions",
+      "service": "coderabbit",
+      "name": "list_role_permissions",
+      "description": "List valid CodeRabbit role permission resource identifiers and access types for custom roles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing CodeRabbit role permission options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One permission resource identifier."
+            },
+            "description": "The valid CodeRabbit permission resource identifiers."
+          },
+          "accessTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "delete"
+              ],
+              "description": "The CodeRabbit role permission access type."
+            },
+            "description": "The valid CodeRabbit permission access types."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with CodeRabbit role permission options."
+      }
+    },
+    {
+      "id": "coderabbit.list_roles",
+      "service": "coderabbit",
+      "name": "list_roles",
+      "description": "List CodeRabbit built-in and Enterprise custom roles for the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          },
+          "roleType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "system",
+              "custom"
+            ],
+            "description": "Filter roles by built-in or custom type."
+          },
+          "includePermissions": {
+            "type": "boolean",
+            "description": "Whether to include permissions for each role."
+          },
+          "includeUserCount": {
+            "type": "boolean",
+            "description": "Whether to include assigned user counts for each role."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing CodeRabbit roles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The CodeRabbit role identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The CodeRabbit role name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The CodeRabbit role description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The CodeRabbit role description."
+                },
+                "is_default": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether this role is the organization default role."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether this role is the organization default role."
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "resource_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The CodeRabbit permission resource identifier."
+                      },
+                      "access_type": {
+                        "type": "string",
+                        "enum": [
+                          "read",
+                          "write",
+                          "delete"
+                        ],
+                        "description": "The CodeRabbit role permission access type."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "resource_id",
+                      "access_type"
+                    ],
+                    "description": "A CodeRabbit role permission."
+                  },
+                  "description": "The permissions attached to this role."
+                },
+                "user_count": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of users assigned to this role."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of users assigned to this role."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A CodeRabbit role."
+            },
+            "description": "The CodeRabbit roles returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing CodeRabbit roles."
+      }
+    },
+    {
+      "id": "coderabbit.list_users",
+      "service": "coderabbit",
+      "name": "list_users",
+      "description": "List CodeRabbit organization users with optional seat and role filters using cursor-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "seatFilter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "assigned",
+              "unassigned"
+            ],
+            "description": "Filter users by seat assignment status."
+          },
+          "roleFilter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "member",
+              "admin"
+            ],
+            "description": "Filter users by organization role."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of users to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor from the previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing CodeRabbit users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "seatsPurchased": {
+            "type": "integer",
+            "description": "The total number of seats purchased in the subscription."
+          },
+          "seatsAssigned": {
+            "type": "integer",
+            "description": "The number of seats currently assigned to users."
+          },
+          "seatAssignmentMode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "description": "The CodeRabbit seat assignment mode."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique user identifier assigned by the Git provider."
+                },
+                "seat_assigned": {
+                  "type": "boolean",
+                  "description": "Whether the user has a CodeRabbit seat assigned."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "The user's CodeRabbit role."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A CodeRabbit organization user."
+            },
+            "description": "The CodeRabbit users returned by the API."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page of results."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page of results."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing CodeRabbit users."
+      }
+    },
+    {
+      "id": "coderabbit.manage_seats",
+      "service": "coderabbit",
+      "name": "manage_seats",
+      "description": "Bulk assign or unassign CodeRabbit seats for up to 500 organization users.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "assign",
+              "unassign"
+            ],
+            "description": "The seat operation to perform."
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One provider user identifier."
+            },
+            "description": "The provider user identifiers to assign or unassign seats for.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "userIds"
+        ],
+        "description": "The input payload for managing CodeRabbit seats."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "partial_success",
+              "failure"
+            ],
+            "description": "The bulk operation status."
+          },
+          "succeeded": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One successful user identifier."
+            },
+            "description": "The user identifiers that were successfully processed."
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user identifier that failed."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The CodeRabbit error code for this failed item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A failed CodeRabbit bulk operation item."
+            },
+            "description": "The failed user operations."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned by a CodeRabbit bulk user operation."
+      }
+    },
+    {
+      "id": "coderabbit.update_role",
+      "service": "coderabbit",
+      "name": "update_role",
+      "description": "Update a CodeRabbit Enterprise custom role.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The git-provider organization ID for workspace-scoped API tokens."
+          },
+          "roleId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CodeRabbit role identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated custom role name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The updated custom role description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The updated custom role description."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this role should become the subscription default."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The CodeRabbit permission resource identifier."
+                },
+                "access_type": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "delete"
+                  ],
+                  "description": "The CodeRabbit role permission access type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "resource_id",
+                "access_type"
+              ],
+              "description": "A CodeRabbit role permission."
+            },
+            "description": "The updated permissions to assign to the custom role."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "roleId"
+        ],
+        "description": "The input payload for updating a CodeRabbit custom role."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The CodeRabbit role identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The CodeRabbit role name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CodeRabbit role description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CodeRabbit role description."
+              },
+              "is_default": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this role is the organization default role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this role is the organization default role."
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "resource_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The CodeRabbit permission resource identifier."
+                    },
+                    "access_type": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "delete"
+                      ],
+                      "description": "The CodeRabbit role permission access type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "resource_id",
+                    "access_type"
+                  ],
+                  "description": "A CodeRabbit role permission."
+                },
+                "description": "The permissions attached to this role."
+              },
+              "user_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of users assigned to this role."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of users assigned to this role."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A CodeRabbit role."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw CodeRabbit response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned with a CodeRabbit role."
+      }
+    },
+    {
+      "id": "coderabbit.update_seat_assignment_mode",
+      "service": "coderabbit",
+      "name": "update_seat_assignment_mode",
+      "description": "Update the CodeRabbit seat assignment mode for a self-hosted Enterprise organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "description": "The CodeRabbit seat assignment mode."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "description": "The input payload for updating CodeRabbit seat assignment mode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "description": "The CodeRabbit seat assignment mode."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after updating CodeRabbit seat assignment mode."
+      }
+    }
+  ]
+}

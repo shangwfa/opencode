@@ -1,0 +1,644 @@
+{
+  "service": "deck_co",
+  "displayName": "Deck.co",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "sk_live_...",
+      "description": "Deck.co v2 secret key sent as a Bearer token. Create or view API keys from the Deck.co dashboard API keys page: https://app.deck.co/api-keys."
+    }
+  ],
+  "homepageUrl": "https://www.deck.co",
+  "actions": [
+    {
+      "id": "deck_co.create_source",
+      "service": "deck_co",
+      "name": "create_source",
+      "description": "Create a Deck.co website source from a URL and optional display name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "website_url": {
+            "type": "string",
+            "description": "The website or service URL to register as a Deck.co source.",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the source."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "An optional Idempotency-Key header value for safe retries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "website_url"
+        ],
+        "description": "Input parameters for creating a Deck.co website source."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the source, prefixed with src_."
+              },
+              "object": {
+                "type": "string",
+                "description": "Resource type returned by Deck.co."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Display name for the source."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Display name for the source."
+              },
+              "type": {
+                "type": "string",
+                "description": "The source type. Deck.co currently supports website sources."
+              },
+              "website": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The website or service URL. Deck.co may normalize this value after create or update."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "url"
+                ],
+                "description": "Website configuration for a Deck.co source."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "object",
+              "name",
+              "type",
+              "website",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Deck.co source object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deck.co source response."
+      }
+    },
+    {
+      "id": "deck_co.get_agent",
+      "service": "deck_co",
+      "name": "get_agent",
+      "description": "Retrieve a Deck.co agent by ID, including its task summaries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier for the agent, prefixed with agt_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Deck.co agent."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the agent, prefixed with agt_."
+              },
+              "object": {
+                "type": "string",
+                "description": "Resource type returned by Deck.co."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name for the agent."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Description of the agent purpose."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description of the agent purpose."
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the task, prefixed with task_."
+                    },
+                    "object": {
+                      "type": "string",
+                      "description": "Resource type returned by Deck.co."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name for the task."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current task status, such as learning, test, or live."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "object",
+                    "name",
+                    "status"
+                  ],
+                  "description": "A Deck.co task summary object."
+                },
+                "description": "Tasks associated with the agent."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "object",
+              "name",
+              "description",
+              "tasks",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Deck.co agent object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deck.co agent response."
+      }
+    },
+    {
+      "id": "deck_co.get_source",
+      "service": "deck_co",
+      "name": "get_source",
+      "description": "Retrieve a Deck.co source by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier for the source, prefixed with src_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Deck.co source."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the source, prefixed with src_."
+              },
+              "object": {
+                "type": "string",
+                "description": "Resource type returned by Deck.co."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Display name for the source."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Display name for the source."
+              },
+              "type": {
+                "type": "string",
+                "description": "The source type. Deck.co currently supports website sources."
+              },
+              "website": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The website or service URL. Deck.co may normalize this value after create or update."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "url"
+                ],
+                "description": "Website configuration for a Deck.co source."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "ISO 8601 timestamp returned by Deck.co.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "object",
+              "name",
+              "type",
+              "website",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Deck.co source object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deck.co source response."
+      }
+    },
+    {
+      "id": "deck_co.list_agents",
+      "service": "deck_co",
+      "name": "list_agents",
+      "description": "List Deck.co agents with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return. Deck.co allows 1 to 100."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor string returned by a previous Deck.co page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cursor pagination parameters for Deck.co list endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the agent, prefixed with agt_."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "Resource type returned by Deck.co."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name for the agent."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Description of the agent purpose."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Description of the agent purpose."
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the task, prefixed with task_."
+                      },
+                      "object": {
+                        "type": "string",
+                        "description": "Resource type returned by Deck.co."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Display name for the task."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Current task status, such as learning, test, or live."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "object",
+                      "name",
+                      "status"
+                    ],
+                    "description": "A Deck.co task summary object."
+                  },
+                  "description": "Tasks associated with the agent."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp returned by Deck.co.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp returned by Deck.co.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "object",
+                "name",
+                "description",
+                "tasks",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "A Deck.co agent object."
+            },
+            "description": "Agents returned for the requested page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Deck.co has more agents beyond this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor to pass into the next request, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to pass into the next request, when available."
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Unique identifier for the Deck.co API request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unique identifier for the Deck.co API request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Deck.co agents response."
+      }
+    },
+    {
+      "id": "deck_co.list_sources",
+      "service": "deck_co",
+      "name": "list_sources",
+      "description": "List Deck.co sources with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return. Deck.co allows 1 to 100."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque cursor string returned by a previous Deck.co page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cursor pagination parameters for Deck.co list endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the source, prefixed with src_."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "Resource type returned by Deck.co."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Display name for the source."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Display name for the source."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The source type. Deck.co currently supports website sources."
+                },
+                "website": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The website or service URL. Deck.co may normalize this value after create or update."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "url"
+                  ],
+                  "description": "Website configuration for a Deck.co source."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp returned by Deck.co.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp returned by Deck.co.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "object",
+                "name",
+                "type",
+                "website",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "A Deck.co source object."
+            },
+            "description": "Sources returned for the requested page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether Deck.co has more sources beyond this page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor to pass into the next request, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor to pass into the next request, when available."
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Unique identifier for the Deck.co API request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unique identifier for the Deck.co API request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Deck.co sources response."
+      }
+    },
+    {
+      "id": "deck_co.test_api_key",
+      "service": "deck_co",
+      "name": "test_api_key",
+      "description": "Verify that a Deck.co secret key can authenticate with the v2 API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to test a Deck.co API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Readiness status returned by Deck.co."
+          },
+          "environment": {
+            "type": "string",
+            "description": "Deck.co API environment for the key."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for the Deck.co API request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Deck.co API key test response."
+      }
+    }
+  ]
+}

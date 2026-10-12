@@ -1,0 +1,456 @@
+{
+  "service": "deutschlandgpt",
+  "displayName": "DeutschlandGPT",
+  "description": "Use DeutschlandGPT models, chat completions, and embeddings.",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DEUTSCHLANDGPT_API_KEY",
+      "description": "DeutschlandGPT Platform API key used as a Bearer token. Manage keys at https://dialog.deutschlandgpt.de/platform-api."
+    }
+  ],
+  "homepageUrl": "https://www.deutschlandgpt.de/",
+  "actions": [
+    {
+      "id": "deutschlandgpt.create_chat_completion",
+      "service": "deutschlandgpt",
+      "name": "create_chat_completion",
+      "description": "Create a synchronous text chat completion through DeutschlandGPT.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model ID returned by list_models."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool",
+                    "developer"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The text content of the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The text content of the message."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "An optional participant name."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tool call identifier answered by a tool message."
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The identifier used by the corresponding tool response."
+                      },
+                      "type": {
+                        "const": "function",
+                        "type": "string",
+                        "description": "The tool-call type. Must be function."
+                      },
+                      "function": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The function name."
+                          },
+                          "arguments": {
+                            "type": "string",
+                            "description": "The function arguments serialized as a JSON string."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The requested function and its serialized arguments."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A function call requested by an assistant message."
+                  },
+                  "description": "Function calls requested by an assistant message.",
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role"
+              ],
+              "description": "A text message in the conversation history."
+            },
+            "description": "The ordered text conversation sent to the model.",
+            "minItems": 1
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of generated tokens, including reasoning tokens."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature between 0 and 2."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to stream the response. Connector actions only accept false or an omitted value."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function",
+                  "type": "string",
+                  "description": "The tool type. Must be function."
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The function name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "A description that helps the model decide when to call the function."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON-compatible value."
+                      },
+                      "description": "A JSON Schema describing the function arguments."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name"
+                  ],
+                  "description": "The function definition."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A function exposed to the model."
+            },
+            "description": "Functions available to the model."
+          },
+          "parallel_tool_calls": {
+            "type": "boolean",
+            "description": "Whether the model may call multiple tools in one turn."
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "none",
+              "minimal",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "description": "The reasoning budget for supported models."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json_object",
+                  "json_schema"
+                ],
+                "description": "The response format type."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "type"
+            ],
+            "description": "The requested response format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "Input for a synchronous OpenAI-compatible chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The upstream object type."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the completion was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that generated the completion."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A generated choice, including its message and finish reason."
+            },
+            "description": "Generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Token usage reported for the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices",
+          "usage"
+        ],
+        "description": "The OpenAI-compatible chat completion result."
+      }
+    },
+    {
+      "id": "deutschlandgpt.create_embeddings",
+      "service": "deutschlandgpt",
+      "name": "create_embeddings",
+      "description": "Create embedding vectors for one or more text inputs through DeutschlandGPT.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The embedding model identifier. Omit it to use the workspace default."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single text input."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A text input."
+                },
+                "description": "Multiple text inputs.",
+                "minItems": 1
+              }
+            ],
+            "description": "Text or a list of texts to embed."
+          },
+          "dimensions": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested embedding vector length when supported by the model."
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "description": "The representation used for embedding vectors."
+          },
+          "task_type": {
+            "type": "string",
+            "description": "A task-type hint for optimizing Gemini embedding models, such as SEMANTIC_SIMILARITY."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "input"
+        ],
+        "description": "Input for creating one or more text embeddings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "model": {
+            "type": "string",
+            "description": "The embedding model used for the request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "description": "The embedding object type."
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "The zero-based input index."
+                },
+                "embedding": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "A vector component."
+                      },
+                      "description": "The embedding vector."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The base64-encoded embedding vector."
+                    }
+                  ],
+                  "description": "The embedding represented as floats or base64 text."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "object",
+                "index",
+                "embedding"
+              ],
+              "description": "A single embedding result."
+            },
+            "description": "Embedding vectors in input order."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Token usage reported for the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "object",
+          "model",
+          "data",
+          "usage"
+        ],
+        "description": "The OpenAI-compatible embedding result."
+      }
+    },
+    {
+      "id": "deutschlandgpt.list_models",
+      "service": "deutschlandgpt",
+      "name": "list_models",
+      "description": "List text models enabled for the connected DeutschlandGPT workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list available models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The upstream object type."
+                },
+                "owned_by": {
+                  "type": "string",
+                  "description": "The provider or organization that owns the model."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "object",
+                "owned_by"
+              ],
+              "description": "A model available to the connected workspace."
+            },
+            "description": "Models available to the API key."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "object",
+          "data"
+        ],
+        "description": "The OpenAI-compatible model list."
+      }
+    }
+  ]
+}

@@ -1,0 +1,853 @@
+{
+  "service": "jamie",
+  "displayName": "Jamie",
+  "categories": [
+    "Productivity",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "jk_...",
+      "description": "Jamie API key sent with the x-api-key header. Create it in Jamie Settings > Developers > API Keys: https://docs.meetjamie.ai/developers/api/getting-started.",
+      "extraFields": [
+        {
+          "key": "keyScope",
+          "label": "Key Scope",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "personal",
+          "description": "Enter personal or workspace to match the Jamie API key type. Personal keys use /v1/me routes; workspace keys use /v1/workspace routes: https://docs.meetjamie.ai/developers/api/access-and-security."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.meetjamie.ai",
+  "actions": [
+    {
+      "id": "jamie.get_meeting",
+      "service": "jamie",
+      "name": "get_meeting",
+      "description": "Get full Jamie meeting details, including summary, transcript, tasks, and tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Jamie meeting ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Jamie meeting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Jamie meeting ID."
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Meeting title."
+              },
+              "generatedTitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "AI-generated meeting title when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "AI-generated meeting title when available."
+              },
+              "startTime": {
+                "type": "string",
+                "description": "ISO 8601 meeting start time.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "ISO 8601 meeting end time when available.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ISO 8601 meeting end time when available."
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Jamie user ID."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "Jamie user email address.",
+                    "format": "email"
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "email"
+                ],
+                "description": "Jamie user who recorded the meeting."
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "markdown": {
+                    "type": "string",
+                    "description": "Meeting summary formatted as Markdown."
+                  },
+                  "html": {
+                    "type": "string",
+                    "description": "Meeting summary formatted as HTML."
+                  },
+                  "short": {
+                    "type": "string",
+                    "description": "Short one-line meeting summary."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "markdown",
+                  "html",
+                  "short"
+                ],
+                "description": "Jamie meeting summary content."
+              },
+              "transcript": {
+                "type": "string",
+                "description": "Full markdown-formatted meeting transcript."
+              },
+              "participants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Participant ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Participant display name."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Participant email address when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Participant email address when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "A participant detected from the Jamie transcript."
+                },
+                "description": "People detected from the transcript."
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Task description."
+                    },
+                    "completed": {
+                      "type": "boolean",
+                      "description": "Whether the task is marked as done."
+                    },
+                    "assignee": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "The person's display name."
+                            },
+                            "email": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "The person's email address when Jamie returned one."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The person's email address when Jamie returned one."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "name"
+                          ],
+                          "description": "A Jamie person object when the value is available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "A Jamie person object when the value is available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "content",
+                    "completed"
+                  ],
+                  "description": "An action item included in a Jamie meeting detail response."
+                },
+                "description": "Action items extracted from the meeting."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Jamie tag name."
+                    },
+                    "color": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Jamie tag color."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "name",
+                    "color"
+                  ],
+                  "description": "A tag applied to a Jamie meeting."
+                },
+                "description": "Tags applied to the meeting."
+              },
+              "event": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Internal Jamie calendar event ID when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Internal Jamie calendar event ID when available."
+                  },
+                  "externalId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Calendar provider event ID when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Calendar provider event ID when available."
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Calendar event title."
+                  },
+                  "scheduledTime": {
+                    "type": "string",
+                    "description": "ISO 8601 scheduled start time.",
+                    "format": "date-time"
+                  },
+                  "endTime": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "ISO 8601 event end time when available.",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "ISO 8601 event end time when available."
+                  },
+                  "attendees": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Attendee display name."
+                        },
+                        "email": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Attendee email address."
+                        },
+                        "responseStatus": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Attendee RSVP status when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Attendee RSVP status when available."
+                        },
+                        "organizer": {
+                          "type": "boolean",
+                          "description": "Whether this attendee organized the calendar event."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "name",
+                        "email",
+                        "organizer"
+                      ],
+                      "description": "A calendar attendee linked to a Jamie meeting."
+                    },
+                    "description": "People invited to the calendar event."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "title",
+                  "scheduledTime",
+                  "attendees"
+                ],
+                "description": "Calendar event information linked to a Jamie meeting."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "title",
+              "generatedTitle",
+              "startTime",
+              "endTime",
+              "user",
+              "summary",
+              "transcript",
+              "participants",
+              "tasks",
+              "tags",
+              "event"
+            ],
+            "description": "Full Jamie meeting details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Jamie meeting detail response."
+      }
+    },
+    {
+      "id": "jamie.list_meetings",
+      "service": "jamie",
+      "name": "list_meetings",
+      "description": "List Jamie meetings for a personal or workspace API key with optional pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return, from 1 to 100."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by Jamie."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or after this ISO 8601 date."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or before this ISO 8601 date."
+          },
+          "userEmail": {
+            "type": "string",
+            "description": "Workspace-key-only filter for a specific user's email address.",
+            "format": "email"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Personal-key-only filter by Jamie tag name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Jamie meetings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique Jamie meeting ID."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Meeting title."
+                },
+                "generatedTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "AI-generated meeting title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "AI-generated meeting title when available."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "ISO 8601 meeting start time.",
+                  "format": "date-time"
+                },
+                "endTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO 8601 meeting end time when available.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO 8601 meeting end time when available."
+                },
+                "calendarEventId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Linked calendar event ID when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Linked calendar event ID when available."
+                },
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID of the Jamie user who recorded the meeting."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title",
+                "startTime",
+                "userId"
+              ],
+              "description": "A Jamie meeting summary returned by a list endpoint."
+            },
+            "description": "Meetings returned for the requested page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null if there are no more pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null if there are no more pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Jamie meetings."
+      }
+    },
+    {
+      "id": "jamie.list_tags",
+      "service": "jamie",
+      "name": "list_tags",
+      "description": "List Jamie tags available to a personal API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Jamie tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique Jamie tag ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Jamie tag name."
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "Whether the tag was shared with the current user."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "shared"
+              ],
+              "description": "A Jamie tag."
+            },
+            "description": "Tags returned by Jamie."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Jamie tags response."
+      }
+    },
+    {
+      "id": "jamie.list_tasks",
+      "service": "jamie",
+      "name": "list_tasks",
+      "description": "List Jamie action items for a personal or workspace API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of items to return, from 1 to 100."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by Jamie."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or after this ISO 8601 date."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or before this ISO 8601 date."
+          },
+          "userEmail": {
+            "type": "string",
+            "description": "Workspace-key-only filter for a specific user's email address.",
+            "format": "email"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Filter tasks by completion status."
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter tasks from a specific Jamie meeting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Jamie tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique Jamie task ID."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Task description."
+                },
+                "completed": {
+                  "type": "boolean",
+                  "description": "Whether the task is marked as done."
+                },
+                "assignee": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Assignee person ID when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Assignee person ID when available."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Assignee display name."
+                        },
+                        "email": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Assignee email address when available."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Assignee email address when available."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "name"
+                      ],
+                      "description": "Assigned person when Jamie returned one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Assigned person when Jamie returned one."
+                },
+                "meetingId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID of the meeting this task was extracted from."
+                },
+                "meetingTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Title of the source meeting when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Title of the source meeting when available."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the task was created.",
+                  "format": "date-time"
+                },
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID of the Jamie user who recorded the meeting."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "text",
+                "completed",
+                "meetingId",
+                "createdAt",
+                "userId"
+              ],
+              "description": "A Jamie action item returned by tasks.list."
+            },
+            "description": "Tasks returned for the requested page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page, or null if there are no more pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page, or null if there are no more pages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Jamie tasks."
+      }
+    },
+    {
+      "id": "jamie.search_meetings",
+      "service": "jamie",
+      "name": "search_meetings",
+      "description": "Search Jamie meeting content with a personal API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The semantic search query."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or after this ISO 8601 date."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return records starting or created on or before this ISO 8601 date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching Jamie meeting content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique search chunk ID."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The matching text excerpt."
+                },
+                "meetingId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ID of the source meeting."
+                },
+                "meetingTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Title of the source meeting when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Title of the source meeting when available."
+                },
+                "meetingDate": {
+                  "type": "string",
+                  "description": "Date of the source meeting.",
+                  "format": "date"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "text",
+                "meetingId",
+                "meetingTitle",
+                "meetingDate"
+              ],
+              "description": "A Jamie semantic search result."
+            },
+            "description": "Matching meeting text chunks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Jamie semantic meeting search results."
+      }
+    }
+  ]
+}

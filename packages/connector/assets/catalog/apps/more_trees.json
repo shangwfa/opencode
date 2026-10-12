@@ -1,0 +1,464 @@
+{
+  "service": "more_trees",
+  "displayName": "More Trees",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Public API Key",
+      "placeholder": "MORE_TREES_PUBLIC_API_KEY",
+      "description": "More Trees public API key. Find it under Settings > Account Settings at https://dashboard.moretrees.eco.",
+      "extraFields": [
+        {
+          "key": "accountCode",
+          "label": "Account Code",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "TL14MD",
+          "description": "More Trees payment account code."
+        },
+        {
+          "key": "publicValidationKey",
+          "label": "Public Validation Key",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "placeholder": "MORE_TREES_PUBLIC_VALIDATION_KEY",
+          "description": "More Trees public validation key used when listing planting projects."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.moretrees.eco",
+  "actions": [
+    {
+      "id": "more_trees.get_account",
+      "service": "more_trees",
+      "name": "get_account",
+      "description": "Get account identity, planting credit balance, and forest identifiers for the connected More Trees account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The request for the connected More Trees account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account_name": {
+            "type": "string",
+            "description": "The More Trees account name."
+          },
+          "credit_balance": {
+            "type": "number",
+            "description": "The current planting credit balance."
+          },
+          "forest_name": {
+            "type": "string",
+            "description": "The account forest name."
+          },
+          "forest_slug": {
+            "type": "string",
+            "description": "The account forest slug."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "account_name",
+          "credit_balance",
+          "forest_name",
+          "forest_slug"
+        ],
+        "description": "The More Trees account information returned for the connected account."
+      }
+    },
+    {
+      "id": "more_trees.get_forest",
+      "service": "more_trees",
+      "name": "get_forest",
+      "description": "Get More Trees forest branding and cumulative planting and carbon statistics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "forestSlugOrAccountCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The forest slug or account code to inspect. Defaults to the connected account code."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The request for a More Trees forest."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forest_name": {
+            "type": "string",
+            "description": "The forest display name."
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The forest logo URL when configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The forest logo URL when configured."
+          },
+          "brand_color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The forest brand color when configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The forest brand color when configured."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "trees_planted": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of trees planted by the forest."
+              },
+              "trees_gifted": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of trees gifted by the forest."
+              },
+              "trees_received": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of trees received by the forest."
+              },
+              "co2_captured": {
+                "type": "number",
+                "description": "The amount of carbon dioxide captured for the forest."
+              },
+              "projects_supported": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of planting projects supported by the forest."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "trees_planted",
+              "trees_gifted",
+              "trees_received",
+              "co2_captured",
+              "projects_supported"
+            ],
+            "description": "The cumulative planting and carbon statistics for a More Trees forest."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "forest_name",
+          "logo_url",
+          "brand_color",
+          "totals"
+        ],
+        "description": "The More Trees forest branding and cumulative impact information."
+      }
+    },
+    {
+      "id": "more_trees.list_projects",
+      "service": "more_trees",
+      "name": "list_projects",
+      "description": "List active More Trees planting projects and the tree species available within each project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The request for active More Trees planting projects."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The project identifier used by planting requests."
+            },
+            "name": {
+              "type": "string",
+              "description": "The project name."
+            },
+            "description": {
+              "type": "string",
+              "description": "The project description."
+            },
+            "country": {
+              "type": "string",
+              "description": "The country where the project operates."
+            },
+            "project_type": {
+              "type": "string",
+              "description": "The project type."
+            },
+            "supplier_name": {
+              "type": "string",
+              "description": "The project supplier name."
+            },
+            "default": {
+              "type": "boolean",
+              "description": "Whether this is the default planting project."
+            },
+            "project_image": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "The project image URL when available."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The project image URL when available."
+            },
+            "trees": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The tree species identifier used by planting requests."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The tree species name."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "The tree species description."
+                  },
+                  "tonnes_c02": {
+                    "type": "number",
+                    "description": "The tonnes of carbon dioxide captured by one tree."
+                  },
+                  "credits_required": {
+                    "type": "number",
+                    "description": "The number of credits required to plant one tree."
+                  },
+                  "default": {
+                    "type": "boolean",
+                    "description": "Whether this is the default tree for the project."
+                  },
+                  "tree_image": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The tree image URL when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The tree image URL when available."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "name",
+                  "tonnes_c02",
+                  "credits_required",
+                  "default"
+                ],
+                "description": "A tree species available within a More Trees planting project."
+              },
+              "description": "The tree species available for this project."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "id",
+            "name",
+            "country",
+            "project_type",
+            "supplier_name",
+            "default",
+            "trees"
+          ],
+          "description": "An active More Trees planting project and its available tree species."
+        },
+        "description": "The active planting projects returned by More Trees."
+      }
+    },
+    {
+      "id": "more_trees.plant_trees",
+      "service": "more_trees",
+      "name": "plant_trees",
+      "description": "Plant trees for the connected More Trees account or gift trees to recipients, with optional non-persistent test mode.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plantForOthers": {
+            "type": "boolean",
+            "description": "Whether to gift trees to recipients instead of planting for the connected account."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether to evaluate the request without persisting it or spending planting credits. More Trees defaults this to false."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of trees to plant for the connected account. Required when plantForOthers is false."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The planting project identifier. More Trees selects the default project when omitted."
+          },
+          "treeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The tree species identifier. More Trees selects the default tree when omitted."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "accountCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient's More Trees account code. Provide exactly one of accountCode or email."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The recipient's email address. Provide exactly one of email or accountCode.",
+                  "format": "email"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient's name."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The number of trees to gift to this recipient."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "quantity"
+              ],
+              "description": "A recipient who should receive one or more gifted trees."
+            },
+            "description": "The recipients who should receive gifted trees. Required when plantForOthers is true.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "plantForOthers"
+        ],
+        "description": "The More Trees request for planting trees for the connected account or gifting trees to recipients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "type": "boolean",
+            "description": "Whether More Trees evaluated the request in non-persistent test mode."
+          },
+          "plant_for_others": {
+            "type": "boolean",
+            "description": "Whether the request planted trees for recipients instead of the connected account."
+          },
+          "credits_used": {
+            "type": "number",
+            "description": "The number of planting credits used or evaluated."
+          },
+          "credits_remaining": {
+            "type": "number",
+            "description": "The number of planting credits remaining."
+          },
+          "project_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The planting project selected by More Trees."
+          },
+          "tree_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The tree species selected by More Trees."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "account_code": {
+                  "type": "string",
+                  "description": "The recipient's More Trees account code."
+                },
+                "account_name": {
+                  "type": "string",
+                  "description": "The recipient's More Trees account name."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The number of trees planted for the recipient."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "account_code",
+                "account_name",
+                "quantity"
+              ],
+              "description": "A recipient confirmed by the More Trees planting response."
+            },
+            "description": "The recipients confirmed for a gifted-tree request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "test",
+          "credits_used",
+          "credits_remaining",
+          "project_id",
+          "tree_id"
+        ],
+        "description": "The More Trees planting result and remaining credit balance."
+      }
+    }
+  ]
+}

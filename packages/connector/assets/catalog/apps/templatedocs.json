@@ -1,0 +1,438 @@
+{
+  "service": "templatedocs",
+  "displayName": "TemplateDocs",
+  "description": "Create documents from TemplateDocs templates and inspect generation jobs.",
+  "categories": [
+    "Productivity",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TEMPLATEDOCS_API_KEY",
+      "description": "TemplateDocs organization API key sent as a Bearer token. Create or manage keys at https://templatedocs.io/settings/api-keys; setup details are at https://templatedocs.io/docs/api/auth."
+    }
+  ],
+  "homepageUrl": "https://templatedocs.io",
+  "actions": [
+    {
+      "id": "templatedocs.delete_template",
+      "service": "templatedocs",
+      "name": "delete_template",
+      "description": "Permanently delete one TemplateDocs template.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique TemplateDocs template identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TemplateDocs template to permanently delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether TemplateDocs completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The completed TemplateDocs operation."
+      }
+    },
+    {
+      "id": "templatedocs.generate_document",
+      "service": "templatedocs",
+      "name": "generate_document",
+      "description": "Fill a TemplateDocs template with JSON data and return the generated DOCX or PDF through file transit.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique TemplateDocs template identifier."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Values whose keys match placeholders in the template."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "docx",
+              "pdf"
+            ],
+            "description": "The generated document format. Defaults to docx."
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The desired generated document filename."
+          },
+          "email": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One primary recipient.",
+                  "format": "email"
+                },
+                "description": "Primary recipient email addresses.",
+                "minItems": 1
+              },
+              "cc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One CC recipient.",
+                  "format": "email"
+                },
+                "description": "CC recipient email addresses.",
+                "minItems": 1
+              },
+              "bcc": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One BCC recipient.",
+                  "format": "email"
+                },
+                "description": "BCC recipient email addresses.",
+                "minItems": 1
+              },
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email subject replacing the default subject."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The text or HTML email body replacing the default body."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "to"
+            ],
+            "description": "Optional email delivery settings applied by TemplateDocs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "data"
+        ],
+        "description": "Data and output options for generating a TemplateDocs document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The generated document filename."
+              },
+              "mimeType": {
+                "type": "string",
+                "description": "The generated document MIME type."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The transit URL for downloading the generated document.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The generated document size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The generated document stored in connector file transit."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The generated TemplateDocs document."
+      }
+    },
+    {
+      "id": "templatedocs.get_template",
+      "service": "templatedocs",
+      "name": "get_template",
+      "description": "Retrieve metadata and placeholder tags for one TemplateDocs template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique TemplateDocs template identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The TemplateDocs template to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique template identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The template filename."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the template was created.",
+            "format": "date-time"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "The template file size in bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "The SHA-256 hash of the template file."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The placeholder tag name."
+                },
+                "shape": {
+                  "type": "string",
+                  "enum": [
+                    "standalone",
+                    "container"
+                  ],
+                  "description": "Whether the tag is standalone or contains nested tags."
+                },
+                "children": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One nested placeholder tag."
+                  },
+                  "description": "Nested placeholder tags when the tag is a container."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "shape",
+                "children"
+              ],
+              "description": "One placeholder tag discovered in the template."
+            },
+            "description": "Placeholder tags discovered in the template."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "fileSize",
+          "sha256",
+          "tags"
+        ],
+        "description": "Template metadata returned by TemplateDocs."
+      }
+    },
+    {
+      "id": "templatedocs.list_templates",
+      "service": "templatedocs",
+      "name": "list_templates",
+      "description": "List one page of templates available to the TemplateDocs API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page index to retrieve. Defaults to 1."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing TemplateDocs templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "number",
+            "description": "The maximum number of templates returned per page."
+          },
+          "pageIndex": {
+            "type": "number",
+            "description": "The 1-based index of the returned page."
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique template identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The template filename."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the template was created.",
+                  "format": "date-time"
+                },
+                "fileSize": {
+                  "type": "number",
+                  "description": "The template file size in bytes."
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "The SHA-256 hash of the template file."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The placeholder tag name."
+                      },
+                      "shape": {
+                        "type": "string",
+                        "enum": [
+                          "standalone",
+                          "container"
+                        ],
+                        "description": "Whether the tag is standalone or contains nested tags."
+                      },
+                      "children": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "One nested placeholder tag."
+                        },
+                        "description": "Nested placeholder tags when the tag is a container."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "name",
+                      "shape",
+                      "children"
+                    ],
+                    "description": "One placeholder tag discovered in the template."
+                  },
+                  "description": "Placeholder tags discovered in the template."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "createdAt",
+                "fileSize",
+                "sha256",
+                "tags"
+              ],
+              "description": "Template metadata returned by TemplateDocs."
+            },
+            "description": "Templates returned for this page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "pageSize",
+          "pageIndex",
+          "templates"
+        ],
+        "description": "One page of TemplateDocs templates."
+      }
+    },
+    {
+      "id": "templatedocs.update_template",
+      "service": "templatedocs",
+      "name": "update_template",
+      "description": "Update the name or generation-warning option for a TemplateDocs template.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique TemplateDocs template identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique template filename ending in .docx."
+          },
+          "allowGenerationWithWarnings": {
+            "type": "boolean",
+            "description": "Whether TemplateDocs may generate documents when the template has warnings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "Metadata changes for one TemplateDocs template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether TemplateDocs completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The completed TemplateDocs operation."
+      }
+    }
+  ]
+}

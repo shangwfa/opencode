@@ -1,0 +1,1190 @@
+{
+  "service": "exa",
+  "displayName": "Exa",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "EXA_API_KEY",
+      "description": "Exa API key used with the x-api-key request header. Get it from the Exa Dashboard."
+    }
+  ],
+  "homepageUrl": "https://exa.ai",
+  "actions": [
+    {
+      "id": "exa.answer",
+      "service": "exa",
+      "name": "answer",
+      "description": "Generate a citation-backed answer from Exa search results.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The question or prompt Exa should answer."
+          },
+          "text": {
+            "type": "boolean",
+            "description": "Whether citations should include the full source text."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for an Exa answer request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The text answer returned by Exa."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The structured answer returned by Exa."
+              }
+            ]
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Exa answer citation."
+            },
+            "description": "The citations supporting the Exa answer."
+          },
+          "costDollars": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "The total request cost in US dollars."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Exa costDollars object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "citations"
+        ],
+        "description": "The response payload for exa.answer."
+      }
+    },
+    {
+      "id": "exa.find_similar",
+      "service": "exa",
+      "name": "find_similar",
+      "description": "Find pages similar to a given URL and optionally enrich them with contents.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL used to find similar pages.",
+            "format": "uri"
+          },
+          "excludeSourceDomain": {
+            "type": "boolean",
+            "description": "Whether to exclude results from the same domain as the input URL."
+          },
+          "numResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of similar results to return, up to 100."
+          },
+          "includeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only return results from these domains.",
+            "minItems": 1
+          },
+          "excludeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Exclude results from these domains.",
+            "minItems": 1
+          },
+          "startCrawlDate": {
+            "type": "string",
+            "description": "Only return results crawled after this timestamp.",
+            "format": "date-time"
+          },
+          "endCrawlDate": {
+            "type": "string",
+            "description": "Only return results crawled before this timestamp.",
+            "format": "date-time"
+          },
+          "startPublishedDate": {
+            "type": "string",
+            "description": "Only return results published after this timestamp.",
+            "format": "date-time"
+          },
+          "endPublishedDate": {
+            "type": "string",
+            "description": "Only return results published before this timestamp.",
+            "format": "date-time"
+          },
+          "includeText": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Phrases that must appear in the result text.",
+            "minItems": 1
+          },
+          "excludeText": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Phrases that must not appear in the result text.",
+            "minItems": 1
+          },
+          "moderation": {
+            "type": "boolean",
+            "description": "Whether Exa should filter unsafe content from results."
+          },
+          "contents": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Exa should return extracted text."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "maxCharacters": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The maximum number of characters to return for extracted text."
+                      },
+                      "includeHtmlTags": {
+                        "type": "boolean",
+                        "description": "Whether Exa should preserve HTML tags in extracted text."
+                      },
+                      "verbosity": {
+                        "type": "string",
+                        "enum": [
+                          "compact",
+                          "standard",
+                          "full"
+                        ],
+                        "description": "The verbosity level for extracted page text."
+                      },
+                      "includeSections": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "header",
+                            "navigation",
+                            "banner",
+                            "body",
+                            "sidebar",
+                            "footer",
+                            "metadata"
+                          ],
+                          "description": "A semantic page section used by Exa content extraction."
+                        },
+                        "description": "Only include content from these semantic page sections.",
+                        "minItems": 1
+                      },
+                      "excludeSections": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "header",
+                            "navigation",
+                            "banner",
+                            "body",
+                            "sidebar",
+                            "footer",
+                            "metadata"
+                          ],
+                          "description": "A semantic page section used by Exa content extraction."
+                        },
+                        "description": "Exclude content from these semantic page sections.",
+                        "minItems": 1
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Advanced configuration for Exa text extraction."
+                  }
+                ]
+              },
+              "highlights": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Exa should return highlights."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "maxCharacters": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The maximum number of characters to return across highlights."
+                      },
+                      "numSentences": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Deprecated by Exa. The number of sentences to include in each highlight snippet."
+                      },
+                      "highlightsPerUrl": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Deprecated by Exa. The number of highlight snippets to return per URL."
+                      },
+                      "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A custom query that guides Exa highlight selection."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Advanced configuration for Exa highlights."
+                  }
+                ]
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A custom query that guides Exa summary generation."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A JSON Schema object used for structured Exa summaries."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for an Exa summary response."
+              },
+              "livecrawlTimeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The livecrawl timeout in milliseconds."
+              },
+              "maxAgeHours": {
+                "anyOf": [
+                  {
+                    "const": -1,
+                    "type": "number"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "A non-negative cache age in hours."
+                  }
+                ],
+                "description": "Maximum age of cached content in hours. Use -1 to always use cache, 0 to always livecrawl, or a positive integer to require fresher content."
+              },
+              "subpages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of subpages Exa should crawl per result."
+              },
+              "subpageTarget": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A single keyword used to locate relevant subpages."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "A list of keywords used to locate relevant subpages.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "Keywords Exa should use when selecting subpages."
+              },
+              "extras": {
+                "type": "object",
+                "properties": {
+                  "links": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The maximum number of webpage links to return for each result."
+                  },
+                  "imageLinks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The maximum number of image links to return for each result."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Additional Exa extraction options."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Exa contents request object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for an Exa findSimilar request. includeDomains and excludeDomains cannot be provided together."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The unique identifier for this Exa request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The temporary Exa document identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The result URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "publishedDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The estimated publication timestamp for the result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated publication timestamp for the result."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The result author."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result author."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The result relevance score."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result relevance score."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Exa search or contents result object."
+            },
+            "description": "The Exa similar-page results."
+          },
+          "costDollars": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "The total request cost in US dollars."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Exa costDollars object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "results"
+        ],
+        "description": "The response payload for exa.find_similar."
+      }
+    },
+    {
+      "id": "exa.get_contents",
+      "service": "exa",
+      "name": "get_contents",
+      "description": "Fetch text, highlights, or summaries from Exa for URLs or document IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL to retrieve content for.",
+              "format": "uri"
+            },
+            "description": "The list of URLs to retrieve content for.",
+            "minItems": 1
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Deprecated. A backward-compatibility list of Exa document IDs.",
+            "minItems": 1
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Exa should return extracted text."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maxCharacters": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The maximum number of characters to return for extracted text."
+                  },
+                  "includeHtmlTags": {
+                    "type": "boolean",
+                    "description": "Whether Exa should preserve HTML tags in extracted text."
+                  },
+                  "verbosity": {
+                    "type": "string",
+                    "enum": [
+                      "compact",
+                      "standard",
+                      "full"
+                    ],
+                    "description": "The verbosity level for extracted page text."
+                  },
+                  "includeSections": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "header",
+                        "navigation",
+                        "banner",
+                        "body",
+                        "sidebar",
+                        "footer",
+                        "metadata"
+                      ],
+                      "description": "A semantic page section used by Exa content extraction."
+                    },
+                    "description": "Only include content from these semantic page sections.",
+                    "minItems": 1
+                  },
+                  "excludeSections": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "header",
+                        "navigation",
+                        "banner",
+                        "body",
+                        "sidebar",
+                        "footer",
+                        "metadata"
+                      ],
+                      "description": "A semantic page section used by Exa content extraction."
+                    },
+                    "description": "Exclude content from these semantic page sections.",
+                    "minItems": 1
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Advanced configuration for Exa text extraction."
+              }
+            ]
+          },
+          "highlights": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Exa should return highlights."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "maxCharacters": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The maximum number of characters to return across highlights."
+                  },
+                  "numSentences": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Deprecated by Exa. The number of sentences to include in each highlight snippet."
+                  },
+                  "highlightsPerUrl": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Deprecated by Exa. The number of highlight snippets to return per URL."
+                  },
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A custom query that guides Exa highlight selection."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Advanced configuration for Exa highlights."
+              }
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A custom query that guides Exa summary generation."
+              },
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A JSON Schema object used for structured Exa summaries."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Configuration for an Exa summary response."
+          },
+          "livecrawlTimeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The livecrawl timeout in milliseconds."
+          },
+          "maxAgeHours": {
+            "anyOf": [
+              {
+                "const": -1,
+                "type": "number"
+              },
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "A non-negative cache age in hours."
+              }
+            ],
+            "description": "Maximum age of cached content in hours. Use -1 to always use cache, 0 to always livecrawl, or a positive integer to require fresher content."
+          },
+          "subpages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of subpages Exa should crawl per result."
+          },
+          "subpageTarget": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A single keyword used to locate relevant subpages."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of keywords used to locate relevant subpages.",
+                "minItems": 1
+              }
+            ],
+            "description": "Keywords Exa should use when selecting subpages."
+          },
+          "extras": {
+            "type": "object",
+            "properties": {
+              "links": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of webpage links to return for each result."
+              },
+              "imageLinks": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of image links to return for each result."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional Exa extraction options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "urls"
+        ],
+        "description": "The input payload for fetching Exa contents by URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The unique identifier for this Exa request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The temporary Exa document identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The result URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "publishedDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The estimated publication timestamp for the result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated publication timestamp for the result."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The result author."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result author."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The result relevance score."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result relevance score."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Exa search or contents result object."
+            },
+            "description": "The Exa content results returned successfully."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Exa content status."
+            },
+            "description": "The fetch status for each requested input item."
+          },
+          "costDollars": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "The total request cost in US dollars."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Exa costDollars object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "results"
+        ],
+        "description": "The response payload for exa.get_contents."
+      }
+    },
+    {
+      "id": "exa.search",
+      "service": "exa",
+      "name": "search",
+      "description": "Search the web with Exa and optionally enrich each result with contents.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query to send to Exa."
+          },
+          "additionalQueries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Additional query variations to use with deep or deep-reasoning search.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "neural",
+              "fast",
+              "auto",
+              "deep",
+              "deep-reasoning",
+              "instant"
+            ],
+            "description": "The Exa search mode to execute."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "company",
+              "research paper",
+              "news",
+              "pdf",
+              "github",
+              "personal site",
+              "people",
+              "financial report"
+            ],
+            "description": "The Exa category used to narrow search results."
+          },
+          "numResults": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of search results to return, up to 100."
+          },
+          "userLocation": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "A two-letter ISO country code used to localize search results."
+          },
+          "includeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only return results from these domains.",
+            "minItems": 1
+          },
+          "excludeDomains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Exclude results from these domains.",
+            "minItems": 1
+          },
+          "startCrawlDate": {
+            "type": "string",
+            "description": "Only return results crawled after this timestamp.",
+            "format": "date-time"
+          },
+          "endCrawlDate": {
+            "type": "string",
+            "description": "Only return results crawled before this timestamp.",
+            "format": "date-time"
+          },
+          "startPublishedDate": {
+            "type": "string",
+            "description": "Only return results published after this timestamp.",
+            "format": "date-time"
+          },
+          "endPublishedDate": {
+            "type": "string",
+            "description": "Only return results published before this timestamp.",
+            "format": "date-time"
+          },
+          "includeText": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Phrases that must appear in the result text.",
+            "minItems": 1
+          },
+          "excludeText": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Phrases that must not appear in the result text.",
+            "minItems": 1
+          },
+          "moderation": {
+            "type": "boolean",
+            "description": "Whether Exa should filter unsafe content from results."
+          },
+          "contents": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Exa should return extracted text."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "maxCharacters": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The maximum number of characters to return for extracted text."
+                      },
+                      "includeHtmlTags": {
+                        "type": "boolean",
+                        "description": "Whether Exa should preserve HTML tags in extracted text."
+                      },
+                      "verbosity": {
+                        "type": "string",
+                        "enum": [
+                          "compact",
+                          "standard",
+                          "full"
+                        ],
+                        "description": "The verbosity level for extracted page text."
+                      },
+                      "includeSections": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "header",
+                            "navigation",
+                            "banner",
+                            "body",
+                            "sidebar",
+                            "footer",
+                            "metadata"
+                          ],
+                          "description": "A semantic page section used by Exa content extraction."
+                        },
+                        "description": "Only include content from these semantic page sections.",
+                        "minItems": 1
+                      },
+                      "excludeSections": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "header",
+                            "navigation",
+                            "banner",
+                            "body",
+                            "sidebar",
+                            "footer",
+                            "metadata"
+                          ],
+                          "description": "A semantic page section used by Exa content extraction."
+                        },
+                        "description": "Exclude content from these semantic page sections.",
+                        "minItems": 1
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Advanced configuration for Exa text extraction."
+                  }
+                ]
+              },
+              "highlights": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Exa should return highlights."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "maxCharacters": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "The maximum number of characters to return across highlights."
+                      },
+                      "numSentences": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Deprecated by Exa. The number of sentences to include in each highlight snippet."
+                      },
+                      "highlightsPerUrl": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Deprecated by Exa. The number of highlight snippets to return per URL."
+                      },
+                      "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A custom query that guides Exa highlight selection."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Advanced configuration for Exa highlights."
+                  }
+                ]
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A custom query that guides Exa summary generation."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A JSON Schema object used for structured Exa summaries."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for an Exa summary response."
+              },
+              "livecrawlTimeout": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The livecrawl timeout in milliseconds."
+              },
+              "maxAgeHours": {
+                "anyOf": [
+                  {
+                    "const": -1,
+                    "type": "number"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "A non-negative cache age in hours."
+                  }
+                ],
+                "description": "Maximum age of cached content in hours. Use -1 to always use cache, 0 to always livecrawl, or a positive integer to require fresher content."
+              },
+              "subpages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The maximum number of subpages Exa should crawl per result."
+              },
+              "subpageTarget": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A single keyword used to locate relevant subpages."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "A list of keywords used to locate relevant subpages.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "Keywords Exa should use when selecting subpages."
+              },
+              "extras": {
+                "type": "object",
+                "properties": {
+                  "links": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The maximum number of webpage links to return for each result."
+                  },
+                  "imageLinks": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The maximum number of image links to return for each result."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Additional Exa extraction options."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Exa contents request object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for an Exa search request. includeDomains and excludeDomains cannot be provided together."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The unique identifier for this Exa request."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The temporary Exa document identifier."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The result URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The result title."
+                },
+                "publishedDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The estimated publication timestamp for the result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The estimated publication timestamp for the result."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The result author."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result author."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The result relevance score."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The result relevance score."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Exa search or contents result object."
+            },
+            "description": "The Exa search results."
+          },
+          "searchType": {
+            "type": "string",
+            "description": "The search type Exa selected for the request."
+          },
+          "output": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Exa deep search output object."
+          },
+          "costDollars": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "The total request cost in US dollars."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Exa costDollars object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "results"
+        ],
+        "description": "The response payload for exa.search."
+      }
+    }
+  ]
+}

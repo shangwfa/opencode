@@ -1,0 +1,469 @@
+{
+  "service": "tally",
+  "displayName": "Tally",
+  "categories": [
+    "Productivity",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "tly_xxxx",
+      "description": "Tally API key used as a bearer token. Create it from Settings > API keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://tally.so",
+  "actions": [
+    {
+      "id": "tally.get_form",
+      "service": "tally",
+      "name": "get_form",
+      "description": "Fetch a single Tally form by ID with its blocks and settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tally form ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Path parameters for fetching a Tally form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tally form ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Tally form name."
+          },
+          "workspaceId": {
+            "type": "string",
+            "description": "Workspace ID that owns the form."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "BLANK",
+              "DRAFT",
+              "PUBLISHED",
+              "DELETED"
+            ],
+            "description": "Tally form status."
+          },
+          "numberOfSubmissions": {
+            "type": "number",
+            "description": "Number of submissions collected by the form."
+          },
+          "isClosed": {
+            "type": "boolean",
+            "description": "Whether the form is closed."
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number",
+                  "description": "Payment amount configured on the form."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Payment currency configured on the form."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Payment summary attached to a Tally form."
+            },
+            "description": "Payment settings returned for the form."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp when the form was created.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp when the form was last updated.",
+            "format": "date-time"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Tally form settings."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw form block payload."
+            },
+            "description": "Blocks and settings returned for the form."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Full Tally form response."
+      }
+    },
+    {
+      "id": "tally.get_submission",
+      "service": "tally",
+      "name": "get_submission",
+      "description": "Fetch a single Tally form submission by ID with its responses and questions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tally form ID that owns the submission."
+          },
+          "submissionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tally submission ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId",
+          "submissionId"
+        ],
+        "description": "Path parameters for fetching a Tally form submission."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Question metadata returned with submissions."
+            },
+            "description": "Questions returned for the form."
+          },
+          "submission": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Submission ID."
+              },
+              "formId": {
+                "type": "string",
+                "description": "Form ID."
+              },
+              "responses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One answer response."
+                },
+                "description": "Responses captured in the submission."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Tally form submission."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "questions",
+          "submission"
+        ],
+        "description": "Tally submission detail response."
+      }
+    },
+    {
+      "id": "tally.list_forms",
+      "service": "tally",
+      "name": "list_forms",
+      "description": "List Tally forms with optional pagination and workspace filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Page number for pagination. Tally defaults to 1."
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Number of items per page. Tally documents a maximum of 500."
+          },
+          "workspaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Workspace IDs used to filter the returned forms."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional query parameters for listing Tally forms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Tally form ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Tally form name."
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "description": "Workspace ID that owns the form."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "BLANK",
+                    "DRAFT",
+                    "PUBLISHED",
+                    "DELETED"
+                  ],
+                  "description": "Tally form status."
+                },
+                "numberOfSubmissions": {
+                  "type": "number",
+                  "description": "Number of submissions collected by the form."
+                },
+                "isClosed": {
+                  "type": "boolean",
+                  "description": "Whether the form is closed."
+                },
+                "payments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "number",
+                        "description": "Payment amount configured on the form."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "Payment currency configured on the form."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Payment summary attached to a Tally form."
+                  },
+                  "description": "Payment settings returned for the form."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the form was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the form was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Tally form summary."
+            },
+            "description": "Forms returned by Tally."
+          },
+          "page": {
+            "type": "number",
+            "description": "Current page number."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Number of items per page."
+          },
+          "total": {
+            "type": "number",
+            "description": "Total number of forms matching the query."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more pages are available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total",
+          "hasMore"
+        ],
+        "description": "Paginated Tally forms response."
+      }
+    },
+    {
+      "id": "tally.list_submissions",
+      "service": "tally",
+      "name": "list_submissions",
+      "description": "List submissions for a Tally form with pagination and documented completion/date filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tally form ID whose submissions should be listed."
+          },
+          "page": {
+            "type": "number",
+            "description": "Page number for pagination. Tally defaults to 1."
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Number of items per page. Tally documents a maximum of 500."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "completed",
+              "partial"
+            ],
+            "description": "Submission completion status filter."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Filter submissions submitted on or after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Filter submissions submitted on or before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "afterId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Submission ID after which results should be returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formId"
+        ],
+        "description": "Path and query parameters for listing Tally form submissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Current page number."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Number of submissions per page."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more pages are available."
+          },
+          "totalNumberOfSubmissionsPerFilter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Submission totals per completion filter."
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Question metadata returned with submissions."
+            },
+            "description": "Questions returned for the form."
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Submission ID."
+                },
+                "formId": {
+                  "type": "string",
+                  "description": "Form ID."
+                },
+                "responses": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One answer response."
+                  },
+                  "description": "Responses captured in the submission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Tally form submission."
+            },
+            "description": "Submissions returned by Tally."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "page",
+          "limit",
+          "hasMore",
+          "totalNumberOfSubmissionsPerFilter",
+          "questions",
+          "submissions"
+        ],
+        "description": "Paginated Tally submissions response."
+      }
+    }
+  ]
+}

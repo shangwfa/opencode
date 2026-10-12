@@ -1,0 +1,859 @@
+{
+  "service": "tick",
+  "displayName": "Tick",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "TICK_API_TOKEN",
+      "description": "Tick API token assigned to your subscription role. Retrieve it through the official roles endpoint: https://github.com/tick/tick-api/blob/master/sections/roles.md",
+      "extraFields": [
+        {
+          "key": "subscriptionId",
+          "label": "Subscription ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "123456",
+          "description": "Numeric Tick subscription ID returned with the API token."
+        },
+        {
+          "key": "email",
+          "label": "Contact Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "you@example.com",
+          "description": "Contact email included in the User-Agent header as required by the Tick API."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.tickspot.com",
+  "actions": [
+    {
+      "id": "tick.create_entry",
+      "service": "tick",
+      "name": "create_entry",
+      "description": "Create a Tick time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The work date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The positive number of hours to record."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The task receiving the time entry."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Notes to record with the time entry."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The user receiving the entry; ignored for non-administrators."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "hours",
+          "taskId"
+        ],
+        "description": "The new time entry fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID as text."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric entry ID."
+                  }
+                ],
+                "description": "The time entry ID."
+              },
+              "date": {
+                "type": "string",
+                "description": "The work date in YYYY-MM-DD format."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of hours recorded."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes recorded with the time entry."
+              },
+              "task_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated task ID."
+              },
+              "user_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated user ID."
+              },
+              "billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "url": {
+                "type": "string",
+                "description": "The API URL for the time entry."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the time entry was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "When the time entry was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Tick time entry."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Tick time entry response."
+      }
+    },
+    {
+      "id": "tick.delete_entry",
+      "service": "tick",
+      "name": "delete_entry",
+      "description": "Permanently delete a Tick time entry.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The time entry deletion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Tick accepted the deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick time entry deletion response."
+      }
+    },
+    {
+      "id": "tick.get_entry",
+      "service": "tick",
+      "name": "get_entry",
+      "description": "Retrieve one Tick time entry by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The time entry ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The time entry lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID as text."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric entry ID."
+                  }
+                ],
+                "description": "The time entry ID."
+              },
+              "date": {
+                "type": "string",
+                "description": "The work date in YYYY-MM-DD format."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of hours recorded."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes recorded with the time entry."
+              },
+              "task_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated task ID."
+              },
+              "user_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated user ID."
+              },
+              "billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "url": {
+                "type": "string",
+                "description": "The API URL for the time entry."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the time entry was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "When the time entry was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Tick time entry."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick time entry response."
+      }
+    },
+    {
+      "id": "tick.list_clients",
+      "service": "tick",
+      "name": "list_clients",
+      "description": "List Tick clients with open projects, or include every client.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "includeAll": {
+            "type": "boolean",
+            "description": "Whether to include clients without open projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The client list options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The client ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The client name."
+                },
+                "archive": {
+                  "type": "boolean",
+                  "description": "Whether the client is archived."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The API URL for the client."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the client was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tick client."
+            },
+            "description": "The returned clients."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick client list response."
+      }
+    },
+    {
+      "id": "tick.list_entries",
+      "service": "tick",
+      "name": "list_entries",
+      "description": "List Tick time entries by date range or update timestamp.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Return entries created or modified after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Filter entries by whether their tasks are billable."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Filter entries by whether they have been billed."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter entries by project ID."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter entries by task ID."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter entries by user ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The time entry filters. Provide both startDate and endDate, or provide updatedAt."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The entry ID as text."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The numeric entry ID."
+                    }
+                  ],
+                  "description": "The time entry ID."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The work date in YYYY-MM-DD format."
+                },
+                "hours": {
+                  "type": "number",
+                  "description": "The number of hours recorded."
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "Notes recorded with the time entry."
+                },
+                "task_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The associated task ID."
+                },
+                "user_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The associated user ID."
+                },
+                "billed": {
+                  "type": "boolean",
+                  "description": "Whether the time entry has been billed."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The API URL for the time entry."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the time entry was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the time entry was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tick time entry."
+            },
+            "description": "The returned time entries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick time entry list response."
+      }
+    },
+    {
+      "id": "tick.list_projects",
+      "service": "tick",
+      "name": "list_projects",
+      "description": "List open or closed Tick projects.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Whether to list closed projects instead of open projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The project list options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project name."
+                },
+                "budget": {
+                  "type": "number",
+                  "description": "The project budget in hours."
+                },
+                "date_closed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date the project was closed, or null if open."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date the project was closed, or null if open."
+                },
+                "notifications": {
+                  "type": "boolean",
+                  "description": "Whether budget notifications are enabled."
+                },
+                "billable": {
+                  "type": "boolean",
+                  "description": "Whether the project is billable."
+                },
+                "recurring": {
+                  "type": "boolean",
+                  "description": "Whether the project recurs."
+                },
+                "client_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The associated client ID."
+                },
+                "owner_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The project owner user ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The API URL for the project."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the project was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the project was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tick project."
+            },
+            "description": "The returned projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick project list response."
+      }
+    },
+    {
+      "id": "tick.list_tasks",
+      "service": "tick",
+      "name": "list_tasks",
+      "description": "List open or closed Tick tasks, optionally within one project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "projectId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The project whose tasks should be returned."
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Whether to list closed tasks instead of open tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The task list options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The task ID as text."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The numeric task ID."
+                    }
+                  ],
+                  "description": "The task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "budget": {
+                  "type": "number",
+                  "description": "The task budget in hours."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "The task position within its project."
+                },
+                "project_id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The associated project ID."
+                },
+                "date_closed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The date the task was closed, or null if open."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The date the task was closed, or null if open."
+                },
+                "billable": {
+                  "type": "boolean",
+                  "description": "Whether time on the task is billable."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The API URL for the task."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the task was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the task was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tick task."
+            },
+            "description": "The returned tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick task list response."
+      }
+    },
+    {
+      "id": "tick.list_users",
+      "service": "tick",
+      "name": "list_users",
+      "description": "List active or deleted users visible to the Tick API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether to list deleted users with time entries instead of active users."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The user list options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The user ID."
+                },
+                "first_name": {
+                  "type": "string",
+                  "description": "The user's first name."
+                },
+                "last_name": {
+                  "type": "string",
+                  "description": "The user's last name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user's email address."
+                },
+                "timezone": {
+                  "type": "string",
+                  "description": "The user's time zone."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the user was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tick subscription user."
+            },
+            "description": "The returned users."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tick user list response."
+      }
+    },
+    {
+      "id": "tick.update_entry",
+      "service": "tick",
+      "name": "update_entry",
+      "description": "Update fields on an existing Tick time entry.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The time entry ID."
+          },
+          "date": {
+            "type": "string",
+            "description": "The replacement work date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "hours": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The replacement positive number of hours."
+          },
+          "taskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The replacement task ID."
+          },
+          "notes": {
+            "type": "string",
+            "description": "The replacement notes."
+          },
+          "userId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The replacement user ID; ignored for non-administrators."
+          },
+          "billed": {
+            "type": "boolean",
+            "description": "Whether the entry has been billed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entryId"
+        ],
+        "description": "The time entry ID and replacement fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entry": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The entry ID as text."
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric entry ID."
+                  }
+                ],
+                "description": "The time entry ID."
+              },
+              "date": {
+                "type": "string",
+                "description": "The work date in YYYY-MM-DD format."
+              },
+              "hours": {
+                "type": "number",
+                "description": "The number of hours recorded."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes recorded with the time entry."
+              },
+              "task_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated task ID."
+              },
+              "user_id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The associated user ID."
+              },
+              "billed": {
+                "type": "boolean",
+                "description": "Whether the time entry has been billed."
+              },
+              "url": {
+                "type": "string",
+                "description": "The API URL for the time entry."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the time entry was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "When the time entry was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Tick time entry."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Tick time entry response."
+      }
+    }
+  ]
+}

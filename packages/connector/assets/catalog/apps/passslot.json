@@ -1,0 +1,508 @@
+{
+  "service": "passslot",
+  "displayName": "PassSlot",
+  "description": "Create and manage Apple Wallet passes from PassSlot templates.",
+  "categories": [
+    "Developer Tools",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "App Key",
+      "placeholder": "PASSSLOT_APP_KEY",
+      "description": "PassSlot App Key used as the HTTP Basic Auth username with an empty password. Create and manage App Keys in your PassSlot account as described at https://www.passslot.com/developer/api/start"
+    }
+  ],
+  "homepageUrl": "https://www.passslot.com",
+  "actions": [
+    {
+      "id": "passslot.create_pass_from_template",
+      "service": "passslot",
+      "name": "create_pass_from_template",
+      "description": "Create a Wallet pass from a PassSlot template using JSON placeholder values and return its installation URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric PassSlot template identifier."
+          },
+          "values": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The template placeholder names and JSON values to apply to the Wallet pass."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "Input parameters for creating a Wallet pass from a template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pass": {
+            "type": "object",
+            "properties": {
+              "serialNumber": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique serial number of the Wallet pass.",
+                "pattern": "\\S"
+              },
+              "passTypeIdentifier": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+                "pattern": "\\S"
+              },
+              "url": {
+                "type": "string",
+                "description": "The short distribution URL for installing the Wallet pass.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "serialNumber",
+              "passTypeIdentifier",
+              "url"
+            ],
+            "description": "A Wallet pass created by PassSlot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pass"
+        ],
+        "description": "The newly created PassSlot Wallet pass."
+      }
+    },
+    {
+      "id": "passslot.delete_pass",
+      "service": "passslot",
+      "name": "delete_pass",
+      "description": "Permanently delete a PassSlot Wallet pass.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique serial number of the Wallet pass.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passTypeIdentifier",
+          "serialNumber"
+        ],
+        "description": "The identity of an existing PassSlot Wallet pass."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the Wallet pass was deleted."
+          },
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique serial number of the Wallet pass.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "passTypeIdentifier",
+          "serialNumber"
+        ],
+        "description": "The acknowledgement for the deleted PassSlot Wallet pass."
+      }
+    },
+    {
+      "id": "passslot.get_pass_url",
+      "service": "passslot",
+      "name": "get_pass_url",
+      "description": "Get the short installation URL for an existing PassSlot Wallet pass.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique serial number of the Wallet pass.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passTypeIdentifier",
+          "serialNumber"
+        ],
+        "description": "The identity of an existing PassSlot Wallet pass."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The short distribution URL for installing the Wallet pass.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The PassSlot Wallet pass installation URL."
+      }
+    },
+    {
+      "id": "passslot.get_pass_values",
+      "service": "passslot",
+      "name": "get_pass_values",
+      "description": "Get the current placeholder values of an existing PassSlot Wallet pass.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique serial number of the Wallet pass.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passTypeIdentifier",
+          "serialNumber"
+        ],
+        "description": "The identity of an existing PassSlot Wallet pass."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The template placeholder names and JSON values to apply to the Wallet pass."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values"
+        ],
+        "description": "The current placeholder values of the PassSlot Wallet pass."
+      }
+    },
+    {
+      "id": "passslot.list_pass_types",
+      "service": "passslot",
+      "name": "list_pass_types",
+      "description": "List Apple Wallet pass type identifiers available in PassSlot.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing PassSlot pass types."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+                  "pattern": "\\S"
+                },
+                "organizationName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The organization name from the pass certificate.",
+                  "pattern": "\\S"
+                },
+                "teamIdentifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Apple Developer team identifier.",
+                  "pattern": "\\S"
+                },
+                "certificateExpirationDate": {
+                  "type": "string",
+                  "description": "The ISO 8601 expiration timestamp of the pass certificate."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "organizationName",
+                "teamIdentifier",
+                "certificateExpirationDate"
+              ],
+              "description": "A PassSlot pass type record."
+            },
+            "description": "The available pass type records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passTypes"
+        ],
+        "description": "The PassSlot pass type collection."
+      }
+    },
+    {
+      "id": "passslot.list_passes",
+      "service": "passslot",
+      "name": "list_passes",
+      "description": "List PassSlot Wallet passes, optionally limited to one pass type identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing PassSlot Wallet passes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "passes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serialNumber": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique serial number of the Wallet pass.",
+                  "pattern": "\\S"
+                },
+                "passType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "serialNumber",
+                "passType"
+              ],
+              "description": "A PassSlot Wallet pass reference."
+            },
+            "description": "The matching Wallet pass references."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passes"
+        ],
+        "description": "The PassSlot Wallet pass collection."
+      }
+    },
+    {
+      "id": "passslot.list_templates",
+      "service": "passslot",
+      "name": "list_templates",
+      "description": "List PassSlot pass templates available to the connected App Key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing PassSlot templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric PassSlot template identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name of the pass template.",
+                  "pattern": "\\S"
+                },
+                "formatVersion": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Apple Wallet pass format version."
+                },
+                "passType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The Apple Wallet template description and field layout."
+                },
+                "placeholder": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A template placeholder name.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The placeholder names accepted when creating a pass from this template."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "formatVersion",
+                "passType",
+                "description",
+                "placeholder"
+              ],
+              "description": "A PassSlot pass template."
+            },
+            "description": "The pass templates available to the App Key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ],
+        "description": "The PassSlot template collection."
+      }
+    },
+    {
+      "id": "passslot.update_pass_values",
+      "service": "passslot",
+      "name": "update_pass_values",
+      "description": "Update the placeholder values of an existing PassSlot Wallet pass.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "passTypeIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Apple Wallet pass type identifier, such as pass.example.membership.",
+            "pattern": "\\S"
+          },
+          "serialNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique serial number of the Wallet pass.",
+            "pattern": "\\S"
+          },
+          "values": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The template placeholder names and JSON values to apply to the Wallet pass."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passTypeIdentifier",
+          "serialNumber",
+          "values"
+        ],
+        "description": "Input parameters for updating PassSlot Wallet pass values."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The template placeholder names and JSON values to apply to the Wallet pass."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values"
+        ],
+        "description": "The placeholder values returned after the PassSlot update."
+      }
+    }
+  ]
+}

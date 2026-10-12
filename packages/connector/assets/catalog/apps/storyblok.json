@@ -1,0 +1,1995 @@
+{
+  "service": "storyblok",
+  "displayName": "Storyblok",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Content Delivery API Access Token",
+      "placeholder": "STORYBLOK_ACCESS_TOKEN",
+      "description": "Storyblok Content Delivery API public or preview token sent as the token query parameter. Create or manage per-space tokens from a Storyblok space under Settings > Access Tokens: https://www.storyblok.com/docs/concepts/access-tokens.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Space Region",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "eu",
+          "description": "Storyblok space server location used to choose the Content Delivery API endpoint. Use one of eu, us, ca, ap, or cn as documented in the Content Delivery API introduction: https://www.storyblok.com/docs/api/content-delivery/v2."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.storyblok.com",
+  "actions": [
+    {
+      "id": "storyblok.get_space",
+      "service": "storyblok",
+      "name": "get_space",
+      "description": "Retrieve metadata for the Storyblok space associated with the access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving the current Storyblok space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Space ID."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Space name."
+              },
+              "domain": {
+                "type": "string",
+                "description": "Domain associated with the Storyblok space.",
+                "format": "uri"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Storyblok cache version as a number."
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Storyblok cache version as a string."
+                  }
+                ],
+                "description": "Storyblok cache version value."
+              },
+              "language_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Storyblok language code."
+                },
+                "description": "Language codes configured in the Storyblok space."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Storyblok space object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "space"
+        ],
+        "description": "Storyblok current space response."
+      }
+    },
+    {
+      "id": "storyblok.get_story",
+      "service": "storyblok",
+      "name": "get_story",
+      "description": "Retrieve one Storyblok story by full slug, numeric ID, or UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "story": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Story full slug, numeric ID, or UUID to place in the path."
+          },
+          "find_by": {
+            "type": "string",
+            "enum": [
+              "uuid"
+            ],
+            "description": "Story lookup mode required when story is a UUID."
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Storyblok content version to request."
+          },
+          "cv": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storyblok cache version timestamp."
+          },
+          "from_release": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Release ID to request a story version from."
+          },
+          "resolve_links": {
+            "type": "string",
+            "enum": [
+              "story",
+              "url",
+              "link"
+            ],
+            "description": "Storyblok link resolution mode."
+          },
+          "resolve_links_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "Number of link levels to resolve."
+          },
+          "resolve_relations": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated component.field references to resolve as stories."
+          },
+          "resolve_level": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 2,
+            "description": "Force second-level relation resolution."
+          },
+          "resolve_assets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Storyblok numeric boolean flag, where 1 means yes and 0 means no."
+          },
+          "fallback_lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Fallback language code configured in the space."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code configured in the space."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "story"
+        ],
+        "description": "Path and query parameters for retrieving one Storyblok story."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "story": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Story name."
+              },
+              "published_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Latest publication timestamp.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Latest publication timestamp."
+              },
+              "first_published_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "First publication timestamp.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First publication timestamp."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "Story creation timestamp.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "Latest story update timestamp.",
+                "format": "date-time"
+              },
+              "id": {
+                "type": "integer",
+                "description": "Story ID."
+              },
+              "uuid": {
+                "type": "string",
+                "description": "Story UUID.",
+                "format": "uuid"
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "component": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Storyblok component technical name."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Storyblok story content object shaped by the space's component schema."
+              },
+              "slug": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Story slug."
+              },
+              "full_slug": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Story full slug."
+              },
+              "sort_by_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Date configured for sorting the story."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Date configured for sorting the story."
+              },
+              "position": {
+                "type": "integer",
+                "description": "Story position in its folder."
+              },
+              "tag_list": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story tag name."
+                },
+                "description": "Story tag names."
+              },
+              "is_startpage": {
+                "type": "boolean",
+                "description": "Whether the story is the start page for a folder."
+              },
+              "parent_id": {
+                "type": "integer",
+                "description": "Parent folder ID."
+              },
+              "meta_data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Story metadata object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Story metadata object."
+              },
+              "group_id": {
+                "type": "string",
+                "description": "Story group UUID shared between alternates.",
+                "format": "uuid"
+              },
+              "release_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Release ID when requested from a release."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Release ID when requested from a release."
+              },
+              "lang": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Story language code."
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Story real path."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Story real path."
+              },
+              "alternates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Story alternate object."
+                },
+                "description": "Alternate stories for this story."
+              },
+              "default_full_slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Default-language full slug."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Default-language full slug."
+              },
+              "translated_slugs": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Story translated slug object."
+                    },
+                    "description": "Translated slug objects."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Translated slug objects."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Storyblok story object."
+          },
+          "rels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story name."
+                },
+                "published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Latest publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Latest publication timestamp."
+                },
+                "first_published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "First publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "First publication timestamp."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Story creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest story update timestamp.",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "Story ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story UUID.",
+                  "format": "uuid"
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Storyblok component technical name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Storyblok story content object shaped by the space's component schema."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story slug."
+                },
+                "full_slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story full slug."
+                },
+                "sort_by_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date configured for sorting the story."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date configured for sorting the story."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "tag_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Story tag name."
+                  },
+                  "description": "Story tag names."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "parent_id": {
+                  "type": "integer",
+                  "description": "Parent folder ID."
+                },
+                "meta_data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Story metadata object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story metadata object."
+                },
+                "group_id": {
+                  "type": "string",
+                  "description": "Story group UUID shared between alternates.",
+                  "format": "uuid"
+                },
+                "release_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Release ID when requested from a release."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Release ID when requested from a release."
+                },
+                "lang": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story language code."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Story alternate object."
+                  },
+                  "description": "Alternate stories for this story."
+                },
+                "default_full_slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Default-language full slug."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Default-language full slug."
+                },
+                "translated_slugs": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Story translated slug object."
+                      },
+                      "description": "Translated slug objects."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Translated slug objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok story object."
+            },
+            "description": "Resolved story objects."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Story or folder ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story or folder UUID.",
+                  "format": "uuid"
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder full slug."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent folder ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder name."
+                },
+                "is_folder": {
+                  "type": "boolean",
+                  "description": "Whether the object is a folder."
+                },
+                "published": {
+                  "type": "boolean",
+                  "description": "Whether the story is published."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "real_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Resolved real path with a leading slash."
+                },
+                "published_at": {
+                  "type": "string",
+                  "description": "Latest publication timestamp.",
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest update timestamp.",
+                  "format": "date-time"
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Link alternate object."
+                  },
+                  "description": "Alternate link objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok link object."
+            },
+            "description": "Resolved link objects."
+          },
+          "rel_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Story UUID.",
+              "format": "uuid"
+            },
+            "description": "Referenced story UUIDs that exceeded the resolution limit."
+          },
+          "link_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Story UUID.",
+              "format": "uuid"
+            },
+            "description": "Linked story UUIDs that exceeded the resolution limit."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "story"
+        ],
+        "description": "Storyblok single-story response."
+      }
+    },
+    {
+      "id": "storyblok.list_datasource_entries",
+      "service": "storyblok",
+      "name": "list_datasource_entries",
+      "description": "List Storyblok datasource entries, optionally filtered by datasource and dimension.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasource": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datasource slug to filter entries by."
+          },
+          "dimension": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Datasource dimension value to request."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from Storyblok."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Datasource entries to request per page."
+          },
+          "cv": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storyblok cache version timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Storyblok datasource entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasource_entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Entry ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Entry name."
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Entry value in the default dimension."
+                },
+                "dimension_value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Entry value for the requested dimension."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok datasource entry object."
+            },
+            "description": "Datasource entries returned for the current page."
+          },
+          "cv": {
+            "type": "integer",
+            "description": "Storyblok cache version timestamp."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of matching items reported by Storyblok."
+              },
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of items per page reported by Storyblok."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata derived from Storyblok response headers."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "datasource_entries"
+        ],
+        "description": "Storyblok datasource entries response."
+      }
+    },
+    {
+      "id": "storyblok.list_datasources",
+      "service": "storyblok",
+      "name": "list_datasources",
+      "description": "List Storyblok datasources with pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from Storyblok."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of items to request per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Storyblok datasources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Datasource ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Datasource name."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Datasource slug."
+                },
+                "dimensions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "description": "Dimension ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Dimension name."
+                      },
+                      "entry_value": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Dimension value."
+                      },
+                      "datasource_id": {
+                        "type": "integer",
+                        "description": "Datasource ID containing this dimension."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "description": "Dimension creation timestamp.",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "description": "Latest dimension update timestamp.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Storyblok datasource dimension object."
+                  },
+                  "description": "Dimensions defined for this datasource."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok datasource object."
+            },
+            "description": "Datasources returned for the current page."
+          },
+          "cv": {
+            "type": "integer",
+            "description": "Storyblok cache version timestamp."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of matching items reported by Storyblok."
+              },
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of items per page reported by Storyblok."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata derived from Storyblok response headers."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "datasources"
+        ],
+        "description": "Storyblok datasources response."
+      }
+    },
+    {
+      "id": "storyblok.list_links",
+      "service": "storyblok",
+      "name": "list_links",
+      "description": "List compact Storyblok link records for stories and folders in a space.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "starts_with": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return links whose full_slug starts with this value."
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Storyblok content version to request."
+          },
+          "cv": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storyblok cache version timestamp."
+          },
+          "with_parent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Folder ID used to filter links, or 0 for root entries."
+          },
+          "include_dates": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Storyblok numeric boolean flag, where 1 means yes and 0 means no."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from Storyblok."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Links to request per page."
+          },
+          "paginated": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Storyblok numeric boolean flag, where 1 means yes and 0 means no."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Storyblok links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Story or folder ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story or folder UUID.",
+                  "format": "uuid"
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder full slug."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent folder ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder name."
+                },
+                "is_folder": {
+                  "type": "boolean",
+                  "description": "Whether the object is a folder."
+                },
+                "published": {
+                  "type": "boolean",
+                  "description": "Whether the story is published."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "real_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Resolved real path with a leading slash."
+                },
+                "published_at": {
+                  "type": "string",
+                  "description": "Latest publication timestamp.",
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest update timestamp.",
+                  "format": "date-time"
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Link alternate object."
+                  },
+                  "description": "Alternate link objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok link object."
+            },
+            "description": "Storyblok links keyed by story or folder UUID."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of matching items reported by Storyblok."
+              },
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of items per page reported by Storyblok."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata derived from Storyblok response headers."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "links"
+        ],
+        "description": "Storyblok links response."
+      }
+    },
+    {
+      "id": "storyblok.list_stories",
+      "service": "storyblok",
+      "name": "list_stories",
+      "description": "List Storyblok stories with pagination, content filters, language, and relation resolution options.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Storyblok content version to request."
+          },
+          "cv": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Storyblok cache version timestamp."
+          },
+          "from_release": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Release ID to request a story version from."
+          },
+          "resolve_links": {
+            "type": "string",
+            "enum": [
+              "story",
+              "url",
+              "link"
+            ],
+            "description": "Storyblok link resolution mode."
+          },
+          "resolve_links_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "Number of link levels to resolve."
+          },
+          "resolve_relations": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated component.field references to resolve as stories."
+          },
+          "resolve_level": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 2,
+            "description": "Force second-level relation resolution."
+          },
+          "resolve_assets": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Storyblok numeric boolean flag, where 1 means yes and 0 means no."
+          },
+          "fallback_lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Fallback language code configured in the space."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code configured in the space."
+          },
+          "starts_with": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories whose full_slug starts with this value."
+          },
+          "search_term": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search term applied to story name, slug, full slug, and content."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request from Storyblok."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Stories to request per page."
+          },
+          "content_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Storyblok content type technical name."
+          },
+          "by_slugs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated full slugs to include, with wildcard support."
+          },
+          "excluding_slugs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated full slugs to exclude, with wildcard support."
+          },
+          "by_uuids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated story UUIDs to include."
+          },
+          "by_uuids_ordered": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated story UUIDs to include while preserving request order."
+          },
+          "excluding_ids": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated story IDs to exclude."
+          },
+          "with_tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated tag slugs used to filter stories."
+          },
+          "sort_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Storyblok sort expression."
+          },
+          "in_workflow_stages": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated workflow stage IDs."
+          },
+          "filter_query": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Storyblok string query value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "Storyblok numeric query value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "Storyblok boolean query value."
+                  }
+                ],
+                "description": "Storyblok query value."
+              },
+              "description": "Storyblok filter operators for one field."
+            },
+            "description": "Storyblok filter_query object keyed by field name."
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Folder level used to filter returned stories."
+          },
+          "is_startpage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Storyblok numeric boolean flag, where 1 means yes and 0 means no."
+          },
+          "first_published_at_gt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories first published after this timestamp."
+          },
+          "first_published_at_lt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories first published before this timestamp."
+          },
+          "published_at_gt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories published after this timestamp."
+          },
+          "published_at_lt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories published before this timestamp."
+          },
+          "published_at_gte": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories published on or after this timestamp."
+          },
+          "published_at_lte": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories published on or before this timestamp."
+          },
+          "updated_at_gt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories updated after this timestamp."
+          },
+          "updated_at_lt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return stories updated before this timestamp."
+          },
+          "excluding_fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated content field names to exclude."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Storyblok stories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story name."
+                },
+                "published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Latest publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Latest publication timestamp."
+                },
+                "first_published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "First publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "First publication timestamp."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Story creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest story update timestamp.",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "Story ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story UUID.",
+                  "format": "uuid"
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Storyblok component technical name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Storyblok story content object shaped by the space's component schema."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story slug."
+                },
+                "full_slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story full slug."
+                },
+                "sort_by_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date configured for sorting the story."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date configured for sorting the story."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "tag_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Story tag name."
+                  },
+                  "description": "Story tag names."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "parent_id": {
+                  "type": "integer",
+                  "description": "Parent folder ID."
+                },
+                "meta_data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Story metadata object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story metadata object."
+                },
+                "group_id": {
+                  "type": "string",
+                  "description": "Story group UUID shared between alternates.",
+                  "format": "uuid"
+                },
+                "release_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Release ID when requested from a release."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Release ID when requested from a release."
+                },
+                "lang": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story language code."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Story alternate object."
+                  },
+                  "description": "Alternate stories for this story."
+                },
+                "default_full_slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Default-language full slug."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Default-language full slug."
+                },
+                "translated_slugs": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Story translated slug object."
+                      },
+                      "description": "Translated slug objects."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Translated slug objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok story object."
+            },
+            "description": "Stories returned for the current page."
+          },
+          "rels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story name."
+                },
+                "published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Latest publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Latest publication timestamp."
+                },
+                "first_published_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "First publication timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "First publication timestamp."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Story creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest story update timestamp.",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "Story ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story UUID.",
+                  "format": "uuid"
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Storyblok component technical name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Storyblok story content object shaped by the space's component schema."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story slug."
+                },
+                "full_slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story full slug."
+                },
+                "sort_by_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Date configured for sorting the story."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Date configured for sorting the story."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "tag_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Story tag name."
+                  },
+                  "description": "Story tag names."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "parent_id": {
+                  "type": "integer",
+                  "description": "Parent folder ID."
+                },
+                "meta_data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Story metadata object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story metadata object."
+                },
+                "group_id": {
+                  "type": "string",
+                  "description": "Story group UUID shared between alternates.",
+                  "format": "uuid"
+                },
+                "release_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Release ID when requested from a release."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Release ID when requested from a release."
+                },
+                "lang": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story language code."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Story alternate object."
+                  },
+                  "description": "Alternate stories for this story."
+                },
+                "default_full_slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Default-language full slug."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Default-language full slug."
+                },
+                "translated_slugs": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Story translated slug object."
+                      },
+                      "description": "Translated slug objects."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Translated slug objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok story object."
+            },
+            "description": "Resolved story objects."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Story or folder ID."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "Story or folder UUID.",
+                  "format": "uuid"
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder full slug."
+                },
+                "path": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Story real path."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Story real path."
+                },
+                "parent_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Parent folder ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent folder ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Story or folder name."
+                },
+                "is_folder": {
+                  "type": "boolean",
+                  "description": "Whether the object is a folder."
+                },
+                "published": {
+                  "type": "boolean",
+                  "description": "Whether the story is published."
+                },
+                "is_startpage": {
+                  "type": "boolean",
+                  "description": "Whether the story is the start page for a folder."
+                },
+                "position": {
+                  "type": "integer",
+                  "description": "Story position in its folder."
+                },
+                "real_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Resolved real path with a leading slash."
+                },
+                "published_at": {
+                  "type": "string",
+                  "description": "Latest publication timestamp.",
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Latest update timestamp.",
+                  "format": "date-time"
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Link alternate object."
+                  },
+                  "description": "Alternate link objects."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok link object."
+            },
+            "description": "Resolved link objects."
+          },
+          "rel_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Story UUID.",
+              "format": "uuid"
+            },
+            "description": "Referenced story UUIDs that exceeded the resolution limit."
+          },
+          "link_uuids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Story UUID.",
+              "format": "uuid"
+            },
+            "description": "Linked story UUIDs that exceeded the resolution limit."
+          },
+          "cv": {
+            "type": "integer",
+            "description": "Storyblok cache version timestamp."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total number of matching items reported by Storyblok."
+              },
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of items per page reported by Storyblok."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata derived from Storyblok response headers."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "stories"
+        ],
+        "description": "Storyblok stories collection response."
+      }
+    },
+    {
+      "id": "storyblok.list_tags",
+      "service": "storyblok",
+      "name": "list_tags",
+      "description": "List Storyblok tags assigned to stories in the current space.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "starts_with": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return tags assigned to stories whose full_slug starts with this value."
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Storyblok content version to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Storyblok tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Tag name."
+                },
+                "taggings_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of stories assigned to the tag."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Storyblok tag object."
+            },
+            "description": "Tags returned by Storyblok."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "tags"
+        ],
+        "description": "Storyblok tags response."
+      }
+    }
+  ]
+}

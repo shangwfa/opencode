@@ -1,0 +1,1546 @@
+{
+  "service": "softr",
+  "displayName": "Softr",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "softr_personal_access_token",
+      "description": "Softr Personal Access Token used with the Softr-Api-Key header. Generate it in the Softr dashboard under My account > API Settings: https://docs.softr.io/softr-api/api-setup-and-endpoints.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.softr.io/",
+  "actions": [
+    {
+      "id": "softr.create_record",
+      "service": "softr",
+      "name": "create_record",
+      "description": "Create one record in a Softr table.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A value accepted by the configured Softr field type."
+            },
+            "description": "Record values keyed by Softr field ID or field name."
+          },
+          "fieldNames": {
+            "type": "boolean",
+            "description": "Whether response field keys should use field names instead of field IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId",
+          "fields"
+        ],
+        "description": "Input for creating a Softr record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The record ID."
+              },
+              "tableId": {
+                "type": "string",
+                "description": "The table ID that owns the record."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A value accepted by the configured Softr field type."
+                },
+                "description": "Record values keyed by Softr field ID or field name."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The record creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The record update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "A Softr table record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "The created Softr record."
+      },
+      "followUpActions": [
+        "softr.get_record"
+      ]
+    },
+    {
+      "id": "softr.delete_record",
+      "service": "softr",
+      "name": "delete_record",
+      "description": "Permanently delete one Softr table record by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId",
+          "recordId"
+        ],
+        "description": "Input for deleting one Softr record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the record deletion request completed successfully."
+          },
+          "recordId": {
+            "type": "string",
+            "description": "The deleted record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "recordId"
+        ],
+        "description": "Softr record deletion acknowledgement."
+      }
+    },
+    {
+      "id": "softr.get_database",
+      "service": "softr",
+      "name": "get_database",
+      "description": "Get one Softr database by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId"
+        ],
+        "description": "Input identifying one Softr database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The database ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The database name."
+              },
+              "workspaceId": {
+                "type": "string",
+                "description": "The workspace ID that owns the database."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional resource description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional resource description."
+              },
+              "tablesCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of tables in the database."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The database creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The database update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "workspaceId"
+            ],
+            "description": "A Softr database."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "database"
+        ],
+        "description": "A single Softr database result."
+      },
+      "followUpActions": [
+        "softr.list_tables"
+      ]
+    },
+    {
+      "id": "softr.get_record",
+      "service": "softr",
+      "name": "get_record",
+      "description": "Get one Softr table record by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr record ID."
+          },
+          "fieldNames": {
+            "type": "boolean",
+            "description": "Whether response field keys should use field names instead of field IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId",
+          "recordId"
+        ],
+        "description": "Input identifying one Softr table record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The record ID."
+              },
+              "tableId": {
+                "type": "string",
+                "description": "The table ID that owns the record."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A value accepted by the configured Softr field type."
+                },
+                "description": "Record values keyed by Softr field ID or field name."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The record creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The record update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "A Softr table record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "A single Softr record result."
+      },
+      "followUpActions": [
+        "softr.update_record",
+        "softr.delete_record"
+      ]
+    },
+    {
+      "id": "softr.get_table",
+      "service": "softr",
+      "name": "get_table",
+      "description": "Get one Softr table and its field definitions by database ID and table ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId"
+        ],
+        "description": "Input identifying one Softr database table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The table ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The table name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional resource description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional resource description."
+              },
+              "primaryFieldId": {
+                "type": "string",
+                "description": "The table's primary field ID."
+              },
+              "defaultViewId": {
+                "type": "string",
+                "description": "The table's default view ID."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The field ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The field name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The Softr field type."
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The optional resource description."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The optional resource description."
+                    },
+                    "options": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Provider-defined configuration for this field type."
+                    },
+                    "allowMultipleEntries": {
+                      "type": "boolean",
+                      "description": "Whether the field accepts multiple values or linked entries."
+                    },
+                    "readonly": {
+                      "type": "boolean",
+                      "description": "Whether the field is read-only."
+                    },
+                    "required": {
+                      "type": "boolean",
+                      "description": "Whether the field requires a value."
+                    },
+                    "locked": {
+                      "type": "boolean",
+                      "description": "Whether the field configuration is locked."
+                    },
+                    "defaultValue": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The field's default value when one is configured."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The field's default value when one is configured."
+                    },
+                    "aiOptions": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "AI-powered auto-fill configuration for the field."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "AI-powered auto-fill configuration for the field."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The field creation timestamp.",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "The field update timestamp.",
+                      "format": "date-time"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "name",
+                    "type"
+                  ],
+                  "description": "A Softr table field definition."
+                },
+                "description": "Field definitions in the table."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The table creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The table update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A Softr database table."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table"
+        ],
+        "description": "A single Softr table result."
+      },
+      "followUpActions": [
+        "softr.list_records",
+        "softr.get_table_field"
+      ]
+    },
+    {
+      "id": "softr.get_table_field",
+      "service": "softr",
+      "name": "get_table_field",
+      "description": "Get one Softr table field definition by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "fieldId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table field ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId",
+          "fieldId"
+        ],
+        "description": "Input identifying one Softr table field."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The field ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The field name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The Softr field type."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional resource description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional resource description."
+              },
+              "options": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-defined configuration for this field type."
+              },
+              "allowMultipleEntries": {
+                "type": "boolean",
+                "description": "Whether the field accepts multiple values or linked entries."
+              },
+              "readonly": {
+                "type": "boolean",
+                "description": "Whether the field is read-only."
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Whether the field requires a value."
+              },
+              "locked": {
+                "type": "boolean",
+                "description": "Whether the field configuration is locked."
+              },
+              "defaultValue": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The field's default value when one is configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The field's default value when one is configured."
+              },
+              "aiOptions": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "AI-powered auto-fill configuration for the field."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "AI-powered auto-fill configuration for the field."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The field creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The field update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "type"
+            ],
+            "description": "A Softr table field definition."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "field"
+        ],
+        "description": "A single Softr table field result."
+      }
+    },
+    {
+      "id": "softr.list_databases",
+      "service": "softr",
+      "name": "list_databases",
+      "description": "List the Softr databases accessible to the connected Personal Access Token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing accessible Softr databases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "databases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The database ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The database name."
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "description": "The workspace ID that owns the database."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional resource description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional resource description."
+                },
+                "tablesCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of tables in the database."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The database creation timestamp.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The database update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "workspaceId"
+              ],
+              "description": "A Softr database."
+            },
+            "description": "Databases accessible to the connected token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databases"
+        ],
+        "description": "Accessible Softr databases."
+      },
+      "followUpActions": [
+        "softr.list_tables"
+      ]
+    },
+    {
+      "id": "softr.list_records",
+      "service": "softr",
+      "name": "list_records",
+      "description": "List a paginated page of records from one Softr table, optionally filtered by a table view.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records to return, from 1 to 200."
+          },
+          "fieldNames": {
+            "type": "boolean",
+            "description": "Whether response field keys should use field names instead of field IDs."
+          },
+          "viewId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table view ID used to filter the records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId"
+        ],
+        "description": "Input for listing Softr records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The record ID."
+                },
+                "tableId": {
+                  "type": "string",
+                  "description": "The table ID that owns the record."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A value accepted by the configured Softr field type."
+                  },
+                  "description": "Record values keyed by Softr field ID or field name."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The record creation timestamp.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The record update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "A Softr table record."
+            },
+            "description": "The records returned in this page."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records skipped."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of records returned in this page."
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "offset",
+              "limit",
+              "total"
+            ],
+            "description": "Softr pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "metadata"
+        ],
+        "description": "A paginated Softr record result."
+      },
+      "followUpActions": [
+        "softr.get_record",
+        "softr.search_records"
+      ]
+    },
+    {
+      "id": "softr.list_table_views",
+      "service": "softr",
+      "name": "list_table_views",
+      "description": "List the configured views for one Softr table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId"
+        ],
+        "description": "Input identifying one Softr database table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The table view ID."
+                },
+                "tableId": {
+                  "type": "string",
+                  "description": "The table ID that owns the view."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The table view name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional resource description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional resource description."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The table view creation timestamp.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The table view update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "tableId",
+                "name"
+              ],
+              "description": "A Softr table view."
+            },
+            "description": "Table views returned by Softr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "views"
+        ],
+        "description": "Views configured for a Softr table."
+      },
+      "followUpActions": [
+        "softr.list_records"
+      ]
+    },
+    {
+      "id": "softr.list_tables",
+      "service": "softr",
+      "name": "list_tables",
+      "description": "List all tables in a Softr database, including their field definitions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId"
+        ],
+        "description": "Input identifying one Softr database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The table ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The table name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional resource description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional resource description."
+                },
+                "primaryFieldId": {
+                  "type": "string",
+                  "description": "The table's primary field ID."
+                },
+                "defaultViewId": {
+                  "type": "string",
+                  "description": "The table's default view ID."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The field ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The field name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The Softr field type."
+                      },
+                      "description": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The optional resource description."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The optional resource description."
+                      },
+                      "options": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Provider-defined configuration for this field type."
+                      },
+                      "allowMultipleEntries": {
+                        "type": "boolean",
+                        "description": "Whether the field accepts multiple values or linked entries."
+                      },
+                      "readonly": {
+                        "type": "boolean",
+                        "description": "Whether the field is read-only."
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "Whether the field requires a value."
+                      },
+                      "locked": {
+                        "type": "boolean",
+                        "description": "Whether the field configuration is locked."
+                      },
+                      "defaultValue": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The field's default value when one is configured."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The field's default value when one is configured."
+                      },
+                      "aiOptions": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": true,
+                            "description": "AI-powered auto-fill configuration for the field."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "AI-powered auto-fill configuration for the field."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "The field creation timestamp.",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "description": "The field update timestamp.",
+                        "format": "date-time"
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "type"
+                    ],
+                    "description": "A Softr table field definition."
+                  },
+                  "description": "Field definitions in the table."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The table creation timestamp.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The table update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Softr database table."
+            },
+            "description": "Tables returned by Softr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tables"
+        ],
+        "description": "Tables in a Softr database."
+      },
+      "followUpActions": [
+        "softr.list_records",
+        "softr.list_table_views"
+      ]
+    },
+    {
+      "id": "softr.search_records",
+      "service": "softr",
+      "name": "search_records",
+      "description": "Search records in one Softr table using optional filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "fieldNames": {
+            "type": "boolean",
+            "description": "Whether response field keys should use field names instead of field IDs."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "object",
+                "properties": {
+                  "operator": {
+                    "type": "string",
+                    "enum": [
+                      "AND",
+                      "OR",
+                      "IS_EMPTY",
+                      "IS_NOT_EMPTY",
+                      "IS_BETWEEN",
+                      "IS_NOT_BETWEEN",
+                      "IS_WITHIN",
+                      "IS_NOT_WITHIN",
+                      "IS",
+                      "IS_NOT",
+                      "GREATER_THAN",
+                      "GREATER_THAN_OR_EQUALS",
+                      "LESS_THAN",
+                      "LESS_THAN_OR_EQUALS",
+                      "CONTAINS",
+                      "DOES_NOT_CONTAIN",
+                      "STARTS_WITH",
+                      "DOES_NOT_START_WITH",
+                      "ENDS_WITH",
+                      "DOES_NOT_END_WITH",
+                      "IS_ONE_OF",
+                      "IS_NOT_ONE_OF",
+                      "HAS_ANY_OF",
+                      "HAS_ALL_OF",
+                      "HAS_NONE_OF"
+                    ],
+                    "description": "The filter condition operator."
+                  },
+                  "leftSide": {
+                    "type": "string",
+                    "description": "The field ID to which the condition applies."
+                  },
+                  "rightSide": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string comparison value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric comparison value."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "A boolean comparison value."
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A string comparison value."
+                        },
+                        "description": "A list of string comparison values."
+                      }
+                    ],
+                    "description": "The scalar or string-array value to compare with the selected field."
+                  },
+                  "lowerBound": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string or date lower bound."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric lower bound."
+                      }
+                    ],
+                    "description": "The lower bound for a between condition."
+                  },
+                  "upperBound": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string or date upper bound."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric upper bound."
+                      }
+                    ],
+                    "description": "The upper bound for a between condition."
+                  },
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A nested Softr record filter condition."
+                    },
+                    "description": "Nested conditions used by AND or OR operators."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Softr record filter condition."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "condition"
+            ],
+            "description": "The filter applied to the search."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sortingField": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The field ID used for sorting."
+                },
+                "sortType": {
+                  "type": "string",
+                  "enum": [
+                    "ASC",
+                    "DESC"
+                  ],
+                  "description": "The sort direction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "sortingField",
+                "sortType"
+              ],
+              "description": "A Softr record sort rule."
+            },
+            "description": "Sort rules applied in order."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of matching records to skip."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200,
+                "description": "The number of matching records to return, from 1 to 200."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination controls for the search."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId"
+        ],
+        "description": "Input for searching Softr records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The record ID."
+                },
+                "tableId": {
+                  "type": "string",
+                  "description": "The table ID that owns the record."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A value accepted by the configured Softr field type."
+                  },
+                  "description": "Record values keyed by Softr field ID or field name."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The record creation timestamp.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The record update timestamp.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "A Softr table record."
+            },
+            "description": "The records returned in this page."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records skipped."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of records returned in this page."
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "offset",
+              "limit",
+              "total"
+            ],
+            "description": "Softr pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records",
+          "metadata"
+        ],
+        "description": "A paginated Softr record result."
+      },
+      "followUpActions": [
+        "softr.get_record"
+      ]
+    },
+    {
+      "id": "softr.update_record",
+      "service": "softr",
+      "name": "update_record",
+      "description": "Partially update the supplied fields of one Softr table record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr database ID."
+          },
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr table ID."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A value accepted by the configured Softr field type."
+            },
+            "description": "Record values keyed by Softr field ID or field name."
+          },
+          "fieldNames": {
+            "type": "boolean",
+            "description": "Whether response field keys should use field names instead of field IDs."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Softr record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "tableId",
+          "recordId",
+          "fields"
+        ],
+        "description": "Input for updating a Softr record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The record ID."
+              },
+              "tableId": {
+                "type": "string",
+                "description": "The table ID that owns the record."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A value accepted by the configured Softr field type."
+                },
+                "description": "Record values keyed by Softr field ID or field name."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The record creation timestamp.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The record update timestamp.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "A Softr table record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "record"
+        ],
+        "description": "The updated Softr record."
+      },
+      "followUpActions": [
+        "softr.get_record"
+      ]
+    }
+  ]
+}

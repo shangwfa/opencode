@@ -1,0 +1,536 @@
+{
+  "service": "jumpserver",
+  "displayName": "JumpServer",
+  "description": "Inspect assets, nodes, accounts, users, permissions, and sessions through an official JumpServer MCP server.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure",
+    "Security"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "mcpEndpoint",
+          "label": "MCP SSE Endpoint",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://jumpserver-mcp.example.com/sse",
+          "description": "The SSE endpoint exposed by the official jumpserver/mcp server. Its default path is /sse. Public HTTPS endpoints are supported by default. Private-network, Tailscale, and NetBird endpoints require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK. Loopback endpoints remain blocked. See https://github.com/jumpserver/mcp."
+        },
+        {
+          "key": "token",
+          "label": "JumpServer Bearer Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Enter the JumpServer API token",
+          "description": "A JumpServer API Bearer token forwarded by jumpserver/mcp to the JumpServer API. If the MCP server enables api_key, configure it to accept this same token."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.jumpserver.org",
+  "actions": [
+    {
+      "id": "jumpserver.accounts_accounts_list",
+      "service": "jumpserver",
+      "name": "accounts_accounts_list",
+      "description": "List managed accounts visible to the configured JumpServer token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer managed accounts record."
+            },
+            "description": "Matching JumpServer managed accounts."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer managed accounts."
+      },
+      "followUpActions": [
+        "jumpserver.assets_assets_list"
+      ]
+    },
+    {
+      "id": "jumpserver.assets_assets_list",
+      "service": "jumpserver",
+      "name": "assets_assets_list",
+      "description": "List assets visible to the configured JumpServer token, with optional pagination and search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer assets record."
+            },
+            "description": "Matching JumpServer assets."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer assets."
+      },
+      "followUpActions": [
+        "jumpserver.assets_nodes_list",
+        "jumpserver.accounts_accounts_list"
+      ]
+    },
+    {
+      "id": "jumpserver.assets_nodes_list",
+      "service": "jumpserver",
+      "name": "assets_nodes_list",
+      "description": "List asset nodes visible to the configured JumpServer token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer asset nodes record."
+            },
+            "description": "Matching JumpServer asset nodes."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer asset nodes."
+      },
+      "followUpActions": [
+        "jumpserver.assets_assets_list"
+      ]
+    },
+    {
+      "id": "jumpserver.perms_asset_permissions_list",
+      "service": "jumpserver",
+      "name": "perms_asset_permissions_list",
+      "description": "List asset permission rules visible to the configured JumpServer token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer asset permission rules record."
+            },
+            "description": "Matching JumpServer asset permission rules."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer asset permission rules."
+      },
+      "followUpActions": [
+        "jumpserver.assets_assets_list",
+        "jumpserver.users_users_list"
+      ]
+    },
+    {
+      "id": "jumpserver.terminal_sessions_list",
+      "service": "jumpserver",
+      "name": "terminal_sessions_list",
+      "description": "List historical and active terminal sessions visible to the configured JumpServer token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer terminal sessions record."
+            },
+            "description": "Matching JumpServer terminal sessions."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer terminal sessions."
+      },
+      "followUpActions": [
+        "jumpserver.assets_assets_list",
+        "jumpserver.users_users_list"
+      ]
+    },
+    {
+      "id": "jumpserver.users_users_list",
+      "service": "jumpserver",
+      "name": "users_users_list",
+      "description": "List JumpServer users visible to the configured token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip before returning results."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text applied to fields supported by this JumpServer resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common JumpServer list filters. Availability of matching records depends on the Bearer token permissions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the next page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the next page when one exists."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL for the previous page when one exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL for the previous page when one exists."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "One JumpServer users record."
+            },
+            "description": "Matching JumpServer users."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "count",
+          "results"
+        ],
+        "description": "A paginated list of JumpServer users."
+      },
+      "followUpActions": [
+        "jumpserver.perms_asset_permissions_list"
+      ]
+    }
+  ]
+}

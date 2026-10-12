@@ -1,0 +1,1029 @@
+{
+  "service": "render",
+  "displayName": "Render",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "render_api_key",
+      "description": "Render API key used with the Authorization Bearer header. Create and manage it from Account Settings in the Render Dashboard: https://render.com/docs/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://render.com",
+  "actions": [
+    {
+      "id": "render.get_current_user",
+      "service": "render",
+      "name": "get_current_user",
+      "description": "Get the currently authenticated Render user profile.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address of the authenticated Render user.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the authenticated Render user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Render user."
+      },
+      "followUpActions": [
+        "render.list_workspaces"
+      ]
+    },
+    {
+      "id": "render.get_service",
+      "service": "render",
+      "name": "get_service",
+      "description": "Get Render service details by service ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the service."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the service."
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Workspace ID that owns the service."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "static_site",
+              "web_service",
+              "private_service",
+              "background_worker",
+              "cron_job"
+            ],
+            "description": "Type of service on Render."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "dashboardUrl": {
+            "type": "string",
+            "description": "Dashboard URL for the service."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "suspended": {
+            "type": "string",
+            "enum": [
+              "suspended",
+              "not_suspended"
+            ],
+            "description": "Suspension state reported by Render."
+          },
+          "suspenders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "billing",
+                "user",
+                "parent_service",
+                "stuck_crashlooping",
+                "hipaa_enablement",
+                "unknown"
+              ],
+              "description": "Reason why the service is suspended."
+            },
+            "description": "Suspension reasons reported for the service."
+          },
+          "autoDeploy": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "description": "Whether Render auto-deploys changes for the service."
+          },
+          "notifyOnFail": {
+            "type": "string",
+            "enum": [
+              "default",
+              "notify",
+              "ignore"
+            ],
+            "description": "Notification setting when a deploy fails."
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-friendly slug of the service."
+          },
+          "serviceDetails": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Render."
+          },
+          "rootDir": {
+            "type": "string",
+            "description": "Repository root directory configured for the service."
+          },
+          "branch": {
+            "type": "string",
+            "description": "Git branch used by the service, when present."
+          },
+          "buildFilter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Render."
+          },
+          "environmentId": {
+            "type": "string",
+            "description": "Environment ID attached to the service, when present."
+          },
+          "imagePath": {
+            "type": "string",
+            "description": "Docker image path used by the service, when present."
+          },
+          "registryCredential": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Render."
+          },
+          "repo": {
+            "type": "string",
+            "description": "Source repository URL for the service, when present."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Render service."
+      },
+      "followUpActions": [
+        "render.list_deploys",
+        "render.restart_service",
+        "render.suspend_service",
+        "render.resume_service"
+      ]
+    },
+    {
+      "id": "render.list_deploys",
+      "service": "render",
+      "name": "list_deploys",
+      "description": "List recent Render deploys for a service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "created",
+                "queued",
+                "build_in_progress",
+                "update_in_progress",
+                "live",
+                "deactivated",
+                "build_failed",
+                "update_failed",
+                "canceled",
+                "pre_deploy_in_progress",
+                "pre_deploy_failed"
+              ],
+              "description": "Deploy status reported by Render."
+            },
+            "description": "Only return deploys with these statuses.",
+            "minItems": 1
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by a previous Render response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deploys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the deploy."
+                },
+                "commit": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Object returned by Render."
+                },
+                "image": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Object returned by Render."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "queued",
+                    "build_in_progress",
+                    "update_in_progress",
+                    "live",
+                    "deactivated",
+                    "build_failed",
+                    "update_failed",
+                    "canceled",
+                    "pre_deploy_in_progress",
+                    "pre_deploy_failed"
+                  ],
+                  "description": "Deploy status reported by Render."
+                },
+                "trigger": {
+                  "type": "string",
+                  "description": "Event that triggered the deploy."
+                },
+                "startedAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "finishedAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Render deploy."
+            },
+            "description": "Deploys returned by Render."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page of deploys, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page of deploys, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Render deploy list."
+      }
+    },
+    {
+      "id": "render.list_services",
+      "service": "render",
+      "name": "list_services",
+      "description": "List Render services with optional workspace, type, and suspension filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only return resources with one of these exact names.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "static_site",
+                "web_service",
+                "private_service",
+                "background_worker",
+                "cron_job"
+              ],
+              "description": "Type of service on Render."
+            },
+            "description": "Only return services with these types.",
+            "minItems": 1
+          },
+          "ownerId": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only return resources for one of these workspace IDs.",
+            "minItems": 1
+          },
+          "suspended": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "suspended",
+                "not_suspended"
+              ],
+              "description": "Suspension state reported by Render."
+            },
+            "description": "Only return services in one of these suspension states.",
+            "minItems": 1
+          },
+          "includePreviews": {
+            "type": "boolean",
+            "description": "Whether preview services should be included in the response."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by a previous Render response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the service."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the service."
+                },
+                "ownerId": {
+                  "type": "string",
+                  "description": "Workspace ID that owns the service."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "static_site",
+                    "web_service",
+                    "private_service",
+                    "background_worker",
+                    "cron_job"
+                  ],
+                  "description": "Type of service on Render."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "dashboardUrl": {
+                  "type": "string",
+                  "description": "Dashboard URL for the service."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp in ISO 8601 format."
+                },
+                "suspended": {
+                  "type": "string",
+                  "enum": [
+                    "suspended",
+                    "not_suspended"
+                  ],
+                  "description": "Suspension state reported by Render."
+                },
+                "suspenders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "billing",
+                      "user",
+                      "parent_service",
+                      "stuck_crashlooping",
+                      "hipaa_enablement",
+                      "unknown"
+                    ],
+                    "description": "Reason why the service is suspended."
+                  },
+                  "description": "Suspension reasons reported for the service."
+                },
+                "autoDeploy": {
+                  "type": "string",
+                  "enum": [
+                    "yes",
+                    "no"
+                  ],
+                  "description": "Whether Render auto-deploys changes for the service."
+                },
+                "notifyOnFail": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "notify",
+                    "ignore"
+                  ],
+                  "description": "Notification setting when a deploy fails."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "URL-friendly slug of the service."
+                },
+                "serviceDetails": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Object returned by Render."
+                },
+                "rootDir": {
+                  "type": "string",
+                  "description": "Repository root directory configured for the service."
+                },
+                "branch": {
+                  "type": "string",
+                  "description": "Git branch used by the service, when present."
+                },
+                "buildFilter": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Object returned by Render."
+                },
+                "environmentId": {
+                  "type": "string",
+                  "description": "Environment ID attached to the service, when present."
+                },
+                "imagePath": {
+                  "type": "string",
+                  "description": "Docker image path used by the service, when present."
+                },
+                "registryCredential": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Object returned by Render."
+                },
+                "repo": {
+                  "type": "string",
+                  "description": "Source repository URL for the service, when present."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Render service."
+            },
+            "description": "Services returned by Render."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page of services, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page of services, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Render service list."
+      }
+    },
+    {
+      "id": "render.list_workspaces",
+      "service": "render",
+      "name": "list_workspaces",
+      "description": "List Render workspaces available to the authenticated API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only return resources with one of these exact names.",
+            "minItems": 1
+          },
+          "email": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Workspace owner email.",
+              "format": "email"
+            },
+            "description": "Only return workspaces owned by one of these email addresses.",
+            "minItems": 1
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by a previous Render response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the workspace."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Workspace display name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Primary email address of the workspace.",
+                  "format": "email"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "team"
+                  ],
+                  "description": "Workspace type."
+                },
+                "ipAllowList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Object returned by Render."
+                  },
+                  "description": "IP allow list entries configured for the workspace, when present."
+                },
+                "twoFactorAuthEnabled": {
+                  "type": "boolean",
+                  "description": "Whether two-factor authentication is enabled for the workspace owner."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Render workspace."
+            },
+            "description": "Workspaces returned by Render."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Cursor for the next page of workspaces, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cursor for the next page of workspaces, or null when there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Render workspace list."
+      }
+    },
+    {
+      "id": "render.restart_service",
+      "service": "render",
+      "name": "restart_service",
+      "description": "Restart a Render service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the lifecycle operation request was accepted."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "restart",
+              "suspend",
+              "resume"
+            ],
+            "description": "Lifecycle action requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Acknowledgement for a Render lifecycle operation."
+      }
+    },
+    {
+      "id": "render.resume_service",
+      "service": "render",
+      "name": "resume_service",
+      "description": "Resume a suspended Render service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the lifecycle operation request was accepted."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "restart",
+              "suspend",
+              "resume"
+            ],
+            "description": "Lifecycle action requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Acknowledgement for a Render lifecycle operation."
+      }
+    },
+    {
+      "id": "render.rollback_deploy",
+      "service": "render",
+      "name": "rollback_deploy",
+      "description": "Trigger a rollback to a previous deploy for a Render service.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "deployId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render deploy."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier of the deploy."
+          },
+          "commit": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Render."
+          },
+          "image": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Render."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "queued",
+              "build_in_progress",
+              "update_in_progress",
+              "live",
+              "deactivated",
+              "build_failed",
+              "update_failed",
+              "canceled",
+              "pre_deploy_in_progress",
+              "pre_deploy_failed"
+            ],
+            "description": "Deploy status reported by Render."
+          },
+          "trigger": {
+            "type": "string",
+            "description": "Event that triggered the deploy."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Timestamp in ISO 8601 format."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Render deploy."
+      }
+    },
+    {
+      "id": "render.suspend_service",
+      "service": "render",
+      "name": "suspend_service",
+      "description": "Suspend a Render service.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the lifecycle operation request was accepted."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "restart",
+              "suspend",
+              "resume"
+            ],
+            "description": "Lifecycle action requested."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Acknowledgement for a Render lifecycle operation."
+      }
+    },
+    {
+      "id": "render.trigger_deploy",
+      "service": "render",
+      "name": "trigger_deploy",
+      "description": "Trigger a new deploy for a Render service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Render service."
+          },
+          "clearCache": {
+            "type": "boolean",
+            "description": "Whether Render should clear the build cache before deploying."
+          },
+          "commitId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Specific Git commit SHA to deploy instead of the latest commit."
+          },
+          "imageUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Image URL to deploy for an image-backed service."
+          },
+          "deployMode": {
+            "type": "string",
+            "enum": [
+              "deploy_only",
+              "build_and_deploy"
+            ],
+            "description": "Deployment behavior to use when triggering a deploy."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceId"
+        ],
+        "description": "Input for triggering a Render deploy. deployMode cannot be combined with commitId, imageUrl, or clearCache."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the deploy."
+              },
+              "commit": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Object returned by Render."
+              },
+              "image": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Object returned by Render."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "queued",
+                  "build_in_progress",
+                  "update_in_progress",
+                  "live",
+                  "deactivated",
+                  "build_failed",
+                  "update_failed",
+                  "canceled",
+                  "pre_deploy_in_progress",
+                  "pre_deploy_failed"
+                ],
+                "description": "Deploy status reported by Render."
+              },
+              "trigger": {
+                "type": "string",
+                "description": "Event that triggered the deploy."
+              },
+              "startedAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              },
+              "finishedAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Timestamp in ISO 8601 format."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Render deploy."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "queued": {
+                "type": "boolean",
+                "description": "Whether the deploy request was accepted and queued."
+              },
+              "serviceId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the Render service."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Acknowledgement for a queued Render deploy request."
+          }
+        ]
+      }
+    }
+  ]
+}

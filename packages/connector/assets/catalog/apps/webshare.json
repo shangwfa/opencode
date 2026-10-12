@@ -1,0 +1,549 @@
+{
+  "service": "webshare",
+  "displayName": "Webshare",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "webshare_api_key",
+      "description": "Webshare API key used with the Authorization: Token header. Create or view API keys in the Webshare dashboard at https://dashboard.webshare.io/userapi/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.webshare.io/",
+  "actions": [
+    {
+      "id": "webshare.get_profile",
+      "service": "webshare",
+      "name": "get_profile",
+      "description": "Get the Webshare account profile for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the Webshare profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Webshare user ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The email address of the Webshare user.",
+                "format": "email"
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's first name."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's last name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's last name."
+              },
+              "last_login": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "When the user last logged in.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When the user last logged in."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's configured timezone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's configured timezone."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Webshare user profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "profile"
+        ],
+        "description": "The response returned when retrieving a Webshare profile."
+      }
+    },
+    {
+      "id": "webshare.get_proxy_config",
+      "service": "webshare",
+      "name": "get_proxy_config",
+      "description": "Get the Webshare proxy configuration for a plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Webshare plan ID whose proxy config should be returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "planId"
+        ],
+        "description": "The input payload for retrieving proxy config."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "proxyConfig": {
+            "type": "object",
+            "properties": {
+              "request_timeout": {
+                "type": "integer",
+                "description": "The request timeout in seconds."
+              },
+              "request_idle_timeout": {
+                "type": "integer",
+                "description": "The request idle timeout in seconds."
+              },
+              "ip_authorization_country_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A two-letter country code."
+                },
+                "description": "Country codes enabled for IP authorization."
+              },
+              "ip_authorization_city": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The city enabled for IP authorization."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The city enabled for IP authorization."
+              },
+              "auto_replace_invalid_proxies": {
+                "type": "boolean",
+                "description": "Whether invalid proxies are automatically replaced."
+              },
+              "auto_replace_low_country_confidence_proxies": {
+                "type": "boolean",
+                "description": "Whether proxies with low country confidence are automatically replaced."
+              },
+              "auto_replace_out_of_rotation_proxies": {
+                "type": "boolean",
+                "description": "Whether out-of-rotation proxies are automatically replaced."
+              },
+              "auto_replace_failed_site_check_proxies": {
+                "type": "boolean",
+                "description": "Whether proxies that fail site checks are automatically replaced."
+              },
+              "proxy_list_download_token": {
+                "type": "string",
+                "description": "The token used by Webshare proxy-list download URLs."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Webshare proxy configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "proxyConfig"
+        ],
+        "description": "The response returned when retrieving Webshare proxy config."
+      }
+    },
+    {
+      "id": "webshare.list_proxies",
+      "service": "webshare",
+      "name": "list_proxies",
+      "description": "List Webshare proxies with official mode, pagination, and filter options.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "backbone"
+            ],
+            "description": "The Webshare proxy list mode."
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Webshare plan ID to target. When omitted, Webshare uses the default plan."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of proxies to return per page."
+          },
+          "country_code__in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated country codes used to filter proxies."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search phrase used to filter direct-mode proxies."
+          },
+          "ordering": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated ordering fields such as -valid,proxy_address."
+          },
+          "created_at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Proxy creation date filter accepted by Webshare."
+          },
+          "proxy_address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A specific proxy address to filter by."
+          },
+          "proxy_address__in": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated proxy addresses to filter by."
+          },
+          "valid": {
+            "type": "boolean",
+            "description": "Filter proxies by validity."
+          },
+          "asn_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ASN number used to filter direct-mode proxies."
+          },
+          "asn_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ASN name used to filter direct-mode proxies."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Webshare proxies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of proxies matching the query."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page URL returned by Webshare."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page URL returned by Webshare."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The previous page URL returned by Webshare."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The previous page URL returned by Webshare."
+          },
+          "proxies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Webshare proxy ID."
+                },
+                "username": {
+                  "type": "string",
+                  "description": "The username used to authenticate with this proxy."
+                },
+                "password": {
+                  "type": "string",
+                  "description": "The password used to authenticate with this proxy."
+                },
+                "proxy_address": {
+                  "type": "string",
+                  "description": "The proxy IP address or hostname."
+                },
+                "port": {
+                  "type": "integer",
+                  "description": "The proxy port."
+                },
+                "valid": {
+                  "type": "boolean",
+                  "description": "Whether Webshare currently considers the proxy valid."
+                },
+                "last_verification": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When Webshare last verified this proxy.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When Webshare last verified this proxy."
+                },
+                "country_code": {
+                  "type": "string",
+                  "description": "The two-letter proxy country code."
+                },
+                "city_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The proxy city name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The proxy city name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the proxy was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Webshare proxy server."
+            },
+            "description": "The proxies returned by Webshare."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "proxies"
+        ],
+        "description": "The normalized response returned when listing Webshare proxies."
+      }
+    },
+    {
+      "id": "webshare.list_stats",
+      "service": "webshare",
+      "name": "list_stats",
+      "description": "List Webshare hourly proxy usage stats for an optional time window.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Webshare plan ID to target. When omitted, Webshare uses the default plan."
+          },
+          "timestamp__lte": {
+            "type": "string",
+            "description": "Return stats with timestamps less than this value.",
+            "format": "date-time"
+          },
+          "timestamp__gte": {
+            "type": "string",
+            "description": "Return stats with timestamps greater than this value.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Webshare proxy stats."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "The hour represented by this stats object.",
+                  "format": "date-time"
+                },
+                "is_projected": {
+                  "type": "boolean",
+                  "description": "Whether the stats object contains projected usage."
+                },
+                "bandwidth_total": {
+                  "type": "integer",
+                  "description": "Total bandwidth used in bytes."
+                },
+                "bandwidth_average": {
+                  "type": "number",
+                  "description": "Average bandwidth used during the hour."
+                },
+                "requests_total": {
+                  "type": "integer",
+                  "description": "Total proxy requests."
+                },
+                "requests_successful": {
+                  "type": "integer",
+                  "description": "Successful proxy requests."
+                },
+                "requests_failed": {
+                  "type": "integer",
+                  "description": "Failed proxy requests."
+                },
+                "error_reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "reason": {
+                        "type": "string",
+                        "description": "The Webshare error reason identifier."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The Webshare error reason category."
+                      },
+                      "how_to_fix": {
+                        "type": "string",
+                        "description": "Webshare guidance for fixing the error."
+                      },
+                      "http_status": {
+                        "type": "integer",
+                        "description": "The HTTP status associated with the error reason."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "The number of failed requests with this reason."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Webshare stats error reason."
+                  },
+                  "description": "The error reasons reported for failed requests."
+                },
+                "countries_used": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "description": "The request count."
+                  },
+                  "description": "Request counts by country code."
+                },
+                "number_of_proxies_used": {
+                  "type": "integer",
+                  "description": "The number of proxies used during the hour."
+                },
+                "protocols_used": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "description": "The request count."
+                  },
+                  "description": "Request counts by protocol."
+                },
+                "average_concurrency": {
+                  "type": "number",
+                  "description": "The average request concurrency."
+                },
+                "average_rps": {
+                  "type": "number",
+                  "description": "The average requests per second."
+                },
+                "last_request_sent_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "When the last request was sent in this hour.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "When the last request was sent in this hour."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Webshare hourly proxy stats object."
+            },
+            "description": "The hourly proxy stats returned by Webshare."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stats"
+        ],
+        "description": "The response returned when listing Webshare proxy stats."
+      }
+    }
+  ]
+}

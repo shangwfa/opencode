@@ -1,0 +1,622 @@
+{
+  "service": "evenium",
+  "displayName": "Evenium",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "evenium_api_key",
+      "description": "Evenium API key or access token sent with the X-Evenium-Token header. Retrieve it from your Evenium profile API key settings."
+    }
+  ],
+  "homepageUrl": "https://corp.evenium.com",
+  "actions": [
+    {
+      "id": "evenium.get_event",
+      "service": "evenium",
+      "name": "get_event",
+      "description": "Get one Evenium event by event ID or external event ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium event identifier or external event ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Evenium event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium event identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The event title returned by Evenium."
+              },
+              "description": {
+                "type": "string",
+                "description": "The event description returned by Evenium."
+              },
+              "startDate": {
+                "type": "string",
+                "description": "The event start timestamp in ISO 8601 format."
+              },
+              "endDate": {
+                "type": "string",
+                "description": "The event end timestamp in ISO 8601 format."
+              },
+              "creationDate": {
+                "type": "string",
+                "description": "The event creation timestamp in ISO 8601 format."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current Evenium event status."
+              },
+              "url": {
+                "type": "string",
+                "description": "The Evenium relative event URL."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One Evenium event field entry."
+                },
+                "description": "Additional event field entries returned by Evenium."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Evenium event returned by the organizer API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium event lookup response."
+      }
+    },
+    {
+      "id": "evenium.get_guest",
+      "service": "evenium",
+      "name": "get_guest",
+      "description": "Get one Evenium guest by contact ID or guest code for a given event.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium event identifier or external event ID."
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium contact identifier or external contact ID."
+          },
+          "guestCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium guest code."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REGISTRATION",
+                "PRESENCE",
+                "SIGNATURE"
+              ],
+              "description": "One guest expansion field name accepted by Evenium."
+            },
+            "description": "Optional guest sub-resources to expand on guest responses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Input parameters for retrieving one Evenium guest. Provide either contactId or guestCode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "guest": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium contact identifier for the guest."
+              },
+              "customId": {
+                "type": "string",
+                "description": "The external custom identifier attached to the guest."
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium event identifier that owns the guest."
+              },
+              "guestCode": {
+                "type": "string",
+                "description": "The Evenium guest code used for direct guest lookup."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The guest first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The guest last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The guest email address."
+              },
+              "status": {
+                "type": "string",
+                "description": "The guest RSVP status returned by Evenium."
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One Evenium custom field entry."
+                },
+                "description": "The custom fields attached to the guest."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One Evenium guest returned by the organizer API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium guest lookup response."
+      }
+    },
+    {
+      "id": "evenium.get_guest_post_status",
+      "service": "evenium",
+      "name": "get_guest_post_status",
+      "description": "Get the current post-event attendance status for one Evenium guest.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium event identifier or external event ID."
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium contact identifier or external contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Evenium guest post-event status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "guestPostStatus": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium contact identifier for the guest."
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium event identifier that owns the guest."
+              },
+              "postStatus": {
+                "type": "string",
+                "description": "The current post-event status returned by Evenium."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Evenium guest post-status payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium guest post-status response."
+      }
+    },
+    {
+      "id": "evenium.get_guest_status",
+      "service": "evenium",
+      "name": "get_guest_status",
+      "description": "Get the current RSVP status for one Evenium guest.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium event identifier or external event ID."
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium contact identifier or external contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Evenium guest status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "guestStatus": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium contact identifier for the guest."
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Evenium event identifier that owns the guest."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current RSVP status returned by Evenium."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Evenium guest status payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium guest status response."
+      }
+    },
+    {
+      "id": "evenium.list_events",
+      "service": "evenium",
+      "name": "list_events",
+      "description": "List Evenium events with optional title, status, date filters, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "maxResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of events to return."
+          },
+          "firstResult": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset of the first event to return."
+          },
+          "startsAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events that start after this ISO 8601 timestamp."
+          },
+          "startsBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events that start before this ISO 8601 timestamp."
+          },
+          "endsAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events that end after this ISO 8601 timestamp."
+          },
+          "endsBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events that end before this ISO 8601 timestamp."
+          },
+          "createdAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events created after this ISO 8601 timestamp."
+          },
+          "createdBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events created before this ISO 8601 timestamp."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events whose title contains this value."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return events with this Evenium status value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Evenium events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nbrResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "firstResult": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "Whether Evenium reports that more events are available."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Evenium event identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The event title returned by Evenium."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The event description returned by Evenium."
+                },
+                "startDate": {
+                  "type": "string",
+                  "description": "The event start timestamp in ISO 8601 format."
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "The event end timestamp in ISO 8601 format."
+                },
+                "creationDate": {
+                  "type": "string",
+                  "description": "The event creation timestamp in ISO 8601 format."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current Evenium event status."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Evenium relative event URL."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One Evenium event field entry."
+                  },
+                  "description": "Additional event field entries returned by Evenium."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Evenium event returned by the organizer API."
+            },
+            "description": "The events returned by the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium event list response."
+      }
+    },
+    {
+      "id": "evenium.list_guests",
+      "service": "evenium",
+      "name": "list_guests",
+      "description": "List guests for one Evenium event with optional attendee filters, expansions, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Evenium event identifier or external event ID."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of guests to return."
+          },
+          "firstResult": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset of the first guest to return."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REGISTRATION",
+                "PRESENCE",
+                "SIGNATURE"
+              ],
+              "description": "One guest expansion field name accepted by Evenium."
+            },
+            "description": "Optional guest sub-resources to expand on guest responses."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests with this Evenium RSVP status."
+          },
+          "since": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests updated after this ISO 8601 timestamp."
+          },
+          "until": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests updated before this ISO 8601 timestamp."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests whose last name matches this value."
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests whose first name matches this value."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests whose email exactly matches this value."
+          },
+          "company": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return guests whose company matches this value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Input parameters for listing Evenium guests."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nbrResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "maxResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "firstResult": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The non-negative pagination value returned by Evenium."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "Whether Evenium reports that more guests are available."
+          },
+          "guests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contactId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Evenium contact identifier for the guest."
+                },
+                "customId": {
+                  "type": "string",
+                  "description": "The external custom identifier attached to the guest."
+                },
+                "eventId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Evenium event identifier that owns the guest."
+                },
+                "guestCode": {
+                  "type": "string",
+                  "description": "The Evenium guest code used for direct guest lookup."
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The guest first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The guest last name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The guest email address."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The guest RSVP status returned by Evenium."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One Evenium custom field entry."
+                  },
+                  "description": "The custom fields attached to the guest."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Evenium guest returned by the organizer API."
+            },
+            "description": "The guests returned by the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Evenium guest list response."
+      }
+    }
+  ]
+}

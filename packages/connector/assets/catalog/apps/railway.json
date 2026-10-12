@@ -1,0 +1,917 @@
+{
+  "service": "railway",
+  "displayName": "Railway",
+  "description": "Inspect Railway projects and services, manage deployments, read logs, and update variables.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Account or Workspace Token",
+      "placeholder": "Enter your Railway token",
+      "description": "A Railway account or workspace token sent as a Bearer token. Create one at https://railway.com/account/tokens. Project tokens use a different authentication header and are not supported by this credential type.",
+      "extraFields": [
+        {
+          "key": "workspaceId",
+          "label": "Workspace ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "Optional Railway workspace ID",
+          "description": "Required when using a workspace-scoped token. Leave blank for an account token."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://railway.com",
+  "actions": [
+    {
+      "id": "railway.deploy_service",
+      "service": "railway",
+      "name": "deploy_service",
+      "description": "Trigger a Railway deployment for a service, optionally at a specific connected-repository commit.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway service ID."
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway environment ID."
+          },
+          "commitSha": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Commit SHA from the repository connected to the Railway service."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceId",
+          "environmentId"
+        ],
+        "description": "Input for deploying a Railway service."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway deployment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The triggered Railway deployment."
+      }
+    },
+    {
+      "id": "railway.get_deployment",
+      "service": "railway",
+      "name": "get_deployment",
+      "description": "Get one Railway deployment and its redeploy and rollback capabilities.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway deployment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Railway deployment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Railway deployment ID."
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Current Railway deployment status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the deployment was created.",
+                "format": "date-time"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Deployment URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Deployment URL."
+              },
+              "staticUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Static deployment URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Static deployment URL."
+              },
+              "canRedeploy": {
+                "type": "boolean",
+                "description": "Whether Railway allows this deployment to be redeployed."
+              },
+              "canRollback": {
+                "type": "boolean",
+                "description": "Whether Railway allows a rollback to this deployment."
+              },
+              "meta": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Provider-defined deployment metadata."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Provider-defined deployment metadata."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "Detailed Railway deployment information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Railway deployment."
+      }
+    },
+    {
+      "id": "railway.get_deployment_logs",
+      "service": "railway",
+      "name": "get_deployment_logs",
+      "description": "Read runtime logs for a Railway deployment with optional text and time filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway deployment ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "Maximum number of log entries to return.",
+            "default": 500
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway log filter expression."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Start of the log time range.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "End of the log time range.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deploymentId"
+        ],
+        "description": "Filters for Railway deployment logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Provider timestamp for the log entry."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Log message."
+                },
+                "severity": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Log severity."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Log severity."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "timestamp",
+                "message"
+              ],
+              "description": "A Railway runtime log entry."
+            },
+            "description": "Railway runtime log entries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Runtime log entries for a Railway deployment."
+      }
+    },
+    {
+      "id": "railway.get_project",
+      "service": "railway",
+      "name": "get_project",
+      "description": "Get a Railway project together with its services and environments.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Railway project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Railway project ID."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Project name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Project description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Project description."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the project was created.",
+                "format": "date-time"
+              },
+              "services": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Railway service ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Service name."
+                    },
+                    "icon": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Service icon URL or identifier."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Service icon URL or identifier."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "description": "A Railway service."
+                },
+                "description": "Services in the project."
+              },
+              "environments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Railway environment ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Environment name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Railway environment."
+                },
+                "description": "Environments in the project."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "services",
+              "environments"
+            ],
+            "description": "Railway project details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Railway project with related resources."
+      }
+    },
+    {
+      "id": "railway.get_service_instance",
+      "service": "railway",
+      "name": "get_service_instance",
+      "description": "Get Railway service configuration and its latest deployment in one environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway service ID."
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway environment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Railway service instance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceInstance": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Railway service instance ID."
+              },
+              "serviceName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Service name."
+              },
+              "startCommand": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Configured start command."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Configured start command."
+              },
+              "buildCommand": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Configured build command."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Configured build command."
+              },
+              "rootDirectory": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Configured repository root directory."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Configured repository root directory."
+              },
+              "healthcheckPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Configured health check path."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Configured health check path."
+              },
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Deployment region."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Deployment region."
+              },
+              "numReplicas": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Configured replica count."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Configured replica count."
+              },
+              "restartPolicyType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Restart policy type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Restart policy type."
+              },
+              "restartPolicyMaxRetries": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Maximum restart attempts."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Maximum restart attempts."
+              },
+              "latestDeployment": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Railway deployment ID."
+                      },
+                      "status": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Current Railway deployment status."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "When the deployment was created.",
+                        "format": "date-time"
+                      },
+                      "url": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Deployment URL."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Deployment URL."
+                      },
+                      "staticUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Static deployment URL."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Static deployment URL."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "status"
+                    ],
+                    "description": "A Railway deployment."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Railway deployment."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "serviceName"
+            ],
+            "description": "A Railway service instance."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Railway service instance configuration."
+      }
+    },
+    {
+      "id": "railway.list_deployments",
+      "service": "railway",
+      "name": "list_deployments",
+      "description": "List recent Railway deployments for a service and environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway project ID."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway service ID."
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway environment ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of deployments to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "serviceId",
+          "environmentId"
+        ],
+        "description": "Filters for Railway deployments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Railway deployment ID."
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Current Railway deployment status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the deployment was created.",
+                  "format": "date-time"
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Deployment URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Deployment URL."
+                },
+                "staticUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Static deployment URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Static deployment URL."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "status"
+              ],
+              "description": "A Railway deployment."
+            },
+            "description": "Railway deployments ordered by the provider."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Recent Railway deployments."
+      }
+    },
+    {
+      "id": "railway.list_projects",
+      "service": "railway",
+      "name": "list_projects",
+      "description": "List Railway projects available to the configured account or workspace token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Railway projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Railway project ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Project name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Project description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Project description."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the project was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "When the project was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Railway project."
+            },
+            "description": "Railway projects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Railway projects available to the token."
+      }
+    },
+    {
+      "id": "railway.rollback_deployment",
+      "service": "railway",
+      "name": "rollback_deployment",
+      "description": "Roll a Railway service back to a deployment that Railway marks as rollback-capable.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Rollback-capable Railway deployment ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for rolling back a Railway deployment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deployment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Railway deployment ID."
+              },
+              "status": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Current Railway deployment status."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the deployment was created.",
+                "format": "date-time"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Deployment URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Deployment URL."
+              },
+              "staticUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Static deployment URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Static deployment URL."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "A Railway deployment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Railway deployment created by the rollback."
+      }
+    },
+    {
+      "id": "railway.upsert_variable",
+      "service": "railway",
+      "name": "upsert_variable",
+      "description": "Create or update one Railway variable for an environment or service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway project ID."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway service ID."
+          },
+          "environmentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Railway environment ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Variable name.",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "value": {
+            "type": "string",
+            "description": "Variable value. This may contain a Railway variable reference."
+          },
+          "skipDeploys": {
+            "type": "boolean",
+            "description": "Do not automatically redeploy after updating the variable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "environmentId",
+          "name",
+          "value"
+        ],
+        "description": "Input for creating or updating a Railway variable."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Railway accepted the variable update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Result of updating a Railway variable."
+      }
+    }
+  ]
+}

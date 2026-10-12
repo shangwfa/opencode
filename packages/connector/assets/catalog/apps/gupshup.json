@@ -1,0 +1,281 @@
+{
+  "service": "gupshup",
+  "displayName": "Gupshup",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GUPSHUP_API_KEY",
+      "description": "Gupshup API key sent in the apikey header. Open the target app in https://www.gupshup.io/whatsapp/dashboard and copy the key from App Settings.",
+      "extraFields": [
+        {
+          "key": "appId",
+          "label": "App ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "YOUR_GUPSHUP_APP_ID",
+          "description": "Gupshup WhatsApp app ID used for app-scoped template requests. Find it beside the API key in the target app's Settings page at https://www.gupshup.io/whatsapp/dashboard."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.gupshup.io",
+  "actions": [
+    {
+      "id": "gupshup.list_templates",
+      "service": "gupshup",
+      "name": "list_templates",
+      "description": "List message templates for the connected Gupshup app.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of templates to return per page."
+          },
+          "templateStatus": {
+            "type": "string",
+            "description": "The template status to filter by, such as APPROVED."
+          },
+          "templateCategory": {
+            "type": "string",
+            "description": "The template category to filter by, such as MARKETING, UTILITY, or AUTHENTICATION."
+          },
+          "templateType": {
+            "type": "string",
+            "description": "The template type to filter by, such as TEXT."
+          },
+          "quality": {
+            "type": "string",
+            "description": "The template quality rating to filter by, such as GREEN."
+          },
+          "languageCode": {
+            "type": "string",
+            "description": "The template language code to filter by, such as en."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing templates in the connected Gupshup app."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success"
+            ],
+            "description": "The template-list request status."
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gupshup template ID."
+                },
+                "appId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gupshup app ID that owns the template."
+                },
+                "elementName": {
+                  "type": "string",
+                  "description": "The template name."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "The template category."
+                },
+                "languageCode": {
+                  "type": "string",
+                  "description": "The template language code."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The template approval status."
+                },
+                "templateType": {
+                  "type": "string",
+                  "description": "The template type."
+                },
+                "quality": {
+                  "type": "string",
+                  "description": "The template quality rating."
+                },
+                "createdOn": {
+                  "type": "integer",
+                  "description": "The template creation timestamp in milliseconds."
+                },
+                "modifiedOn": {
+                  "type": "integer",
+                  "description": "The template modification timestamp in milliseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Gupshup WhatsApp message template with provider-defined metadata."
+            },
+            "description": "The templates returned for the connected app."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "templates"
+        ],
+        "description": "The template-list response returned by Gupshup."
+      }
+    },
+    {
+      "id": "gupshup.send_template_message",
+      "service": "gupshup",
+      "name": "send_template_message",
+      "description": "Send an approved text template message through Gupshup.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The registered WhatsApp Business sender number in international format without a plus sign."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recipient WhatsApp number in international format without a plus sign."
+          },
+          "appName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gupshup app name associated with the sender number."
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique ID of the approved Gupshup template."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A template parameter value."
+            },
+            "description": "The template parameter values in their order of occurrence."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "destination",
+          "appName",
+          "templateId"
+        ],
+        "description": "A Gupshup WhatsApp text template message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The submission status returned by Gupshup."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Gupshup message identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A submitted Gupshup WhatsApp message."
+      }
+    },
+    {
+      "id": "gupshup.send_text_message",
+      "service": "gupshup",
+      "name": "send_text_message",
+      "description": "Send a text message in an active WhatsApp conversation through Gupshup.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The registered WhatsApp Business sender number in international format without a plus sign."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The recipient WhatsApp number in international format without a plus sign."
+          },
+          "appName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Gupshup app name associated with the sender number."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "The text content to send to the recipient."
+          },
+          "disablePreview": {
+            "type": "boolean",
+            "description": "Whether to disable link previews in the text message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "destination",
+          "appName",
+          "text"
+        ],
+        "description": "A Gupshup WhatsApp text message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The submission status returned by Gupshup."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Gupshup message identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A submitted Gupshup WhatsApp message."
+      }
+    }
+  ]
+}

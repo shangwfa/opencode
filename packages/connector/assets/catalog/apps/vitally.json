@@ -1,0 +1,314 @@
+{
+  "service": "vitally",
+  "displayName": "Vitally",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "vitally_api_key",
+      "description": "Vitally REST API key used as the Basic Auth username. Create and copy keys in Vitally under Settings > Operations > Integrations > Vitally REST API: https://docs.vitally.io/en/articles/9880649-rest-api-overview.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "us",
+          "description": "Vitally REST API region. Use us for https://<subdomain>.rest.vitally.io or eu for https://rest.vitally-eu.io."
+        },
+        {
+          "key": "subdomain",
+          "label": "Subdomain",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "your-company",
+          "description": "US REST API subdomain used to build https://<subdomain>.rest.vitally.io. Required for US accounts and ignored for EU accounts."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.vitally.io/",
+  "actions": [
+    {
+      "id": "vitally.create_account",
+      "service": "vitally",
+      "name": "create_account",
+      "description": "Create a Vitally account with an external ID, name, optional organization, and traits.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique account ID from your system."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The account name."
+          },
+          "organizationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vitally-assigned organization ID to relate this account to."
+          },
+          "traits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Vitally account traits keyed by trait name. Values are forwarded using Vitally's documented trait inference rules."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "externalId",
+          "name"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Vitally account object returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "vitally.delete_account",
+      "service": "vitally",
+      "name": "delete_account",
+      "description": "Delete a Vitally account by its Vitally ID or external ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vitally account ID or the external ID supplied when creating it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Vitally accepted the delete request."
+          },
+          "raw": {
+            "description": "The raw Vitally delete response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "raw"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "vitally.get_account",
+      "service": "vitally",
+      "name": "get_account",
+      "description": "Get a Vitally account by its Vitally ID or external ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vitally account ID or the external ID supplied when creating it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Vitally account object returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "vitally.list_accounts",
+      "service": "vitally",
+      "name": "list_accounts",
+      "description": "List Vitally accounts with optional status and cursor pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of accounts to return, up to 100."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by a previous Vitally list response."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "churned",
+              "activeOrChurned"
+            ],
+            "description": "The account status filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Vitally account object returned by the REST API."
+            },
+            "description": "Vitally accounts in the current page."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page, or null when there are no more pages."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page, or null when there are no more pages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts",
+          "next"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "vitally.update_account",
+      "service": "vitally",
+      "name": "update_account",
+      "description": "Update a Vitally account name, organization relationship, or traits by Vitally ID or external ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vitally account ID or the external ID supplied when creating it."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated account name."
+          },
+          "organizationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Vitally organization ID or external ID, or null to remove the organization relationship."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Vitally organization ID or external ID, or null to remove the organization relationship."
+          },
+          "traits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Vitally account traits keyed by trait name. Values are forwarded using Vitally's documented trait inference rules."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A raw Vitally account object returned by the REST API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

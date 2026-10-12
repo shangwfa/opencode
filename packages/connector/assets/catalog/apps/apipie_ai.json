@@ -1,0 +1,777 @@
+{
+  "service": "apipie_ai",
+  "displayName": "APIpie AI",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "APIpie AI API key used with the Authorization Bearer header. Create or manage keys at https://apipie.ai/profile/api-keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://apipie.ai",
+  "actions": [
+    {
+      "id": "apipie_ai.create_chat_completion",
+      "service": "apipie_ai",
+      "name": "create_chat_completion",
+      "description": "Create a non-streaming APIpie AI OpenAI-compatible chat completion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The APIpie AI model identifier to use."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string",
+                                "description": "The content block type."
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "The text content for this block."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "description": "A text content block in a chat message."
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "image_url",
+                                "type": "string",
+                                "description": "The content block type."
+                              },
+                              "image_url": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "description": "The image URL or data URL to send to a vision-capable model.",
+                                    "format": "uri"
+                                  },
+                                  "detail": {
+                                    "type": "string",
+                                    "enum": [
+                                      "auto",
+                                      "low",
+                                      "high"
+                                    ],
+                                    "description": "The image detail level."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "required": [
+                                  "url"
+                                ],
+                                "description": "The image URL payload."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "required": [
+                              "type",
+                              "image_url"
+                            ],
+                            "description": "An image URL content block in a chat message."
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "Any JSON value accepted by the upstream API."
+                            },
+                            "description": "Any JSON object."
+                          }
+                        ],
+                        "description": "A structured message content block."
+                      },
+                      "description": "Structured message content blocks."
+                    },
+                    {
+                      "type": "null",
+                      "description": "Null content for assistant tool call messages."
+                    }
+                  ],
+                  "description": "The message content sent to the model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The optional participant name for the message."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "The identifier of the tool call that this tool message responds to."
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "description": "Any JSON value accepted by the upstream API."
+                    },
+                    "description": "Any JSON object."
+                  },
+                  "description": "Tool calls emitted by the assistant."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "role"
+              ],
+              "description": "A message in the OpenAI-compatible chat completion request."
+            },
+            "description": "The ordered conversation history sent to the model.",
+            "minItems": 1
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The frequency penalty applied to repeated tokens."
+          },
+          "logit_bias": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the upstream API."
+            },
+            "description": "Any JSON object."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of tokens to generate."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of chat completions to generate."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The presence penalty applied to newly introduced tokens."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json_object",
+                  "json_schema"
+                ],
+                "description": "The requested response format type."
+              },
+              "json_schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "Any JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Response format configuration."
+          },
+          "seed": {
+            "type": "integer",
+            "description": "A seed for deterministic sampling."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single stop sequence."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A stop sequence."
+                },
+                "description": "A list of stop sequences."
+              }
+            ],
+            "description": "One or more sequences where generation should stop."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only supports false."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "auto",
+                  "required"
+                ],
+                "description": "A predefined tool selection mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "Any JSON object."
+              }
+            ],
+            "description": "Tool selection strategy for the request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the upstream API."
+              },
+              "description": "Any JSON object."
+            },
+            "description": "Tools available to the model."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          },
+          "user": {
+            "type": "string",
+            "description": "An end-user identifier for monitoring or abuse detection."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for creating a non-streaming APIpie AI chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the completion was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used to generate the completion."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant",
+                        "tool"
+                      ],
+                      "description": "The role of the message author."
+                    },
+                    "content": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Plain text message content."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "const": "text",
+                                    "type": "string",
+                                    "description": "The content block type."
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "description": "The text content for this block."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "description": "A text content block in a chat message."
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "const": "image_url",
+                                    "type": "string",
+                                    "description": "The content block type."
+                                  },
+                                  "image_url": {
+                                    "type": "object",
+                                    "properties": {
+                                      "url": {
+                                        "type": "string",
+                                        "description": "The image URL or data URL to send to a vision-capable model.",
+                                        "format": "uri"
+                                      },
+                                      "detail": {
+                                        "type": "string",
+                                        "enum": [
+                                          "auto",
+                                          "low",
+                                          "high"
+                                        ],
+                                        "description": "The image detail level."
+                                      }
+                                    },
+                                    "additionalProperties": true,
+                                    "required": [
+                                      "url"
+                                    ],
+                                    "description": "The image URL payload."
+                                  }
+                                },
+                                "additionalProperties": true,
+                                "required": [
+                                  "type",
+                                  "image_url"
+                                ],
+                                "description": "An image URL content block in a chat message."
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "description": "Any JSON value accepted by the upstream API."
+                                },
+                                "description": "Any JSON object."
+                              }
+                            ],
+                            "description": "A structured message content block."
+                          },
+                          "description": "Structured message content blocks."
+                        },
+                        {
+                          "type": "null",
+                          "description": "Null content for assistant tool call messages."
+                        }
+                      ],
+                      "description": "The message content sent to the model."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The optional participant name for the message."
+                    },
+                    "tool_call_id": {
+                      "type": "string",
+                      "description": "The identifier of the tool call that this tool message responds to."
+                    },
+                    "tool_calls": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the upstream API."
+                        },
+                        "description": "Any JSON object."
+                      },
+                      "description": "Tool calls emitted by the assistant."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "role"
+                  ],
+                  "description": "A message in the OpenAI-compatible chat completion request."
+                },
+                "finish_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reason generation finished for this choice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reason generation finished for this choice."
+                },
+                "logprobs": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON value accepted by the upstream API."
+                      },
+                      "description": "Any JSON object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Any JSON object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A chat completion choice."
+            },
+            "description": "The generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "prompt_tokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens consumed."
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "The number of completion tokens generated."
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "The total number of tokens consumed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage information."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for an APIpie AI chat completion."
+      }
+    },
+    {
+      "id": "apipie_ai.create_embedding",
+      "service": "apipie_ai",
+      "name": "create_embedding",
+      "description": "Generate APIpie AI embeddings for one or more text inputs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The APIpie AI embedding model identifier to use."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A single text input."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A text input."
+                },
+                "description": "Multiple text inputs.",
+                "minItems": 1
+              }
+            ],
+            "description": "The text input to embed."
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "np"
+            ],
+            "description": "The format of the returned embedding vectors."
+          },
+          "dimensions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1536,
+            "description": "The number of dimensions in the output embedding vector."
+          },
+          "user": {
+            "type": "string",
+            "description": "An end-user identifier for monitoring or abuse detection."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "The input payload for creating APIpie AI embeddings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "description": "The object type for this embedding item."
+                },
+                "embedding": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One embedding vector dimension."
+                  },
+                  "description": "The embedding vector."
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "The index of the input item."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One embedding result item."
+            },
+            "description": "The generated embedding items."
+          },
+          "model": {
+            "type": "string",
+            "description": "The embedding model used by the API."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "prompt_tokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens consumed."
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "The number of completion tokens generated."
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "The total number of tokens consumed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage information."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for APIpie AI embeddings."
+      }
+    },
+    {
+      "id": "apipie_ai.list_detailed_models",
+      "service": "apipie_ai",
+      "name": "list_detailed_models",
+      "description": "List detailed APIpie AI model metadata available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by the API."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model type, such as llm or embedding."
+                },
+                "provider": {
+                  "type": "string",
+                  "description": "The upstream provider that serves the model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the model."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A short model description."
+                },
+                "context_length": {
+                  "type": "integer",
+                  "description": "The maximum context length supported by the model."
+                },
+                "max_tokens": {
+                  "type": "integer",
+                  "description": "The maximum output tokens supported by the model."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An APIpie AI model record."
+            },
+            "description": "The list of available APIpie AI models."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for listing APIpie AI models."
+      }
+    },
+    {
+      "id": "apipie_ai.list_models",
+      "service": "apipie_ai",
+      "name": "list_models",
+      "description": "List the APIpie AI models available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "description": "The object type returned by the API."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model type, such as llm or embedding."
+                },
+                "provider": {
+                  "type": "string",
+                  "description": "The upstream provider that serves the model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the model."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A short model description."
+                },
+                "context_length": {
+                  "type": "integer",
+                  "description": "The maximum context length supported by the model."
+                },
+                "max_tokens": {
+                  "type": "integer",
+                  "description": "The maximum output tokens supported by the model."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An APIpie AI model record."
+            },
+            "description": "The list of available APIpie AI models."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for listing APIpie AI models."
+      }
+    }
+  ]
+}

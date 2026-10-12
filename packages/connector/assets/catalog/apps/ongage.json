@@ -1,0 +1,838 @@
+{
+  "service": "ongage",
+  "displayName": "Ongage",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ONGAGE_API_KEY",
+      "description": "Ongage API key sent in the x-api-key header. Create it from the API Keys tab in Ongage.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.ongage.com/",
+  "actions": [
+    {
+      "id": "ongage.change_contact_status",
+      "service": "ongage",
+      "name": "change_contact_status",
+      "description": "Change non-destructive subscription or delivery status for contacts in an Ongage list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          },
+          "changeTo": {
+            "type": "string",
+            "enum": [
+              "resubscribe",
+              "unsubscribe",
+              "bounce",
+              "complaint",
+              "soft_bounce"
+            ],
+            "description": "The contact status transition to apply."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A contact email address.",
+              "format": "email"
+            },
+            "description": "Contact email addresses whose status should change.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "ocxChildId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional campaign child ID used to attribute unsubscribe statistics."
+          },
+          "ocxConnectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional ESP connection ID used to attribute transactional unsubscribe statistics."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "listId",
+          "changeTo",
+          "emails"
+        ],
+        "description": "A bounded batch of email addresses and the status transition to apply."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contact rows submitted."
+          },
+          "success": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of successful contact rows."
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of failed contact rows."
+          },
+          "created": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts created."
+          },
+          "created_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts updated."
+          },
+          "updated_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "revived": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts revived."
+          },
+          "revived_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "success_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "failed_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ongage contact mutation summary."
+      }
+    },
+    {
+      "id": "ongage.get_contact_by_email",
+      "service": "ongage",
+      "name": "get_contact_by_email",
+      "description": "Get one contact from an Ongage list by email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The list and contact email to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Ongage contact ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The contact email address.",
+                "format": "email"
+              },
+              "ocx_status": {
+                "type": "string",
+                "description": "The contact status returned by Ongage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Ongage contact resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Ongage contact."
+      }
+    },
+    {
+      "id": "ongage.get_contact_by_id",
+      "service": "ongage",
+      "name": "get_contact_by_id",
+      "description": "Get one contact from an Ongage list by contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ongage contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The list and contact ID to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Ongage contact ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The contact email address.",
+                "format": "email"
+              },
+              "ocx_status": {
+                "type": "string",
+                "description": "The contact status returned by Ongage."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Ongage contact resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Ongage contact."
+      }
+    },
+    {
+      "id": "ongage.get_list",
+      "service": "ongage",
+      "name": "get_list",
+      "description": "Get one Ongage list by its numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Ongage list to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The numeric list ID."
+              },
+              "account_id": {
+                "type": "integer",
+                "description": "The numeric Ongage account ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The list name."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "sending",
+                  "suppression"
+                ],
+                "description": "The Ongage list type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An Ongage list resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Ongage list."
+      }
+    },
+    {
+      "id": "ongage.list_lists",
+      "service": "ongage",
+      "name": "list_lists",
+      "description": "List Ongage sending or suppression lists with offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by list name."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "sending",
+              "suppression"
+            ],
+            "description": "The Ongage list type."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "List column name used for sorting."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The list sort direction."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching lists to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of lists to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Ongage lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The numeric list ID."
+                },
+                "account_id": {
+                  "type": "integer",
+                  "description": "The numeric Ongage account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The list name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "sending",
+                    "suppression"
+                  ],
+                  "description": "The Ongage list type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Ongage list resource."
+            },
+            "description": "Lists returned by Ongage."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching lists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Ongage lists."
+      }
+    },
+    {
+      "id": "ongage.update_contacts",
+      "service": "ongage",
+      "name": "update_contacts",
+      "description": "Update existing contacts in an Ongage list by email address or contact ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The existing contact email address.",
+                      "format": "email"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Account-defined Ongage contact fields keyed by the list field name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Update an Ongage contact selected by email address."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The existing Ongage contact ID."
+                    },
+                    "fields": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Account-defined Ongage contact fields keyed by the list field name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Update an Ongage contact selected by contact ID."
+                }
+              ],
+              "description": "One existing Ongage contact and the fields to update."
+            },
+            "description": "Existing contacts and fields to update.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "description": "A bounded batch of existing contacts to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contact rows submitted."
+          },
+          "success": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of successful contact rows."
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of failed contact rows."
+          },
+          "created": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts created."
+          },
+          "created_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts updated."
+          },
+          "updated_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "revived": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts revived."
+          },
+          "revived_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "success_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "failed_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ongage contact mutation summary."
+      }
+    },
+    {
+      "id": "ongage.upsert_contacts",
+      "service": "ongage",
+      "name": "upsert_contacts",
+      "description": "Create contacts in an Ongage list and optionally overwrite existing fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "listId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Ongage list ID."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The contact email address.",
+                  "format": "email"
+                },
+                "overwrite": {
+                  "type": "boolean",
+                  "description": "Whether Ongage should overwrite fields for an existing contact."
+                },
+                "fields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Account-defined Ongage contact fields keyed by the list field name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "One contact to create or optionally overwrite in an Ongage list."
+            },
+            "description": "Contacts to create or overwrite.",
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "additionalProperties": false,
+        "description": "A bounded batch of contacts to create or overwrite."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contact rows submitted."
+          },
+          "success": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of successful contact rows."
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of failed contact rows."
+          },
+          "created": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts created."
+          },
+          "created_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "updated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts updated."
+          },
+          "updated_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "revived": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of contacts revived."
+          },
+          "revived_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "success_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          },
+          "failed_emails": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Results keyed by contact email address."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "description": "One email result."
+                },
+                "description": "An empty or provider-defined list of email results."
+              }
+            ],
+            "description": "Results keyed by contact email address, or an empty array when Ongage has no results."
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Ongage contact mutation summary."
+      }
+    }
+  ]
+}

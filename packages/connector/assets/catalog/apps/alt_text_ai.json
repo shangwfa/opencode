@@ -1,0 +1,1246 @@
+{
+  "service": "alt_text_ai",
+  "displayName": "AltText.ai",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ALT_TEXT_AI_API_KEY",
+      "description": "AltText.ai API key sent with the X-API-Key header. Create or view API keys in your AltText.ai account: https://alttext.ai/account/api_keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://alttext.ai",
+  "actions": [
+    {
+      "id": "alt_text_ai.create_image",
+      "service": "alt_text_ai",
+      "name": "create_image",
+      "description": "Add a publicly accessible image URL to AltText.ai and generate alt text.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public URL of the image that needs alt text.",
+            "format": "uri"
+          },
+          "asset_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Your own unique asset ID for this image."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An image tag."
+            },
+            "description": "Words or phrases to associate with the image."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom key-value metadata associated with the image."
+          },
+          "ecomm": {
+            "type": "object",
+            "properties": {
+              "product": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Product name or description."
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Brand name."
+              },
+              "color": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Product color."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Ecommerce product context for product image alt text generation."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword or phrase written in English."
+            },
+            "description": "Keywords or phrases to consider when generating SEO-optimized alt text.",
+            "maxItems": 6
+          },
+          "negative_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword or phrase written in English."
+            },
+            "description": "Keywords or phrases to consider when generating SEO-optimized alt text.",
+            "maxItems": 6
+          },
+          "keyword_source": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 1024,
+            "description": "Text source for extracting keywords when keywords is blank."
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code or comma-separated language codes for generated alt text."
+          },
+          "max_chars": {
+            "type": "integer",
+            "minimum": 80,
+            "maximum": 500,
+            "description": "Maximum generated alt text length in characters."
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "Whether to regenerate existing alt text for the image."
+          },
+          "gpt_prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Prompt to apply to generated alt text using the {{AltText}} macro."
+          },
+          "model_name": {
+            "type": "string",
+            "enum": [
+              "describe-detailed",
+              "describe-regular",
+              "describe-factual",
+              "succinct-describe-factual",
+              "describe-terse"
+            ],
+            "description": "The language model style to use for alt text generation."
+          },
+          "timeout_secs": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 30,
+            "description": "Maximum timeout in seconds for synchronous generation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input for generating alt text for a publicly accessible image URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The unique ID of the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The unique ID of the image."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The public image URL, or null when the image was uploaded as raw data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The public image URL, or null when the image was uploaded as raw data."
+          },
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The primary generated alt text for the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary generated alt text for the image."
+          },
+          "alt_texts": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Generated alt text keyed by language code."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An image tag."
+            },
+            "description": "Words or phrases associated with the image."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom metadata stored with the image."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Creation time in seconds since epoch."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Creation time in seconds since epoch."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field-specific image processing errors."
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An identifier describing the type of image processing error."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An identifier describing the type of image processing error."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An AltText.ai image record."
+      }
+    },
+    {
+      "id": "alt_text_ai.delete_image",
+      "service": "alt_text_ai",
+      "name": "delete_image",
+      "description": "Delete an image from the AltText.ai library by asset ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset ID of the image to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for deleting a specific image by asset ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The unique ID of the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The unique ID of the image."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The public image URL, or null when the image was uploaded as raw data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The public image URL, or null when the image was uploaded as raw data."
+          },
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The primary generated alt text for the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary generated alt text for the image."
+          },
+          "alt_texts": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Generated alt text keyed by language code."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An image tag."
+            },
+            "description": "Words or phrases associated with the image."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom metadata stored with the image."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Creation time in seconds since epoch."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Creation time in seconds since epoch."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field-specific image processing errors."
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An identifier describing the type of image processing error."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An identifier describing the type of image processing error."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An AltText.ai image record."
+      }
+    },
+    {
+      "id": "alt_text_ai.get_account",
+      "service": "alt_text_ai",
+      "name": "get_account",
+      "description": "Retrieve AltText.ai account settings and usage details for the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve account settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The name of the AltText.ai account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The name of the AltText.ai account."
+          },
+          "webhook_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The default notification URL for webhooks."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default notification URL for webhooks."
+          },
+          "notification_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The email address for important account notifications."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The email address for important account notifications."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of credits used this billing period."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of credits used this billing period."
+          },
+          "usage_limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The maximum credits that can be used during this billing period."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The maximum credits that can be used during this billing period."
+          },
+          "whitelabel": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether whitelabel mode is enabled for the account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether whitelabel mode is enabled for the account."
+          },
+          "ending_period": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether generated alt text should end with a period by default."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether generated alt text should end with a period by default."
+          },
+          "no_quotes": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether quote characters are removed from generated alt text by default."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether quote characters are removed from generated alt text by default."
+          },
+          "remove_symbols": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A symbol."
+                },
+                "description": "Symbol characters removed from generated alt text."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Symbol characters removed from generated alt text."
+          },
+          "gpt_prompt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The default prompt applied to initially generated alt text."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The default prompt applied to initially generated alt text."
+          },
+          "max_chars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The account-level maximum character limit for alt text."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account-level maximum character limit for alt text."
+          },
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "plan_name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The name of the current subscription plan."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The name of the current subscription plan."
+                  },
+                  "usage_quota": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of credits granted each billing period on this plan."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of credits granted each billing period on this plan."
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current status of the subscription plan."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current status of the subscription plan."
+                  },
+                  "expires_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The renewal or expiration date of the plan."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The renewal or expiration date of the plan."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Subscription details associated with the account."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Subscription details associated with the account."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field-specific account errors."
+          }
+        },
+        "additionalProperties": false,
+        "description": "AltText.ai account settings and usage details."
+      }
+    },
+    {
+      "id": "alt_text_ai.get_image",
+      "service": "alt_text_ai",
+      "name": "get_image",
+      "description": "Retrieve a single AltText.ai image record by asset ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique asset ID of the image to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a specific image by asset ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The unique ID of the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The unique ID of the image."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The public image URL, or null when the image was uploaded as raw data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The public image URL, or null when the image was uploaded as raw data."
+          },
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The primary generated alt text for the image."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary generated alt text for the image."
+          },
+          "alt_texts": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Generated alt text keyed by language code."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An image tag."
+            },
+            "description": "Words or phrases associated with the image."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom metadata stored with the image."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Creation time in seconds since epoch."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Creation time in seconds since epoch."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field-specific image processing errors."
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An identifier describing the type of image processing error."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An identifier describing the type of image processing error."
+          }
+        },
+        "additionalProperties": false,
+        "description": "An AltText.ai image record."
+      }
+    },
+    {
+      "id": "alt_text_ai.list_images",
+      "service": "alt_text_ai",
+      "name": "list_images",
+      "description": "List image records in the AltText.ai library with optional URL filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve, starting at 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of images per page, up to 100."
+          },
+          "url": {
+            "type": "string",
+            "description": "Exact image URL used to filter results.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and filtering input for listing image records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asset_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique ID of the image."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique ID of the image."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The public image URL, or null when the image was uploaded as raw data."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The public image URL, or null when the image was uploaded as raw data."
+                },
+                "alt_text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary generated alt text for the image."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary generated alt text for the image."
+                },
+                "alt_texts": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Generated alt text keyed by language code."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An image tag."
+                  },
+                  "description": "Words or phrases associated with the image."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom metadata stored with the image."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Creation time in seconds since epoch."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Creation time in seconds since epoch."
+                },
+                "errors": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Field-specific image processing errors."
+                },
+                "error_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "An identifier describing the type of image processing error."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An identifier describing the type of image processing error."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An AltText.ai image record."
+            },
+            "description": "Image records returned by AltText.ai."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page number returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page number returned by AltText.ai."
+              },
+              "pageItems": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of items in each page returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of items in each page returned by AltText.ai."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of pages returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of pages returned by AltText.ai."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of items returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of items returned by AltText.ai."
+              },
+              "link": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The RFC 8288 pagination link header returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The RFC 8288 pagination link header returned by AltText.ai."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned in AltText.ai response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of AltText.ai image records."
+      }
+    },
+    {
+      "id": "alt_text_ai.scrape_page",
+      "service": "alt_text_ai",
+      "name": "scrape_page",
+      "description": "Scrape a web page or raw HTML document and queue discovered images for alt text generation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The page URL to scrape. The crawler does not execute JavaScript.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw HTML document to parse for image elements."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword or phrase written in English."
+            },
+            "description": "Keywords or phrases to consider when generating SEO-optimized alt text.",
+            "maxItems": 6
+          },
+          "negative_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A keyword or phrase written in English."
+            },
+            "description": "Keywords or phrases to consider when generating SEO-optimized alt text.",
+            "maxItems": 6
+          },
+          "lang": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Language code or comma-separated language codes for generated alt text."
+          },
+          "include_existing": {
+            "type": "boolean",
+            "description": "Whether to process images that already have alt text."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for scraping images from a URL or raw HTML document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The page URL that was scraped, or null when raw HTML was sent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The page URL that was scraped, or null when raw HTML was sent."
+          },
+          "scraped_images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The image src attribute discovered in the page HTML."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The image src attribute discovered in the page HTML."
+                },
+                "alt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The existing alt attribute discovered in the page HTML."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The existing alt attribute discovered in the page HTML."
+                },
+                "width": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The image width in pixels when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The image width in pixels when available."
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The image height in pixels when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The image height in pixels when available."
+                },
+                "skip_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reason this image was skipped from processing, or null when queued."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reason this image was skipped from processing, or null when queued."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single image discovered during page scraping."
+            },
+            "description": "Images discovered during page scraping."
+          },
+          "total_processed": {
+            "type": "integer",
+            "description": "The number of scraped images queued for alt text generation."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Errors encountered while scraping or queuing images."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of scraping a web page or HTML document for images."
+      }
+    },
+    {
+      "id": "alt_text_ai.search_images",
+      "service": "alt_text_ai",
+      "name": "search_images",
+      "description": "Search the AltText.ai image library by URL, asset ID, or alt text content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "The search query for URL, asset ID, or alt text content."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve, starting at 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of search results per page, up to 100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Search and pagination input for the AltText.ai image library."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asset_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique ID of the image."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique ID of the image."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The public image URL, or null when the image was uploaded as raw data."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The public image URL, or null when the image was uploaded as raw data."
+                },
+                "alt_text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary generated alt text for the image."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary generated alt text for the image."
+                },
+                "alt_texts": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Generated alt text keyed by language code."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An image tag."
+                  },
+                  "description": "Words or phrases associated with the image."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom metadata stored with the image."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Creation time in seconds since epoch."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Creation time in seconds since epoch."
+                },
+                "errors": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Field-specific image processing errors."
+                },
+                "error_code": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "An identifier describing the type of image processing error."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "An identifier describing the type of image processing error."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An AltText.ai image record."
+            },
+            "description": "Image records returned by AltText.ai."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page number returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page number returned by AltText.ai."
+              },
+              "pageItems": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of items in each page returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of items in each page returned by AltText.ai."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of pages returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of pages returned by AltText.ai."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of items returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of items returned by AltText.ai."
+              },
+              "link": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The RFC 8288 pagination link header returned by AltText.ai."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The RFC 8288 pagination link header returned by AltText.ai."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned in AltText.ai response headers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of AltText.ai image records."
+      }
+    }
+  ]
+}

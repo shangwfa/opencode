@@ -1,0 +1,185 @@
+{
+  "service": "mintlify",
+  "displayName": "Mintlify",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Admin API Key",
+      "placeholder": "mint_...",
+      "description": "Mintlify admin API key used as a Bearer token. Create one at https://app.mintlify.com/settings/organization/api-keys.",
+      "extraFields": [
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "your-project-id",
+          "description": "A Mintlify project ID used to validate the admin API key."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.mintlify.com",
+  "actions": [
+    {
+      "id": "mintlify.get_deployment_status",
+      "service": "mintlify",
+      "name": "get_deployment_status",
+      "description": "Get the current status and details of a Mintlify deployment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statusId": {
+            "type": "string",
+            "description": "The status ID returned when a deployment was queued."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mintlify deployment status to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "success",
+              "failure"
+            ],
+            "description": "The current deployment state."
+          },
+          "_id": {
+            "type": "string",
+            "description": "The deployment status ID."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The Mintlify project ID."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The UTC timestamp when the deployment was created."
+          },
+          "endedAt": {
+            "type": "string",
+            "description": "The UTC timestamp when the deployment ended."
+          },
+          "summary": {
+            "type": "string",
+            "description": "A summary of the deployment status."
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One deployment log message."
+            },
+            "description": "The deployment log messages."
+          },
+          "subdomain": {
+            "type": "string",
+            "description": "The subdomain of the documentation site."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "The current status and available details for a Mintlify deployment."
+      }
+    },
+    {
+      "id": "mintlify.trigger_deployment",
+      "service": "mintlify",
+      "name": "trigger_deployment",
+      "description": "Queue a production deployment for a Mintlify documentation project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The Mintlify project ID copied from the organization API keys page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mintlify project to deploy."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusId": {
+            "type": "string",
+            "description": "The status ID used to track the deployment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A queued Mintlify deployment request."
+      },
+      "asyncLifecycle": {
+        "startActionId": "mintlify.trigger_deployment",
+        "statusActionId": "mintlify.get_deployment_status"
+      }
+    },
+    {
+      "id": "mintlify.trigger_preview_deployment",
+      "service": "mintlify",
+      "name": "trigger_preview_deployment",
+      "description": "Create or redeploy a Mintlify preview for a specific Git branch.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The Mintlify project ID copied from the organization API keys page."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The non-empty Git branch name to deploy as a preview."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Mintlify project and Git branch to preview."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statusId": {
+            "type": "string",
+            "description": "The status ID used to track the preview deployment."
+          },
+          "previewUrl": {
+            "type": "string",
+            "description": "The URL where the preview deployment is hosted.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A queued Mintlify preview deployment."
+      },
+      "asyncLifecycle": {
+        "startActionId": "mintlify.trigger_preview_deployment",
+        "statusActionId": "mintlify.get_deployment_status"
+      }
+    }
+  ]
+}

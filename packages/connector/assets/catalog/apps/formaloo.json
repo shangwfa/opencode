@@ -1,0 +1,492 @@
+{
+  "service": "formaloo",
+  "displayName": "Formaloo",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FORMALOO_API_KEY",
+      "description": "Formaloo API Key from your profile API Keys page.",
+      "extraFields": [
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "FORMALOO_API_SECRET",
+          "description": "Formaloo API Secret used to obtain short-lived authorization tokens."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.formaloo.com/",
+  "actions": [
+    {
+      "id": "formaloo.create_row",
+      "service": "formaloo",
+      "name": "create_row",
+      "description": "Submit JSON field values as a new row on a Formaloo form.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the Formaloo form."
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible field value accepted by the configured Formaloo field."
+            },
+            "description": "Form field values keyed by Formaloo field slug or alias."
+          },
+          "rowTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Row tag slug."
+            },
+            "description": "Row tag slugs to attach to the submission."
+          },
+          "submitByAlias": {
+            "type": "boolean",
+            "description": "Whether keys in values are field aliases instead of field slugs."
+          },
+          "language": {
+            "type": "string",
+            "description": "Language slug to associate with the submission."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formSlug",
+          "values"
+        ],
+        "description": "Form identifier and field values for a new submission."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Formaloo object with provider-defined fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly submitted Formaloo row."
+      },
+      "followUpActions": [
+        "formaloo.get_row"
+      ]
+    },
+    {
+      "id": "formaloo.delete_row",
+      "service": "formaloo",
+      "name": "delete_row",
+      "description": "Permanently delete a submitted Formaloo row.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rowSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the submitted row."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Formaloo row to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Status code returned in the Formaloo deletion response."
+          },
+          "errors": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Error details returned by Formaloo, empty after a successful deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Formaloo deletion acknowledgement."
+      }
+    },
+    {
+      "id": "formaloo.get_form",
+      "service": "formaloo",
+      "name": "get_form",
+      "description": "Retrieve Formaloo form settings, metadata, and field definitions by slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the Formaloo form."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Formaloo form to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Formaloo object with provider-defined fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Formaloo form."
+      },
+      "followUpActions": [
+        "formaloo.list_rows",
+        "formaloo.create_row"
+      ]
+    },
+    {
+      "id": "formaloo.get_row",
+      "service": "formaloo",
+      "name": "get_row",
+      "description": "Retrieve one submitted Formaloo row by slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rowSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the submitted row."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Formaloo row to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Formaloo object with provider-defined fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Formaloo row."
+      }
+    },
+    {
+      "id": "formaloo.list_forms",
+      "service": "formaloo",
+      "name": "list_forms",
+      "description": "List forms created by or shared with the current Formaloo account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results to return per page."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text matched against form titles and slugs."
+          },
+          "category": {
+            "type": "string",
+            "description": "Category slug used to filter forms."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Tag slug used to filter forms."
+          },
+          "sortBy": {
+            "type": "string",
+            "description": "Comma-separated sort fields; prefix a field with a minus sign for descending order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Formaloo forms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the next page, or null when this is the last page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the next page, or null when this is the last page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the previous page, or null when this is the first page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the previous page, or null when this is the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Number of records requested per page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Formaloo object with provider-defined fields."
+            },
+            "description": "Forms returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Formaloo forms."
+      },
+      "followUpActions": [
+        "formaloo.get_form"
+      ]
+    },
+    {
+      "id": "formaloo.list_rows",
+      "service": "formaloo",
+      "name": "list_rows",
+      "description": "List submitted rows for a Formaloo form with filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the Formaloo form."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to request."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of results to return per page."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search text matched against searchable row data and row slug."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Update date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "submitNumber": {
+            "type": "string",
+            "description": "Submission number used to filter rows."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated row tag slugs used to filter rows."
+          },
+          "trackingCode": {
+            "type": "string",
+            "description": "Tracking code used to filter rows."
+          },
+          "sortBy": {
+            "type": "string",
+            "description": "Comma-separated sort fields; prefix a field with a minus sign for descending order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "formSlug"
+        ],
+        "description": "Form identifier, filters, and pagination for listing submitted rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Total number of matching records."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the next page, or null when this is the last page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the next page, or null when this is the last page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "URL of the previous page, or null when this is the first page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "URL of the previous page, or null when this is the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Number of records requested per page."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "Total number of pages."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Formaloo object with provider-defined fields."
+            },
+            "description": "Rows returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Formaloo rows."
+      },
+      "followUpActions": [
+        "formaloo.get_row"
+      ]
+    },
+    {
+      "id": "formaloo.update_row",
+      "service": "formaloo",
+      "name": "update_row",
+      "description": "Update JSON field values or tags on an existing Formaloo row.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rowSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique slug of the submitted row."
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible field value accepted by the configured Formaloo field."
+            },
+            "description": "Form field values keyed by Formaloo field slug or alias."
+          },
+          "rowTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Row tag slug."
+            },
+            "description": "Replacement row tag slugs."
+          },
+          "status": {
+            "type": "string",
+            "description": "Formaloo row status value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rowSlug"
+        ],
+        "description": "Row identifier and values to update.",
+        "minProperties": 2
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Formaloo object with provider-defined fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Formaloo row."
+      }
+    }
+  ]
+}

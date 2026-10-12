@@ -1,0 +1,866 @@
+{
+  "service": "aifinmarket",
+  "displayName": "Wind AIFin Market",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "WIND_API_KEY",
+      "placeholder": "Enter your WIND_API_KEY",
+      "description": "The WIND_API_KEY used to access Wind financial data. Sign in with your phone number and copy the key from https://aifinmarket.wind.com.cn/#/user/overview."
+    }
+  ],
+  "homepageUrl": "https://aifinmarket.wind.com.cn/#/home",
+  "actions": [
+    {
+      "id": "aifinmarket.call_tool",
+      "service": "aifinmarket",
+      "name": "call_tool",
+      "description": "Call a current Wind financial data MCP tool with JSON arguments after checking its live schema with list_tools.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverType": {
+            "type": "string",
+            "enum": [
+              "stock_data",
+              "fund_data",
+              "index_data",
+              "bond_data",
+              "financial_docs",
+              "economic_data",
+              "analytics_data"
+            ],
+            "description": "The Wind MCP service family that owns the requested tool."
+          },
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool; serialized arguments must not exceed 1000000 bytes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serverType",
+          "toolName"
+        ],
+        "description": "Input for invoking one current Wind MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      },
+      "followUpActions": [
+        "aifinmarket.list_tools"
+      ]
+    },
+    {
+      "id": "aifinmarket.get_company_announcements",
+      "service": "aifinmarket",
+      "name": "get_company_announcements",
+      "description": "Search listed-company announcements by company, document type, topic, and time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language search query containing the topic or entity and date range when applicable.",
+            "pattern": "\\S"
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of relevant documents or excerpts to return; defaults to 5."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for searching Wind financial documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_financial_news",
+      "service": "aifinmarket",
+      "name": "get_financial_news",
+      "description": "Search financial news by topic, entity, and time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language search query containing the topic or entity and date range when applicable.",
+            "pattern": "\\S"
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of relevant documents or excerpts to return; defaults to 5."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for searching Wind financial documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_fund_kline",
+      "service": "aifinmarket",
+      "name": "get_fund_kline",
+      "description": "Get historical ETF or LOF K-line price data for an explicit date range and period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The Wind security name or code.",
+            "pattern": "\\S"
+          },
+          "begin_date": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "1min",
+              "5min",
+              "10min",
+              "15min",
+              "30min",
+              "60min",
+              "120min",
+              "240min",
+              "1d",
+              "1w",
+              "1mo",
+              "1y",
+              "1q",
+              "6mo"
+            ],
+            "description": "The requested K-line aggregation period."
+          },
+          "aftype": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "The adjustment type: 0 for forward adjustment or 1 for backward adjustment."
+          },
+          "issusp": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Whether to include suspended periods: 0 to exclude or 1 to include."
+          },
+          "afdate": {
+            "type": "string",
+            "description": "The optional adjustment base date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode",
+          "begin_date",
+          "end_date"
+        ],
+        "description": "Input for reading a security K-line series over an explicit date range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_fund_performance",
+      "service": "aifinmarket",
+      "name": "get_fund_performance",
+      "description": "Get fund NAV, returns, rankings, risk-adjusted metrics, ratings, and performance data using a natural-language query.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language request containing the relevant entity, indicators, and date or reporting period when applicable.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a natural-language Wind data query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_fund_price_indicators",
+      "service": "aifinmarket",
+      "name": "get_fund_price_indicators",
+      "description": "Get the current trading indicators for up to 50 exchange-traded funds or listed open-ended funds.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "One or more Wind security names or codes separated by commas, with at most 50 securities per call.",
+            "pattern": "\\S"
+          },
+          "indexes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Comma-separated Wind indicator names to return; omit to use Wind defaults.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode"
+        ],
+        "description": "Input for reading current price indicators for up to 50 securities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_index_kline",
+      "service": "aifinmarket",
+      "name": "get_index_kline",
+      "description": "Get historical index or sector K-line data for an explicit date range and period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The Wind security name or code.",
+            "pattern": "\\S"
+          },
+          "begin_date": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "1min",
+              "5min",
+              "10min",
+              "15min",
+              "30min",
+              "60min",
+              "120min",
+              "240min",
+              "1d",
+              "1w",
+              "1mo",
+              "1y",
+              "1q",
+              "6mo"
+            ],
+            "description": "The requested K-line aggregation period."
+          },
+          "aftype": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "The adjustment type: 0 for forward adjustment or 1 for backward adjustment."
+          },
+          "issusp": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Whether to include suspended periods: 0 to exclude or 1 to include."
+          },
+          "afdate": {
+            "type": "string",
+            "description": "The optional adjustment base date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode",
+          "begin_date",
+          "end_date"
+        ],
+        "description": "Input for reading a security K-line series over an explicit date range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_index_price_indicators",
+      "service": "aifinmarket",
+      "name": "get_index_price_indicators",
+      "description": "Get the current price and trading indicators for up to 50 indices or sectors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "One or more Wind security names or codes separated by commas, with at most 50 securities per call.",
+            "pattern": "\\S"
+          },
+          "indexes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Comma-separated Wind indicator names to return; omit to use Wind defaults.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode"
+        ],
+        "description": "Input for reading current price indicators for up to 50 securities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_stock_fundamentals",
+      "service": "aifinmarket",
+      "name": "get_stock_fundamentals",
+      "description": "Get stock financial statement, ratio, valuation, dividend, and market-cap data using a natural-language query.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language request containing the relevant entity, indicators, and date or reporting period when applicable.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a natural-language Wind data query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_stock_kline",
+      "service": "aifinmarket",
+      "name": "get_stock_kline",
+      "description": "Get historical stock K-line price and volume data for an explicit date range and period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The Wind security name or code.",
+            "pattern": "\\S"
+          },
+          "begin_date": {
+            "type": "string",
+            "description": "The inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "The inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "1min",
+              "5min",
+              "10min",
+              "15min",
+              "30min",
+              "60min",
+              "120min",
+              "240min",
+              "1d",
+              "1w",
+              "1mo",
+              "1y",
+              "1q",
+              "6mo"
+            ],
+            "description": "The requested K-line aggregation period."
+          },
+          "aftype": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "The adjustment type: 0 for forward adjustment or 1 for backward adjustment."
+          },
+          "issusp": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Whether to include suspended periods: 0 to exclude or 1 to include."
+          },
+          "afdate": {
+            "type": "string",
+            "description": "The optional adjustment base date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode",
+          "begin_date",
+          "end_date"
+        ],
+        "description": "Input for reading a security K-line series over an explicit date range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.get_stock_price_indicators",
+      "service": "aifinmarket",
+      "name": "get_stock_price_indicators",
+      "description": "Get the current price, trading, valuation, and market-cap indicators for up to 50 stocks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "windcode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "One or more Wind security names or codes separated by commas, with at most 50 securities per call.",
+            "pattern": "\\S"
+          },
+          "indexes": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Comma-separated Wind indicator names to return; omit to use Wind defaults.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "windcode"
+        ],
+        "description": "Input for reading current price indicators for up to 50 securities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.list_tools",
+      "service": "aifinmarket",
+      "name": "list_tools",
+      "description": "Discover the current Wind financial data tools and their live input schemas for stocks, funds, indices, bonds, documents, economics, or analytics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverType": {
+            "type": "string",
+            "enum": [
+              "stock_data",
+              "fund_data",
+              "index_data",
+              "bond_data",
+              "financial_docs",
+              "economic_data",
+              "analytics_data"
+            ],
+            "description": "The Wind MCP service family that owns the requested tool."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Wind MCP service whose tools should be discovered."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "serverType": {
+            "type": "string",
+            "enum": [
+              "stock_data",
+              "fund_data",
+              "index_data",
+              "bond_data",
+              "financial_docs",
+              "economic_data",
+              "analytics_data"
+            ],
+            "description": "The Wind MCP service family that owns the requested tool."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact Wind MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by Wind MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive operations."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside Wind."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by Wind."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Wind MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by one Wind MCP service."
+            },
+            "description": "Tools currently exposed by the selected Wind MCP service."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current tool catalog for one Wind MCP service."
+      },
+      "followUpActions": [
+        "aifinmarket.call_tool"
+      ]
+    },
+    {
+      "id": "aifinmarket.natural_language_get_edb_data",
+      "service": "aifinmarket",
+      "name": "natural_language_get_edb_data",
+      "description": "Search Wind EDB economic indicators, fetch their time-series values, or do both.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "executionMode": {
+            "type": "string",
+            "enum": [
+              "search",
+              "fetch",
+              "searchFetch",
+              "仅搜索",
+              "仅提数",
+              "搜索并提数"
+            ],
+            "description": "Whether to search indicators, fetch values, or do both."
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language indicator query for search modes, or comma-separated EDB indicator codes for fetch mode.",
+            "pattern": "\\S"
+          },
+          "beginDate": {
+            "type": "string",
+            "description": "The inclusive data start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive data end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "observation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 6,
+            "description": "A number of recent observations, or all for the complete series.",
+            "pattern": "^(all|[0-9]+)$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "executionMode",
+          "question"
+        ],
+        "description": "Input for searching or fetching Wind EDB economic indicators."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.search_funds",
+      "service": "aifinmarket",
+      "name": "search_funds",
+      "description": "Screen funds with natural-language performance, size, fee, holding, or product criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language request containing the relevant entity, indicators, and date or reporting period when applicable.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a natural-language Wind data query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    },
+    {
+      "id": "aifinmarket.search_stocks",
+      "service": "aifinmarket",
+      "name": "search_stocks",
+      "description": "Screen stock markets with natural-language financial, valuation, technical, or business criteria.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "A natural-language request containing the relevant entity, indicators, and date or reporting period when applicable.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for a natural-language Wind data query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Wind MCP tool."
+      }
+    }
+  ]
+}

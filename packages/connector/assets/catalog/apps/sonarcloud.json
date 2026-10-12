@@ -1,0 +1,923 @@
+{
+  "service": "sonarcloud",
+  "displayName": "SonarQube Cloud",
+  "description": "Inspect projects, code issues, and quality measures with SonarQube Cloud.",
+  "categories": [
+    "Developer Tools",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Token",
+      "placeholder": "SONAR_TOKEN",
+      "description": "SonarQube Cloud personal access token or scoped organization token sent as a Bearer token. Create a token from My Account > Security: https://sonarcloud.io/account/security",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://sonarcloud.io/api",
+          "description": "Optional official SonarQube Cloud region API base URL. Use https://sonarcloud.io/api for EU or https://sonarqube.us/api for US: https://docs.sonarsource.com/sonarqube-cloud/advanced-setup/web-api"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.sonarsource.com/products/sonarqube/cloud/",
+  "actions": [
+    {
+      "id": "sonarcloud.get_component_measures",
+      "service": "sonarcloud",
+      "name": "get_component_measures",
+      "description": "Read selected code-health measures for a SonarQube Cloud component.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "componentKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project or component key to inspect.",
+            "pattern": "\\S"
+          },
+          "metricKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A SonarQube metric key.",
+              "pattern": "\\S"
+            },
+            "description": "The metric keys to return.",
+            "minItems": 1
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional branch key to inspect.",
+            "pattern": "\\S"
+          },
+          "pullRequest": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional pull request identifier to inspect.",
+            "pattern": "\\S"
+          },
+          "includeMetricDetails": {
+            "type": "boolean",
+            "description": "Whether to include metric definitions in addition to metric values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "componentKey",
+          "metricKeys"
+        ],
+        "description": "A component and metric selection for reading SonarQube Cloud measures.",
+        "not": {
+          "required": [
+            "branch",
+            "pullRequest"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "The component key."
+              },
+              "name": {
+                "type": "string",
+                "description": "The component display name."
+              },
+              "qualifier": {
+                "type": "string",
+                "description": "The SonarQube component qualifier."
+              },
+              "language": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The component language key, or null when it is not language-specific."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The component language key, or null when it is not language-specific."
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The component path, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The component path, or null when unavailable."
+              },
+              "measures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "metric": {
+                      "type": "string",
+                      "description": "The metric key."
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The overall metric value, or null when only period values are available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The overall metric value, or null when only period values are available."
+                    },
+                    "bestValue": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether this is the metric's best value, or null when unspecified."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether this is the metric's best value, or null when unspecified."
+                    },
+                    "periods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "index": {
+                            "type": "integer",
+                            "description": "The period index."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The metric value within this period."
+                          },
+                          "bestValue": {
+                            "anyOf": [
+                              {
+                                "type": "boolean",
+                                "description": "Whether this is the metric's best value, or null when unspecified."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether this is the metric's best value, or null when unspecified."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "index",
+                          "value",
+                          "bestValue"
+                        ],
+                        "description": "A new-code period value for one metric."
+                      },
+                      "description": "The new-code period values returned for this metric."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "metric",
+                    "value",
+                    "bestValue",
+                    "periods"
+                  ],
+                  "description": "One metric value returned for the requested component."
+                },
+                "description": "The requested metric values."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "name",
+              "qualifier",
+              "language",
+              "path",
+              "measures"
+            ],
+            "description": "The measured SonarQube component."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The metric key."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The metric display name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The metric description, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The metric description, or null when unavailable."
+                },
+                "domain": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The metric domain, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The metric domain, or null when unavailable."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The SonarQube metric value type."
+                },
+                "higherValuesAreBetter": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether higher values are better, or null when unspecified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether higher values are better, or null when unspecified."
+                },
+                "qualitative": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the metric is qualitative, or null when unspecified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the metric is qualitative, or null when unspecified."
+                },
+                "hidden": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the metric is hidden, or null when unspecified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the metric is hidden, or null when unspecified."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "name",
+                "description",
+                "domain",
+                "type",
+                "higherValuesAreBetter",
+                "qualitative",
+                "hidden"
+              ],
+              "description": "Metadata describing one requested metric."
+            },
+            "description": "Metric definitions returned when includeMetricDetails is enabled."
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The period index."
+                },
+                "mode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The period mode, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The period mode, or null when unavailable."
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The period start timestamp, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The period start timestamp, or null when unavailable."
+                },
+                "parameter": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The period parameter, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The period parameter, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "index",
+                "mode",
+                "date",
+                "parameter"
+              ],
+              "description": "The active new-code period returned for the component."
+            },
+            "description": "The active new-code periods returned for the component."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "metrics",
+          "periods"
+        ],
+        "description": "The requested measures and metric metadata for a SonarQube Cloud component."
+      }
+    },
+    {
+      "id": "sonarcloud.list_projects",
+      "service": "sonarcloud",
+      "name": "list_projects",
+      "description": "List projects visible in a SonarQube Cloud organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization key whose projects should be returned.",
+            "pattern": "\\S"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional text matched against project names and keys.",
+            "pattern": "\\S"
+          },
+          "projectKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A project key.",
+              "pattern": "\\S"
+            },
+            "description": "Optional project keys used to restrict the result.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "analyzedBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional date or timestamp used to return projects last analyzed before that value.",
+            "pattern": "\\S"
+          },
+          "provisionedOnly": {
+            "type": "boolean",
+            "description": "Whether to return only provisioned projects."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organization"
+        ],
+        "description": "Filters and pagination for listing projects in a SonarQube Cloud organization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paging": {
+            "type": "object",
+            "properties": {
+              "pageIndex": {
+                "type": "integer",
+                "description": "The 1-based page number returned by SonarQube Cloud."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The page size returned by SonarQube Cloud."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pageIndex",
+              "pageSize",
+              "total"
+            ],
+            "description": "Pagination metadata returned by SonarQube Cloud."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "organization": {
+                  "type": "string",
+                  "description": "The organization key that owns the project."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The unique project key."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project display name."
+                },
+                "qualifier": {
+                  "type": "string",
+                  "description": "The SonarQube component qualifier for the project."
+                },
+                "visibility": {
+                  "type": "string",
+                  "description": "The project visibility."
+                },
+                "lastAnalysisDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp of the latest analysis, or null when the project has not been analyzed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp of the latest analysis, or null when the project has not been analyzed."
+                },
+                "revision": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The source revision from the latest analysis, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The source revision from the latest analysis, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "organization",
+                "key",
+                "name",
+                "qualifier",
+                "visibility",
+                "lastAnalysisDate",
+                "revision"
+              ],
+              "description": "A SonarQube Cloud project visible to the connected token."
+            },
+            "description": "The projects returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paging",
+          "projects"
+        ],
+        "description": "The paginated SonarQube Cloud projects visible to the connected token."
+      }
+    },
+    {
+      "id": "sonarcloud.search_issues",
+      "service": "sonarcloud",
+      "name": "search_issues",
+      "description": "Search and filter code issues across SonarQube Cloud projects.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A project key.",
+              "pattern": "\\S"
+            },
+            "description": "The project keys whose issues should be searched.",
+            "minItems": 1
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional branch key to search.",
+            "pattern": "\\S"
+          },
+          "pullRequest": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional pull request identifier to search.",
+            "pattern": "\\S"
+          },
+          "issueStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "CONFIRMED",
+                "FALSE_POSITIVE",
+                "ACCEPTED",
+                "FIXED"
+              ],
+              "description": "A current issue status."
+            },
+            "description": "Optional current issue statuses to include.",
+            "minItems": 1
+          },
+          "impactSeverities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INFO",
+                "LOW",
+                "MEDIUM",
+                "HIGH",
+                "BLOCKER"
+              ],
+              "description": "An impact severity."
+            },
+            "description": "Optional impact severities to include.",
+            "minItems": 1
+          },
+          "softwareQualities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "MAINTAINABILITY",
+                "RELIABILITY",
+                "SECURITY"
+              ],
+              "description": "A software quality."
+            },
+            "description": "Optional software qualities to include.",
+            "minItems": 1
+          },
+          "assigned": {
+            "type": "boolean",
+            "description": "Whether to return only assigned or only unassigned issues."
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An assignee login.",
+              "pattern": "\\S"
+            },
+            "description": "Optional assignee logins to include. Use __me__ for the connected user.",
+            "minItems": 1
+          },
+          "createdAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional inclusive lower bound for the issue creation date.",
+            "pattern": "\\S"
+          },
+          "createdBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional inclusive upper bound for the issue creation date.",
+            "pattern": "\\S"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A language key.",
+              "pattern": "\\S"
+            },
+            "description": "Optional programming language keys to include.",
+            "minItems": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An issue tag.",
+              "pattern": "\\S"
+            },
+            "description": "Optional issue tags to include.",
+            "minItems": 1
+          },
+          "resolved": {
+            "type": "boolean",
+            "description": "Whether to return resolved or unresolved issues."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectKeys"
+        ],
+        "description": "Filters and pagination for searching SonarQube Cloud issues.",
+        "not": {
+          "required": [
+            "branch",
+            "pullRequest"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "paging": {
+            "type": "object",
+            "properties": {
+              "pageIndex": {
+                "type": "integer",
+                "description": "The 1-based page number returned by SonarQube Cloud."
+              },
+              "pageSize": {
+                "type": "integer",
+                "description": "The page size returned by SonarQube Cloud."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "pageIndex",
+              "pageSize",
+              "total"
+            ],
+            "description": "Pagination metadata returned by SonarQube Cloud."
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The unique issue key."
+                },
+                "project": {
+                  "type": "string",
+                  "description": "The project key containing the issue."
+                },
+                "component": {
+                  "type": "string",
+                  "description": "The component key containing the issue."
+                },
+                "rule": {
+                  "type": "string",
+                  "description": "The coding rule key that raised the issue."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current issue status."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The issue message."
+                },
+                "line": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The source line containing the issue, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The source line containing the issue, or null when unavailable."
+                },
+                "assignee": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The login of the assigned user, or null when the issue is unassigned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The login of the assigned user, or null when the issue is unassigned."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The source-control author, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The source-control author, or null when unavailable."
+                },
+                "effort": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The remediation effort, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The remediation effort, or null when unavailable."
+                },
+                "creationDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue creation timestamp, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue creation timestamp, or null when unavailable."
+                },
+                "updateDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issue update timestamp, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issue update timestamp, or null when unavailable."
+                },
+                "cleanCodeAttribute": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The clean-code attribute assigned to the issue, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The clean-code attribute assigned to the issue, or null when unavailable."
+                },
+                "cleanCodeAttributeCategory": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The clean-code attribute category, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The clean-code attribute category, or null when unavailable."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "An issue tag."
+                  },
+                  "description": "The tags assigned to the issue."
+                },
+                "impacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "softwareQuality": {
+                        "type": "string",
+                        "description": "The affected software quality."
+                      },
+                      "severity": {
+                        "type": "string",
+                        "description": "The impact severity."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "softwareQuality",
+                      "severity"
+                    ],
+                    "description": "A software-quality impact reported for an issue."
+                  },
+                  "description": "The software-quality impacts reported for the issue."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "project",
+                "component",
+                "rule",
+                "status",
+                "message",
+                "line",
+                "assignee",
+                "author",
+                "effort",
+                "creationDate",
+                "updateDate",
+                "cleanCodeAttribute",
+                "cleanCodeAttributeCategory",
+                "tags",
+                "impacts"
+              ],
+              "description": "A normalized SonarQube Cloud code issue."
+            },
+            "description": "The issues returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paging",
+          "issues"
+        ],
+        "description": "The normalized paginated SonarQube Cloud issues."
+      }
+    }
+  ]
+}

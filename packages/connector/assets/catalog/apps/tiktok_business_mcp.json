@@ -1,0 +1,170 @@
+{
+  "service": "tiktok_business_mcp",
+  "displayName": "TikTok for Business MCP",
+  "description": "Use the official TikTok for Business MCP tools for advertising workflows.",
+  "categories": [
+    "Marketing",
+    "Advertising"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://business-api.tiktok.com/portal/mcp-tt4b-authorize",
+      "tokenUrl": "https://business-api.tiktok.com/open_mcp/tt-ads-mcp-flat/oauth/token",
+      "refreshTokenUrl": "https://business-api.tiktok.com/open_mcp/tt-ads-mcp-flat/oauth/token",
+      "scopes": [
+        "mcp:tt4b"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "resource": "https://business-api.tiktok.com/open_mcp/tt-ads-mcp-flat"
+      },
+      "clientSetup": {
+        "docsUrl": "https://business-api.tiktok.com/portal/docs",
+        "steps": [
+          "Create a TikTok for Business developer application with MCP access.",
+          "Add the callback URL shown here to the application's redirect URLs.",
+          "Copy the client ID and client secret into OOMOL Connect."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://business.tiktok.com",
+  "actions": [
+    {
+      "id": "tiktok_business_mcp.call_tool",
+      "service": "tiktok_business_mcp",
+      "name": "call_tool",
+      "description": "Call a current TikTok for Business MCP tool with JSON arguments. Discover the live schema first and confirm the user's intent because tools may create ads, change budgets or delivery, revoke access, or delete advertising assets.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "tiktok_business_mcp.tools"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by TikTok MCP discovery."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the current inputSchema for the selected TikTok MCP tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current TikTok for Business MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The current TikTok MCP result after standard MCP content normalization."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the TikTok for Business MCP tool."
+      },
+      "followUpActions": [
+        "tiktok_business_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "tiktok_business_mcp.list_tools",
+      "service": "tiktok_business_mcp",
+      "name": "list_tools",
+      "description": "List the complete current tool catalog and live input schemas exposed by the connected TikTok for Business MCP account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "tiktok_business_mcp.tools"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact TikTok MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by TikTok."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether TikTok expects the tool not to modify advertising data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether TikTok indicates that the tool may perform a destructive operation."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside TikTok Ads."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by TikTok for a tool."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by TikTok MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A core or discovery tool currently exposed by TikTok for Business MCP."
+            },
+            "description": "Tools currently exposed by the full MCP connection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current TikTok for Business MCP tool catalog."
+      },
+      "followUpActions": [
+        "tiktok_business_mcp.call_tool"
+      ]
+    }
+  ]
+}

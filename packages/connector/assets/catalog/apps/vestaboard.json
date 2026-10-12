@@ -1,0 +1,270 @@
+{
+  "service": "vestaboard",
+  "displayName": "Vestaboard",
+  "categories": [
+    "Communication",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Cloud API Token",
+      "placeholder": "vestaboard_cloud_api_token",
+      "description": "Vestaboard Cloud API token sent with the X-Vestaboard-Token header. Create it in the API tab of the Vestaboard web app or under Settings / Advanced Settings in the mobile app: https://docs.vestaboard.com/docs/read-write-api/authentication.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.vestaboard.com",
+  "actions": [
+    {
+      "id": "vestaboard.get_current_message",
+      "service": "vestaboard",
+      "name": "get_current_message",
+      "description": "Read the current message displayed by Vestaboard Cloud API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for reading the current Vestaboard message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currentMessage": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vestaboard message identifier.",
+                "format": "uuid"
+              },
+              "layout": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The raw Vestaboard layout JSON string returned by the Cloud API."
+              },
+              "characters": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "One Vestaboard character code integer."
+                  },
+                  "description": "One row of Vestaboard character codes.",
+                  "minItems": 1
+                },
+                "description": "The parsed Vestaboard character grid derived from the layout string.",
+                "minItems": 1
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of rows in the parsed Vestaboard character grid."
+              },
+              "columns": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of columns in the parsed Vestaboard character grid."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The current Vestaboard message returned by the Cloud API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current message response returned by Vestaboard."
+      }
+    },
+    {
+      "id": "vestaboard.get_transition",
+      "service": "vestaboard",
+      "name": "get_transition",
+      "description": "Read the current Vestaboard transition settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for reading Vestaboard transition settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transition": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "wave",
+              "drift",
+              "curtain"
+            ],
+            "description": "The Vestaboard transition style."
+          },
+          "transitionSpeed": {
+            "type": "string",
+            "enum": [
+              "gentle",
+              "fast"
+            ],
+            "description": "The Vestaboard transition speed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Vestaboard transition settings."
+      }
+    },
+    {
+      "id": "vestaboard.send_message",
+      "service": "vestaboard",
+      "name": "send_message",
+      "description": "Send a new Vestaboard message as plain text or as a two-dimensional character-code grid.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The text message sent to Vestaboard."
+              },
+              "forced": {
+                "type": "boolean",
+                "description": "Whether Vestaboard should bypass quiet hours for this message."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Text-mode input for sending a Vestaboard message."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "characters": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "One Vestaboard character code integer."
+                  },
+                  "description": "One row of Vestaboard character codes.",
+                  "minItems": 1
+                },
+                "description": "The Vestaboard character grid to send.",
+                "minItems": 1
+              },
+              "forced": {
+                "type": "boolean",
+                "description": "Whether Vestaboard should bypass quiet hours for this message."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "characters"
+            ],
+            "description": "Character-grid input for sending a Vestaboard message."
+          }
+        ],
+        "description": "Input for sending a Vestaboard message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The write status returned by Vestaboard."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Vestaboard message identifier.",
+            "format": "uuid"
+          },
+          "created": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Unix epoch timestamp in milliseconds when Vestaboard created the message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Vestaboard message write result."
+      }
+    },
+    {
+      "id": "vestaboard.set_transition",
+      "service": "vestaboard",
+      "name": "set_transition",
+      "description": "Update the Vestaboard transition style and transition speed.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transition": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "wave",
+              "drift",
+              "curtain"
+            ],
+            "description": "The Vestaboard transition style."
+          },
+          "transitionSpeed": {
+            "type": "string",
+            "enum": [
+              "gentle",
+              "fast"
+            ],
+            "description": "The Vestaboard transition speed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for updating Vestaboard transition settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transition": {
+            "type": "string",
+            "enum": [
+              "classic",
+              "wave",
+              "drift",
+              "curtain"
+            ],
+            "description": "The Vestaboard transition style."
+          },
+          "transitionSpeed": {
+            "type": "string",
+            "enum": [
+              "gentle",
+              "fast"
+            ],
+            "description": "The Vestaboard transition speed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Vestaboard transition settings."
+      }
+    }
+  ]
+}

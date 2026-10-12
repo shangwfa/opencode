@@ -1,0 +1,906 @@
+{
+  "service": "addressfinder",
+  "displayName": "Addressfinder",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ADDRESSFINDER_API_KEY",
+      "description": "Addressfinder API key sent as the key query parameter. Find it in your Addressfinder Portal project credentials: https://portal.addressfinder.net/.",
+      "extraFields": [
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "ADDRESSFINDER_API_SECRET",
+          "description": "Addressfinder API secret sent in the Authorization header for server-to-server requests. Find it with the API key in your Addressfinder Portal project credentials: https://portal.addressfinder.net/."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://addressfinder.com/au",
+  "actions": [
+    {
+      "id": "addressfinder.find_au_addresses",
+      "service": "addressfinder",
+      "name": "find_au_addresses",
+      "description": "Search Australian addresses with Addressfinder autocomplete and return matching address completions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial Australian address being searched."
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "GNAF,PAF",
+              "GNAF",
+              "PAF"
+            ],
+            "description": "The Australian address dataset source to query."
+          },
+          "postBox": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Set this filter to 0 or 1."
+          },
+          "canonical": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "stateCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACT",
+                "NSW",
+                "NT",
+                "QLD",
+                "SA",
+                "TAS",
+                "VIC",
+                "WA",
+                "OT"
+              ],
+              "description": "One Australian state or territory code."
+            },
+            "description": "Australian state or territory codes used to filter results.",
+            "minItems": 1
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "highlight": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for Australian address autocomplete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "completions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "full_address": {
+                  "type": "string",
+                  "description": "The full Australian address string."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The unique Addressfinder address identifier."
+                },
+                "canonical_address_id": {
+                  "type": "string",
+                  "description": "The canonical address identifier for this result."
+                },
+                "highlighted_full_address": {
+                  "type": "string",
+                  "description": "The highlighted full address when the highlight option is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "full_address",
+                "id"
+              ],
+              "description": "One Australian address autocomplete completion returned by Addressfinder."
+            },
+            "description": "The autocomplete completions returned by Addressfinder."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "completions",
+          "meta",
+          "raw"
+        ],
+        "description": "The Addressfinder Australian address autocomplete response."
+      },
+      "followUpActions": [
+        "addressfinder.get_au_address_metadata"
+      ]
+    },
+    {
+      "id": "addressfinder.find_nz_addresses",
+      "service": "addressfinder",
+      "name": "find_nz_addresses",
+      "description": "Search New Zealand addresses with Addressfinder autocomplete and return matching address completions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The partial New Zealand address being searched."
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "delivered": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Set this filter to 0 or 1."
+          },
+          "postBox": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Set this filter to 0 or 1."
+          },
+          "rural": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Set this filter to 0 or 1."
+          },
+          "strict": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1",
+              "2"
+            ],
+            "description": "How closely Addressfinder should match the query."
+          },
+          "regionCode": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F",
+              "G",
+              "H"
+            ],
+            "description": "The New Zealand regional authority code used to filter results."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "highlight": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for New Zealand address autocomplete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "completions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "a": {
+                  "type": "string",
+                  "description": "The canonical New Zealand address string."
+                },
+                "pxid": {
+                  "type": "string",
+                  "description": "The unique Addressfinder address identifier."
+                },
+                "v": {
+                  "type": "integer",
+                  "description": "Whether the result is postal or physical according to Addressfinder."
+                },
+                "highlighted_a": {
+                  "type": "string",
+                  "description": "The highlighted address when the highlight option is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "a",
+                "pxid",
+                "v"
+              ],
+              "description": "One New Zealand address autocomplete completion returned by Addressfinder."
+            },
+            "description": "The autocomplete completions returned by Addressfinder."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "completions",
+          "meta",
+          "raw"
+        ],
+        "description": "The Addressfinder New Zealand address autocomplete response."
+      },
+      "followUpActions": [
+        "addressfinder.get_nz_address_metadata"
+      ]
+    },
+    {
+      "id": "addressfinder.get_au_address_metadata",
+      "service": "addressfinder",
+      "name": "get_au_address_metadata",
+      "description": "Retrieve full metadata for an Australian address selected from Addressfinder autocomplete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Addressfinder address identifier returned by autocomplete."
+          },
+          "gnafId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique G-NAF address identifier."
+          },
+          "dpid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Australia Post delivery point identifier."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "GNAF,PAF",
+              "GNAF",
+              "PAF"
+            ],
+            "description": "The Australian address dataset source to query."
+          },
+          "gps": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "census": {
+            "type": "integer",
+            "minimum": 2016,
+            "maximum": 2021,
+            "description": "The Australian census year for statistical identifiers."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving Australian address metadata.",
+        "anyOf": [
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "gnafId"
+            ]
+          },
+          {
+            "required": [
+              "dpid"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "address",
+          "meta"
+        ],
+        "description": "The Addressfinder Australian address metadata response."
+      }
+    },
+    {
+      "id": "addressfinder.get_nz_address_metadata",
+      "service": "addressfinder",
+      "name": "get_nz_address_metadata",
+      "description": "Retrieve full metadata for a New Zealand address selected from Addressfinder autocomplete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pxid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Addressfinder PXID returned by autocomplete."
+          },
+          "dpid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NZ Post delivery point identifier."
+          },
+          "census": {
+            "type": "integer",
+            "minimum": 2018,
+            "maximum": 2023,
+            "description": "The New Zealand census year for Statistics NZ metadata."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving New Zealand address metadata.",
+        "anyOf": [
+          {
+            "required": [
+              "pxid"
+            ]
+          },
+          {
+            "required": [
+              "dpid"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "address": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "address",
+          "meta"
+        ],
+        "description": "The Addressfinder New Zealand address metadata response."
+      }
+    },
+    {
+      "id": "addressfinder.verify_au_address",
+      "service": "addressfinder",
+      "name": "verify_au_address",
+      "description": "Verify and enrich an Australian address with Addressfinder address verification.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Australian address to verify."
+          },
+          "gnaf": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "paf": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "postBox": {
+            "const": "0",
+            "type": "string",
+            "description": "Exclude box type addresses from the verification results."
+          },
+          "gps": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "extended": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          },
+          "census": {
+            "type": "integer",
+            "minimum": 2016,
+            "maximum": 2021,
+            "description": "The Australian census year for statistical identifiers."
+          },
+          "stateCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ACT",
+                "NSW",
+                "NT",
+                "QLD",
+                "SA",
+                "TAS",
+                "VIC",
+                "WA",
+                "OT"
+              ],
+              "description": "One Australian state or territory code."
+            },
+            "description": "Australian state or territory codes used to filter results.",
+            "minItems": 1
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for verifying an Australian address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Addressfinder matched the submitted address."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Addressfinder matched the submitted address."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Addressfinder object returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Addressfinder object returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "matched",
+          "address",
+          "meta",
+          "raw"
+        ],
+        "description": "The Addressfinder Australian address verification response."
+      }
+    },
+    {
+      "id": "addressfinder.verify_nz_address",
+      "service": "addressfinder",
+      "name": "verify_nz_address",
+      "description": "Verify and enrich a New Zealand address with Addressfinder address verification.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The New Zealand address to verify."
+          },
+          "postBox": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "Set this filter to 0 or 1."
+          },
+          "regionCode": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F",
+              "G",
+              "H"
+            ],
+            "description": "The New Zealand regional authority code used to filter results."
+          },
+          "census": {
+            "type": "integer",
+            "minimum": 2018,
+            "maximum": 2023,
+            "description": "The New Zealand census year for Statistics NZ metadata."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional registered Addressfinder domain used for portal activity monitoring."
+          },
+          "ascii": {
+            "const": "1",
+            "type": "string",
+            "description": "Set this flag to 1 when the option should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for verifying a New Zealand address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Addressfinder reported the request as successful."
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Addressfinder matched the submitted address."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Addressfinder matched the submitted address."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Addressfinder object returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Addressfinder object returned by the API."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "description": "The Addressfinder API endpoint path used for the request."
+              },
+              "country": {
+                "type": "string",
+                "enum": [
+                  "au",
+                  "nz"
+                ],
+                "description": "The country-specific Addressfinder API family."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint",
+              "country"
+            ],
+            "description": "Connector metadata for the Addressfinder API request."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Addressfinder object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "matched",
+          "address",
+          "meta",
+          "raw"
+        ],
+        "description": "The Addressfinder New Zealand address verification response."
+      }
+    }
+  ]
+}

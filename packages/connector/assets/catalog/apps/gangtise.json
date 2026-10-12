@@ -1,0 +1,3438 @@
+{
+  "service": "gangtise",
+  "displayName": "Gangtise",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Key",
+      "placeholder": "GANGTISE_ACCESS_KEY",
+      "description": "Gangtise Access Key. Create an account and get both keys under My Account > Account List at https://open-platform.gangtise.com/.",
+      "extraFields": [
+        {
+          "key": "secretKey",
+          "label": "Secret Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "GANGTISE_SECRET_KEY",
+          "description": "Secret Key paired with the Gangtise Access Key."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.gangtise.com",
+  "actions": [
+    {
+      "id": "gangtise.get_company_indicators",
+      "service": "gangtise",
+      "name": "get_company_indicators",
+      "description": "Get Gangtise A-share company indicator values as a time series or a single-date cross section.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "description": "Input parameters for retrieving Gangtise company indicator values.",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "time_series",
+                  "cross_section"
+                ],
+                "description": "The official indicator query shape to use."
+              },
+              "indicatorCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An indicator code returned by search_company_indicators."
+                },
+                "description": "The exact Gangtise indicator codes to query.",
+                "minItems": 1
+              },
+              "securities": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An exact Gangtise security code such as 600519.SH."
+                },
+                "description": "The exact A-share security codes to query.",
+                "minItems": 1
+              },
+              "startDate": {
+                "type": "string",
+                "description": "The first value date; required for time_series mode and ignored for cross_section.",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "description": "The last value date for time_series mode or the observation date for cross_section mode.",
+                "format": "date"
+              },
+              "calendarType": {
+                "type": "string",
+                "enum": [
+                  "TD",
+                  "CD"
+                ],
+                "description": "The calendar used by time-series queries.",
+                "default": "TD"
+              },
+              "scale": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The official Gangtise indicator scale value.",
+                "pattern": "\\S",
+                "default": "0"
+              },
+              "indicatorParameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "indicatorCode": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The indicator code these parameters apply to.",
+                      "pattern": "\\S"
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "An official Gangtise indicator parameter value."
+                      },
+                      "description": "The parameter keys and values accepted by the official indicator."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Parameters for one indicator."
+                },
+                "description": "Per-indicator parameter values discovered through search_company_indicators.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "indicatorCodes",
+              "securities",
+              "endDate"
+            ],
+            "description": "Common Gangtise company indicator parameters."
+          },
+          {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "time_series",
+                    "type": "string",
+                    "description": "The time-series query mode."
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "The first value date for the time series.",
+                    "format": "date"
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "mode",
+                  "startDate"
+                ],
+                "description": "A time-series indicator query."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "cross_section",
+                    "type": "string",
+                    "description": "The cross-section query mode."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "mode"
+                ],
+                "description": "A cross-section indicator query."
+              }
+            ],
+            "description": "A supported Gangtise indicator query mode."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "time_series",
+              "cross_section"
+            ],
+            "description": "The query mode used for this result."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The value date, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The value date, or null when unavailable."
+                },
+                "securityCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code."
+                },
+                "securityName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The security name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The security name, or null when unavailable."
+                },
+                "indicatorCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise indicator code."
+                },
+                "indicatorName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The indicator name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The indicator name, or null when unavailable."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The indicator value, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The indicator value, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The indicator value, or null when unavailable."
+                    }
+                  ],
+                  "description": "The indicator value, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized company indicator value."
+            },
+            "description": "The normalized indicator values."
+          },
+          "cellCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of upstream value cells returned."
+          },
+          "estimatedPoints": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The estimated Gangtise points charged for the returned cells."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise company indicator result."
+      }
+    },
+    {
+      "id": "gangtise.get_daily_kline",
+      "service": "gangtise",
+      "name": "get_daily_kline",
+      "description": "Get Gangtise unadjusted daily K-line market data for exact security codes in one supported market.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "enum": [
+              "a_share",
+              "hong_kong",
+              "united_states",
+              "index"
+            ],
+            "description": "The Gangtise market to query."
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes valid for the selected market.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first trading date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last trading date to include.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum number of rows to return.",
+            "default": 5000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "market",
+          "securities",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for retrieving Gangtise daily K-line data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "enum": [
+              "a_share",
+              "hong_kong",
+              "united_states",
+              "index"
+            ],
+            "description": "The Gangtise market to query."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Gangtise security code for this row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Gangtise security code for this row."
+                },
+                "tradeDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The trading date returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The trading date returned by Gangtise."
+                },
+                "open": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The opening price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The opening price, or null when unavailable."
+                },
+                "high": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The highest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The highest price, or null when unavailable."
+                },
+                "low": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The lowest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The lowest price, or null when unavailable."
+                },
+                "close": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The closing price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The closing price, or null when unavailable."
+                },
+                "preClose": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The previous closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The previous closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The previous closing price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The previous closing price, or null when unavailable."
+                },
+                "change": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The absolute price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The absolute price change, or null when unavailable."
+                },
+                "pctChange": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The percentage price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The percentage price change, or null when unavailable."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading volume, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading volume, or null when unavailable."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading amount, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading amount, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized daily K-line row."
+            },
+            "description": "The returned daily K-line rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise daily K-line result."
+      }
+    },
+    {
+      "id": "gangtise.get_earnings_forecast",
+      "service": "gangtise",
+      "name": "get_earnings_forecast",
+      "description": "Get Gangtise broker-consensus earnings forecasts for exact security codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first forecast update date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last forecast update date to include.",
+            "format": "date"
+          },
+          "consensusFields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "netIncome",
+                "netIncomeYoy",
+                "eps",
+                "pe",
+                "bps",
+                "pb",
+                "peg",
+                "roe",
+                "ps"
+              ],
+              "description": "A supported Gangtise consensus field."
+            },
+            "description": "The consensus forecast fields to return.",
+            "minItems": 1,
+            "maxItems": 9
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for retrieving Gangtise earnings forecasts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code."
+                },
+                "securityName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The security name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The security name, or null when unavailable."
+                },
+                "updateDate": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The forecast update date."
+                },
+                "forecastYear": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The fiscal year covered by this forecast."
+                },
+                "netIncome": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast net income, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast net income, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast net income, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast net income, or null when unavailable."
+                },
+                "netIncomeYoy": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast year-over-year net income growth, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast year-over-year net income growth, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast year-over-year net income growth, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast year-over-year net income growth, or null when unavailable."
+                },
+                "eps": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast earnings per share, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast earnings per share, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast earnings per share, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast earnings per share, or null when unavailable."
+                },
+                "pe": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast price-to-earnings ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast price-to-earnings ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast price-to-earnings ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast price-to-earnings ratio, or null when unavailable."
+                },
+                "bps": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast book value per share, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast book value per share, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast book value per share, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast book value per share, or null when unavailable."
+                },
+                "pb": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast price-to-book ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast price-to-book ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast price-to-book ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast price-to-book ratio, or null when unavailable."
+                },
+                "peg": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast PEG ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast PEG ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast PEG ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast PEG ratio, or null when unavailable."
+                },
+                "roe": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast return on equity, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast return on equity, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast return on equity, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast return on equity, or null when unavailable."
+                },
+                "ps": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The forecast price-to-sales ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The forecast price-to-sales ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The forecast price-to-sales ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The forecast price-to-sales ratio, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Gangtise consensus forecast row."
+            },
+            "description": "The consensus forecast rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise earnings forecast result."
+      }
+    },
+    {
+      "id": "gangtise.get_financial_statements",
+      "service": "gangtise",
+      "name": "get_financial_statements",
+      "description": "Get Gangtise income statements, balance sheets, or cash-flow statements for exact security codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "description": "Input parameters for retrieving company financial statements.",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "market": {
+                "type": "string",
+                "enum": [
+                  "a_share",
+                  "hong_kong",
+                  "united_states"
+                ],
+                "description": "The Gangtise company financial market to query."
+              },
+              "statement": {
+                "type": "string",
+                "enum": [
+                  "income",
+                  "balance_sheet",
+                  "cash_flow"
+                ],
+                "description": "The financial statement to retrieve."
+              },
+              "granularity": {
+                "type": "string",
+                "enum": [
+                  "accumulated",
+                  "quarterly"
+                ],
+                "description": "Whether values are accumulated or single-quarter values.",
+                "default": "accumulated"
+              },
+              "securities": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An exact Gangtise security code such as 600519.SH."
+                },
+                "description": "The exact Gangtise security codes to query.",
+                "minItems": 1
+              },
+              "startDate": {
+                "type": "string",
+                "description": "The first report date to include.",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "description": "The last report date to include.",
+                "format": "date"
+              },
+              "fiscalYears": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A four-digit fiscal year such as 2025."
+                },
+                "description": "The fiscal years to include.",
+                "minItems": 1
+              },
+              "periods": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Q0",
+                    "Q1",
+                    "Q2",
+                    "Q3",
+                    "Q4"
+                  ],
+                  "description": "A Gangtise financial report period."
+                },
+                "description": "The report periods to include.",
+                "minItems": 1
+              },
+              "reportTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "consolidated",
+                    "consolidatedRestated",
+                    "standalone",
+                    "standaloneRestated"
+                  ],
+                  "description": "A Gangtise financial report type."
+                },
+                "description": "The report consolidation types to include.",
+                "minItems": 1
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An official Gangtise financial field name."
+                },
+                "description": "The official financial statement fields to return.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "market",
+              "statement",
+              "securities"
+            ],
+            "description": "Common Gangtise financial statement parameters."
+          },
+          {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "market": {
+                    "const": "a_share",
+                    "type": "string",
+                    "description": "The A-share market."
+                  },
+                  "statement": {
+                    "type": "string",
+                    "enum": [
+                      "income",
+                      "cash_flow"
+                    ],
+                    "description": "A statement with quarterly support."
+                  },
+                  "granularity": {
+                    "type": "string",
+                    "enum": [
+                      "accumulated",
+                      "quarterly"
+                    ],
+                    "description": "A supported A-share statement granularity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "market",
+                  "statement",
+                  "granularity"
+                ],
+                "description": "An A-share income or cash-flow statement."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "market": {
+                    "const": "a_share",
+                    "type": "string",
+                    "description": "The A-share market."
+                  },
+                  "statement": {
+                    "const": "balance_sheet",
+                    "type": "string",
+                    "description": "The balance-sheet statement."
+                  },
+                  "granularity": {
+                    "const": "accumulated",
+                    "type": "string",
+                    "description": "The accumulated report granularity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "market",
+                  "statement",
+                  "granularity"
+                ],
+                "description": "An accumulated A-share balance sheet."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "market": {
+                    "type": "string",
+                    "enum": [
+                      "hong_kong",
+                      "united_states"
+                    ],
+                    "description": "A market that supports accumulated statements only."
+                  },
+                  "statement": {
+                    "type": "string",
+                    "enum": [
+                      "income",
+                      "balance_sheet",
+                      "cash_flow"
+                    ],
+                    "description": "A supported company financial statement."
+                  },
+                  "granularity": {
+                    "const": "accumulated",
+                    "type": "string",
+                    "description": "The accumulated report granularity."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "market",
+                  "statement",
+                  "granularity"
+                ],
+                "description": "An accumulated Hong Kong or US financial statement."
+              }
+            ],
+            "description": "A market, statement, and granularity combination supported by Gangtise."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "enum": [
+              "a_share",
+              "hong_kong",
+              "united_states"
+            ],
+            "description": "The Gangtise company financial market to query."
+          },
+          "statement": {
+            "type": "string",
+            "enum": [
+              "income",
+              "balance_sheet",
+              "cash_flow"
+            ],
+            "description": "The returned statement type."
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "accumulated",
+              "quarterly"
+            ],
+            "description": "The returned report granularity."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One normalized row using the official Gangtise field names."
+            },
+            "description": "The returned statement rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise financial statement result."
+      }
+    },
+    {
+      "id": "gangtise.get_fund_flow",
+      "service": "gangtise",
+      "name": "get_fund_flow",
+      "description": "Get historical A-share daily small, medium, large, extra-large, total, and main-fund net inflows.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact A-share security codes, or the official aShares token for the full market.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first trading date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last trading date to include.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum number of rows to return.",
+            "default": 5000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for retrieving Gangtise daily fund flow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Gangtise security code for this row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Gangtise security code for this row."
+                },
+                "tradeDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The trading date returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The trading date returned by Gangtise."
+                },
+                "smallNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The small-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The small-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The small-order net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The small-order net inflow, or null when unavailable."
+                },
+                "mediumNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The medium-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The medium-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The medium-order net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The medium-order net inflow, or null when unavailable."
+                },
+                "largeNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The large-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The large-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The large-order net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The large-order net inflow, or null when unavailable."
+                },
+                "xlargeNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The extra-large-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The extra-large-order net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The extra-large-order net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The extra-large-order net inflow, or null when unavailable."
+                },
+                "totalNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The total net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The total net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The total net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The total net inflow, or null when unavailable."
+                },
+                "mainNetInflow": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The main-fund net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The main-fund net inflow, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The main-fund net inflow, or null when unavailable."
+                    }
+                  ],
+                  "description": "The main-fund net inflow, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized daily fund-flow row."
+            },
+            "description": "The returned fund-flow rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise daily fund-flow result."
+      }
+    },
+    {
+      "id": "gangtise.get_main_business_breakdown",
+      "service": "gangtise",
+      "name": "get_main_business_breakdown",
+      "description": "Get a company's main-business revenue and profitability breakdown by product, industry, or region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first report date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last report date to include.",
+            "format": "date"
+          },
+          "breakdown": {
+            "type": "string",
+            "enum": [
+              "product",
+              "industry",
+              "region"
+            ],
+            "description": "The business breakdown dimension."
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "interim",
+              "annual"
+            ],
+            "description": "The optional report period filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "startDate",
+          "endDate",
+          "breakdown"
+        ],
+        "description": "Input parameters for retrieving Gangtise main-business data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code."
+                },
+                "securityName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The security name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The security name, or null when unavailable."
+                },
+                "breakdown": {
+                  "type": "string",
+                  "enum": [
+                    "product",
+                    "industry",
+                    "region"
+                  ],
+                  "description": "The dimension used for this row."
+                },
+                "periodName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reporting period name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reporting period name, or null when unavailable."
+                },
+                "periodEndDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reporting period end date, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reporting period end date, or null when unavailable."
+                },
+                "categoryName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The product, industry, or region name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The product, industry, or region name."
+                },
+                "opRevenue": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The operating revenue, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The operating revenue, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The operating revenue, or null when unavailable."
+                    }
+                  ],
+                  "description": "The operating revenue, or null when unavailable."
+                },
+                "opRevenueYoy": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The year-over-year operating revenue growth, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The year-over-year operating revenue growth, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The year-over-year operating revenue growth, or null when unavailable."
+                    }
+                  ],
+                  "description": "The year-over-year operating revenue growth, or null when unavailable."
+                },
+                "opRevenueRatio": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The operating revenue contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The operating revenue contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The operating revenue contribution ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The operating revenue contribution ratio, or null when unavailable."
+                },
+                "opCost": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The operating cost, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The operating cost, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The operating cost, or null when unavailable."
+                    }
+                  ],
+                  "description": "The operating cost, or null when unavailable."
+                },
+                "opCostYoy": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The year-over-year operating cost growth, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The year-over-year operating cost growth, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The year-over-year operating cost growth, or null when unavailable."
+                    }
+                  ],
+                  "description": "The year-over-year operating cost growth, or null when unavailable."
+                },
+                "opCostRatio": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The operating cost contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The operating cost contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The operating cost contribution ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The operating cost contribution ratio, or null when unavailable."
+                },
+                "grossProfit": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The gross profit, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gross profit, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The gross profit, or null when unavailable."
+                    }
+                  ],
+                  "description": "The gross profit, or null when unavailable."
+                },
+                "grossProfitYoy": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The year-over-year gross profit growth, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The year-over-year gross profit growth, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The year-over-year gross profit growth, or null when unavailable."
+                    }
+                  ],
+                  "description": "The year-over-year gross profit growth, or null when unavailable."
+                },
+                "grossProfitRatio": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The gross profit contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gross profit contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The gross profit contribution ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The gross profit contribution ratio, or null when unavailable."
+                },
+                "grossMargin": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The gross margin, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gross margin, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The gross margin, or null when unavailable."
+                    }
+                  ],
+                  "description": "The gross margin, or null when unavailable."
+                },
+                "grossMarginYoy": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The year-over-year gross margin growth, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The year-over-year gross margin growth, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The year-over-year gross margin growth, or null when unavailable."
+                    }
+                  ],
+                  "description": "The year-over-year gross margin growth, or null when unavailable."
+                },
+                "grossMarginRatio": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The gross margin contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gross margin contribution ratio, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The gross margin contribution ratio, or null when unavailable."
+                    }
+                  ],
+                  "description": "The gross margin contribution ratio, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized main-business breakdown row."
+            },
+            "description": "The main-business breakdown rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise main-business result."
+      }
+    },
+    {
+      "id": "gangtise.get_minute_kline",
+      "service": "gangtise",
+      "name": "get_minute_kline",
+      "description": "Get historical minute K-line data for one or more exact A-share security codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact A-share security codes to query.",
+            "minItems": 1
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first timestamp to include, using YYYY-MM-DD HH:mm:ss or an accepted official timestamp format.",
+            "pattern": "\\S"
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The last timestamp to include, using YYYY-MM-DD HH:mm:ss or an accepted official timestamp format.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum number of rows requested per security.",
+            "default": 5000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "startTime",
+          "endTime"
+        ],
+        "description": "Input parameters for retrieving Gangtise minute K-line data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Gangtise security code for this row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Gangtise security code for this row."
+                },
+                "tradeTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The minute timestamp returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The minute timestamp returned by Gangtise."
+                },
+                "open": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The opening price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The opening price, or null when unavailable."
+                },
+                "high": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The highest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The highest price, or null when unavailable."
+                },
+                "low": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The lowest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The lowest price, or null when unavailable."
+                },
+                "close": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The closing price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The closing price, or null when unavailable."
+                },
+                "change": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The absolute price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The absolute price change, or null when unavailable."
+                },
+                "pctChange": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The percentage price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The percentage price change, or null when unavailable."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading volume, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading volume, or null when unavailable."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading amount, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading amount, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized minute K-line row."
+            },
+            "description": "The returned minute K-line rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise minute K-line result."
+      }
+    },
+    {
+      "id": "gangtise.get_realtime_quotes",
+      "service": "gangtise",
+      "name": "get_realtime_quotes",
+      "description": "Get current Gangtise market snapshots for one or more exact security codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving real-time Gangtise quotes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "quotes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Gangtise security code for this quote."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Gangtise security code for this quote."
+                },
+                "exchange": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The exchange identifier returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The exchange identifier returned by Gangtise."
+                },
+                "tradeDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The trading date returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The trading date returned by Gangtise."
+                },
+                "tradeTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The quote time returned by Gangtise."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The quote time returned by Gangtise."
+                },
+                "latestPrice": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The latest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The latest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The latest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The latest price, or null when unavailable."
+                },
+                "open": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The opening price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The opening price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The opening price, or null when unavailable."
+                },
+                "high": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The highest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The highest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The highest price, or null when unavailable."
+                },
+                "low": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The lowest price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The lowest price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The lowest price, or null when unavailable."
+                },
+                "preClose": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The previous closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The previous closing price, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The previous closing price, or null when unavailable."
+                    }
+                  ],
+                  "description": "The previous closing price, or null when unavailable."
+                },
+                "change": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The absolute price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The absolute price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The absolute price change, or null when unavailable."
+                },
+                "pctChange": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The percentage price change, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The percentage price change, or null when unavailable."
+                    }
+                  ],
+                  "description": "The percentage price change, or null when unavailable."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading volume, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading volume, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading volume, or null when unavailable."
+                },
+                "amount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading amount, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading amount, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading amount, or null when unavailable."
+                },
+                "amplitude": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The trading amplitude, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The trading amplitude, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The trading amplitude, or null when unavailable."
+                    }
+                  ],
+                  "description": "The trading amplitude, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized real-time quote row."
+            },
+            "description": "The returned real-time quotes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise real-time quote result."
+      }
+    },
+    {
+      "id": "gangtise.get_top_shareholders",
+      "service": "gangtise",
+      "name": "get_top_shareholders",
+      "description": "Get the top ten shareholders or top ten floating shareholders for exact security codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "holderType": {
+            "type": "string",
+            "enum": [
+              "top10",
+              "top10Float"
+            ],
+            "description": "The shareholder table to retrieve."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first report date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last report date to include.",
+            "format": "date"
+          },
+          "fiscalYears": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A four-digit fiscal year such as 2025."
+            },
+            "description": "The fiscal years to include.",
+            "minItems": 1
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "q1",
+                "interim",
+                "q3",
+                "annual",
+                "latest"
+              ],
+              "description": "A Gangtise shareholder report period."
+            },
+            "description": "The report periods to include.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "holderType"
+        ],
+        "description": "Input parameters for retrieving Gangtise top-shareholder data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code."
+                },
+                "holderType": {
+                  "type": "string",
+                  "enum": [
+                    "top10",
+                    "top10Float"
+                  ],
+                  "description": "The requested shareholder table."
+                },
+                "reportPeriod": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The report period, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The report period, or null when unavailable."
+                },
+                "rank": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The shareholder rank, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The shareholder rank, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The shareholder rank, or null when unavailable."
+                    }
+                  ],
+                  "description": "The shareholder rank, or null when unavailable."
+                },
+                "shareholderName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The shareholder name, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The shareholder name, or null when unavailable."
+                },
+                "shareholderType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The shareholder type, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The shareholder type, or null when unavailable."
+                },
+                "holdingNum": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The number of shares held, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The number of shares held, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The number of shares held, or null when unavailable."
+                    }
+                  ],
+                  "description": "The number of shares held, or null when unavailable."
+                },
+                "holdingPct": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The holding percentage, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The holding percentage, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The holding percentage, or null when unavailable."
+                    }
+                  ],
+                  "description": "The holding percentage, or null when unavailable."
+                },
+                "chgNum": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The holding change amount, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The holding change amount, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The holding change amount, or null when unavailable."
+                    }
+                  ],
+                  "description": "The holding change amount, or null when unavailable."
+                },
+                "chgPct": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The holding change percentage, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The holding change percentage, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The holding change percentage, or null when unavailable."
+                    }
+                  ],
+                  "description": "The holding change percentage, or null when unavailable."
+                },
+                "shareCategory": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The share category, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The share category, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized top-shareholder row."
+            },
+            "description": "The top-shareholder rows."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise top-shareholder result."
+      }
+    },
+    {
+      "id": "gangtise.get_valuation_metrics",
+      "service": "gangtise",
+      "name": "get_valuation_metrics",
+      "description": "Get Gangtise valuation metrics and their percentile ranks over a requested date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first valuation date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last valuation date to include.",
+            "format": "date"
+          },
+          "indicators": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "peTtm",
+                "psTtm",
+                "pbMrq",
+                "peg",
+                "pcfTtm",
+                "em"
+              ],
+              "description": "A supported Gangtise valuation indicator."
+            },
+            "description": "The valuation indicators to retrieve.",
+            "minItems": 1,
+            "maxItems": 6
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum rows requested for each security and indicator.",
+            "default": 2000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input parameters for retrieving Gangtise valuation metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "securityCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code."
+                },
+                "indicator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The official Gangtise valuation indicator code."
+                },
+                "tradeDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The valuation observation date, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The valuation observation date, or null when unavailable."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The valuation metric value, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The valuation metric value, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The valuation metric value, or null when unavailable."
+                    }
+                  ],
+                  "description": "The valuation metric value, or null when unavailable."
+                },
+                "percentileRank": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The metric percentile within the requested range, or null when unavailable."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The metric percentile within the requested range, or null when unavailable."
+                    },
+                    {
+                      "type": "null",
+                      "description": "The metric percentile within the requested range, or null when unavailable."
+                    }
+                  ],
+                  "description": "The metric percentile within the requested range, or null when unavailable."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Gangtise valuation observation."
+            },
+            "description": "The valuation observations."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise valuation result."
+      }
+    },
+    {
+      "id": "gangtise.search_announcements",
+      "service": "gangtise",
+      "name": "search_announcements",
+      "description": "Search Gangtise company announcement indexes without downloading source files.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "enum": [
+              "a_share",
+              "hong_kong",
+              "united_states"
+            ],
+            "description": "The announcement market to query."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The announcement keyword to search for.",
+            "pattern": "\\S"
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first publication date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last publication date to include.",
+            "format": "date"
+          },
+          "searchType": {
+            "type": "string",
+            "enum": [
+              "title",
+              "full_text"
+            ],
+            "description": "Whether to search titles or full text.",
+            "default": "title"
+          },
+          "rankType": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "latest"
+            ],
+            "description": "How to rank the returned results.",
+            "default": "relevance"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of results to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "market"
+        ],
+        "description": "Input parameters for searching Gangtise announcements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "report",
+                    "meeting_summary",
+                    "announcement"
+                  ],
+                  "description": "The research-content type."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The resource title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication time, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication time, or null when unavailable."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publisher or source, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publisher or source, or null when unavailable."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author, or null when unavailable."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource summary, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource summary, or null when unavailable."
+                },
+                "highlights": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The extracted highlights, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The extracted highlights, or null when unavailable."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official resource URL, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official resource URL, or null when unavailable."
+                },
+                "pageCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The page count, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page count, or null when unavailable."
+                },
+                "securities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Gangtise security code, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Gangtise security code, or null when unavailable."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The security name, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The security name, or null when unavailable."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A security associated with a research item."
+                  },
+                  "description": "The securities associated with this result."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Gangtise research-content search result."
+            },
+            "description": "The matching research items."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next offset when another page may exist, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next offset when another page may exist, otherwise null."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The upstream total result count, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream total result count, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of normalized Gangtise research results."
+      }
+    },
+    {
+      "id": "gangtise.search_company_indicators",
+      "service": "gangtise",
+      "name": "search_company_indicators",
+      "description": "Search Gangtise A-share company indicators before requesting time-series or cross-section values.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A specific indicator keyword such as close price or ROE.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of indicator matches to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Input parameters for searching Gangtise company indicators."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "indicators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "indicatorCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The indicator code required by indicator data requests."
+                },
+                "indicatorName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable indicator name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The indicator description, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The indicator description, or null when unavailable."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The search relevance score, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The search relevance score, or null when unavailable."
+                },
+                "scopeList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One official Gangtise indicator scope."
+                  },
+                  "description": "The supported market and security scopes."
+                },
+                "parameterList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One official Gangtise indicator parameter definition."
+                  },
+                  "description": "The optional or required parameters accepted by this indicator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Gangtise company indicator search result."
+            },
+            "description": "The matching company indicators."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Gangtise company indicator search result."
+      }
+    },
+    {
+      "id": "gangtise.search_meeting_summaries",
+      "service": "gangtise",
+      "name": "search_meeting_summaries",
+      "description": "Search Gangtise meeting and research summaries without downloading source files.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword to search for.",
+            "pattern": "\\S"
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first publication date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last publication date to include.",
+            "format": "date"
+          },
+          "searchType": {
+            "type": "string",
+            "enum": [
+              "title",
+              "full_text"
+            ],
+            "description": "Whether to search titles or full text.",
+            "default": "title"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of results to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching Gangtise meeting summaries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "report",
+                    "meeting_summary",
+                    "announcement"
+                  ],
+                  "description": "The research-content type."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The resource title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication time, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication time, or null when unavailable."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publisher or source, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publisher or source, or null when unavailable."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author, or null when unavailable."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource summary, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource summary, or null when unavailable."
+                },
+                "highlights": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The extracted highlights, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The extracted highlights, or null when unavailable."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official resource URL, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official resource URL, or null when unavailable."
+                },
+                "pageCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The page count, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page count, or null when unavailable."
+                },
+                "securities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Gangtise security code, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Gangtise security code, or null when unavailable."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The security name, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The security name, or null when unavailable."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A security associated with a research item."
+                  },
+                  "description": "The securities associated with this result."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Gangtise research-content search result."
+            },
+            "description": "The matching research items."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next offset when another page may exist, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next offset when another page may exist, otherwise null."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The upstream total result count, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream total result count, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of normalized Gangtise research results."
+      }
+    },
+    {
+      "id": "gangtise.search_reports",
+      "service": "gangtise",
+      "name": "search_reports",
+      "description": "Search Gangtise domestic broker research reports without downloading report files.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword to search for.",
+            "pattern": "\\S"
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact Gangtise security code such as 600519.SH."
+            },
+            "description": "The exact Gangtise security codes to query.",
+            "minItems": 1
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first publication date to include.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last publication date to include.",
+            "format": "date"
+          },
+          "searchType": {
+            "type": "string",
+            "enum": [
+              "title",
+              "full_text"
+            ],
+            "description": "Whether to search titles or full text.",
+            "default": "title"
+          },
+          "rankType": {
+            "type": "string",
+            "enum": [
+              "relevance",
+              "latest"
+            ],
+            "description": "How to rank the returned results.",
+            "default": "relevance"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of results to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching Gangtise reports."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "report",
+                    "meeting_summary",
+                    "announcement"
+                  ],
+                  "description": "The research-content type."
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The resource title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publication time, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publication time, or null when unavailable."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The publisher or source, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The publisher or source, or null when unavailable."
+                },
+                "author": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The author, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The author, or null when unavailable."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource summary, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource summary, or null when unavailable."
+                },
+                "highlights": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The extracted highlights, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The extracted highlights, or null when unavailable."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The official resource URL, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The official resource URL, or null when unavailable."
+                },
+                "pageCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The page count, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page count, or null when unavailable."
+                },
+                "securities": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Gangtise security code, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Gangtise security code, or null when unavailable."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The security name, or null when unavailable."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The security name, or null when unavailable."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A security associated with a research item."
+                  },
+                  "description": "The securities associated with this result."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Gangtise research-content search result."
+            },
+            "description": "The matching research items."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next offset when another page may exist, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next offset when another page may exist, otherwise null."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The upstream total result count, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream total result count, or null when unavailable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of normalized Gangtise research results."
+      }
+    },
+    {
+      "id": "gangtise.search_securities",
+      "service": "gangtise",
+      "name": "search_securities",
+      "description": "Search Gangtise securities by name, code, abbreviation, or pinyin before requesting market data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The security name, code, abbreviation, or pinyin keyword to search for.",
+            "pattern": "\\S"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "stock",
+                "dr",
+                "index",
+                "fund"
+              ],
+              "description": "A Gangtise security category."
+            },
+            "description": "Optional security categories to include in the search.",
+            "minItems": 1,
+            "maxItems": 4
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The maximum number of matches to request.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Input parameters for searching Gangtise securities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Gangtise security code used by data endpoints."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The security name returned by Gangtise."
+                },
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Gangtise security category, or null when omitted."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Gangtise security category, or null when omitted."
+                },
+                "matchScore": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The upstream search match score, or null when omitted."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The upstream search match score, or null when omitted."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A security matched by Gangtise."
+            },
+            "description": "The matching securities."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Gangtise security search result."
+      }
+    }
+  ]
+}

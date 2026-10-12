@@ -1,0 +1,1159 @@
+{
+  "service": "zoom",
+  "displayName": "Zoom",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://zoom.us/oauth/authorize",
+      "tokenUrl": "https://zoom.us/oauth/token",
+      "refreshTokenUrl": "https://zoom.us/oauth/token",
+      "scopes": [
+        "user:read:user",
+        "meeting:read:list_meetings",
+        "meeting:write:meeting",
+        "meeting:update:meeting"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://www.zoom.com",
+  "actions": [
+    {
+      "id": "zoom.create_meeting",
+      "service": "zoom",
+      "name": "create_meeting",
+      "description": "Create a Zoom meeting for a user with the core official scheduling fields and first-pass settings.",
+      "operationType": "write",
+      "requiredScopes": [
+        "meeting:write:meeting"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zoom user ID or email address. Use me when the credential can act on the current app user."
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The meeting topic."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number",
+                "description": "Instant meeting type."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "Scheduled meeting type."
+              },
+              {
+                "const": 3,
+                "type": "number",
+                "description": "Recurring meeting with no fixed time type."
+              },
+              {
+                "const": 4,
+                "type": "number",
+                "description": "Personal Meeting ID meeting type."
+              },
+              {
+                "const": 8,
+                "type": "number",
+                "description": "Recurring meeting with fixed time type."
+              },
+              {
+                "const": 10,
+                "type": "number",
+                "description": "Screen share only meeting type."
+              }
+            ],
+            "description": "The Zoom meeting type: 1 instant, 2 scheduled, 3 recurring with no fixed time, 4 PMI, 8 recurring with fixed time, or 10 screen share only."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Zoom date-time value. Use UTC format such as 2026-05-18T09:00:00Z, or a local date-time with timezone."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "The scheduled meeting duration in minutes."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The meeting timezone, such as America/Los_Angeles, Asia/Tokyo, or UTC."
+          },
+          "agenda": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "The meeting agenda. Zoom allows up to 2,000 characters."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The passcode required to join the meeting."
+          },
+          "scheduleFor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email address or user ID of the user to schedule for."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "hostVideo": {
+                "type": "boolean",
+                "description": "Whether to start the meeting with host video enabled."
+              },
+              "participantVideo": {
+                "type": "boolean",
+                "description": "Whether to start the meeting with participant video enabled."
+              },
+              "joinBeforeHost": {
+                "type": "boolean",
+                "description": "Whether participants can join before the host."
+              },
+              "waitingRoom": {
+                "type": "boolean",
+                "description": "Whether Zoom Waiting Room is enabled."
+              },
+              "muteUponEntry": {
+                "type": "boolean",
+                "description": "Whether participants are muted when they enter."
+              },
+              "autoRecording": {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "cloud",
+                  "none"
+                ],
+                "description": "The automatic recording mode for the meeting."
+              },
+              "audio": {
+                "type": "string",
+                "enum": [
+                  "both",
+                  "telephony",
+                  "voip",
+                  "thirdParty"
+                ],
+                "description": "How participants join audio."
+              },
+              "approvalType": {
+                "type": "integer",
+                "description": "The meeting registration approval type documented by Zoom."
+              },
+              "registrationType": {
+                "type": "integer",
+                "description": "The registration type documented by Zoom."
+              },
+              "enforceLogin": {
+                "type": "boolean",
+                "description": "Whether participants must authenticate before joining."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Meeting settings supported by the first Zoom provider pass."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "description": "The recurrence type: 1 daily, 2 weekly, or 3 monthly."
+              },
+              "repeatInterval": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The interval at which the meeting recurs."
+              },
+              "weeklyDays": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The weekly days string documented by Zoom, such as 1 for Sunday or comma-separated values."
+              },
+              "monthlyDay": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31,
+                "description": "The day of the month for monthly recurrence."
+              },
+              "endTimes": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of recurrences before the meeting stops."
+              },
+              "endDateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Zoom date-time value. Use UTC format such as 2026-05-18T09:00:00Z, or a local date-time with timezone."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "Recurrence settings for Zoom recurring meetings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Zoom meeting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meeting": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The unique meeting UUID returned by Zoom."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The unique meeting UUID returned by Zoom."
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The numeric Zoom meeting ID."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The string Zoom meeting ID."
+                      }
+                    ],
+                    "description": "The Zoom meeting ID. Zoom may return large numeric IDs as numbers or strings."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Zoom meeting ID. Zoom may return large numeric IDs as numbers or strings."
+              },
+              "hostId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Zoom user ID of the host."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Zoom user ID of the host."
+              },
+              "hostEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The host email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The host email address."
+              },
+              "topic": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting topic."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting topic."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Zoom meeting type numeric code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Zoom meeting type numeric code."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting status returned by Zoom."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting status returned by Zoom."
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting start time returned by Zoom."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting start time returned by Zoom."
+              },
+              "duration": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The scheduled meeting duration in minutes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The scheduled meeting duration in minutes."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting timezone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting timezone."
+              },
+              "agenda": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting agenda."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting agenda."
+              },
+              "joinUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The participant join URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The participant join URL."
+              },
+              "startUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The host start URL, when Zoom returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The host start URL, when Zoom returns it."
+              },
+              "password": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The meeting passcode, when Zoom returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The meeting passcode, when Zoom returns it."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the meeting was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the meeting was created."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Zoom meeting object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Zoom meeting record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a Zoom meeting."
+      }
+    },
+    {
+      "id": "zoom.get_user",
+      "service": "zoom",
+      "name": "get_user",
+      "description": "Fetch one Zoom user by user ID, email address, or me when supported by the app.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user:read:user"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zoom user ID or email address. Use me when the credential can act on the current app user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one Zoom user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Zoom user identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Zoom user identifier."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's email address."
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's first name."
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's last name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's last name."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's display name when returned by Zoom."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's display name when returned by Zoom."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Zoom user type numeric code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Zoom user type numeric code."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's Zoom account status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's Zoom account status."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's timezone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's timezone."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the user was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the user was created."
+              },
+              "lastLoginTime": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp when the user last logged in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp when the user last logged in."
+              },
+              "pmi": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's personal meeting ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's personal meeting ID."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Zoom user object returned by the API."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Zoom user record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching one Zoom user."
+      }
+    },
+    {
+      "id": "zoom.list_meetings",
+      "service": "zoom",
+      "name": "list_meetings",
+      "description": "List scheduled, live, upcoming, or previous meetings for a Zoom user using official pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "meeting:read:list_meetings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zoom user ID or email address. Use me when the credential can act on the current app user."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "live",
+              "upcoming",
+              "upcoming_meetings",
+              "previous_meetings"
+            ],
+            "description": "The meeting list type to request from Zoom."
+          },
+          "from": {
+            "type": "string",
+            "description": "A Zoom date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "A Zoom date filter in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timezone used to interpret the from and to filters."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "description": "The number of records returned within a single API call."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The next_page_token value returned by Zoom for the next page of results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The input payload for listing Zoom meetings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "pageSize": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of records requested or returned for this page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of records requested or returned for this page."
+              },
+              "totalRecords": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of records Zoom reported."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of records Zoom reported."
+              },
+              "nextPageToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The token to request the next page, when Zoom returned one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The token to request the next page, when Zoom returned one."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by Zoom list endpoints."
+          },
+          "meetings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unique meeting UUID returned by Zoom."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unique meeting UUID returned by Zoom."
+                },
+                "id": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The numeric Zoom meeting ID."
+                        },
+                        {
+                          "type": "string",
+                          "description": "The string Zoom meeting ID."
+                        }
+                      ],
+                      "description": "The Zoom meeting ID. Zoom may return large numeric IDs as numbers or strings."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Zoom meeting ID. Zoom may return large numeric IDs as numbers or strings."
+                },
+                "hostId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Zoom user ID of the host."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Zoom user ID of the host."
+                },
+                "hostEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The host email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The host email address."
+                },
+                "topic": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting topic."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting topic."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Zoom meeting type numeric code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Zoom meeting type numeric code."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting status returned by Zoom."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting status returned by Zoom."
+                },
+                "startTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting start time returned by Zoom."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting start time returned by Zoom."
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The scheduled meeting duration in minutes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The scheduled meeting duration in minutes."
+                },
+                "timezone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting timezone."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting timezone."
+                },
+                "agenda": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting agenda."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting agenda."
+                },
+                "joinUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The participant join URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The participant join URL."
+                },
+                "startUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The host start URL, when Zoom returns it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The host start URL, when Zoom returns it."
+                },
+                "password": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The meeting passcode, when Zoom returns it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The meeting passcode, when Zoom returns it."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the meeting was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the meeting was created."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Zoom meeting object returned by the API."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Zoom meeting record."
+            },
+            "description": "The normalized Zoom meetings returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Zoom meetings."
+      }
+    },
+    {
+      "id": "zoom.update_meeting",
+      "service": "zoom",
+      "name": "update_meeting",
+      "description": "Update a Zoom meeting by meeting ID with the core official scheduling fields and first-pass settings.",
+      "operationType": "write",
+      "requiredScopes": [
+        "meeting:update:meeting"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The numeric Zoom meeting ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The string Zoom meeting ID."
+              }
+            ],
+            "description": "The Zoom meeting ID returned by Zoom."
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The meeting topic."
+          },
+          "type": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number",
+                "description": "Instant meeting type."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "Scheduled meeting type."
+              },
+              {
+                "const": 3,
+                "type": "number",
+                "description": "Recurring meeting with no fixed time type."
+              },
+              {
+                "const": 4,
+                "type": "number",
+                "description": "Personal Meeting ID meeting type."
+              },
+              {
+                "const": 8,
+                "type": "number",
+                "description": "Recurring meeting with fixed time type."
+              },
+              {
+                "const": 10,
+                "type": "number",
+                "description": "Screen share only meeting type."
+              }
+            ],
+            "description": "The Zoom meeting type: 1 instant, 2 scheduled, 3 recurring with no fixed time, 4 PMI, 8 recurring with fixed time, or 10 screen share only."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Zoom date-time value. Use UTC format such as 2026-05-18T09:00:00Z, or a local date-time with timezone."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "The scheduled meeting duration in minutes."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The meeting timezone, such as America/Los_Angeles, Asia/Tokyo, or UTC."
+          },
+          "agenda": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "The meeting agenda. Zoom allows up to 2,000 characters."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The passcode required to join the meeting."
+          },
+          "scheduleFor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email address or user ID of the user to schedule for."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "hostVideo": {
+                "type": "boolean",
+                "description": "Whether to start the meeting with host video enabled."
+              },
+              "participantVideo": {
+                "type": "boolean",
+                "description": "Whether to start the meeting with participant video enabled."
+              },
+              "joinBeforeHost": {
+                "type": "boolean",
+                "description": "Whether participants can join before the host."
+              },
+              "waitingRoom": {
+                "type": "boolean",
+                "description": "Whether Zoom Waiting Room is enabled."
+              },
+              "muteUponEntry": {
+                "type": "boolean",
+                "description": "Whether participants are muted when they enter."
+              },
+              "autoRecording": {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "cloud",
+                  "none"
+                ],
+                "description": "The automatic recording mode for the meeting."
+              },
+              "audio": {
+                "type": "string",
+                "enum": [
+                  "both",
+                  "telephony",
+                  "voip",
+                  "thirdParty"
+                ],
+                "description": "How participants join audio."
+              },
+              "approvalType": {
+                "type": "integer",
+                "description": "The meeting registration approval type documented by Zoom."
+              },
+              "registrationType": {
+                "type": "integer",
+                "description": "The registration type documented by Zoom."
+              },
+              "enforceLogin": {
+                "type": "boolean",
+                "description": "Whether participants must authenticate before joining."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Meeting settings supported by the first Zoom provider pass."
+          },
+          "recurrence": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3,
+                "description": "The recurrence type: 1 daily, 2 weekly, or 3 monthly."
+              },
+              "repeatInterval": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The interval at which the meeting recurs."
+              },
+              "weeklyDays": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The weekly days string documented by Zoom, such as 1 for Sunday or comma-separated values."
+              },
+              "monthlyDay": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 31,
+                "description": "The day of the month for monthly recurrence."
+              },
+              "endTimes": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of recurrences before the meeting stops."
+              },
+              "endDateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Zoom date-time value. Use UTC format such as 2026-05-18T09:00:00Z, or a local date-time with timezone."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "Recurrence settings for Zoom recurring meetings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingId"
+        ],
+        "description": "The input payload for updating a Zoom meeting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Zoom accepted the meeting update request."
+          },
+          "meetingId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The numeric Zoom meeting ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The string Zoom meeting ID."
+              }
+            ],
+            "description": "The Zoom meeting ID returned by Zoom."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when updating a Zoom meeting."
+      }
+    }
+  ]
+}

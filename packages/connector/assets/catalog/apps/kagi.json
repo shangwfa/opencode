@@ -1,0 +1,120 @@
+{
+  "service": "kagi",
+  "displayName": "Kagi Universal Summarizer",
+  "homepageUrl": "https://kagi.com/summarizer/",
+  "categories": [
+    "AI",
+    "Documents & Content"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Get a Kagi API key at https://kagi.com/settings/api and add API credits. Summarizer requests use Authorization: Bot <key>. The key is checked by Kagi on first execution; connecting only checks that it is nonempty."
+    }
+  ],
+  "actions": [
+    {
+      "id": "kagi.summarize",
+      "service": "kagi",
+      "name": "summarize",
+      "description": "Summarize text or a document URL with Kagi, optionally translating the summary or extracting key takeaways.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL of a document, web page, audio file, or video for Kagi to fetch. Mutually exclusive with text.",
+            "format": "uri"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text to summarize. Mutually exclusive with url."
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "cecil",
+              "agnes",
+              "daphne",
+              "muriel"
+            ],
+            "description": "Summarization engine; defaults to cecil. Daphne is a deprecated alias of agnes. Muriel uses enterprise pricing."
+          },
+          "summary_type": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "takeaway"
+            ],
+            "description": "Summary format; defaults to summary for prose, or takeaway for bullet points."
+          },
+          "target_language": {
+            "type": "string",
+            "description": "Output language code, normalized to uppercase. Supported: BG, CS, DA, DE, EL, EN, ES, ET, FI, FR, HU, ID, IT, JA, KO, LT, LV, NB, NL, PL, PT, RO, RU, SK, SL, SV, TR, UK, ZH, ZH-HANT."
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Allow Kagi to cache requests and responses; defaults to true. Set false for sensitive documents."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Document and summary options. The serialized request must not exceed 1 MB.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "text"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Request metadata, including request ID, processing time, and API balance when available."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "output": {
+                "type": "string",
+                "description": "Generated summary text."
+              },
+              "tokens": {
+                "type": "integer",
+                "description": "Number of tokens processed."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "output",
+              "tokens"
+            ],
+            "description": "Generated summary and token usage."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Kagi summary response with upstream metadata and extension fields."
+      }
+    }
+  ]
+}

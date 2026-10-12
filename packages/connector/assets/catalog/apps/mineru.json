@@ -1,0 +1,458 @@
+{
+  "service": "mineru",
+  "displayName": "MinerU",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "mineru_api_token",
+      "description": "MinerU API token used with the Authorization Bearer header. Apply for or manage it here: https://mineru.net/apiManage/token"
+    }
+  ],
+  "homepageUrl": "https://mineru.net",
+  "actions": [
+    {
+      "id": "mineru.create_extract_batch",
+      "service": "mineru",
+      "name": "create_extract_batch",
+      "description": "Create a MinerU precise extraction batch from document URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The public HTTP or HTTPS URL of one document to parse with MinerU.",
+                  "format": "uri"
+                },
+                "is_ocr": {
+                  "type": "boolean",
+                  "description": "Whether to enable OCR for this file. Only applies to pipeline and vlm models."
+                },
+                "data_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "The caller-defined data identifier associated with the source document."
+                },
+                "page_ranges": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The page range expression to parse for this file."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One URL-based MinerU batch extraction file descriptor."
+            },
+            "description": "The URL-based documents to submit for batch parsing.",
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "enable_formula": {
+            "type": "boolean",
+            "description": "Whether to enable formula recognition for pipeline and vlm models."
+          },
+          "enable_table": {
+            "type": "boolean",
+            "description": "Whether to enable table recognition for pipeline and vlm models."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ch",
+              "ch_server",
+              "en",
+              "japan",
+              "korean",
+              "chinese_cht",
+              "ta",
+              "te",
+              "ka",
+              "el",
+              "th",
+              "latin",
+              "arabic",
+              "cyrillic",
+              "east_slavic",
+              "devanagari"
+            ],
+            "description": "The document language pack used by pipeline and vlm models."
+          },
+          "extra_formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "docx",
+                "html",
+                "latex"
+              ],
+              "description": "An additional export format requested for the parsed result."
+            },
+            "description": "Additional result formats to export besides Markdown and JSON.",
+            "minItems": 1
+          },
+          "model_version": {
+            "type": "string",
+            "enum": [
+              "pipeline",
+              "vlm",
+              "MinerU-HTML"
+            ],
+            "description": "The MinerU model version to use for parsing."
+          },
+          "no_cache": {
+            "type": "boolean",
+            "description": "Whether MinerU should bypass its URL content cache."
+          },
+          "cache_tolerance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The acceptable MinerU URL cache age in seconds when no_cache is false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "description": "Input payload for creating a MinerU URL batch extraction task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "description": "The MinerU batch extraction task identifier."
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "The upstream request trace identifier."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "batch_id"
+        ],
+        "description": "The normalized output payload for creating a MinerU extraction batch."
+      }
+    },
+    {
+      "id": "mineru.create_extract_task",
+      "service": "mineru",
+      "name": "create_extract_task",
+      "description": "Create a MinerU precise extraction task from a document URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public HTTP or HTTPS URL of the document to parse with MinerU.",
+            "format": "uri"
+          },
+          "is_ocr": {
+            "type": "boolean",
+            "description": "Whether to enable OCR. Only applies to pipeline and vlm models."
+          },
+          "enable_formula": {
+            "type": "boolean",
+            "description": "Whether to enable formula recognition for pipeline and vlm models."
+          },
+          "enable_table": {
+            "type": "boolean",
+            "description": "Whether to enable table recognition for pipeline and vlm models."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ch",
+              "ch_server",
+              "en",
+              "japan",
+              "korean",
+              "chinese_cht",
+              "ta",
+              "te",
+              "ka",
+              "el",
+              "th",
+              "latin",
+              "arabic",
+              "cyrillic",
+              "east_slavic",
+              "devanagari"
+            ],
+            "description": "The document language pack used by pipeline and vlm models."
+          },
+          "data_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The caller-defined data identifier associated with the source document."
+          },
+          "extra_formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "docx",
+                "html",
+                "latex"
+              ],
+              "description": "An additional export format requested for the parsed result."
+            },
+            "description": "Additional result formats to export besides Markdown and JSON.",
+            "minItems": 1
+          },
+          "page_ranges": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The page range expression to parse, such as 2,4-6 or 2--2."
+          },
+          "model_version": {
+            "type": "string",
+            "enum": [
+              "pipeline",
+              "vlm",
+              "MinerU-HTML"
+            ],
+            "description": "The MinerU model version to use for parsing."
+          },
+          "no_cache": {
+            "type": "boolean",
+            "description": "Whether MinerU should bypass its URL content cache."
+          },
+          "cache_tolerance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The acceptable MinerU URL cache age in seconds when no_cache is false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input payload for creating a MinerU extraction task from a document URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The MinerU extraction task identifier."
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "The upstream request trace identifier."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "The normalized output payload for creating a MinerU extraction task."
+      }
+    },
+    {
+      "id": "mineru.get_extract_batch_results",
+      "service": "mineru",
+      "name": "get_extract_batch_results",
+      "description": "Get the current status and result URLs for a MinerU extraction batch.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MinerU batch extraction task identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "batch_id"
+        ],
+        "description": "Input payload for looking up MinerU batch extraction results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "description": "The MinerU batch extraction task identifier."
+          },
+          "extract_result": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file_name": {
+                  "type": "string",
+                  "description": "The submitted source file name, when returned."
+                },
+                "data_id": {
+                  "type": "string",
+                  "description": "The caller-defined data identifier, when provided."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The upstream task state, such as waiting-file, pending, running, converting, done, or failed."
+                },
+                "full_zip_url": {
+                  "type": "string",
+                  "description": "The ZIP URL containing Markdown, JSON, and any requested exports."
+                },
+                "err_msg": {
+                  "type": "string",
+                  "description": "The upstream failure reason when the task failed."
+                },
+                "extract_progress": {
+                  "type": "object",
+                  "properties": {
+                    "extracted_pages": {
+                      "type": "integer",
+                      "description": "The number of pages that have already been parsed."
+                    },
+                    "total_pages": {
+                      "type": "integer",
+                      "description": "The total number of pages reported for the document."
+                    },
+                    "start_time": {
+                      "type": "string",
+                      "description": "The upstream parsing start time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The upstream parsing progress details returned while the task is running."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "state"
+              ],
+              "description": "The normalized MinerU batch extraction item result."
+            },
+            "description": "The extraction results for files in the requested batch."
+          },
+          "trace_id": {
+            "type": "string",
+            "description": "The upstream request trace identifier."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream response message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "batch_id",
+          "extract_result"
+        ],
+        "description": "The normalized output payload for MinerU batch extraction results."
+      }
+    },
+    {
+      "id": "mineru.get_extract_task",
+      "service": "mineru",
+      "name": "get_extract_task",
+      "description": "Get the current status and result URLs for a MinerU extraction task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MinerU extraction task identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Input payload for looking up a MinerU extraction task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The MinerU extraction task identifier."
+          },
+          "data_id": {
+            "type": "string",
+            "description": "The caller-defined data identifier, when provided."
+          },
+          "state": {
+            "type": "string",
+            "description": "The upstream task state, such as pending, running, converting, done, or failed."
+          },
+          "full_zip_url": {
+            "type": "string",
+            "description": "The ZIP URL containing Markdown, JSON, and any requested exports."
+          },
+          "err_msg": {
+            "type": "string",
+            "description": "The upstream failure reason when the task failed."
+          },
+          "extract_progress": {
+            "type": "object",
+            "properties": {
+              "extracted_pages": {
+                "type": "integer",
+                "description": "The number of pages that have already been parsed."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of pages reported for the document."
+              },
+              "start_time": {
+                "type": "string",
+                "description": "The upstream parsing start time."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The upstream parsing progress details returned while the task is running."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "state"
+        ],
+        "description": "The normalized MinerU extraction task result."
+      }
+    }
+  ]
+}

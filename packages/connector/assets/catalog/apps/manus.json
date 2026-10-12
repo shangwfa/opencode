@@ -1,0 +1,1699 @@
+{
+  "service": "manus",
+  "displayName": "Manus",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MANUS_API_KEY",
+      "description": "Manus API key sent with the x-manus-api-key header. Create and copy a key from Manus API Integration settings: https://manus.im/app?show_settings=integrations&app_name=api."
+    }
+  ],
+  "homepageUrl": "https://manus.im",
+  "actions": [
+    {
+      "id": "manus.confirm_task_action",
+      "service": "manus",
+      "name": "confirm_task_action",
+      "description": "Confirm a pending Manus task action from a waiting status event. Use send_message instead for messageAskUser events.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID with a pending action."
+          },
+          "event_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The waiting_for_event_id value from the status update event."
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional input for the pending action, matching the event confirm_input_schema."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "event_id"
+        ],
+        "description": "Input parameters for confirming a pending Manus task action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "The ID of the confirmed task."
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether the pending action confirmation was accepted."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task_id",
+          "confirmed"
+        ],
+        "description": "Result returned after confirming a pending Manus task action."
+      },
+      "followUpActions": [
+        "manus.list_task_messages"
+      ]
+    },
+    {
+      "id": "manus.create_project",
+      "service": "manus",
+      "name": "create_project",
+      "description": "Create a Manus project for grouping tasks under shared instructions.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name for the project."
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Default instruction applied to tasks in this project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating a Manus project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the project."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the project."
+              },
+              "created_at": {
+                "type": "integer",
+                "description": "Unix timestamp in seconds when the project was created."
+              },
+              "instruction": {
+                "type": "string",
+                "description": "Default instruction applied to tasks in this project."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "created_at",
+              "instruction"
+            ],
+            "description": "Manus project."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "project"
+        ],
+        "description": "Result returned after creating a Manus project."
+      }
+    },
+    {
+      "id": "manus.create_task",
+      "service": "manus",
+      "name": "create_task",
+      "description": "Create a new asynchronous Manus task from a message and optional project, connector, skill, sharing, or structured-output settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain text message content."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One Manus message content part."
+                },
+                "description": "Structured message content parts.",
+                "minItems": 1
+              }
+            ],
+            "description": "Plain text or structured Manus content parts."
+          },
+          "connectors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus connector ID."
+            },
+            "description": "Connector IDs to enable for the message.",
+            "minItems": 1
+          },
+          "enable_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus skill ID."
+            },
+            "description": "Skill IDs to enable for the message.",
+            "minItems": 1
+          },
+          "force_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus skill ID."
+            },
+            "description": "Skill IDs the agent must invoke.",
+            "minItems": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Plain text message content."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "One Manus message content part."
+                    },
+                    "description": "Structured message content parts.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "Plain text or structured Manus content parts."
+              },
+              "connectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus connector ID."
+                },
+                "description": "Connector IDs to enable for the message.",
+                "minItems": 1
+              },
+              "enable_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus skill ID."
+                },
+                "description": "Skill IDs to enable for the message.",
+                "minItems": 1
+              },
+              "force_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus skill ID."
+                },
+                "description": "Skill IDs the agent must invoke.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "Manus task message."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID to associate this task with."
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Locale for the task output language, such as `en` or `zh-CN`."
+          },
+          "interactive_mode": {
+            "type": "boolean",
+            "description": "Whether the agent may pause to ask follow-up questions."
+          },
+          "hide_in_task_list": {
+            "type": "boolean",
+            "description": "Whether to hide the task from the Manus web app task list."
+          },
+          "share_visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "description": "Task sharing visibility."
+          },
+          "agent_profile": {
+            "type": "string",
+            "enum": [
+              "manus-1.6",
+              "manus-1.6-lite",
+              "manus-1.6-max"
+            ],
+            "description": "Manus agent profile to use for this task turn."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom title for the task."
+          },
+          "structured_output_schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "JSON Schema for Manus structured output extraction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Manus task.",
+        "anyOf": [
+          {
+            "required": [
+              "message"
+            ]
+          },
+          {
+            "required": [
+              "content"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Unique identifier for the created task."
+          },
+          "task_title": {
+            "type": "string",
+            "description": "Title for the created task."
+          },
+          "task_url": {
+            "type": "string",
+            "description": "URL to view the task in the Manus web app.",
+            "format": "uri"
+          },
+          "share_url": {
+            "type": "string",
+            "description": "Public share URL when the task is shareable.",
+            "format": "uri"
+          },
+          "share_visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "description": "Task sharing visibility."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task_id",
+          "task_title",
+          "task_url"
+        ],
+        "description": "Result returned after creating a Manus task."
+      },
+      "followUpActions": [
+        "manus.list_task_messages",
+        "manus.get_task"
+      ]
+    },
+    {
+      "id": "manus.delete_task",
+      "service": "manus",
+      "name": "delete_task",
+      "description": "Permanently delete a stopped Manus task. Stop a running task before deleting it.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Manus task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "id": {
+            "type": "string",
+            "description": "The ID of the deleted task."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the task was deleted."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "id",
+          "deleted"
+        ],
+        "description": "Result returned after deleting a Manus task."
+      }
+    },
+    {
+      "id": "manus.get_agent",
+      "service": "manus",
+      "name": "get_agent",
+      "description": "Retrieve a Manus custom agent by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The agent ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Manus agent."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the agent."
+              },
+              "task_id": {
+                "type": "string",
+                "description": "Task ID associated with this agent."
+              },
+              "nickname": {
+                "type": "string",
+                "description": "Display name of the agent."
+              },
+              "about": {
+                "type": "string",
+                "description": "Description or bio of the agent."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "task_id",
+              "nickname",
+              "about"
+            ],
+            "description": "Manus custom agent."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "agent"
+        ],
+        "description": "Manus agent detail response."
+      }
+    },
+    {
+      "id": "manus.get_task",
+      "service": "manus",
+      "name": "get_task",
+      "description": "Retrieve a Manus task's current status and metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID to retrieve, including supported Manus shortcuts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Manus task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the task."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "stopped",
+                  "waiting",
+                  "error"
+                ],
+                "description": "Current task status."
+              },
+              "created_at": {
+                "type": "integer",
+                "description": "Unix timestamp in seconds when the task was created."
+              },
+              "updated_at": {
+                "type": "integer",
+                "description": "Unix timestamp in seconds when the task was last updated."
+              },
+              "task_type": {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "project",
+                  "agent_subtask"
+                ],
+                "description": "Type of the task."
+              },
+              "share_visibility": {
+                "type": "string",
+                "enum": [
+                  "private",
+                  "team",
+                  "public"
+                ],
+                "description": "Task sharing visibility."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the task."
+              },
+              "credit_usage": {
+                "type": "integer",
+                "description": "Total credits consumed by the task."
+              },
+              "task_url": {
+                "type": "string",
+                "description": "URL to view the task in the Manus web app.",
+                "format": "uri"
+              },
+              "created_by_api_key": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "API key metadata when this task was created via API."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "API key metadata when this task was created via API."
+              },
+              "agent_profile": {
+                "type": "string",
+                "enum": [
+                  "manus-1.6",
+                  "manus-1.6-lite",
+                  "manus-1.6-max"
+                ],
+                "description": "Manus agent profile to use for this task turn."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status",
+              "created_at",
+              "updated_at",
+              "task_type",
+              "title"
+            ],
+            "description": "Manus task object with current status and metadata."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task"
+        ],
+        "description": "Task detail response from Manus."
+      }
+    },
+    {
+      "id": "manus.list_agents",
+      "service": "manus",
+      "name": "list_agents",
+      "description": "List Manus custom agents in the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Manus agents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the agent."
+                },
+                "task_id": {
+                  "type": "string",
+                  "description": "Task ID associated with this agent."
+                },
+                "nickname": {
+                  "type": "string",
+                  "description": "Display name of the agent."
+                },
+                "about": {
+                  "type": "string",
+                  "description": "Description or bio of the agent."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "task_id",
+                "nickname",
+                "about"
+              ],
+              "description": "Manus custom agent."
+            },
+            "description": "Agent objects."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data"
+        ],
+        "description": "Manus agent list response."
+      }
+    },
+    {
+      "id": "manus.list_connectors",
+      "service": "manus",
+      "name": "list_connectors",
+      "description": "List Manus connectors installed in the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Manus connectors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the connector."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the connector."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "builtin",
+                    "byok",
+                    "mcp"
+                  ],
+                  "description": "Connector type."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable description of the connector."
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Category grouping for the connector."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "type"
+              ],
+              "description": "Manus connector available to the current user."
+            },
+            "description": "Connector objects installed in the user account."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data"
+        ],
+        "description": "Manus connector list response."
+      }
+    },
+    {
+      "id": "manus.list_online_browser_clients",
+      "service": "manus",
+      "name": "list_online_browser_clients",
+      "description": "List online Manus browser clients that can be selected when confirming browser connection events.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing online Manus browser clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "client_id": {
+                  "type": "string",
+                  "description": "Unique identifier for the browser client."
+                },
+                "client_name": {
+                  "type": "string",
+                  "description": "Display name of the browser client."
+                },
+                "ua": {
+                  "type": "string",
+                  "description": "User-Agent string for the browser client."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "client_id",
+                "client_name",
+                "ua"
+              ],
+              "description": "Online Manus browser client."
+            },
+            "description": "Online browser clients available to the current account."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data"
+        ],
+        "description": "Manus online browser client list response."
+      }
+    },
+    {
+      "id": "manus.list_projects",
+      "service": "manus",
+      "name": "list_projects",
+      "description": "List Manus projects available to the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Manus projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the project."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the project."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp in seconds when the project was created."
+                },
+                "instruction": {
+                  "type": "string",
+                  "description": "Default instruction applied to tasks in this project."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "created_at",
+                "instruction"
+              ],
+              "description": "Manus project."
+            },
+            "description": "Project objects."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data"
+        ],
+        "description": "Manus project list response."
+      }
+    },
+    {
+      "id": "manus.list_skills",
+      "service": "manus",
+      "name": "list_skills",
+      "description": "List Manus skills available to the current account or project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID used to include project-specific skills."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Manus skills."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the skill."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the skill."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "What the skill does and when it is useful."
+                },
+                "owner_type": {
+                  "type": "string",
+                  "enum": [
+                    "personal",
+                    "official",
+                    "team",
+                    "project"
+                  ],
+                  "description": "Skill owner type."
+                },
+                "creator_info": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Information about who created the skill."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp in seconds when the skill was created."
+                },
+                "updated_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp in seconds when the skill was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "owner_type"
+              ],
+              "description": "Manus skill that extends agent capabilities."
+            },
+            "description": "Skill objects available to the user."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data"
+        ],
+        "description": "Manus skill list response."
+      }
+    },
+    {
+      "id": "manus.list_task_messages",
+      "service": "manus",
+      "name": "list_task_messages",
+      "description": "List Manus task event messages with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID to list messages for."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of messages to return per page, from 1 to 200."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor from the previous response."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for cursor-paginated results."
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "Whether to include detailed tool, plan, and explanation events."
+          },
+          "slides_format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "pptx"
+            ],
+            "description": "Slides attachment format returned in task messages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Input parameters for listing Manus task messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "The task ID these messages belong to."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Manus task event."
+            },
+            "description": "Task event objects representing conversation and agent activity."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more messages are available."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Cursor to fetch the next page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task_id",
+          "messages",
+          "has_more"
+        ],
+        "description": "Cursor-paginated Manus task event response."
+      }
+    },
+    {
+      "id": "manus.list_tasks",
+      "service": "manus",
+      "name": "list_tasks",
+      "description": "List Manus tasks with optional scope filters and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of tasks to return per page, from 1 to 100."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor from the previous response."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for cursor-paginated results."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "agent_subtask",
+              "project",
+              "standard"
+            ],
+            "description": "Task list scope filter."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID used when scope is `agent_subtask`."
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project ID used when scope is `project`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Manus tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the task."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "stopped",
+                    "waiting",
+                    "error"
+                  ],
+                  "description": "Current task status."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp in seconds when the task was created."
+                },
+                "updated_at": {
+                  "type": "integer",
+                  "description": "Unix timestamp in seconds when the task was last updated."
+                },
+                "task_type": {
+                  "type": "string",
+                  "enum": [
+                    "standard",
+                    "project",
+                    "agent_subtask"
+                  ],
+                  "description": "Type of the task."
+                },
+                "share_visibility": {
+                  "type": "string",
+                  "enum": [
+                    "private",
+                    "team",
+                    "public"
+                  ],
+                  "description": "Task sharing visibility."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Title of the task."
+                },
+                "credit_usage": {
+                  "type": "integer",
+                  "description": "Total credits consumed by the task."
+                },
+                "task_url": {
+                  "type": "string",
+                  "description": "URL to view the task in the Manus web app.",
+                  "format": "uri"
+                },
+                "created_by_api_key": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "API key metadata when this task was created via API."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "API key metadata when this task was created via API."
+                },
+                "agent_profile": {
+                  "type": "string",
+                  "enum": [
+                    "manus-1.6",
+                    "manus-1.6-lite",
+                    "manus-1.6-max"
+                  ],
+                  "description": "Manus agent profile to use for this task turn."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "status",
+                "created_at",
+                "updated_at",
+                "task_type",
+                "title"
+              ],
+              "description": "Manus task object with current status and metadata."
+            },
+            "description": "Tasks matching the filter criteria."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more tasks are available."
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Cursor to fetch the next page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "data",
+          "has_more"
+        ],
+        "description": "Cursor-paginated Manus task list response."
+      }
+    },
+    {
+      "id": "manus.send_message",
+      "service": "manus",
+      "name": "send_message",
+      "description": "Send a follow-up message to an existing Manus task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID to send the message to."
+          },
+          "content": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain text message content."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One Manus message content part."
+                },
+                "description": "Structured message content parts.",
+                "minItems": 1
+              }
+            ],
+            "description": "Plain text or structured Manus content parts."
+          },
+          "connectors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus connector ID."
+            },
+            "description": "Connector IDs to enable for the message.",
+            "minItems": 1
+          },
+          "enable_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus skill ID."
+            },
+            "description": "Skill IDs to enable for the message.",
+            "minItems": 1
+          },
+          "force_skills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Manus skill ID."
+            },
+            "description": "Skill IDs the agent must invoke.",
+            "minItems": 1
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Plain text message content."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "One Manus message content part."
+                    },
+                    "description": "Structured message content parts.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "Plain text or structured Manus content parts."
+              },
+              "connectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus connector ID."
+                },
+                "description": "Connector IDs to enable for the message.",
+                "minItems": 1
+              },
+              "enable_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus skill ID."
+                },
+                "description": "Skill IDs to enable for the message.",
+                "minItems": 1
+              },
+              "force_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manus skill ID."
+                },
+                "description": "Skill IDs the agent must invoke.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "content"
+            ],
+            "description": "Manus task message."
+          },
+          "agent_profile": {
+            "type": "string",
+            "enum": [
+              "manus-1.6",
+              "manus-1.6-lite",
+              "manus-1.6-max"
+            ],
+            "description": "Manus agent profile to use for this task turn."
+          },
+          "structured_output_schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "JSON Schema for Manus structured output extraction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Input parameters for sending a follow-up Manus task message.",
+        "anyOf": [
+          {
+            "required": [
+              "message"
+            ]
+          },
+          {
+            "required": [
+              "content"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Unique identifier for the task."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task_id"
+        ],
+        "description": "Manus response containing a task ID."
+      },
+      "followUpActions": [
+        "manus.list_task_messages"
+      ]
+    },
+    {
+      "id": "manus.stop_task",
+      "service": "manus",
+      "name": "stop_task",
+      "description": "Stop a running Manus task.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The running task ID to stop."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for stopping a Manus task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id"
+        ],
+        "description": "Standard Manus success response."
+      }
+    },
+    {
+      "id": "manus.update_agent",
+      "service": "manus",
+      "name": "update_agent",
+      "description": "Update a Manus custom agent's display name or description.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The agent ID to update."
+          },
+          "nickname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New display name for the agent."
+          },
+          "about": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New description or bio for the agent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agent_id"
+        ],
+        "description": "Input parameters for updating a Manus agent."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the agent."
+              },
+              "task_id": {
+                "type": "string",
+                "description": "Task ID associated with this agent."
+              },
+              "nickname": {
+                "type": "string",
+                "description": "Display name of the agent."
+              },
+              "about": {
+                "type": "string",
+                "description": "Description or bio of the agent."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "task_id",
+              "nickname",
+              "about"
+            ],
+            "description": "Manus custom agent."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "agent"
+        ],
+        "description": "Manus agent detail response."
+      }
+    },
+    {
+      "id": "manus.update_task",
+      "service": "manus",
+      "name": "update_task",
+      "description": "Update a Manus task title, sharing visibility, or task-list visibility.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task ID to update."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New title for the task."
+          },
+          "share_visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "description": "Task sharing visibility."
+          },
+          "enable_visible_in_task_list": {
+            "type": "boolean",
+            "description": "Whether the task appears in the Manus web app task list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Input parameters for updating Manus task metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the request was successful."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique identifier for this API request."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "The ID of the updated task."
+          },
+          "task_title": {
+            "type": "string",
+            "description": "The current title of the task."
+          },
+          "task_url": {
+            "type": "string",
+            "description": "URL to view the task in the Manus web app.",
+            "format": "uri"
+          },
+          "share_url": {
+            "type": "string",
+            "description": "Public share URL when the task is shareable.",
+            "format": "uri"
+          },
+          "share_visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "description": "Task sharing visibility."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "ok",
+          "request_id",
+          "task_id",
+          "task_title",
+          "task_url"
+        ],
+        "description": "Result returned after updating a Manus task."
+      }
+    }
+  ]
+}

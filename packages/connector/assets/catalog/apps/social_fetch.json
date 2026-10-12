@@ -1,0 +1,382 @@
+{
+  "service": "social_fetch",
+  "displayName": "Social Fetch",
+  "description": "Retrieve Social Fetch account data and public profiles across supported social platforms.",
+  "categories": [
+    "Social",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sfk_...",
+      "description": "Social Fetch API key sent in the x-api-key header. Sign up and get your key at https://app.socialfetch.dev/playground."
+    }
+  ],
+  "homepageUrl": "https://www.socialfetch.dev",
+  "actions": [
+    {
+      "id": "social_fetch.get_account",
+      "service": "social_fetch",
+      "name": "get_account",
+      "description": "Get the Social Fetch user associated with the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the authenticated Social Fetch account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The internal Social Fetch user identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's display name when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's display name when available."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's email address when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's email address when available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The authenticated Social Fetch user."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The request identifier used for support and tracing."
+              },
+              "creditsCharged": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of Social Fetch credits charged for the request."
+              },
+              "version": {
+                "type": "string",
+                "enum": [
+                  "v1"
+                ],
+                "description": "The Social Fetch API version that served the request."
+              },
+              "cached": {
+                "type": "boolean",
+                "description": "Whether Social Fetch served the response from its shared cache."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requestId",
+              "creditsCharged",
+              "version"
+            ],
+            "description": "Metadata returned with a Social Fetch API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authenticated Social Fetch account response."
+      }
+    },
+    {
+      "id": "social_fetch.get_balance",
+      "service": "social_fetch",
+      "name": "get_balance",
+      "description": "Get the remaining Social Fetch credit balance and billing state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the Social Fetch credit balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total spendable Social Fetch credit balance."
+          },
+          "payg": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total pay-as-you-go credit bucket, including grace credits."
+          },
+          "paygSpendable": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The pay-as-you-go credits currently available to spend."
+          },
+          "graceDebtCredits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The grace credits used during the current refill episode."
+          },
+          "refillState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "healthy",
+                  "grace",
+                  "exhausted"
+                ],
+                "description": "The automatic refill state when auto-refill is enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The automatic refill state when auto-refill is enabled."
+          },
+          "billingAlert": {
+            "type": "string",
+            "enum": [
+              "none",
+              "payment_action_required",
+              "suspended"
+            ],
+            "description": "The current billing alert state."
+          },
+          "subscriptionIncludedRemaining": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The subscription credits remaining in the current period."
+          },
+          "subscriptionIncludedTotal": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The subscription credits granted for the current period."
+          },
+          "subscription": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "tier": {
+                    "type": "string",
+                    "description": "The subscription tier."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The subscription status."
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "description": "The ISO 8601 end time of the current subscription period."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The active subscription summary for subscribed accounts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The active subscription summary for subscribed accounts."
+          },
+          "collectionStatus": {
+            "type": "string",
+            "enum": [
+              "current",
+              "base_past_due",
+              "suspended"
+            ],
+            "description": "The subscription collection state."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The request identifier used for support and tracing."
+              },
+              "creditsCharged": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of Social Fetch credits charged for the request."
+              },
+              "version": {
+                "type": "string",
+                "enum": [
+                  "v1"
+                ],
+                "description": "The Social Fetch API version that served the request."
+              },
+              "cached": {
+                "type": "boolean",
+                "description": "Whether Social Fetch served the response from its shared cache."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requestId",
+              "creditsCharged",
+              "version"
+            ],
+            "description": "Metadata returned with a Social Fetch API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Social Fetch credit balance response."
+      }
+    },
+    {
+      "id": "social_fetch.get_profile",
+      "service": "social_fetch",
+      "name": "get_profile",
+      "description": "Get a public profile or channel by handle from a supported social platform.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "tiktok",
+              "instagram",
+              "twitter",
+              "threads",
+              "bluesky",
+              "telegram",
+              "github",
+              "soundcloud",
+              "linktree"
+            ],
+            "description": "The social platform containing the public profile."
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "description": "The public profile handle, with or without a leading at sign.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for a Social Fetch profile lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lookupStatus": {
+            "type": "string",
+            "enum": [
+              "found",
+              "private",
+              "restricted",
+              "not_found"
+            ],
+            "description": "The outcome reported by Social Fetch for the lookup."
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The platform-specific profile or channel returned by Social Fetch."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The platform-specific profile or channel returned by Social Fetch."
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The platform-specific profile metrics returned by Social Fetch."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The platform-specific profile metrics returned by Social Fetch."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete platform-specific data object returned by Social Fetch."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The request identifier used for support and tracing."
+              },
+              "creditsCharged": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of Social Fetch credits charged for the request."
+              },
+              "version": {
+                "type": "string",
+                "enum": [
+                  "v1"
+                ],
+                "description": "The Social Fetch API version that served the request."
+              },
+              "cached": {
+                "type": "boolean",
+                "description": "Whether Social Fetch served the response from its shared cache."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requestId",
+              "creditsCharged",
+              "version"
+            ],
+            "description": "Metadata returned with a Social Fetch API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Social Fetch profile lookup response."
+      }
+    }
+  ]
+}

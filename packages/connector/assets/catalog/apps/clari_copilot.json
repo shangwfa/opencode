@@ -1,0 +1,1346 @@
+{
+  "service": "clari_copilot",
+  "displayName": "Clari Copilot",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CLARI_COPILOT_API_KEY",
+      "description": "Clari Copilot API key sent with the X-Api-Key header. Find it in workspace settings > integrations > Clari Copilot API: https://api-doc.copilot.clari.com/",
+      "extraFields": [
+        {
+          "key": "apiPassword",
+          "label": "API Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "CLARI_COPILOT_API_PASSWORD",
+          "description": "Clari Copilot API password sent with the X-Api-Password header. Find it next to the API key in workspace settings > integrations > Clari Copilot API: https://api-doc.copilot.clari.com/"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.clari.com/products/copilot/",
+  "actions": [
+    {
+      "id": "clari_copilot.get_call_details",
+      "service": "clari_copilot",
+      "name": "get_call_details",
+      "description": "Retrieve one Clari Copilot call with transcript, summary, and optional media URLs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Clari Copilot call ID."
+          },
+          "includeAudio": {
+            "type": "boolean",
+            "description": "Whether a signed audio URL should be included."
+          },
+          "includeVideo": {
+            "type": "boolean",
+            "description": "Whether a signed video URL should be included."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Clari Copilot call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The call ID."
+              },
+              "source_id": {
+                "type": "string",
+                "description": "The source call ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The call title."
+              },
+              "users": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "userId": {
+                      "type": "string",
+                      "description": "The Clari Copilot user ID."
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "description": "The Clari Copilot user email."
+                    },
+                    "isOrganizer": {
+                      "type": "boolean",
+                      "description": "Whether the user organized the call."
+                    },
+                    "personId": {
+                      "type": "integer",
+                      "description": "The participant person ID in the call transcript."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Clari Copilot user on a call."
+                },
+                "description": "Internal Clari Copilot users on the call."
+              },
+              "externalParticipants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The participant name."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The participant email."
+                    },
+                    "phone": {
+                      "type": "string",
+                      "description": "The participant phone number."
+                    },
+                    "personId": {
+                      "type": "integer",
+                      "description": "The participant person ID in the call transcript."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An external Clari Copilot call participant."
+                },
+                "description": "External call participants."
+              },
+              "joinedParticipants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A joined participant."
+                },
+                "description": "Participants that joined the call."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "SCHEDULED",
+                  "INITIATED",
+                  "INPROGRESS",
+                  "WAITING_IN_QUEUE",
+                  "PROCESSING",
+                  "PROCESSED",
+                  "ERROR_IN_TRANSCRIBE",
+                  "ERROR_IN_PROCESSING",
+                  "ERROR_IN_RECORDING",
+                  "UNABLE_TO_JOIN",
+                  "CALL_DID_NOT_HAPPEN",
+                  "IGNORED_BY_USER",
+                  "BOTJOIN_DISABLED",
+                  "POST_PROCESSING_DONE",
+                  "NO_DATA_INCALL",
+                  "NOBODY_JOINED_CALL",
+                  "BOTJOIN_DENIED"
+                ],
+                "description": "A Clari Copilot call status."
+              },
+              "bot_not_join_reason": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "IGNORED_DUE_TO_WHITELIST",
+                    "CONSENT_REVOKED",
+                    "IGNORED_BY_USER",
+                    "IGNORED_CALL_TYPE_IGNORED_BY_CUSTOMER",
+                    "IGNORED_NO_USER_HAS_ACCEPTED_INVITE",
+                    "RECORDING_PERMISSION_DENIED",
+                    "IGNORED_NON_MEETING",
+                    "IGNORED_NOT_CONFIRMED",
+                    "IGNORED_NOT_EXTERNAL_MEETING",
+                    "IGNORED_NOT_ORGANIZER",
+                    "IGNORED"
+                  ],
+                  "description": "A reason why the Clari Copilot bot did not join."
+                },
+                "description": "Reasons why the bot did not join."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ZOOM",
+                  "GOOGLE_MEET",
+                  "FRESHCALLER",
+                  "AIRCALL_RECORDING",
+                  "RINGCENTRAL",
+                  "GOTO_MEETING",
+                  "OUTREACH",
+                  "HUBSPOT",
+                  "BLUE_JEANS",
+                  "SALESLOFT",
+                  "MS_TEAMS",
+                  "DIALPAD",
+                  "FRONTSPIN",
+                  "TALKDESK"
+                ],
+                "description": "A Clari Copilot call source type."
+              },
+              "time": {
+                "type": "string",
+                "description": "The call scheduled or start time."
+              },
+              "icaluid": {
+                "type": "string",
+                "description": "The calendar iCal UID."
+              },
+              "calendar_id": {
+                "type": "string",
+                "description": "The calendar ID."
+              },
+              "recurring_event_id": {
+                "type": "string",
+                "description": "The recurring event ID."
+              },
+              "original_start_time": {
+                "type": "string",
+                "description": "The original call start time."
+              },
+              "last_modified_time": {
+                "type": "string",
+                "description": "The last time the call was modified."
+              },
+              "audio_url": {
+                "type": "string",
+                "description": "A signed audio URL when requested and available."
+              },
+              "video_url": {
+                "type": "string",
+                "description": "A signed video URL when requested and available."
+              },
+              "disposition": {
+                "type": "string",
+                "enum": [
+                  "UNKNOWN_CALL_DISPOSITION",
+                  "CALL_CONNECTED_WITH_PROSPECT",
+                  "CALL_DID_NOT_CONNECT_WITH_PROSPECT",
+                  "CALL_NOBODY_JOINED",
+                  "CALL_BOTJOIN_DENIED"
+                ],
+                "description": "A Clari Copilot call disposition."
+              },
+              "deal_name": {
+                "type": "string",
+                "description": "The associated deal name."
+              },
+              "deal_value": {
+                "type": "string",
+                "description": "The associated deal value."
+              },
+              "deal_close_date": {
+                "type": "string",
+                "description": "The associated deal close date."
+              },
+              "deal_stage_before_call": {
+                "type": "string",
+                "description": "The deal stage before the call."
+              },
+              "account_name": {
+                "type": "string",
+                "description": "The associated account name."
+              },
+              "contact_names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A contact name."
+                },
+                "description": "Associated contact names."
+              },
+              "crm_info": {
+                "type": "object",
+                "properties": {
+                  "source_crm": {
+                    "type": "string",
+                    "description": "The source CRM name."
+                  },
+                  "deal_id": {
+                    "type": "string",
+                    "description": "The CRM deal ID."
+                  },
+                  "account_id": {
+                    "type": "string",
+                    "description": "The CRM account ID."
+                  },
+                  "contact_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A CRM contact ID."
+                    },
+                    "description": "CRM contact IDs."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "CRM metadata associated with a Clari Copilot call."
+              },
+              "bookmark_timestamps": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A bookmark timestamp."
+                },
+                "description": "Bookmark timestamps."
+              },
+              "metrics": {
+                "type": "object",
+                "properties": {
+                  "talk_listen_ratio": {
+                    "type": "number",
+                    "description": "Talk-listen ratio for the call."
+                  },
+                  "num_questions_asked": {
+                    "type": "integer",
+                    "description": "Number of questions asked during the call."
+                  },
+                  "num_questions_asked_by_reps": {
+                    "type": "integer",
+                    "description": "Number of questions asked by reps."
+                  },
+                  "call_duration": {
+                    "type": "integer",
+                    "description": "Call duration in seconds."
+                  },
+                  "total_speak_duration": {
+                    "type": "number",
+                    "description": "Total speak duration in seconds."
+                  },
+                  "longest_monologue_duration": {
+                    "type": "number",
+                    "description": "Longest monologue duration in seconds."
+                  },
+                  "longest_monologue_start_time": {
+                    "type": "number",
+                    "description": "Start time of the longest monologue in seconds."
+                  },
+                  "engaging_questions": {
+                    "type": "integer",
+                    "description": "Number of engaging questions."
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A category."
+                    },
+                    "description": "Metric categories returned by Clari Copilot."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Clari Copilot call metrics."
+              },
+              "call_review_page_url": {
+                "type": "string",
+                "description": "The Clari Copilot call review page URL."
+              },
+              "deal_stage_live": {
+                "type": "string",
+                "description": "The live deal stage."
+              },
+              "transcript": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "The transcript text."
+                    },
+                    "start": {
+                      "type": "number",
+                      "description": "The turn start time in seconds."
+                    },
+                    "end": {
+                      "type": "number",
+                      "description": "The turn end time in seconds."
+                    },
+                    "personId": {
+                      "type": "integer",
+                      "description": "The participant person ID."
+                    },
+                    "annotations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A transcript annotation."
+                      },
+                      "description": "Transcript annotations."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Clari Copilot transcript turn."
+                },
+                "description": "Call transcript turns."
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "full_summary": {
+                    "type": "string",
+                    "description": "The full call summary."
+                  },
+                  "topics_discussed": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The topic name."
+                        },
+                        "start_timestamp": {
+                          "type": "string",
+                          "description": "The topic start timestamp."
+                        },
+                        "end_timestamp": {
+                          "type": "string",
+                          "description": "The topic end timestamp."
+                        },
+                        "summary": {
+                          "type": "string",
+                          "description": "The topic summary."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A Clari Copilot summary topic."
+                    },
+                    "description": "Topics discussed in the call."
+                  },
+                  "key_action_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "action_item": {
+                          "type": "string",
+                          "description": "The action item text."
+                        },
+                        "speaker_name": {
+                          "type": "string",
+                          "description": "The speaker name."
+                        },
+                        "start_timestamp": {
+                          "type": "string",
+                          "description": "The action item start timestamp."
+                        },
+                        "end_timestamp": {
+                          "type": "string",
+                          "description": "The action item end timestamp."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A Clari Copilot summary action item."
+                    },
+                    "description": "Key action items from the call."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Call summary returned by Clari Copilot."
+              },
+              "competitor_sentiments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A competitor sentiment item."
+                },
+                "description": "Competitor sentiment details returned by Clari Copilot."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Detailed Clari Copilot call information."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "call"
+        ],
+        "description": "The Clari Copilot call details response."
+      }
+    },
+    {
+      "id": "clari_copilot.list_calls",
+      "service": "clari_copilot",
+      "name": "list_calls",
+      "description": "List Clari Copilot calls with supported filters, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The number of calls to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of calls to return."
+          },
+          "filterUser": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A user email.",
+              "format": "email"
+            },
+            "description": "Filter calls by Clari Copilot user email.",
+            "minItems": 1
+          },
+          "filterAttendees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An attendee email.",
+              "format": "email"
+            },
+            "description": "Filter calls by external attendee email.",
+            "minItems": 1
+          },
+          "filterTopics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A topic name."
+            },
+            "description": "Filter calls by topic name.",
+            "minItems": 1
+          },
+          "filterStatus": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SCHEDULED",
+                "INITIATED",
+                "INPROGRESS",
+                "WAITING_IN_QUEUE",
+                "PROCESSING",
+                "PROCESSED",
+                "ERROR_IN_TRANSCRIBE",
+                "ERROR_IN_PROCESSING",
+                "ERROR_IN_RECORDING",
+                "UNABLE_TO_JOIN",
+                "CALL_DID_NOT_HAPPEN",
+                "IGNORED_BY_USER",
+                "BOTJOIN_DISABLED",
+                "POST_PROCESSING_DONE",
+                "NO_DATA_INCALL",
+                "NOBODY_JOINED_CALL",
+                "BOTJOIN_DENIED"
+              ],
+              "description": "A Clari Copilot call status."
+            },
+            "description": "Filter calls by status.",
+            "minItems": 1
+          },
+          "filterType": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ZOOM",
+                "GOOGLE_MEET",
+                "FRESHCALLER",
+                "AIRCALL_RECORDING",
+                "RINGCENTRAL",
+                "GOTO_MEETING",
+                "OUTREACH",
+                "HUBSPOT",
+                "BLUE_JEANS",
+                "SALESLOFT",
+                "MS_TEAMS",
+                "DIALPAD",
+                "FRONTSPIN",
+                "TALKDESK"
+              ],
+              "description": "A Clari Copilot call source type."
+            },
+            "description": "Filter calls by source type.",
+            "minItems": 1
+          },
+          "filterSourceId": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A source ID."
+            },
+            "description": "Filter calls by source IDs.",
+            "minItems": 1
+          },
+          "filterTimeGt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return calls scheduled or started after this time. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterTimeLt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return calls scheduled or started before this time. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterModifiedGt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return calls modified after this time. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterModifiedLt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return calls modified before this time. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterDurationGt": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7200,
+            "description": "Return calls longer than this duration in seconds."
+          },
+          "filterDurationLt": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7200,
+            "description": "Return calls shorter than this duration in seconds."
+          },
+          "sortTime": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction."
+          },
+          "sortProcessed": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction."
+          },
+          "includePrivate": {
+            "type": "boolean",
+            "description": "Whether private calls should be included."
+          },
+          "includeAudio": {
+            "type": "boolean",
+            "description": "Whether signed audio URLs should be included."
+          },
+          "includeVideo": {
+            "type": "boolean",
+            "description": "Whether signed video URLs should be included."
+          },
+          "includePagination": {
+            "type": "boolean",
+            "description": "Whether pagination metadata should be included."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Clari Copilot calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The call ID."
+                },
+                "source_id": {
+                  "type": "string",
+                  "description": "The source call ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The call title."
+                },
+                "users": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "userId": {
+                        "type": "string",
+                        "description": "The Clari Copilot user ID."
+                      },
+                      "userEmail": {
+                        "type": "string",
+                        "description": "The Clari Copilot user email."
+                      },
+                      "isOrganizer": {
+                        "type": "boolean",
+                        "description": "Whether the user organized the call."
+                      },
+                      "personId": {
+                        "type": "integer",
+                        "description": "The participant person ID in the call transcript."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Clari Copilot user on a call."
+                  },
+                  "description": "Internal Clari Copilot users on the call."
+                },
+                "externalParticipants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The participant name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The participant email."
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "The participant phone number."
+                      },
+                      "personId": {
+                        "type": "integer",
+                        "description": "The participant person ID in the call transcript."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "An external Clari Copilot call participant."
+                  },
+                  "description": "External call participants."
+                },
+                "joinedParticipants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A joined participant."
+                  },
+                  "description": "Participants that joined the call."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "SCHEDULED",
+                    "INITIATED",
+                    "INPROGRESS",
+                    "WAITING_IN_QUEUE",
+                    "PROCESSING",
+                    "PROCESSED",
+                    "ERROR_IN_TRANSCRIBE",
+                    "ERROR_IN_PROCESSING",
+                    "ERROR_IN_RECORDING",
+                    "UNABLE_TO_JOIN",
+                    "CALL_DID_NOT_HAPPEN",
+                    "IGNORED_BY_USER",
+                    "BOTJOIN_DISABLED",
+                    "POST_PROCESSING_DONE",
+                    "NO_DATA_INCALL",
+                    "NOBODY_JOINED_CALL",
+                    "BOTJOIN_DENIED"
+                  ],
+                  "description": "A Clari Copilot call status."
+                },
+                "bot_not_join_reason": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "IGNORED_DUE_TO_WHITELIST",
+                      "CONSENT_REVOKED",
+                      "IGNORED_BY_USER",
+                      "IGNORED_CALL_TYPE_IGNORED_BY_CUSTOMER",
+                      "IGNORED_NO_USER_HAS_ACCEPTED_INVITE",
+                      "RECORDING_PERMISSION_DENIED",
+                      "IGNORED_NON_MEETING",
+                      "IGNORED_NOT_CONFIRMED",
+                      "IGNORED_NOT_EXTERNAL_MEETING",
+                      "IGNORED_NOT_ORGANIZER",
+                      "IGNORED"
+                    ],
+                    "description": "A reason why the Clari Copilot bot did not join."
+                  },
+                  "description": "Reasons why the bot did not join."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ZOOM",
+                    "GOOGLE_MEET",
+                    "FRESHCALLER",
+                    "AIRCALL_RECORDING",
+                    "RINGCENTRAL",
+                    "GOTO_MEETING",
+                    "OUTREACH",
+                    "HUBSPOT",
+                    "BLUE_JEANS",
+                    "SALESLOFT",
+                    "MS_TEAMS",
+                    "DIALPAD",
+                    "FRONTSPIN",
+                    "TALKDESK"
+                  ],
+                  "description": "A Clari Copilot call source type."
+                },
+                "time": {
+                  "type": "string",
+                  "description": "The call scheduled or start time."
+                },
+                "icaluid": {
+                  "type": "string",
+                  "description": "The calendar iCal UID."
+                },
+                "calendar_id": {
+                  "type": "string",
+                  "description": "The calendar ID."
+                },
+                "recurring_event_id": {
+                  "type": "string",
+                  "description": "The recurring event ID."
+                },
+                "original_start_time": {
+                  "type": "string",
+                  "description": "The original call start time."
+                },
+                "last_modified_time": {
+                  "type": "string",
+                  "description": "The last time the call was modified."
+                },
+                "audio_url": {
+                  "type": "string",
+                  "description": "A signed audio URL when requested and available."
+                },
+                "video_url": {
+                  "type": "string",
+                  "description": "A signed video URL when requested and available."
+                },
+                "disposition": {
+                  "type": "string",
+                  "enum": [
+                    "UNKNOWN_CALL_DISPOSITION",
+                    "CALL_CONNECTED_WITH_PROSPECT",
+                    "CALL_DID_NOT_CONNECT_WITH_PROSPECT",
+                    "CALL_NOBODY_JOINED",
+                    "CALL_BOTJOIN_DENIED"
+                  ],
+                  "description": "A Clari Copilot call disposition."
+                },
+                "deal_name": {
+                  "type": "string",
+                  "description": "The associated deal name."
+                },
+                "deal_value": {
+                  "type": "string",
+                  "description": "The associated deal value."
+                },
+                "deal_close_date": {
+                  "type": "string",
+                  "description": "The associated deal close date."
+                },
+                "deal_stage_before_call": {
+                  "type": "string",
+                  "description": "The deal stage before the call."
+                },
+                "account_name": {
+                  "type": "string",
+                  "description": "The associated account name."
+                },
+                "contact_names": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A contact name."
+                  },
+                  "description": "Associated contact names."
+                },
+                "crm_info": {
+                  "type": "object",
+                  "properties": {
+                    "source_crm": {
+                      "type": "string",
+                      "description": "The source CRM name."
+                    },
+                    "deal_id": {
+                      "type": "string",
+                      "description": "The CRM deal ID."
+                    },
+                    "account_id": {
+                      "type": "string",
+                      "description": "The CRM account ID."
+                    },
+                    "contact_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A CRM contact ID."
+                      },
+                      "description": "CRM contact IDs."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "CRM metadata associated with a Clari Copilot call."
+                },
+                "bookmark_timestamps": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A bookmark timestamp."
+                  },
+                  "description": "Bookmark timestamps."
+                },
+                "metrics": {
+                  "type": "object",
+                  "properties": {
+                    "talk_listen_ratio": {
+                      "type": "number",
+                      "description": "Talk-listen ratio for the call."
+                    },
+                    "num_questions_asked": {
+                      "type": "integer",
+                      "description": "Number of questions asked during the call."
+                    },
+                    "num_questions_asked_by_reps": {
+                      "type": "integer",
+                      "description": "Number of questions asked by reps."
+                    },
+                    "call_duration": {
+                      "type": "integer",
+                      "description": "Call duration in seconds."
+                    },
+                    "total_speak_duration": {
+                      "type": "number",
+                      "description": "Total speak duration in seconds."
+                    },
+                    "longest_monologue_duration": {
+                      "type": "number",
+                      "description": "Longest monologue duration in seconds."
+                    },
+                    "longest_monologue_start_time": {
+                      "type": "number",
+                      "description": "Start time of the longest monologue in seconds."
+                    },
+                    "engaging_questions": {
+                      "type": "integer",
+                      "description": "Number of engaging questions."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A category."
+                      },
+                      "description": "Metric categories returned by Clari Copilot."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Clari Copilot call metrics."
+                },
+                "call_review_page_url": {
+                  "type": "string",
+                  "description": "The Clari Copilot call review page URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Clari Copilot call."
+            },
+            "description": "Calls returned by Clari Copilot."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "matched": {
+                    "type": "integer",
+                    "description": "The number of records matching the query."
+                  },
+                  "hasMore": {
+                    "type": "boolean",
+                    "description": "Whether more records are available."
+                  },
+                  "nextPageSkip": {
+                    "type": "integer",
+                    "description": "The skip value for the next page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination information returned by Clari Copilot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination information returned by Clari Copilot."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "calls"
+        ],
+        "description": "The Clari Copilot calls list response."
+      }
+    },
+    {
+      "id": "clari_copilot.list_scorecards",
+      "service": "clari_copilot",
+      "name": "list_scorecards",
+      "description": "List Clari Copilot scorecards with pagination and scorer filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "The number of scorecards to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of scorecards to return."
+          },
+          "filterTimeGt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return scorecards after this timestamp. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterTimeLt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return scorecards before this timestamp. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterRepId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter scorecards by scored rep user ID."
+          },
+          "filterScorerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter scorecards by scorer user ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Clari Copilot scorecards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scorecards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The scorecard ID."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The scorecard type."
+                },
+                "rep": {
+                  "type": "string",
+                  "description": "The scored rep ID."
+                },
+                "scorer": {
+                  "type": "string",
+                  "description": "The scorer ID."
+                },
+                "template_id": {
+                  "type": "string",
+                  "description": "The scorecard template ID."
+                },
+                "call_id": {
+                  "type": "string",
+                  "description": "The scored call ID."
+                },
+                "total_score": {
+                  "type": "number",
+                  "description": "The total score."
+                },
+                "remark": {
+                  "type": "string",
+                  "description": "Additional remarks or comments on the scorecard."
+                },
+                "questions_score": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "score": {
+                        "type": "integer",
+                        "description": "The score for the question."
+                      },
+                      "skill": {
+                        "type": "string",
+                        "description": "The assessed skill."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "The question label."
+                      },
+                      "order": {
+                        "type": "string",
+                        "description": "The question order."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Clari Copilot scorecard question score."
+                  },
+                  "description": "Question-level scores."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Clari Copilot scorecard."
+            },
+            "description": "Scorecards returned by Clari Copilot."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "matched": {
+                    "type": "integer",
+                    "description": "The number of records matching the query."
+                  },
+                  "hasMore": {
+                    "type": "boolean",
+                    "description": "Whether more records are available."
+                  },
+                  "nextPageSkip": {
+                    "type": "integer",
+                    "description": "The skip value for the next page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination information returned by Clari Copilot."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination information returned by Clari Copilot."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "scorecards"
+        ],
+        "description": "The Clari Copilot scorecards response."
+      }
+    },
+    {
+      "id": "clari_copilot.list_topics",
+      "service": "clari_copilot",
+      "name": "list_topics",
+      "description": "List Clari Copilot topics, optionally filtered by last modified time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filterModifiedLt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return topics modified before this timestamp. Use the date-time format accepted by the Clari Copilot API."
+          },
+          "filterModifiedGt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return topics modified after this timestamp. Use the date-time format accepted by the Clari Copilot API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Clari Copilot topics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "topic_id": {
+                  "type": "string",
+                  "description": "The topic ID."
+                },
+                "topic_name": {
+                  "type": "string",
+                  "description": "The topic name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The topic type."
+                },
+                "team_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A team ID."
+                  },
+                  "description": "Team IDs associated with the topic."
+                },
+                "custom_topic": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string",
+                      "description": "The custom topic description."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The custom topic status."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Custom topic details."
+                },
+                "keyword_topic": {
+                  "type": "object",
+                  "properties": {
+                    "trackers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A tracker."
+                      },
+                      "description": "Keyword trackers associated with the topic."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Keyword topic details."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Clari Copilot topic."
+            },
+            "description": "Topics returned by Clari Copilot."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "topics"
+        ],
+        "description": "The Clari Copilot topics response."
+      }
+    },
+    {
+      "id": "clari_copilot.list_users",
+      "service": "clari_copilot",
+      "name": "list_users",
+      "description": "List current users in the Clari Copilot workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Clari Copilot users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The user ID."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The user email address."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The user's display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "REP",
+                    "MANAGER",
+                    "OBSERVER"
+                  ],
+                  "description": "The user's Clari Copilot role."
+                },
+                "is_recording": {
+                  "type": "boolean",
+                  "description": "Whether calls for this user are recorded."
+                },
+                "manager_id": {
+                  "type": "string",
+                  "description": "The user's manager ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Clari Copilot user."
+            },
+            "description": "Users returned by Clari Copilot."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "users"
+        ],
+        "description": "The Clari Copilot users response."
+      }
+    }
+  ]
+}

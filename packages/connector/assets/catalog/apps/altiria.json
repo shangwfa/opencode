@@ -1,0 +1,1415 @@
+{
+  "service": "altiria",
+  "displayName": "Altiria",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "ALTIRIA_USERNAME",
+          "description": "Altiria API username used as the Basic Auth username. Use the username for the Altiria platform account: https://www.altiria.com."
+        },
+        {
+          "key": "apiPassword",
+          "label": "API Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "ALTIRIA_API_PASSWORD",
+          "description": "Altiria API password used as the Basic Auth password. It is different from the platform login password; get it from the APIs > Change API password menu in the Altiria platform, as described in https://apidocs.altiria.com/."
+        },
+        {
+          "key": "dashboardHost",
+          "label": "Dashboard Host",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://www.altiria.net",
+          "description": "Altiria dashboard host used before /api/rest in API requests. Copy the HTTPS host from your Altiria platform URL; the REST docs show it as DASHBOARD_HOST: https://apidocs.altiria.com/."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_groups",
+        "input": {
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.altiria.com",
+  "actions": [
+    {
+      "id": "altiria.create_contact",
+      "service": "altiria",
+      "name": "create_contact",
+      "description": "Create a new Altiria contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Contact email address.",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact mobile phone number with international prefix."
+          },
+          "landline": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact landline phone number."
+          },
+          "countryIso": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code required when phone or landline is specified."
+          },
+          "groupsIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Altiria group ID."
+            },
+            "description": "Contact group IDs to attach this contact to.",
+            "minItems": 1
+          },
+          "groupsNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Altiria group name."
+            },
+            "description": "Contact group names to attach this contact to.",
+            "minItems": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact first name."
+          },
+          "surname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact surname."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom field name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "date",
+                    "decimal"
+                  ],
+                  "description": "Custom field type."
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom field value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "value"
+              ],
+              "description": "One Altiria contact custom field value."
+            },
+            "description": "Custom fields to set on this contact.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating an Altiria contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Altiria contact identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Altiria contact identifier."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact mobile phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact mobile phone number."
+              },
+              "landline": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact landline phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact landline phone number."
+              },
+              "countryIso": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Two-letter contact country code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Two-letter contact country code."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact first name."
+              },
+              "surname": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact surname."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact surname."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact creation timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact creation timestamp returned by Altiria."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact update timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact update timestamp returned by Altiria."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Altiria contact object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One normalized Altiria contact."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact",
+          "raw"
+        ],
+        "description": "Contact created by Altiria."
+      }
+    },
+    {
+      "id": "altiria.delete_contact",
+      "service": "altiria",
+      "name": "delete_contact",
+      "description": "Delete one Altiria contact by contact ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Altiria contact identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for deleting one Altiria contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the contact delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Delete status returned after removing an Altiria contact."
+      }
+    },
+    {
+      "id": "altiria.get_contact",
+      "service": "altiria",
+      "name": "get_contact",
+      "description": "Fetch one Altiria contact by contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Altiria contact identifier."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customFields",
+                "groups"
+              ],
+              "description": "One associated contact resource name."
+            },
+            "description": "Associated contact resources to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for fetching one Altiria contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Altiria contact identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Altiria contact identifier."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact mobile phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact mobile phone number."
+              },
+              "landline": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact landline phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact landline phone number."
+              },
+              "countryIso": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Two-letter contact country code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Two-letter contact country code."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact first name."
+              },
+              "surname": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact surname."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact surname."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact creation timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact creation timestamp returned by Altiria."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact update timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact update timestamp returned by Altiria."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Altiria contact object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One normalized Altiria contact."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact",
+          "raw"
+        ],
+        "description": "Contact returned by Altiria."
+      }
+    },
+    {
+      "id": "altiria.get_sms",
+      "service": "altiria",
+      "name": "get_sms",
+      "description": "Fetch SMS information from Altiria by one or more message identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Altiria SMS message identifier, or multiple identifiers separated by commas."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for fetching Altiria SMS information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Altiria SMS message identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria SMS message identifier."
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Sender value used for the SMS message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sender value used for the SMS message."
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Recipient phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recipient phone number."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "SMS message body."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "SMS message body."
+                },
+                "campaignId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria campaign identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria campaign identifier."
+                },
+                "sendingId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria sending identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria sending identifier."
+                },
+                "isDelivered": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Altiria reports the message as delivered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Altiria reports the message as delivered."
+                },
+                "isClicked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Altiria reports a shortened link click."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Altiria reports a shortened link click."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Altiria SMS object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One normalized Altiria SMS message."
+            },
+            "description": "SMS message records returned by Altiria."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "raw"
+        ],
+        "description": "SMS messages returned by Altiria."
+      }
+    },
+    {
+      "id": "altiria.list_contacts",
+      "service": "altiria",
+      "name": "list_contacts",
+      "description": "List contacts from the connected Altiria account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum contacts to return in one request."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Result page to request."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "customFields",
+                "groups"
+              ],
+              "description": "One associated contact resource name."
+            },
+            "description": "Associated contact resources to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Altiria contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria contact identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria contact identifier."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact email address."
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact mobile phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact mobile phone number."
+                },
+                "landline": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact landline phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact landline phone number."
+                },
+                "countryIso": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Two-letter contact country code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Two-letter contact country code."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact first name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact first name."
+                },
+                "surname": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact surname."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact surname."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact creation timestamp returned by Altiria."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact creation timestamp returned by Altiria."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact update timestamp returned by Altiria."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact update timestamp returned by Altiria."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Altiria contact object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One normalized Altiria contact."
+            },
+            "description": "Contact records returned by Altiria."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination and other metadata returned by Altiria."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination and other metadata returned by Altiria."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "meta",
+          "raw"
+        ],
+        "description": "Contacts returned by Altiria."
+      }
+    },
+    {
+      "id": "altiria.list_groups",
+      "service": "altiria",
+      "name": "list_groups",
+      "description": "List contact groups from the connected Altiria account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum groups to return in one request."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Result page to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Altiria contact groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria group identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria group identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Altiria group name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria group name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Altiria group object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One normalized Altiria contact group."
+            },
+            "description": "Group records returned by Altiria."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Pagination and other metadata returned by Altiria."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination and other metadata returned by Altiria."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groups",
+          "meta",
+          "raw"
+        ],
+        "description": "Contact groups returned by Altiria."
+      }
+    },
+    {
+      "id": "altiria.send_sms",
+      "service": "altiria",
+      "name": "send_sms",
+      "description": "Send an SMS message through Altiria's REST SMS endpoint.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One recipient mobile phone number."
+            },
+            "description": "Recipient mobile phone numbers with international prefix.",
+            "minItems": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SMS sender value registered or allowed in Altiria."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SMS body text to send."
+          },
+          "notificationUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "One delivery notification URL.",
+                "format": "uri"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One delivery URL.",
+                  "format": "uri"
+                },
+                "description": "Delivery notification URLs by recipient.",
+                "minItems": 1
+              }
+            ],
+            "description": "Delivery notification URL, either shared by all recipients or one URL per recipient."
+          },
+          "campaignName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional campaign name used in Altiria statistics."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag."
+            },
+            "description": "Campaign tags to attach to the send.",
+            "minItems": 1
+          },
+          "certified": {
+            "type": "boolean",
+            "description": "Whether to send the message as certified SMS."
+          },
+          "splitParts": {
+            "type": "boolean",
+            "description": "Whether Altiria should split long SMS messages into SMS parts."
+          },
+          "flash": {
+            "type": "boolean",
+            "description": "Whether to send the message as a Flash SMS."
+          },
+          "sub": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Variable value."
+              },
+              "description": "Substitution variables for one recipient."
+            },
+            "description": "Substitution variable objects, one per recipient.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "from",
+          "message"
+        ],
+        "description": "The input payload for sending an Altiria SMS message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Altiria accepted the SMS request."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Altiria SMS message identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria SMS message identifier."
+                },
+                "from": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Sender value used for the SMS message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Sender value used for the SMS message."
+                },
+                "to": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Recipient phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recipient phone number."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "SMS message body."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "SMS message body."
+                },
+                "campaignId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria campaign identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria campaign identifier."
+                },
+                "sendingId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Altiria sending identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Altiria sending identifier."
+                },
+                "isDelivered": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Altiria reports the message as delivered."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Altiria reports the message as delivered."
+                },
+                "isClicked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Altiria reports a shortened link click."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Altiria reports a shortened link click."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Altiria SMS object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One normalized Altiria SMS message."
+            },
+            "description": "SMS message records returned by Altiria."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "messages",
+          "raw"
+        ],
+        "description": "The result returned by Altiria after sending SMS."
+      }
+    },
+    {
+      "id": "altiria.update_contact",
+      "service": "altiria",
+      "name": "update_contact",
+      "description": "Update an existing Altiria contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Altiria contact identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "Contact email address.",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact mobile phone number with international prefix."
+          },
+          "landline": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact landline phone number."
+          },
+          "countryIso": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "Two-letter country code required when phone or landline is specified."
+          },
+          "groupsIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Altiria group ID."
+            },
+            "description": "Contact group IDs to attach this contact to.",
+            "minItems": 1
+          },
+          "groupsNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Altiria group name."
+            },
+            "description": "Contact group names to attach this contact to.",
+            "minItems": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact first name."
+          },
+          "surname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact surname."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom field name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "string",
+                    "date",
+                    "decimal"
+                  ],
+                  "description": "Custom field type."
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Custom field value."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "value"
+              ],
+              "description": "One Altiria contact custom field value."
+            },
+            "description": "Custom fields to set on this contact.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for updating an Altiria contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Altiria contact identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Altiria contact identifier."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact mobile phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact mobile phone number."
+              },
+              "landline": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact landline phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact landline phone number."
+              },
+              "countryIso": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Two-letter contact country code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Two-letter contact country code."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact first name."
+              },
+              "surname": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact surname."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact surname."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact creation timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact creation timestamp returned by Altiria."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact update timestamp returned by Altiria."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact update timestamp returned by Altiria."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Altiria contact object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "One normalized Altiria contact."
+          },
+          "raw": {
+            "description": "Raw Altiria response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact",
+          "raw"
+        ],
+        "description": "Contact updated by Altiria."
+      }
+    }
+  ]
+}

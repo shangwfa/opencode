@@ -1,0 +1,1037 @@
+{
+  "service": "leadiq",
+  "displayName": "LeadIQ",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Base64 API Key",
+      "placeholder": "your_secret_base64_api_key",
+      "description": "LeadIQ Secret Base64 API key sent in the HTTP Basic Authorization header. Copy it from Settings > API.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://leadiq.com",
+  "actions": [
+    {
+      "id": "leadiq.flat_advanced_search",
+      "service": "leadiq",
+      "name": "flat_advanced_search",
+      "description": "Search for people using documented role, seniority, and location filters and return a flat list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A professional role."
+            },
+            "description": "Professional roles to include.",
+            "minItems": 1
+          },
+          "seniorities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A professional seniority level."
+            },
+            "description": "Professional seniority levels to include.",
+            "minItems": 1
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The city name."
+                },
+                "areaLevel1": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The state, province, or first-level administrative area."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The country name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A geographic filter for advanced people search."
+            },
+            "description": "Geographic locations to include.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of results to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Documented filters and pagination for LeadIQ advanced people search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalPeople": {
+            "type": "integer",
+            "description": "The total number of matching people."
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LeadIQ person ID."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A person in flat advanced search."
+            },
+            "description": "The matching people."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalPeople",
+          "people"
+        ],
+        "description": "The flat LeadIQ advanced search result."
+      }
+    },
+    {
+      "id": "leadiq.get_account",
+      "service": "leadiq",
+      "name": "get_account",
+      "description": "Retrieve LeadIQ subscription plans and current Data Hub and Universal credit balances.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The plan name."
+                },
+                "product": {
+                  "type": "string",
+                  "description": "The LeadIQ product covered by the plan."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current plan status."
+                },
+                "nextBillingPeriod": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The next billing period date or timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The next billing period date or timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "product",
+                "status",
+                "nextBillingPeriod"
+              ],
+              "description": "A LeadIQ subscription plan."
+            },
+            "description": "The account's subscription plans."
+          },
+          "dataHubPlan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The plan name."
+                  },
+                  "product": {
+                    "type": "string",
+                    "description": "The LeadIQ product covered by the plan."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The current plan status."
+                  },
+                  "nextBillingPeriod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next billing period date or timestamp."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next billing period date or timestamp."
+                  },
+                  "available": {
+                    "type": "number",
+                    "description": "The number of credits currently available."
+                  },
+                  "used": {
+                    "type": "number",
+                    "description": "The number of credits used in the current billing period."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "name",
+                  "product",
+                  "status",
+                  "nextBillingPeriod",
+                  "available",
+                  "used"
+                ],
+                "description": "A LeadIQ credit-bearing plan."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A LeadIQ credit-bearing plan."
+          },
+          "universalPlan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The plan name."
+                  },
+                  "product": {
+                    "type": "string",
+                    "description": "The LeadIQ product covered by the plan."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The current plan status."
+                  },
+                  "nextBillingPeriod": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next billing period date or timestamp."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next billing period date or timestamp."
+                  },
+                  "available": {
+                    "type": "number",
+                    "description": "The number of credits currently available."
+                  },
+                  "used": {
+                    "type": "number",
+                    "description": "The number of credits used in the current billing period."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "name",
+                  "product",
+                  "status",
+                  "nextBillingPeriod",
+                  "available",
+                  "used"
+                ],
+                "description": "A LeadIQ credit-bearing plan."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A LeadIQ credit-bearing plan."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "plans"
+        ],
+        "description": "The connected LeadIQ account plans and credit balances."
+      }
+    },
+    {
+      "id": "leadiq.grouped_advanced_search",
+      "service": "leadiq",
+      "name": "grouped_advanced_search",
+      "description": "Search for people using documented filters and return matches grouped by company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A professional role."
+            },
+            "description": "Professional roles to include.",
+            "minItems": 1
+          },
+          "seniorities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A professional seniority level."
+            },
+            "description": "Professional seniority levels to include.",
+            "minItems": 1
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The city name."
+                },
+                "areaLevel1": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The state, province, or first-level administrative area."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The country name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A geographic filter for advanced people search."
+            },
+            "description": "Geographic locations to include.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of results to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Documented filters and pagination for LeadIQ advanced people search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCompanies": {
+            "type": "integer",
+            "description": "The total number of matching companies."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "totalContactsInCompany": {
+                  "type": "integer",
+                  "description": "The number of matching contacts at the company."
+                },
+                "company": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The LeadIQ company ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The company name."
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The company domain."
+                    },
+                    "industry": {
+                      "type": "string",
+                      "description": "The company's industry."
+                    },
+                    "numberOfEmployees": {
+                      "type": "integer",
+                      "description": "The company's employee count."
+                    },
+                    "locationInfo": {
+                      "type": "object",
+                      "properties": {
+                        "city": {
+                          "type": "string",
+                          "description": "The city."
+                        },
+                        "areaLevel1": {
+                          "type": "string",
+                          "description": "The state, province, or first-level administrative area."
+                        },
+                        "country": {
+                          "type": "string",
+                          "description": "The country."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "city",
+                        "areaLevel1",
+                        "country"
+                      ],
+                      "description": "The company's location."
+                    },
+                    "fundingInfo": {
+                      "type": "object",
+                      "properties": {
+                        "fundingTotalUsd": {
+                          "type": "number",
+                          "description": "The company's total funding in US dollars."
+                        },
+                        "lastFundingType": {
+                          "type": "string",
+                          "description": "The most recent funding type."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "fundingTotalUsd",
+                        "lastFundingType"
+                      ],
+                      "description": "The company's funding information."
+                    },
+                    "technologies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "The technology name."
+                          },
+                          "category": {
+                            "type": "string",
+                            "description": "The technology category."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "required": [
+                          "name",
+                          "category"
+                        ],
+                        "description": "A technology used by the company."
+                      },
+                      "description": "Technologies used by the company."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "name",
+                    "domain",
+                    "industry",
+                    "numberOfEmployees",
+                    "locationInfo",
+                    "fundingInfo",
+                    "technologies"
+                  ],
+                  "description": "A company returned by LeadIQ."
+                },
+                "people": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The LeadIQ person ID."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The person's full name."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "The person's job title."
+                      },
+                      "seniority": {
+                        "type": "string",
+                        "description": "The person's seniority."
+                      },
+                      "linkedinUrl": {
+                        "type": "string",
+                        "description": "The person's LinkedIn profile URL."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name",
+                      "title",
+                      "seniority",
+                      "linkedinUrl"
+                    ],
+                    "description": "A person in grouped advanced search."
+                  },
+                  "description": "The people matching at this company."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "totalContactsInCompany",
+                "company",
+                "people"
+              ],
+              "description": "A company and its matching people."
+            },
+            "description": "Companies with their matching people."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalCompanies",
+          "companies"
+        ],
+        "description": "The company-grouped LeadIQ advanced search result."
+      }
+    },
+    {
+      "id": "leadiq.search_company",
+      "service": "leadiq",
+      "name": "search_company",
+      "description": "Find companies in LeadIQ by company ID, name, domain, or LinkedIn ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A LeadIQ company ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company domain."
+          },
+          "linkedinId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LinkedIn company ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifiers for finding companies in LeadIQ."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of matching companies."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LeadIQ company ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The company name."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The company domain."
+                },
+                "industry": {
+                  "type": "string",
+                  "description": "The company's industry."
+                },
+                "numberOfEmployees": {
+                  "type": "integer",
+                  "description": "The company's employee count."
+                },
+                "locationInfo": {
+                  "type": "object",
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "The city."
+                    },
+                    "areaLevel1": {
+                      "type": "string",
+                      "description": "The state, province, or first-level administrative area."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "The country."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "city",
+                    "areaLevel1",
+                    "country"
+                  ],
+                  "description": "The company's location."
+                },
+                "fundingInfo": {
+                  "type": "object",
+                  "properties": {
+                    "fundingTotalUsd": {
+                      "type": "number",
+                      "description": "The company's total funding in US dollars."
+                    },
+                    "lastFundingType": {
+                      "type": "string",
+                      "description": "The most recent funding type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "fundingTotalUsd",
+                    "lastFundingType"
+                  ],
+                  "description": "The company's funding information."
+                },
+                "technologies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The technology name."
+                      },
+                      "category": {
+                        "type": "string",
+                        "description": "The technology category."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "name",
+                      "category"
+                    ],
+                    "description": "A technology used by the company."
+                  },
+                  "description": "Technologies used by the company."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "domain",
+                "industry",
+                "numberOfEmployees",
+                "locationInfo",
+                "fundingInfo",
+                "technologies"
+              ],
+              "description": "A company returned by LeadIQ."
+            },
+            "description": "The matching companies."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "results"
+        ],
+        "description": "The LeadIQ company search result."
+      }
+    },
+    {
+      "id": "leadiq.search_people",
+      "service": "leadiq",
+      "name": "search_people",
+      "description": "Find and enrich people in LeadIQ by person ID, LinkedIn URL, email, or name and company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A LeadIQ person ID."
+          },
+          "linkedinUrl": {
+            "type": "string",
+            "description": "A LinkedIn profile URL.",
+            "format": "uri"
+          },
+          "email": {
+            "type": "string",
+            "description": "A known email address.",
+            "format": "email"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The person's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The person's last name."
+          },
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company name."
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company domain, such as example.com."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Company information used to identify a person."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of results to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifiers and pagination for finding people in LeadIQ."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of matching people."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more results are available."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The LeadIQ person ID."
+                },
+                "name": {
+                  "type": "object",
+                  "properties": {
+                    "fullName": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The person's full name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The person's full name."
+                    },
+                    "first": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The person's first name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The person's first name."
+                    },
+                    "last": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The person's last name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The person's last name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "fullName",
+                    "first",
+                    "last"
+                  ],
+                  "description": "The person's name."
+                },
+                "currentPositions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The current job title."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The current job title."
+                      },
+                      "seniority": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The current job seniority."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The current job seniority."
+                      },
+                      "function": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The current job function."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The current job function."
+                      },
+                      "companyInfo": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "The LeadIQ company ID."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "The company name."
+                              },
+                              "domain": {
+                                "type": "string",
+                                "description": "The company domain."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "required": [
+                              "id",
+                              "name",
+                              "domain"
+                            ],
+                            "description": "The company associated with this position."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The company associated with this position."
+                      },
+                      "emails": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "type": "string",
+                              "description": "The email address."
+                            },
+                            "status": {
+                              "type": "string",
+                              "description": "The email verification status."
+                            },
+                            "type": {
+                              "type": "string",
+                              "description": "The email type."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "value",
+                            "status",
+                            "type"
+                          ],
+                          "description": "A work email address."
+                        },
+                        "description": "Work email addresses associated with this position."
+                      },
+                      "phones": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "value": {
+                              "type": "string",
+                              "description": "The phone number."
+                            },
+                            "type": {
+                              "type": "string",
+                              "description": "The phone type."
+                            },
+                            "verificationStatus": {
+                              "type": "string",
+                              "description": "The phone verification status."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "required": [
+                            "value",
+                            "type",
+                            "verificationStatus"
+                          ],
+                          "description": "A work phone number."
+                        },
+                        "description": "Work phone numbers associated with this position."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "title",
+                      "seniority",
+                      "function",
+                      "companyInfo",
+                      "emails",
+                      "phones"
+                    ],
+                    "description": "A current position."
+                  },
+                  "description": "The person's current positions."
+                },
+                "linkedin": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "linkedinUrl": {
+                          "type": "string",
+                          "description": "The LinkedIn profile URL."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "linkedinUrl"
+                      ],
+                      "description": "The person's LinkedIn profile."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The person's LinkedIn profile."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "currentPositions",
+                "linkedin"
+              ],
+              "description": "A person returned by LeadIQ."
+            },
+            "description": "The matching people."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "hasMore",
+          "results"
+        ],
+        "description": "The LeadIQ people search result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,392 @@
+{
+  "service": "trigger_dev",
+  "displayName": "Trigger.dev",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret API Key",
+      "placeholder": "tr_dev_...",
+      "description": "Trigger.dev secret API key used with the Authorization Bearer header. Find or create it in the Trigger.dev project dashboard API Keys section: https://trigger.dev/docs/apikeys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://trigger.dev",
+  "actions": [
+    {
+      "id": "trigger_dev.cancel_run",
+      "service": "trigger_dev",
+      "name": "cancel_run",
+      "description": "Cancel an in-progress Trigger.dev run.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Trigger.dev run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Trigger.dev run identifier response."
+      }
+    },
+    {
+      "id": "trigger_dev.get_run",
+      "service": "trigger_dev",
+      "name": "get_run",
+      "description": "Retrieve a Trigger.dev run by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Trigger.dev run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A JSON object returned by Trigger.dev."
+      }
+    },
+    {
+      "id": "trigger_dev.get_run_result",
+      "service": "trigger_dev",
+      "name": "get_run_result",
+      "description": "Retrieve the execution result for a completed Trigger.dev run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Trigger.dev run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "A JSON object returned by Trigger.dev."
+      }
+    },
+    {
+      "id": "trigger_dev.list_runs",
+      "service": "trigger_dev",
+      "name": "list_runs",
+      "description": "List Trigger.dev runs with optional status, task, version, and time filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100,
+            "description": "Number of runs per page."
+          },
+          "pageAfter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID to start the next page after."
+          },
+          "pageBefore": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run ID to start the previous page before."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING_VERSION",
+                "QUEUED",
+                "EXECUTING",
+                "REATTEMPTING",
+                "FROZEN",
+                "COMPLETED",
+                "CANCELED",
+                "FAILED",
+                "CRASHED",
+                "INTERRUPTED",
+                "SYSTEM_FAILURE"
+              ],
+              "description": "A Trigger.dev run status."
+            },
+            "description": "Statuses to include in the run list.",
+            "minItems": 1
+          },
+          "taskIdentifiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Trigger.dev task identifier to execute."
+            },
+            "description": "Task identifiers to include in the run list.",
+            "minItems": 1
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A worker version."
+            },
+            "description": "Worker versions to include in the run list.",
+            "minItems": 1
+          },
+          "createdFrom": {
+            "type": "string",
+            "description": "Only include runs created at or after this time.",
+            "format": "date-time"
+          },
+          "createdTo": {
+            "type": "string",
+            "description": "Only include runs created at or before this time.",
+            "format": "date-time"
+          },
+          "createdPeriod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Relative created-at period accepted by Trigger.dev, such as 1d."
+          },
+          "bulkAction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bulk action ID to filter by."
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Schedule ID to filter by."
+          },
+          "isTest": {
+            "type": "boolean",
+            "description": "Whether to include only test or non-test runs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and cursor pagination for listing Trigger.dev runs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A JSON object returned by Trigger.dev."
+            },
+            "description": "Runs returned by Trigger.dev."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Cursor pagination metadata returned by Trigger.dev."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Trigger.dev runs."
+      }
+    },
+    {
+      "id": "trigger_dev.replay_run",
+      "service": "trigger_dev",
+      "name": "replay_run",
+      "description": "Replay a Trigger.dev run with the same payload and options.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Trigger.dev run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Trigger.dev run identifier response."
+      }
+    },
+    {
+      "id": "trigger_dev.trigger_task",
+      "service": "trigger_dev",
+      "name": "trigger_task",
+      "description": "Trigger a Trigger.dev task by task identifier.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev task identifier to execute."
+          },
+          "payload": {
+            "description": "Any JSON value accepted by Trigger.dev."
+          },
+          "context": {
+            "description": "Any JSON value accepted by Trigger.dev."
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "queue": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Queue name."
+                  },
+                  "concurrencyLimit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Maximum concurrent executions for the queue."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "description": "Queue options for the triggered run."
+              },
+              "concurrencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Concurrency scope key for this run."
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Idempotency key used to deduplicate triggered runs."
+              },
+              "ttl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Duration string such as 1h42m."
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Duration in seconds."
+                  }
+                ],
+                "description": "Time-to-live for the queued run."
+              },
+              "delay": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Delay before the task executes, such as 1h or an ISO date-time."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A run tag."
+                },
+                "description": "Tags to attach to the run.",
+                "minItems": 1,
+                "maxItems": 10
+              },
+              "machine": {
+                "type": "string",
+                "enum": [
+                  "micro",
+                  "small-1x",
+                  "small-2x",
+                  "medium-1x",
+                  "medium-2x",
+                  "large-1x",
+                  "large-2x"
+                ],
+                "description": "Machine preset to use for this run."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Trigger.dev run options for a task trigger request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskIdentifier"
+        ],
+        "description": "Input for triggering a Trigger.dev task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Trigger.dev run ID, prefixed with run_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Trigger.dev run identifier response."
+      }
+    }
+  ]
+}

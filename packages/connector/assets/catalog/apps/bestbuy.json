@@ -1,0 +1,1450 @@
+{
+  "service": "bestbuy",
+  "displayName": "Best Buy",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BESTBUY_API_KEY",
+      "description": "Best Buy developer API key sent as the apiKey query parameter. Get one from the Best Buy Developer Portal: https://developer.bestbuy.com/"
+    }
+  ],
+  "homepageUrl": "https://www.bestbuy.com",
+  "actions": [
+    {
+      "id": "bestbuy.get_categories",
+      "service": "bestbuy",
+      "name": "get_categories",
+      "description": "List Best Buy categories with optional identifier or name filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A category identifier or a pipe-separated list of category identifiers."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A category name or a pipe-separated list of category names."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page, from 1 to 100."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy sort expression, such as name.asc or salePrice.dsc."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Best Buy categories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "The starting index of the current page."
+          },
+          "to": {
+            "type": "integer",
+            "description": "The ending index of the current page."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current one-based page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "queryTime": {
+            "type": "number",
+            "description": "The query execution time reported by Best Buy."
+          },
+          "totalTime": {
+            "type": "number",
+            "description": "The total request time reported by Best Buy."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the response is a partial result set."
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "description": "The canonical URL returned by Best Buy."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category display name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical URL for the category."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the category is active."
+                },
+                "parent": {
+                  "type": "string",
+                  "description": "The parent category identifier."
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The category identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The category display name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "description": "A category path entry returned by Best Buy."
+                  },
+                  "description": "The category path from root to the current category."
+                },
+                "subCategories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The subcategory identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The subcategory display name."
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "The canonical URL for the subcategory."
+                      },
+                      "active": {
+                        "type": "boolean",
+                        "description": "Whether the subcategory is active."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "description": "A direct subcategory entry returned by Best Buy."
+                  },
+                  "description": "The direct subcategories of the category."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A Best Buy category object."
+            },
+            "description": "The categories returned by the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "from",
+          "to",
+          "currentPage",
+          "totalPages",
+          "total",
+          "categories"
+        ],
+        "description": "The Best Buy categories response."
+      }
+    },
+    {
+      "id": "bestbuy.get_category_details",
+      "service": "bestbuy",
+      "name": "get_category_details",
+      "description": "Retrieve one Best Buy category by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The category identifier to retrieve."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for retrieving one Best Buy category."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The category identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The category display name."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical URL for the category."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the category is active."
+          },
+          "parent": {
+            "type": "string",
+            "description": "The parent category identifier."
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category display name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A category path entry returned by Best Buy."
+            },
+            "description": "The category path from root to the current category."
+          },
+          "subCategories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The subcategory identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The subcategory display name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical URL for the subcategory."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the subcategory is active."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A direct subcategory entry returned by Best Buy."
+            },
+            "description": "The direct subcategories of the category."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "A Best Buy category object."
+      }
+    },
+    {
+      "id": "bestbuy.get_product_details",
+      "service": "bestbuy",
+      "name": "get_product_details",
+      "description": "Retrieve one Best Buy product by SKU.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The product SKU."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product SKU."
+              }
+            ],
+            "description": "The product SKU."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sku"
+        ],
+        "description": "The input payload for retrieving one Best Buy product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The product SKU."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product SKU."
+              }
+            ],
+            "description": "The product SKU."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product display name."
+          },
+          "type": {
+            "type": "string",
+            "description": "The upstream product type."
+          },
+          "upc": {
+            "type": "string",
+            "description": "The product UPC."
+          },
+          "url": {
+            "type": "string",
+            "description": "The canonical Best Buy product URL."
+          },
+          "image": {
+            "type": "string",
+            "description": "The primary product image URL."
+          },
+          "thumbnailImage": {
+            "type": "string",
+            "description": "The thumbnail product image URL."
+          },
+          "salePrice": {
+            "type": "number",
+            "description": "The current sale price."
+          },
+          "regularPrice": {
+            "type": "number",
+            "description": "The regular list price."
+          },
+          "shortDescription": {
+            "type": "string",
+            "description": "The short product description."
+          },
+          "longDescription": {
+            "type": "string",
+            "description": "The long product description."
+          },
+          "description": {
+            "type": "string",
+            "description": "The product description text."
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "The product manufacturer."
+          },
+          "customerReviewCount": {
+            "type": "integer",
+            "description": "The number of customer reviews."
+          },
+          "customerReviewAverage": {
+            "type": "number",
+            "description": "The average customer review score."
+          },
+          "categoryPath": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The category display name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A category path entry returned by Best Buy."
+            },
+            "description": "The category hierarchy for the product."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "sku",
+          "name"
+        ],
+        "description": "A Best Buy product object."
+      }
+    },
+    {
+      "id": "bestbuy.get_products",
+      "service": "bestbuy",
+      "name": "get_products",
+      "description": "List Best Buy products with optional SKU, UPC, name, category, or price filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The product SKU."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product SKU."
+              }
+            ],
+            "description": "The product SKU."
+          },
+          "upc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product UPC to filter by."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The product name filter. Plain values are converted into a name clause, and raw Best Buy name expressions are also accepted."
+          },
+          "salePrice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The salePrice filter. Values such as >100 are converted into a Best Buy comparison clause, and raw salePrice expressions are also accepted."
+          },
+          "categoryPathId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy category identifier to filter products by."
+          },
+          "categoryPath.id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy category identifier alias used by the toolkit to filter products by."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page, from 1 to 100."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy sort expression, such as name.asc or salePrice.dsc."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Best Buy products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "The starting index of the current page."
+          },
+          "to": {
+            "type": "integer",
+            "description": "The ending index of the current page."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current one-based page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "queryTime": {
+            "type": "number",
+            "description": "The query execution time reported by Best Buy."
+          },
+          "totalTime": {
+            "type": "number",
+            "description": "The total request time reported by Best Buy."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the response is a partial result set."
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "description": "The canonical URL returned by Best Buy."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The product SKU."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The product SKU."
+                    }
+                  ],
+                  "description": "The product SKU."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The product display name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The upstream product type."
+                },
+                "upc": {
+                  "type": "string",
+                  "description": "The product UPC."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The canonical Best Buy product URL."
+                },
+                "image": {
+                  "type": "string",
+                  "description": "The primary product image URL."
+                },
+                "thumbnailImage": {
+                  "type": "string",
+                  "description": "The thumbnail product image URL."
+                },
+                "salePrice": {
+                  "type": "number",
+                  "description": "The current sale price."
+                },
+                "regularPrice": {
+                  "type": "number",
+                  "description": "The regular list price."
+                },
+                "shortDescription": {
+                  "type": "string",
+                  "description": "The short product description."
+                },
+                "longDescription": {
+                  "type": "string",
+                  "description": "The long product description."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The product description text."
+                },
+                "manufacturer": {
+                  "type": "string",
+                  "description": "The product manufacturer."
+                },
+                "customerReviewCount": {
+                  "type": "integer",
+                  "description": "The number of customer reviews."
+                },
+                "customerReviewAverage": {
+                  "type": "number",
+                  "description": "The average customer review score."
+                },
+                "categoryPath": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The category identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The category display name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "description": "A category path entry returned by Best Buy."
+                  },
+                  "description": "The category hierarchy for the product."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "sku",
+                "name"
+              ],
+              "description": "A Best Buy product object."
+            },
+            "description": "The products returned by the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "from",
+          "to",
+          "currentPage",
+          "totalPages",
+          "total",
+          "products"
+        ],
+        "description": "The Best Buy products response."
+      }
+    },
+    {
+      "id": "bestbuy.get_review_details",
+      "service": "bestbuy",
+      "name": "get_review_details",
+      "description": "Retrieve one Best Buy review by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The review identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The review identifier."
+              }
+            ],
+            "description": "The review identifier."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for retrieving one Best Buy review."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The review identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The review identifier."
+              }
+            ],
+            "description": "The unique review identifier."
+          },
+          "productId": {
+            "type": "string",
+            "description": "The reviewed product identifier."
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The reviewed product SKU."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The reviewed product SKU."
+              }
+            ],
+            "description": "The reviewed product SKU."
+          },
+          "reviewer": {
+            "type": "string",
+            "description": "The reviewer display name."
+          },
+          "reviewerLocation": {
+            "type": "string",
+            "description": "The reviewer location string."
+          },
+          "title": {
+            "type": "string",
+            "description": "The review title."
+          },
+          "comment": {
+            "type": "string",
+            "description": "The review body text."
+          },
+          "rating": {
+            "type": "integer",
+            "description": "The review rating score."
+          },
+          "submissionTime": {
+            "type": "string",
+            "description": "The review submission timestamp."
+          },
+          "isRecommended": {
+            "type": "boolean",
+            "description": "Whether the reviewer recommends the product."
+          },
+          "helpfulVotes": {
+            "type": "integer",
+            "description": "The helpful vote count."
+          },
+          "notHelpfulVotes": {
+            "type": "integer",
+            "description": "The not-helpful vote count."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "A Best Buy review object."
+      }
+    },
+    {
+      "id": "bestbuy.get_reviews",
+      "service": "bestbuy",
+      "name": "get_reviews",
+      "description": "List Best Buy product reviews with optional SKU, reviewer, and rating filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The product SKU."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The product SKU."
+              }
+            ],
+            "description": "The product SKU."
+          },
+          "reviewer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reviewer name used to filter reviews."
+          },
+          "minScore": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The minimum review rating to include."
+          },
+          "maxScore": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The maximum review rating to include."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page, from 1 to 100."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy sort expression, such as name.asc or salePrice.dsc."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Best Buy reviews."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "The starting index of the current page."
+          },
+          "to": {
+            "type": "integer",
+            "description": "The ending index of the current page."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current one-based page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "queryTime": {
+            "type": "number",
+            "description": "The query execution time reported by Best Buy."
+          },
+          "totalTime": {
+            "type": "number",
+            "description": "The total request time reported by Best Buy."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the response is a partial result set."
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "description": "The canonical URL returned by Best Buy."
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The review identifier."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The review identifier."
+                    }
+                  ],
+                  "description": "The unique review identifier."
+                },
+                "productId": {
+                  "type": "string",
+                  "description": "The reviewed product identifier."
+                },
+                "sku": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The reviewed product SKU."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The reviewed product SKU."
+                    }
+                  ],
+                  "description": "The reviewed product SKU."
+                },
+                "reviewer": {
+                  "type": "string",
+                  "description": "The reviewer display name."
+                },
+                "reviewerLocation": {
+                  "type": "string",
+                  "description": "The reviewer location string."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The review title."
+                },
+                "comment": {
+                  "type": "string",
+                  "description": "The review body text."
+                },
+                "rating": {
+                  "type": "integer",
+                  "description": "The review rating score."
+                },
+                "submissionTime": {
+                  "type": "string",
+                  "description": "The review submission timestamp."
+                },
+                "isRecommended": {
+                  "type": "boolean",
+                  "description": "Whether the reviewer recommends the product."
+                },
+                "helpfulVotes": {
+                  "type": "integer",
+                  "description": "The helpful vote count."
+                },
+                "notHelpfulVotes": {
+                  "type": "integer",
+                  "description": "The not-helpful vote count."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A Best Buy review object."
+            },
+            "description": "The reviews returned by the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "from",
+          "to",
+          "currentPage",
+          "totalPages",
+          "total",
+          "reviews"
+        ],
+        "description": "The Best Buy reviews response."
+      }
+    },
+    {
+      "id": "bestbuy.get_store_details",
+      "service": "bestbuy",
+      "name": "get_store_details",
+      "description": "Retrieve one Best Buy store by store identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The store identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The store identifier."
+              }
+            ],
+            "description": "The store identifier."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeId"
+        ],
+        "description": "The input payload for retrieving one Best Buy store."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The store identifier."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The store identifier."
+              }
+            ],
+            "description": "The store identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The store display name."
+          },
+          "type": {
+            "type": "string",
+            "description": "The upstream store type alias."
+          },
+          "storeType": {
+            "type": "string",
+            "description": "The upstream store type."
+          },
+          "address": {
+            "type": "string",
+            "description": "The primary store street address."
+          },
+          "address2": {
+            "type": "string",
+            "description": "The secondary store address line."
+          },
+          "city": {
+            "type": "string",
+            "description": "The store city."
+          },
+          "state": {
+            "type": "string",
+            "description": "The store state or region code."
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "The store postal code."
+          },
+          "fullPostalCode": {
+            "type": "string",
+            "description": "The full store postal code."
+          },
+          "country": {
+            "type": "string",
+            "description": "The store country code."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The store phone number."
+          },
+          "hours": {
+            "type": "string",
+            "description": "The store hours string."
+          },
+          "lat": {
+            "type": "number",
+            "description": "The store latitude."
+          },
+          "lng": {
+            "type": "number",
+            "description": "The store longitude."
+          },
+          "distance": {
+            "type": "number",
+            "description": "The distance from the requested origin."
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A service offered by the store."
+            },
+            "description": "The services offered by the store."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "storeId"
+        ],
+        "description": "A Best Buy store object."
+      }
+    },
+    {
+      "id": "bestbuy.get_stores",
+      "service": "bestbuy",
+      "name": "get_stores",
+      "description": "List Best Buy stores with optional geographic and attribute filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "geo": {
+            "type": "object",
+            "properties": {
+              "lat": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "The latitude used for area-based store search."
+              },
+              "long": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "The longitude used for area-based store search."
+              },
+              "radius": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The search radius in miles used for area-based store search."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "lat",
+              "long"
+            ],
+            "description": "The geographic area filter for listing Best Buy stores."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name used to filter stores."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state code alias used to filter stores."
+          },
+          "region": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy region filter used to filter stores."
+          },
+          "storeId": {
+            "type": "integer",
+            "description": "The store identifier used to filter stores."
+          },
+          "storeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The store type used to filter stores."
+          },
+          "postalCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal code used to filter stores."
+          },
+          "services": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The services filter used to filter stores."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results to return per page, from 1 to 100."
+          },
+          "show": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of upstream fields to include in the response."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Best Buy sort expression, such as name.asc or salePrice.dsc."
+          },
+          "format": {
+            "const": "json",
+            "type": "string",
+            "description": "Response format. Only json is supported by this connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Best Buy stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "The starting index of the current page."
+          },
+          "to": {
+            "type": "integer",
+            "description": "The ending index of the current page."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current one-based page number."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total number of pages available."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching records."
+          },
+          "queryTime": {
+            "type": "number",
+            "description": "The query execution time reported by Best Buy."
+          },
+          "totalTime": {
+            "type": "number",
+            "description": "The total request time reported by Best Buy."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the response is a partial result set."
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "description": "The canonical URL returned by Best Buy."
+          },
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "storeId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The store identifier."
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The store identifier."
+                    }
+                  ],
+                  "description": "The store identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The store display name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The upstream store type alias."
+                },
+                "storeType": {
+                  "type": "string",
+                  "description": "The upstream store type."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The primary store street address."
+                },
+                "address2": {
+                  "type": "string",
+                  "description": "The secondary store address line."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The store city."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The store state or region code."
+                },
+                "postalCode": {
+                  "type": "string",
+                  "description": "The store postal code."
+                },
+                "fullPostalCode": {
+                  "type": "string",
+                  "description": "The full store postal code."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The store country code."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "The store phone number."
+                },
+                "hours": {
+                  "type": "string",
+                  "description": "The store hours string."
+                },
+                "lat": {
+                  "type": "number",
+                  "description": "The store latitude."
+                },
+                "lng": {
+                  "type": "number",
+                  "description": "The store longitude."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the requested origin."
+                },
+                "services": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A service offered by the store."
+                  },
+                  "description": "The services offered by the store."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "storeId"
+              ],
+              "description": "A Best Buy store object."
+            },
+            "description": "The stores returned by the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "from",
+          "to",
+          "currentPage",
+          "totalPages",
+          "total",
+          "stores"
+        ],
+        "description": "The Best Buy stores response."
+      }
+    }
+  ]
+}

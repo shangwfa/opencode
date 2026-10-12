@@ -1,0 +1,2059 @@
+{
+  "service": "habitica",
+  "displayName": "Habitica",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "HABITICA_API_TOKEN",
+      "description": "Habitica API Token sent with the x-api-key header for authenticated API v3 requests. Find or reset it in Settings > API after signing in, then follow the official API docs: https://habitica.com/apidoc/",
+      "extraFields": [
+        {
+          "key": "userId",
+          "label": "User ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+          "description": "Habitica User ID sent with the x-api-user header. Copy it from Settings > API in your Habitica account, alongside the API Token: https://habitica.com/apidoc/"
+        },
+        {
+          "key": "xClient",
+          "label": "X-Client Header",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "<habitica_user_id>-oomol-connect",
+          "description": "The exact X-Client header value required by Habitica for third-party tools. Follow the official API usage guideline format <creator Habitica UserID>-<appname>: https://github.com/HabitRPG/habitica/wiki/API-Usage-Guidelines"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://habitica.com",
+  "actions": [
+    {
+      "id": "habitica.create_tag",
+      "service": "habitica",
+      "name": "create_tag",
+      "description": "Create one new Habitica tag.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica tag name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating one Habitica tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica tag identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica tag identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica tag name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica tag name."
+              },
+              "challenge": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized Habitica tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag"
+        ],
+        "description": "The response returned when creating one Habitica tag."
+      }
+    },
+    {
+      "id": "habitica.create_task",
+      "service": "habitica",
+      "name": "create_task",
+      "description": "Create one new personal Habitica task from a single JSON task object.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text displayed for the Habitica task."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "habit",
+              "daily",
+              "todo",
+              "reward"
+            ],
+            "description": "The Habitica task type."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Habitica tag ID."
+            },
+            "description": "The Habitica tag IDs to attach to the task."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional Habitica alias for the task."
+          },
+          "attribute": {
+            "type": "string",
+            "enum": [
+              "str",
+              "int",
+              "per",
+              "con"
+            ],
+            "description": "The Habitica stat associated with the task."
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The checklist item text."
+                },
+                "completed": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item starts completed."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One checklist item to send to Habitica."
+            },
+            "description": "The checklist items to attach to the task."
+          },
+          "collapseChecklist": {
+            "type": "boolean",
+            "description": "Whether Habitica should collapse the checklist."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Additional Habitica task notes."
+          },
+          "date": {
+            "type": "string",
+            "description": "The due date to send to Habitica for todo tasks.",
+            "format": "date-time"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": 0.1,
+                "type": "number",
+                "description": "A trivial task priority."
+              },
+              {
+                "const": 1,
+                "type": "number",
+                "description": "An easy task priority."
+              },
+              {
+                "const": 1.5,
+                "type": "number",
+                "description": "A medium task priority."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "A hard task priority."
+              }
+            ],
+            "description": "The Habitica task priority."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "description": "The Habitica daily frequency."
+          },
+          "repeat": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The Habitica repeat object for dailies, keyed by weekday abbreviations."
+          },
+          "everyX": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Habitica everyX interval for dailies."
+          },
+          "streak": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Habitica streak value for dailies."
+          },
+          "daysOfMonth": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31,
+              "description": "One day of month."
+            },
+            "description": "The Habitica daysOfMonth values for monthly dailies."
+          },
+          "weeksOfMonth": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "description": "One week-of-month value."
+            },
+            "description": "The Habitica weeksOfMonth values for monthly dailies."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The Habitica start date for dailies.",
+            "format": "date-time"
+          },
+          "up": {
+            "type": "boolean",
+            "description": "Whether a habit can be scored up."
+          },
+          "down": {
+            "type": "boolean",
+            "description": "Whether a habit can be scored down."
+          },
+          "value": {
+            "type": "number",
+            "description": "The Habitica reward cost or task value."
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the task is completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "type"
+        ],
+        "description": "The common Habitica user task fields accepted by create and update endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task identifier."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task text."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task text."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task alias."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "habit",
+                      "daily",
+                      "todo",
+                      "reward"
+                    ],
+                    "description": "The Habitica task type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task type."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task notes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task notes."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the Habitica task is completed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the Habitica task is completed."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task priority."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task priority."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task value."
+              },
+              "attribute": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "str",
+                      "int",
+                      "per",
+                      "con"
+                    ],
+                    "description": "The Habitica stat associated with the task."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica stat associated with the task."
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica due date string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica due date string when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One Habitica tag ID."
+                },
+                "description": "The Habitica tag IDs attached to the task."
+              },
+              "checklist": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Habitica checklist item identifier."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Habitica checklist item identifier."
+                    },
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The checklist item text."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The checklist item text."
+                    },
+                    "completed": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the checklist item is completed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the checklist item is completed."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The raw Habitica object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One normalized Habitica checklist item."
+                },
+                "description": "The normalized Habitica checklist items."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized Habitica task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "The response returned when creating one Habitica task."
+      }
+    },
+    {
+      "id": "habitica.delete_tag",
+      "service": "habitica",
+      "name": "delete_tag",
+      "description": "Delete one Habitica tag by tag ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "string",
+            "description": "The Habitica tag ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tagId"
+        ],
+        "description": "Input parameters for deleting one Habitica tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the Habitica tag deletion was accepted."
+          },
+          "tagId": {
+            "type": "string",
+            "description": "The Habitica tag ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "tagId"
+        ],
+        "description": "The response returned when deleting one Habitica tag."
+      }
+    },
+    {
+      "id": "habitica.delete_task",
+      "service": "habitica",
+      "name": "delete_task",
+      "description": "Delete one Habitica task by task ID or alias.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica task ID or alias."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input parameters for deleting one Habitica task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the Habitica task deletion was accepted."
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica task ID or alias."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "taskId"
+        ],
+        "description": "The response returned when deleting one Habitica task."
+      }
+    },
+    {
+      "id": "habitica.get_task",
+      "service": "habitica",
+      "name": "get_task",
+      "description": "Get one Habitica task by task ID or alias.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica task ID or alias."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input parameters for reading one Habitica task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task identifier."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task text."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task text."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task alias."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "habit",
+                      "daily",
+                      "todo",
+                      "reward"
+                    ],
+                    "description": "The Habitica task type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task type."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task notes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task notes."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the Habitica task is completed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the Habitica task is completed."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task priority."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task priority."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task value."
+              },
+              "attribute": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "str",
+                      "int",
+                      "per",
+                      "con"
+                    ],
+                    "description": "The Habitica stat associated with the task."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica stat associated with the task."
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica due date string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica due date string when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One Habitica tag ID."
+                },
+                "description": "The Habitica tag IDs attached to the task."
+              },
+              "checklist": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Habitica checklist item identifier."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Habitica checklist item identifier."
+                    },
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The checklist item text."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The checklist item text."
+                    },
+                    "completed": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the checklist item is completed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the checklist item is completed."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The raw Habitica object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One normalized Habitica checklist item."
+                },
+                "description": "The normalized Habitica checklist items."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized Habitica task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "The response returned when reading one Habitica task."
+      }
+    },
+    {
+      "id": "habitica.get_user_profile",
+      "service": "habitica",
+      "name": "get_user_profile",
+      "description": "Get the authenticated Habitica user's profile with optional userFields filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userFields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated Habitica userFields selection passed through to the /user endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading the authenticated Habitica user profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica user identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica user identifier."
+              },
+              "profileName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica profile display name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica profile display name."
+              },
+              "level": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Habitica user level."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica user level."
+              },
+              "class": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica user class."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica user class."
+              },
+              "partyId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica party identifier when the user has one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica party identifier when the user has one."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized authenticated Habitica user profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The response returned when reading the authenticated Habitica user profile."
+      }
+    },
+    {
+      "id": "habitica.list_my_tasks",
+      "service": "habitica",
+      "name": "list_my_tasks",
+      "description": "List the authenticated Habitica user's tasks with optional type and dueDate filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "habits",
+              "dailys",
+              "todos",
+              "rewards",
+              "completedTodos"
+            ],
+            "description": "The task type filter supported by Habitica."
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "The optional date used for Habitica nextDue computation.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing the authenticated Habitica user's tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica task identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task identifier."
+                },
+                "text": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica task text."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task text."
+                },
+                "alias": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica task alias."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task alias."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "habit",
+                        "daily",
+                        "todo",
+                        "reward"
+                      ],
+                      "description": "The Habitica task type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task type."
+                },
+                "notes": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica task notes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task notes."
+                },
+                "completed": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the Habitica task is completed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the Habitica task is completed."
+                },
+                "priority": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The Habitica task priority."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task priority."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The Habitica task value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica task value."
+                },
+                "attribute": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "str",
+                        "int",
+                        "per",
+                        "con"
+                      ],
+                      "description": "The Habitica stat associated with the task."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica stat associated with the task."
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica due date string when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica due date string when returned."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One Habitica tag ID."
+                  },
+                  "description": "The Habitica tag IDs attached to the task."
+                },
+                "checklist": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The Habitica checklist item identifier."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The Habitica checklist item identifier."
+                      },
+                      "text": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The checklist item text."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The checklist item text."
+                      },
+                      "completed": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "Whether the checklist item is completed."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Whether the checklist item is completed."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The raw Habitica object."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One normalized Habitica checklist item."
+                  },
+                  "description": "The normalized Habitica checklist items."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Habitica object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Habitica task."
+            },
+            "description": "The normalized Habitica tasks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks"
+        ],
+        "description": "The response returned when listing Habitica tasks."
+      }
+    },
+    {
+      "id": "habitica.list_tags",
+      "service": "habitica",
+      "name": "list_tags",
+      "description": "List the authenticated Habitica user's tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for listing Habitica tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica tag identifier."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica tag identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica tag name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica tag name."
+                },
+                "challenge": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The raw Habitica object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized Habitica tag."
+            },
+            "description": "The normalized Habitica tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tags"
+        ],
+        "description": "The response returned when listing Habitica tags."
+      }
+    },
+    {
+      "id": "habitica.score_task",
+      "service": "habitica",
+      "name": "score_task",
+      "description": "Score one Habitica task in the up or down direction.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica task ID or alias."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "description": "The direction used to score a Habitica task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "direction"
+        ],
+        "description": "Input parameters for scoring one Habitica task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scoreResult": {
+            "type": "object",
+            "properties": {
+              "delta": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica score delta."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica score delta."
+              },
+              "hp": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's HP after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's HP after scoring."
+              },
+              "mp": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's MP after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's MP after scoring."
+              },
+              "exp": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's EXP after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's EXP after scoring."
+              },
+              "gp": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's GP after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's GP after scoring."
+              },
+              "lvl": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user's level after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's level after scoring."
+              },
+              "class": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The user's class after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's class after scoring."
+              },
+              "points": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user's remaining stat points after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's remaining stat points after scoring."
+              },
+              "str": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's STR after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's STR after scoring."
+              },
+              "con": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's CON after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's CON after scoring."
+              },
+              "int": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's INT after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's INT after scoring."
+              },
+              "per": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The user's PER after scoring."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user's PER after scoring."
+              },
+              "tmp": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The temporary drop payload returned by Habitica."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica score response data."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized Habitica task score result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scoreResult"
+        ],
+        "description": "The response returned when scoring one Habitica task."
+      }
+    },
+    {
+      "id": "habitica.update_tag",
+      "service": "habitica",
+      "name": "update_tag",
+      "description": "Update one Habitica tag by tag ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "string",
+            "description": "The Habitica tag ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement Habitica tag name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tagId",
+          "name"
+        ],
+        "description": "Input parameters for updating one Habitica tag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica tag identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica tag identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica tag name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica tag name."
+              },
+              "challenge": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica challenge identifier when this tag belongs to a challenge."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized Habitica tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag"
+        ],
+        "description": "The response returned when updating one Habitica tag."
+      }
+    },
+    {
+      "id": "habitica.update_task",
+      "service": "habitica",
+      "name": "update_task",
+      "description": "Update one Habitica task by task ID or alias.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Habitica task ID or alias."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text displayed for the Habitica task."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Habitica tag ID."
+            },
+            "description": "The Habitica tag IDs to attach to the task."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional Habitica alias for the task."
+          },
+          "attribute": {
+            "type": "string",
+            "enum": [
+              "str",
+              "int",
+              "per",
+              "con"
+            ],
+            "description": "The Habitica stat associated with the task."
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The checklist item text."
+                },
+                "completed": {
+                  "type": "boolean",
+                  "description": "Whether the checklist item starts completed."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One checklist item to send to Habitica."
+            },
+            "description": "The checklist items to attach to the task."
+          },
+          "collapseChecklist": {
+            "type": "boolean",
+            "description": "Whether Habitica should collapse the checklist."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Additional Habitica task notes."
+          },
+          "date": {
+            "type": "string",
+            "description": "The due date to send to Habitica for todo tasks.",
+            "format": "date-time"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "const": 0.1,
+                "type": "number",
+                "description": "A trivial task priority."
+              },
+              {
+                "const": 1,
+                "type": "number",
+                "description": "An easy task priority."
+              },
+              {
+                "const": 1.5,
+                "type": "number",
+                "description": "A medium task priority."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "A hard task priority."
+              }
+            ],
+            "description": "The Habitica task priority."
+          },
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "description": "The Habitica daily frequency."
+          },
+          "repeat": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The Habitica repeat object for dailies, keyed by weekday abbreviations."
+          },
+          "everyX": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Habitica everyX interval for dailies."
+          },
+          "streak": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Habitica streak value for dailies."
+          },
+          "daysOfMonth": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31,
+              "description": "One day of month."
+            },
+            "description": "The Habitica daysOfMonth values for monthly dailies."
+          },
+          "weeksOfMonth": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "description": "One week-of-month value."
+            },
+            "description": "The Habitica weeksOfMonth values for monthly dailies."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The Habitica start date for dailies.",
+            "format": "date-time"
+          },
+          "up": {
+            "type": "boolean",
+            "description": "Whether a habit can be scored up."
+          },
+          "down": {
+            "type": "boolean",
+            "description": "Whether a habit can be scored down."
+          },
+          "value": {
+            "type": "number",
+            "description": "The Habitica reward cost or task value."
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the task is completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "Input parameters for updating one Habitica task.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "alias"
+            ]
+          },
+          {
+            "required": [
+              "attribute"
+            ]
+          },
+          {
+            "required": [
+              "checklist"
+            ]
+          },
+          {
+            "required": [
+              "collapseChecklist"
+            ]
+          },
+          {
+            "required": [
+              "notes"
+            ]
+          },
+          {
+            "required": [
+              "date"
+            ]
+          },
+          {
+            "required": [
+              "priority"
+            ]
+          },
+          {
+            "required": [
+              "frequency"
+            ]
+          },
+          {
+            "required": [
+              "repeat"
+            ]
+          },
+          {
+            "required": [
+              "everyX"
+            ]
+          },
+          {
+            "required": [
+              "streak"
+            ]
+          },
+          {
+            "required": [
+              "daysOfMonth"
+            ]
+          },
+          {
+            "required": [
+              "weeksOfMonth"
+            ]
+          },
+          {
+            "required": [
+              "startDate"
+            ]
+          },
+          {
+            "required": [
+              "up"
+            ]
+          },
+          {
+            "required": [
+              "down"
+            ]
+          },
+          {
+            "required": [
+              "value"
+            ]
+          },
+          {
+            "required": [
+              "completed"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task identifier."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task text."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task text."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task alias."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "habit",
+                      "daily",
+                      "todo",
+                      "reward"
+                    ],
+                    "description": "The Habitica task type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task type."
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica task notes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task notes."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the Habitica task is completed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the Habitica task is completed."
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task priority."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task priority."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The Habitica task value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica task value."
+              },
+              "attribute": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "str",
+                      "int",
+                      "per",
+                      "con"
+                    ],
+                    "description": "The Habitica stat associated with the task."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica stat associated with the task."
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Habitica due date string when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Habitica due date string when returned."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One Habitica tag ID."
+                },
+                "description": "The Habitica tag IDs attached to the task."
+              },
+              "checklist": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The Habitica checklist item identifier."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The Habitica checklist item identifier."
+                    },
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The checklist item text."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The checklist item text."
+                    },
+                    "completed": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the checklist item is completed."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the checklist item is completed."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The raw Habitica object."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One normalized Habitica checklist item."
+                },
+                "description": "The normalized Habitica checklist items."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The raw Habitica object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "One normalized Habitica task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "The response returned when updating one Habitica task."
+      }
+    }
+  ]
+}

@@ -1,0 +1,612 @@
+{
+  "service": "safetyculture",
+  "displayName": "SafetyCulture",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "SAFETYCULTURE_API_TOKEN",
+      "description": "SafetyCulture API token sent as a Bearer token. Create or manage API tokens from the SafetyCulture web app.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://safetyculture.com",
+  "actions": [
+    {
+      "id": "safetyculture.create_action",
+      "service": "safetyculture",
+      "name": "create_action",
+      "description": "Create a SafetyCulture action and return the created action ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Required title of the action. SafetyCulture limits this to 255 characters."
+          },
+          "taskId": {
+            "type": "string",
+            "description": "The unique identifier of the action. If omitted, SafetyCulture generates one."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 30000,
+            "description": "Description of the action. SafetyCulture limits this to 30000 characters."
+          },
+          "collaborators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "USER",
+                    "GROUP",
+                    "EXTERNAL_USER",
+                    "CONTRIBUTOR"
+                  ],
+                  "description": "The collaborator type."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "ASSIGNEE",
+                    "CREATOR"
+                  ],
+                  "description": "The collaborator role."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The user, group, external user, or contributor identifier."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "A collaborator involved in a SafetyCulture action."
+            },
+            "description": "Collaborators involved in the action."
+          },
+          "priorityId": {
+            "type": "string",
+            "description": "ID of the action priority."
+          },
+          "statusId": {
+            "type": "string",
+            "description": "ID of the action status."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Date and time this action was created.",
+            "format": "date-time"
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "Date and time this action is due.",
+            "format": "date-time"
+          },
+          "inspectionId": {
+            "type": "string",
+            "description": "ID of the inspection the action belongs to."
+          },
+          "inspectionItemId": {
+            "type": "string",
+            "description": "ID of the item in the inspection associated with the action."
+          },
+          "templateId": {
+            "type": "string",
+            "description": "Template ID associated with the action."
+          },
+          "siteId": {
+            "type": "string",
+            "description": "Site ID associated with the action."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "SENSOR",
+                    "SENSOR_ALERT",
+                    "INSPECTION",
+                    "INCIDENT",
+                    "SCHEDULE",
+                    "ACTION",
+                    "LINKED_INSPECTION",
+                    "ASSET_MAINTENANCE_PLAN"
+                  ],
+                  "description": "The reference type."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The referenced resource ID."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type",
+                "id"
+              ],
+              "description": "A reference attached to a SafetyCulture action."
+            },
+            "description": "References attached to the action."
+          },
+          "assetId": {
+            "type": "string",
+            "description": "Asset ID associated with the action."
+          },
+          "labelIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A label ID."
+            },
+            "description": "IDs of labels associated with the action."
+          },
+          "type": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "TASK_TYPE_ACTION",
+                  "TASK_TYPE_CUSTOM"
+                ],
+                "description": "The task type."
+              },
+              "id": {
+                "type": "string",
+                "description": "The action type ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The action type name."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "type",
+              "id",
+              "name"
+            ],
+            "description": "The SafetyCulture action type to create."
+          },
+          "fieldValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field_id": {
+                  "type": "string",
+                  "description": "The custom field ID."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "field_id"
+              ],
+              "description": "A SafetyCulture custom field value to create with an action."
+            },
+            "description": "Custom field values to create with the action."
+          },
+          "templateIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A template ID."
+            },
+            "description": "Template IDs to link to the action."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Input for creating a SafetyCulture action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "description": "The created SafetyCulture action ID."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SafetyCulture create action result."
+      }
+    },
+    {
+      "id": "safetyculture.get_action",
+      "service": "safetyculture",
+      "name": "get_action",
+      "description": "Get a SafetyCulture action by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SafetyCulture action ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading one SafetyCulture action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "object",
+            "properties": {
+              "task": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The task data associated with the action."
+              },
+              "custom_field_and_values": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw SafetyCulture object returned by the API."
+                },
+                "description": "Custom fields and their values belonging to the action."
+              },
+              "type": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Custom type metadata associated with the action."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A SafetyCulture action object."
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Whether the action is read-only for the token owner."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "raw"
+        ],
+        "description": "SafetyCulture action result."
+      }
+    },
+    {
+      "id": "safetyculture.get_inspection",
+      "service": "safetyculture",
+      "name": "get_inspection",
+      "description": "Get a SafetyCulture inspection by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inspectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SafetyCulture inspection ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading one SafetyCulture inspection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inspection": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SafetyCulture inspection result."
+      }
+    },
+    {
+      "id": "safetyculture.list_actions",
+      "service": "safetyculture",
+      "name": "list_actions",
+      "description": "List SafetyCulture actions using pagination, sorting, and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of actions to return in a single request. Maximum 100."
+          },
+          "pageToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The page token returned by a previous list_actions response."
+          },
+          "inspectionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The inspection ID to list related actions for."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Offset from where actions should be listed."
+          },
+          "sortField": {
+            "type": "string",
+            "enum": [
+              "PRIORITY",
+              "DATE_DUE",
+              "CREATED_AT",
+              "MODIFIED_AT"
+            ],
+            "description": "The field to use for sorting."
+          },
+          "sortDirection": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sorting direction."
+          },
+          "withoutCount": {
+            "type": "boolean",
+            "description": "Whether SafetyCulture should omit the deprecated total count."
+          },
+          "taskFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw SafetyCulture object returned by the API."
+            },
+            "description": "Task filters to apply to the SafetyCulture action list request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing SafetyCulture actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The task data associated with the action."
+                },
+                "custom_field_and_values": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw SafetyCulture object returned by the API."
+                  },
+                  "description": "Custom fields and their values belonging to the action."
+                },
+                "type": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Custom type metadata associated with the action."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A SafetyCulture action object."
+            },
+            "description": "Actions returned by SafetyCulture."
+          },
+          "nextPageToken": {
+            "type": "string",
+            "description": "Token for the next page of SafetyCulture actions."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of actions returned by SafetyCulture."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SafetyCulture action list result."
+      }
+    },
+    {
+      "id": "safetyculture.search_inspections",
+      "service": "safetyculture",
+      "name": "search_inspections",
+      "description": "Search SafetyCulture inspections by modification time, template, archive state, completion state, and owner.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "audit_id",
+                "modified_at",
+                "template_id"
+              ],
+              "description": "A SafetyCulture inspection search field."
+            },
+            "description": "Fields to return for each inspection. audit_id is always included by SafetyCulture."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order to return inspection results in."
+          },
+          "modifiedAfter": {
+            "type": "string",
+            "description": "Filter inspections modified after this timestamp.",
+            "format": "date-time"
+          },
+          "modifiedBefore": {
+            "type": "string",
+            "description": "Filter inspections modified before this timestamp.",
+            "format": "date-time"
+          },
+          "templateIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A SafetyCulture template ID."
+            },
+            "description": "Template IDs to search inspections for."
+          },
+          "archived": {
+            "type": "string",
+            "enum": [
+              "false",
+              "true",
+              "both"
+            ],
+            "description": "Filter inspections by archived status."
+          },
+          "completed": {
+            "type": "string",
+            "enum": [
+              "both",
+              "false",
+              "true"
+            ],
+            "description": "Filter inspections by completion status."
+          },
+          "owner": {
+            "type": "string",
+            "enum": [
+              "all",
+              "me",
+              "other"
+            ],
+            "description": "Filter inspections by owner."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of inspections to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for searching SafetyCulture inspections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of inspection results returned."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of inspection results available."
+          },
+          "inspections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "audit_id": {
+                  "type": "string",
+                  "description": "The SafetyCulture inspection ID."
+                },
+                "modified_at": {
+                  "type": "string",
+                  "description": "The inspection modification timestamp, when requested."
+                },
+                "template_id": {
+                  "type": "string",
+                  "description": "The template ID used by the inspection, when requested."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One inspection returned by SafetyCulture search."
+            },
+            "description": "Inspections returned by SafetyCulture."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SafetyCulture object returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SafetyCulture inspection search result."
+      }
+    }
+  ]
+}

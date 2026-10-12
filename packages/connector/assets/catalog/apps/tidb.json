@@ -1,0 +1,1713 @@
+{
+  "service": "tidb",
+  "displayName": "TiDB Cloud",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "publicKey",
+          "label": "Public Key",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Your TiDB Cloud API public key",
+          "description": "TiDB Cloud API public key used as the HTTP Digest username. Create or view organization API keys in TiDB Cloud API Keys: https://tidbcloud.com/org-settings/api-keys."
+        },
+        {
+          "key": "privateKey",
+          "label": "Private Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your TiDB Cloud API private key",
+          "description": "TiDB Cloud API private key used as the HTTP Digest password. TiDB Cloud only shows the private key when you create the API key."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_api_keys",
+        "input": {
+          "pageSize": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.pingcap.com/tidb/cloud/",
+  "actions": [
+    {
+      "id": "tidb.get_api_key",
+      "service": "tidb",
+      "name": "get_api_key",
+      "description": "Fetch one TiDB Cloud API key by access key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accessKey": {
+            "type": "string",
+            "description": "The public access key value of the TiDB Cloud API key to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one TiDB Cloud API key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The API key resource name."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The API key resource name."
+          },
+          "accessKey": {
+            "type": "string",
+            "description": "The public access key value."
+          },
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The display name of the API key."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The display name of the API key."
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The role assigned to the API key."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role assigned to the API key."
+          },
+          "secretKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The masked secret key value returned by TiDB Cloud."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The masked secret key value returned by TiDB Cloud."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accessKey"
+        ],
+        "description": "One TiDB Cloud API key visible to the connected credential."
+      }
+    },
+    {
+      "id": "tidb.get_branch",
+      "service": "tidb",
+      "name": "get_branch",
+      "description": "Fetch one TiDB Cloud Starter or Essential branch by branch ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud Starter or Essential cluster ID."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "The TiDB Cloud branch ID to fetch."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "BASIC",
+              "FULL"
+            ],
+            "description": "The detail level for the branch response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clusterId",
+          "branchId"
+        ],
+        "description": "The input payload for fetching one TiDB Cloud Starter or Essential branch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The branch resource name, if returned by TiDB Cloud."
+          },
+          "branchId": {
+            "type": "string",
+            "description": "The branch ID, if returned by TiDB Cloud."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The user-defined branch display name, if returned."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The cluster ID to which the branch belongs."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "The parent branch ID, if returned by TiDB Cloud."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current branch state, if returned by TiDB Cloud."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The branch creation timestamp, if returned."
+          },
+          "updateTime": {
+            "type": "string",
+            "description": "The branch update timestamp, if returned."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One TiDB Cloud Starter or Essential branch payload."
+      }
+    },
+    {
+      "id": "tidb.get_cluster",
+      "service": "tidb",
+      "name": "get_cluster",
+      "description": "Fetch one TiDB Cloud Starter, Essential, or Dedicated cluster by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiFamily": {
+            "type": "string",
+            "enum": [
+              "starter_essential",
+              "dedicated"
+            ],
+            "description": "The TiDB Cloud API family to query."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud cluster ID to fetch."
+          },
+          "view": {
+            "type": "string",
+            "enum": [
+              "BASIC",
+              "FULL"
+            ],
+            "description": "The detail level for Starter and Essential clusters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiFamily",
+          "clusterId"
+        ],
+        "description": "The input payload for fetching one TiDB Cloud cluster."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The cluster resource name, if returned by TiDB Cloud."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud cluster ID."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The user-defined display name of the cluster, if returned."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current cluster state, if returned by TiDB Cloud."
+          },
+          "version": {
+            "type": "string",
+            "description": "The TiDB version of the cluster, if returned."
+          },
+          "regionId": {
+            "type": "string",
+            "description": "The region ID for a Dedicated cluster, if returned."
+          },
+          "region": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The region resource name, if returned by TiDB Cloud."
+              },
+              "regionId": {
+                "type": "string",
+                "description": "The region identifier, if returned by TiDB Cloud."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name of the region, if returned by TiDB Cloud."
+              },
+              "cloudProvider": {
+                "type": "string",
+                "description": "The cloud provider where the region is located, if returned."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The TiDB Cloud region payload returned by the API."
+          },
+          "cloudProvider": {
+            "type": "string",
+            "description": "The cloud provider where the cluster is located, if returned."
+          },
+          "servicePlan": {
+            "type": "string",
+            "description": "The service plan for a Starter or Essential instance, if returned."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One label value."
+                },
+                "description": "The labels returned by TiDB Cloud."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The labels returned by TiDB Cloud."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The cluster creation timestamp, if returned by TiDB Cloud."
+          },
+          "updateTime": {
+            "type": "string",
+            "description": "The cluster update timestamp, if returned by TiDB Cloud."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The TiDB Cloud cluster payload returned by the API."
+      }
+    },
+    {
+      "id": "tidb.get_export",
+      "service": "tidb",
+      "name": "get_export",
+      "description": "Fetch one TiDB Cloud Starter or Essential export task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud Starter or Essential cluster ID."
+          },
+          "exportId": {
+            "type": "string",
+            "description": "The TiDB Cloud export task ID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one TiDB Cloud export task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The export task resource name, if returned by TiDB Cloud."
+          },
+          "exportId": {
+            "type": "string",
+            "description": "The export task ID, if returned by TiDB Cloud."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The cluster ID for the export task."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the export task, if returned."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current export task state, if returned by TiDB Cloud."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The export task creation timestamp, if returned."
+          },
+          "updateTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The export task update timestamp, if returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The export task update timestamp, if returned."
+          },
+          "completeTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The export task completion timestamp, if returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The export task completion timestamp, if returned."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One TiDB Cloud export task payload returned by the API."
+      }
+    },
+    {
+      "id": "tidb.get_import",
+      "service": "tidb",
+      "name": "get_import",
+      "description": "Fetch one TiDB Cloud Starter, Essential, or Dedicated import task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiFamily": {
+            "type": "string",
+            "enum": [
+              "starter_essential",
+              "dedicated"
+            ],
+            "description": "The TiDB Cloud API family to query."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud cluster ID that contains the import task."
+          },
+          "importId": {
+            "type": "string",
+            "description": "The TiDB Cloud import task ID to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching one TiDB Cloud import task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The import task resource name, if returned by TiDB Cloud."
+          },
+          "importId": {
+            "type": "string",
+            "description": "The import task ID, if returned by TiDB Cloud."
+          },
+          "id": {
+            "type": "string",
+            "description": "The deprecated import task ID field, if returned by TiDB Cloud."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The target cluster ID for the import task."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current import task state, if returned by TiDB Cloud."
+          },
+          "completePercent": {
+            "type": "integer",
+            "description": "The import task completion percentage, if returned."
+          },
+          "createTime": {
+            "type": "string",
+            "description": "The import task creation timestamp, if returned."
+          },
+          "completeTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The import task completion timestamp, if returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The import task completion timestamp, if returned."
+          },
+          "message": {
+            "type": "string",
+            "description": "The import task message, if returned by TiDB Cloud."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One TiDB Cloud import task payload returned by the API."
+      }
+    },
+    {
+      "id": "tidb.get_node_spec",
+      "service": "tidb",
+      "name": "get_node_spec",
+      "description": "Fetch one TiDB Cloud Dedicated node spec by region, component type, and key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "regionId": {
+            "type": "string",
+            "description": "The TiDB Cloud region ID to query, such as aws-us-east-1."
+          },
+          "componentType": {
+            "type": "string",
+            "enum": [
+              "TIKV",
+              "TIDB",
+              "TIFLASH",
+              "PD"
+            ],
+            "description": "The TiDB Dedicated component type to query."
+          },
+          "nodeSpecKey": {
+            "type": "string",
+            "description": "The TiDB Cloud node spec key to fetch, such as 8C32G."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to fetch node spec details."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The cluster ID used to fetch node spec details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "regionId",
+          "componentType",
+          "nodeSpecKey"
+        ],
+        "description": "The input payload for fetching one TiDB Cloud Dedicated node spec."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The node spec resource name, if returned by TiDB Cloud."
+          },
+          "regionId": {
+            "type": "string",
+            "description": "The region ID where the node spec is available."
+          },
+          "componentType": {
+            "type": "string",
+            "description": "The TiDB component type for this node spec."
+          },
+          "nodeSpecKey": {
+            "type": "string",
+            "description": "The node spec key, such as 8C32G."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the node spec, if returned."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The TiDB Cloud Dedicated node spec payload returned by the API."
+      }
+    },
+    {
+      "id": "tidb.get_region",
+      "service": "tidb",
+      "name": "get_region",
+      "description": "Fetch one TiDB Cloud Dedicated region by region ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "regionId": {
+            "type": "string",
+            "description": "The TiDB Cloud region ID to fetch, such as aws-us-east-1."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to fetch region details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "regionId"
+        ],
+        "description": "The input payload for fetching one TiDB Cloud Dedicated region."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The region resource name, if returned by TiDB Cloud."
+          },
+          "regionId": {
+            "type": "string",
+            "description": "The region identifier, if returned by TiDB Cloud."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the region, if returned by TiDB Cloud."
+          },
+          "cloudProvider": {
+            "type": "string",
+            "description": "The cloud provider where the region is located, if returned."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The TiDB Cloud region payload returned by the API."
+      }
+    },
+    {
+      "id": "tidb.list_api_keys",
+      "service": "tidb",
+      "name": "list_api_keys",
+      "description": "List TiDB Cloud API keys visible to the connected organization API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "description": "The project ID used to filter API keys."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of API keys to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_api_keys response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TiDB Cloud API keys."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apiKeys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The API key resource name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The API key resource name."
+                },
+                "accessKey": {
+                  "type": "string",
+                  "description": "The public access key value."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The display name of the API key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The display name of the API key."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The role assigned to the API key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The role assigned to the API key."
+                },
+                "secretKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The masked secret key value returned by TiDB Cloud."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The masked secret key value returned by TiDB Cloud."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "accessKey"
+              ],
+              "description": "One TiDB Cloud API key visible to the connected credential."
+            },
+            "description": "The API keys returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud API keys."
+      }
+    },
+    {
+      "id": "tidb.list_audit_logs",
+      "service": "tidb",
+      "name": "list_audit_logs",
+      "description": "List TiDB Cloud console audit logs for security and change tracking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of audit logs to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_audit_logs response."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Return audit logs created on or after this timestamp.",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "Return audit logs created before or at this timestamp.",
+            "format": "date-time"
+          },
+          "auditEventTypes": {
+            "type": "string",
+            "description": "The TiDB Cloud audit event type filter."
+          },
+          "keyword": {
+            "type": "string",
+            "description": "The search keyword used to filter audit logs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TiDB Cloud console audit logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "auditLogs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The audit log ID, if returned by TiDB Cloud."
+                },
+                "eventType": {
+                  "type": "string",
+                  "description": "The audit event type, if returned by TiDB Cloud."
+                },
+                "result": {
+                  "type": "string",
+                  "description": "The operation result, if returned by TiDB Cloud."
+                },
+                "operationEmail": {
+                  "type": "string",
+                  "description": "The email address of the user who performed the operation."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "The operation start timestamp, if returned by TiDB Cloud."
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "The operation end timestamp, if returned by TiDB Cloud."
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "The related project ID, if returned by TiDB Cloud."
+                },
+                "clusterId": {
+                  "type": "string",
+                  "description": "The related cluster ID, if returned by TiDB Cloud."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One TiDB Cloud console audit log entry."
+            },
+            "description": "The audit logs returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud audit logs."
+      }
+    },
+    {
+      "id": "tidb.list_branches",
+      "service": "tidb",
+      "name": "list_branches",
+      "description": "List TiDB Cloud Starter or Essential branches for a cluster.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud Starter or Essential cluster ID whose branches to list."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of branches to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_branches response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clusterId"
+        ],
+        "description": "The input payload for listing TiDB Cloud Starter or Essential branches."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The branch resource name, if returned by TiDB Cloud."
+                },
+                "branchId": {
+                  "type": "string",
+                  "description": "The branch ID, if returned by TiDB Cloud."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The user-defined branch display name, if returned."
+                },
+                "clusterId": {
+                  "type": "string",
+                  "description": "The cluster ID to which the branch belongs."
+                },
+                "parentId": {
+                  "type": "string",
+                  "description": "The parent branch ID, if returned by TiDB Cloud."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current branch state, if returned by TiDB Cloud."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The branch creation timestamp, if returned."
+                },
+                "updateTime": {
+                  "type": "string",
+                  "description": "The branch update timestamp, if returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One TiDB Cloud Starter or Essential branch payload."
+            },
+            "description": "The branches returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud branches."
+      }
+    },
+    {
+      "id": "tidb.list_clusters",
+      "service": "tidb",
+      "name": "list_clusters",
+      "description": "List TiDB Cloud Starter, Essential, or Dedicated clusters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiFamily": {
+            "type": "string",
+            "enum": [
+              "starter_essential",
+              "dedicated"
+            ],
+            "description": "The TiDB Cloud API family to query."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to filter Dedicated clusters."
+          },
+          "clusterIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One cluster ID."
+            },
+            "description": "The Dedicated cluster IDs to include."
+          },
+          "regionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One region ID."
+            },
+            "description": "The Dedicated region IDs to include."
+          },
+          "clusterStates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One cluster state."
+            },
+            "description": "The Dedicated cluster states to include."
+          },
+          "filter": {
+            "type": "string",
+            "description": "The Google AIP filter expression for Starter and Essential clusters."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of clusters to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_clusters response."
+          },
+          "skip": {
+            "type": "integer",
+            "description": "The number of clusters to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiFamily"
+        ],
+        "description": "The input payload for listing TiDB Cloud clusters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clusters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The cluster resource name, if returned by TiDB Cloud."
+                },
+                "clusterId": {
+                  "type": "string",
+                  "description": "The TiDB Cloud cluster ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The user-defined display name of the cluster, if returned."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current cluster state, if returned by TiDB Cloud."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "The TiDB version of the cluster, if returned."
+                },
+                "regionId": {
+                  "type": "string",
+                  "description": "The region ID for a Dedicated cluster, if returned."
+                },
+                "region": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The region resource name, if returned by TiDB Cloud."
+                    },
+                    "regionId": {
+                      "type": "string",
+                      "description": "The region identifier, if returned by TiDB Cloud."
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "description": "The display name of the region, if returned by TiDB Cloud."
+                    },
+                    "cloudProvider": {
+                      "type": "string",
+                      "description": "The cloud provider where the region is located, if returned."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The TiDB Cloud region payload returned by the API."
+                },
+                "cloudProvider": {
+                  "type": "string",
+                  "description": "The cloud provider where the cluster is located, if returned."
+                },
+                "servicePlan": {
+                  "type": "string",
+                  "description": "The service plan for a Starter or Essential instance, if returned."
+                },
+                "labels": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "One label value."
+                      },
+                      "description": "The labels returned by TiDB Cloud."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The labels returned by TiDB Cloud."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The cluster creation timestamp, if returned by TiDB Cloud."
+                },
+                "updateTime": {
+                  "type": "string",
+                  "description": "The cluster update timestamp, if returned by TiDB Cloud."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The TiDB Cloud cluster payload returned by the API."
+            },
+            "description": "The clusters returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud clusters."
+      }
+    },
+    {
+      "id": "tidb.list_exports",
+      "service": "tidb",
+      "name": "list_exports",
+      "description": "List TiDB Cloud Starter or Essential export tasks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud Starter or Essential cluster ID whose tasks to list."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of tasks to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous task list response."
+          },
+          "orderBy": {
+            "type": "string",
+            "description": "The official TiDB Cloud sorting expression, such as createTime desc."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clusterId"
+        ],
+        "description": "The input payload for listing TiDB Cloud Starter or Essential tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "exports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The export task resource name, if returned by TiDB Cloud."
+                },
+                "exportId": {
+                  "type": "string",
+                  "description": "The export task ID, if returned by TiDB Cloud."
+                },
+                "clusterId": {
+                  "type": "string",
+                  "description": "The cluster ID for the export task."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The display name of the export task, if returned."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current export task state, if returned by TiDB Cloud."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The export task creation timestamp, if returned."
+                },
+                "updateTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The export task update timestamp, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The export task update timestamp, if returned."
+                },
+                "completeTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The export task completion timestamp, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The export task completion timestamp, if returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One TiDB Cloud export task payload returned by the API."
+            },
+            "description": "The export tasks returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud export tasks."
+      }
+    },
+    {
+      "id": "tidb.list_imports",
+      "service": "tidb",
+      "name": "list_imports",
+      "description": "List TiDB Cloud Starter, Essential, or Dedicated import tasks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiFamily": {
+            "type": "string",
+            "enum": [
+              "starter_essential",
+              "dedicated"
+            ],
+            "description": "The TiDB Cloud API family to query."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The TiDB Cloud cluster ID whose tasks should be listed."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of tasks to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous task list response."
+          },
+          "orderBy": {
+            "type": "string",
+            "description": "The official TiDB Cloud sorting expression, such as createTime desc."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiFamily",
+          "clusterId"
+        ],
+        "description": "The input payload for listing TiDB Cloud import or export tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "imports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The import task resource name, if returned by TiDB Cloud."
+                },
+                "importId": {
+                  "type": "string",
+                  "description": "The import task ID, if returned by TiDB Cloud."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The deprecated import task ID field, if returned by TiDB Cloud."
+                },
+                "clusterId": {
+                  "type": "string",
+                  "description": "The target cluster ID for the import task."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current import task state, if returned by TiDB Cloud."
+                },
+                "completePercent": {
+                  "type": "integer",
+                  "description": "The import task completion percentage, if returned."
+                },
+                "createTime": {
+                  "type": "string",
+                  "description": "The import task creation timestamp, if returned."
+                },
+                "completeTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The import task completion timestamp, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The import task completion timestamp, if returned."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The import task message, if returned by TiDB Cloud."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One TiDB Cloud import task payload returned by the API."
+            },
+            "description": "The import tasks returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud import tasks."
+      }
+    },
+    {
+      "id": "tidb.list_node_specs",
+      "service": "tidb",
+      "name": "list_node_specs",
+      "description": "List TiDB Cloud Dedicated node specs available in a region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "regionId": {
+            "type": "string",
+            "description": "The TiDB Cloud region ID to query, such as aws-us-east-1."
+          },
+          "componentType": {
+            "type": "string",
+            "enum": [
+              "TIKV",
+              "TIDB",
+              "TIFLASH",
+              "PD"
+            ],
+            "description": "The TiDB Dedicated component type to query."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to filter available node specs."
+          },
+          "clusterId": {
+            "type": "string",
+            "description": "The cluster ID used to filter available node specs."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of node specs to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_node_specs response."
+          },
+          "skip": {
+            "type": "integer",
+            "description": "The number of node specs to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "regionId"
+        ],
+        "description": "The input payload for listing TiDB Cloud Dedicated node specs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nodeSpecs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The node spec resource name, if returned by TiDB Cloud."
+                },
+                "regionId": {
+                  "type": "string",
+                  "description": "The region ID where the node spec is available."
+                },
+                "componentType": {
+                  "type": "string",
+                  "description": "The TiDB component type for this node spec."
+                },
+                "nodeSpecKey": {
+                  "type": "string",
+                  "description": "The node spec key, such as 8C32G."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The display name of the node spec, if returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The TiDB Cloud Dedicated node spec payload returned by the API."
+            },
+            "description": "The node specs returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud Dedicated node specs."
+      }
+    },
+    {
+      "id": "tidb.list_regions",
+      "service": "tidb",
+      "name": "list_regions",
+      "description": "List TiDB Cloud regions available to the connected organization API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "apiFamily": {
+            "type": "string",
+            "enum": [
+              "starter_essential",
+              "dedicated"
+            ],
+            "description": "The TiDB Cloud API family to query."
+          },
+          "cloudProvider": {
+            "type": "string",
+            "description": "The cloud provider used to filter Dedicated regions."
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to list Dedicated regions."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of regions to return."
+          },
+          "pageToken": {
+            "type": "string",
+            "description": "The pagination token from a previous list_regions response."
+          },
+          "skip": {
+            "type": "integer",
+            "description": "The number of regions to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apiFamily"
+        ],
+        "description": "The input payload for listing TiDB Cloud regions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The region resource name, if returned by TiDB Cloud."
+                },
+                "regionId": {
+                  "type": "string",
+                  "description": "The region identifier, if returned by TiDB Cloud."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The display name of the region, if returned by TiDB Cloud."
+                },
+                "cloudProvider": {
+                  "type": "string",
+                  "description": "The cloud provider where the region is located, if returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The TiDB Cloud region payload returned by the API."
+            },
+            "description": "The regions returned by TiDB Cloud."
+          },
+          "nextPageToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The token to retrieve the next page of results, if one is available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token to retrieve the next page of results, if one is available."
+          },
+          "totalSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching records, if returned by TiDB."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching records, if returned by TiDB."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud regions."
+      }
+    },
+    {
+      "id": "tidb.show_cloud_providers",
+      "service": "tidb",
+      "name": "show_cloud_providers",
+      "description": "List cloud providers available for TiDB Cloud Dedicated clusters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The project ID used to filter available cloud providers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing TiDB Cloud Dedicated cloud providers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cloudProviders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "aws",
+                "gcp",
+                "azure",
+                "alicloud"
+              ],
+              "description": "One TiDB Cloud cloud provider identifier."
+            },
+            "description": "The cloud provider identifiers returned by TiDB Cloud."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing TiDB Cloud cloud providers."
+      }
+    },
+    {
+      "id": "tidb.show_node_quota",
+      "service": "tidb",
+      "name": "show_node_quota",
+      "description": "List TiDB Cloud Dedicated node quotas for the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Dedicated node quotas."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "componentQuotas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "componentType": {
+                  "type": "string",
+                  "description": "The component type for this quota."
+                },
+                "quota": {
+                  "type": "integer",
+                  "description": "The maximum number of nodes allowed for the component."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One TiDB Cloud Dedicated component quota."
+            },
+            "description": "The Dedicated component quotas returned by TiDB Cloud."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing Dedicated node quotas."
+      }
+    }
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "service": "framejet",
+  "displayName": "Framejet",
+  "categories": [
+    "Developer Tools",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "fj_xxx",
+      "description": "Framejet API key sent as the X-Api-Key header. Create a free key (200 screenshots a month) at https://framejet.dev."
+    }
+  ],
+  "homepageUrl": "https://framejet.dev",
+  "actions": [
+    {
+      "id": "framejet.create_signed_url",
+      "service": "framejet",
+      "name": "create_signed_url",
+      "description": "Build a signed capture URL that can be embedded where the API key must stay secret. Nothing is captured until the URL is loaded.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public http or https page to capture.",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg"
+            ],
+            "description": "The image format. Defaults to png."
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Whether to capture the whole scrollable page instead of the viewport."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 320,
+            "maximum": 3840,
+            "description": "The viewport width in pixels. Defaults to 1280."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 4320,
+            "description": "The viewport height in pixels. Defaults to 800."
+          },
+          "dpr": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The device pixel ratio. Defaults to 1."
+          },
+          "clean": {
+            "type": "boolean",
+            "description": "Whether to remove cookie banners, consent walls and chat widgets before the capture. Defaults to true."
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "An extra wait in milliseconds after the page loads."
+          },
+          "actions": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Up to 10 steps, with at most 15 seconds of waiting in total, to run before the capture, separated by semicolons: click:<css>, type:<css>=<text>, waitfor:<css>, wait:<ms> or scroll:<px>. Example: click:#accept;waitfor:.pricing"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Seconds until the URL stops working. Omit it for a URL that never expires."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for building a signed Framejet capture URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signed_url": {
+            "type": "string",
+            "description": "A capture URL that works in an img src, a CMS or a spreadsheet without exposing the API key. The first load spends one screenshot. Framejet serves later loads from its cache for seven days, then captures again, so a URL that keeps being viewed costs at most about one screenshot a week.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signed_url"
+        ],
+        "description": "The output payload for a signed Framejet capture URL."
+      }
+    },
+    {
+      "id": "framejet.take_screenshot",
+      "service": "framejet",
+      "name": "take_screenshot",
+      "description": "Capture a public web page as a PNG or JPEG with cookie banners and chat widgets removed, optionally after running page steps or reaching a state described in plain language.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public http or https page to capture.",
+            "format": "uri"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg"
+            ],
+            "description": "The image format. Defaults to png."
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Whether to capture the whole scrollable page instead of the viewport."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 320,
+            "maximum": 3840,
+            "description": "The viewport width in pixels. Defaults to 1280."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 200,
+            "maximum": 4320,
+            "description": "The viewport height in pixels. Defaults to 800."
+          },
+          "dpr": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The device pixel ratio. Defaults to 1."
+          },
+          "clean": {
+            "type": "boolean",
+            "description": "Whether to remove cookie banners, consent walls and chat widgets before the capture. Defaults to true."
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "An extra wait in milliseconds after the page loads."
+          },
+          "actions": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Up to 10 steps, with at most 15 seconds of waiting in total, to run before the capture, separated by semicolons: click:<css>, type:<css>=<text>, waitfor:<css>, wait:<ms> or scroll:<px>. Example: click:#accept;waitfor:.pricing"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "A plain-language description of the page state to reach before the capture, ending with when to stop. Any text typed into the page must come from values. Example: switch the pricing table to yearly billing and stop when the yearly prices are shown"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "One exact string of at most 200 characters. It cannot contain |, which Framejet uses to separate values.",
+              "pattern": "^[^|]+$"
+            },
+            "description": "Exact strings goal mode may type into the page. Framejet never invents text, so a goal that fills a field fails with values_required unless a fitting value is listed. Joined with | separators, the list may total at most 1000 characters.",
+            "maxItems": 10
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Whether an identical earlier capture may be returned without spending a screenshot. Defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for capturing a web page with Framejet."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The image size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The image file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The image MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "The captured image stored in local transit storage."
+          },
+          "cache": {
+            "type": "string",
+            "enum": [
+              "HIT",
+              "MISS"
+            ],
+            "description": "Whether Framejet served an earlier identical capture."
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Screenshots left in the current month, or null when Framejet does not report it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Screenshots left in the current month, or null when Framejet does not report it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "cache",
+          "remaining"
+        ],
+        "description": "The output payload for a Framejet capture."
+      }
+    }
+  ]
+}

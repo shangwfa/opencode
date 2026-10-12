@@ -1,0 +1,1001 @@
+{
+  "service": "zorus",
+  "displayName": "Zorus",
+  "categories": [
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "zorus_api_token",
+      "description": "Zorus API token sent in the Authorization header as an impersonation token. Generate it in the Zorus Portal under Integrations > API Access: https://portal.zorustech.com/integrations/api-keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.zorustech.com",
+  "actions": [
+    {
+      "id": "zorus.search_active_unblock_requests",
+      "service": "zorus",
+      "name": "search_active_unblock_requests",
+      "description": "Search active Zorus unblock requests with documented filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page of data to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of items per page."
+          },
+          "sortAscending": {
+            "type": "boolean",
+            "description": "Whether Zorus should sort the result set in ascending order."
+          },
+          "sortProperty": {
+            "type": "string",
+            "enum": [
+              "CustomerName",
+              "LoggedOnUser",
+              "EndpointName",
+              "Website"
+            ],
+            "description": "Active unblock-request field to sort by."
+          },
+          "customerUuidIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Zorus UUID.",
+              "format": "uuid"
+            },
+            "description": "Only include unblock requests whose customer UUID is in this list."
+          },
+          "policyUuidIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Zorus UUID.",
+              "format": "uuid"
+            },
+            "description": "Only include unblock requests whose policy UUID is in this list."
+          },
+          "loggedOnUserContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include unblock requests whose logged-on user contains this value."
+          },
+          "requestedBefore": {
+            "type": "string",
+            "description": "Only include unblock requests submitted before this UTC timestamp.",
+            "format": "date-time"
+          },
+          "requestedAfter": {
+            "type": "string",
+            "description": "Only include unblock requests submitted after this UTC timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search, pagination, and sorting options for active Zorus unblock requests."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The unblock request UUID.",
+                  "format": "uuid"
+                },
+                "customerUuid": {
+                  "type": "string",
+                  "description": "The unblock request customer UUID.",
+                  "format": "uuid"
+                },
+                "customerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The unblock request customer name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The unblock request customer name."
+                },
+                "policyUuid": {
+                  "type": "string",
+                  "description": "The policy UUID responsible for the block.",
+                  "format": "uuid"
+                },
+                "loggedOnUser": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The remote username of the submitter."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The remote username of the submitter."
+                },
+                "endpointName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint hostname that submitted the request."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint hostname that submitted the request."
+                },
+                "website": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The blocked URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The blocked URL."
+                },
+                "blockReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Zorus-provided block reason."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Zorus-provided block reason."
+                },
+                "categoryNames": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Category name."
+                      },
+                      "description": "Categories assigned to the blocked website or URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Categories assigned to the blocked website or URL."
+                },
+                "requestReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The user-supplied reason for the unblock request."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user-supplied reason for the unblock request."
+                },
+                "requestDateUtc": {
+                  "type": "string",
+                  "description": "Timestamp when the unblock request was submitted.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "An active Zorus unblock request returned by the API."
+            },
+            "description": "Items returned by the Zorus search endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Active Zorus unblock-request search results."
+      }
+    },
+    {
+      "id": "zorus.search_customers",
+      "service": "zorus",
+      "name": "search_customers",
+      "description": "Search Zorus customers with documented filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page of data to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of items per page."
+          },
+          "sortAscending": {
+            "type": "boolean",
+            "description": "Whether Zorus should sort the result set in ascending order."
+          },
+          "sortProperty": {
+            "type": "string",
+            "enum": [
+              "Name"
+            ],
+            "description": "Customer field to sort by."
+          },
+          "nameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include customers whose name contains this value."
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "Only include customers whose enabled state matches this value."
+          },
+          "uuidEquals": {
+            "type": "string",
+            "description": "Only include the customer with this UUID.",
+            "format": "uuid"
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Only include customers created after this UTC timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Only include customers created before this UTC timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search, pagination, and sorting options for Zorus customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The customer UUID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer name."
+                },
+                "createdDateUtc": {
+                  "type": "string",
+                  "description": "Timestamp when the customer was created.",
+                  "format": "date-time"
+                },
+                "isEnabled": {
+                  "type": "boolean",
+                  "description": "Whether the customer is enabled."
+                },
+                "deploymentInfo": {
+                  "type": "object",
+                  "properties": {
+                    "deployedEndpointCount": {
+                      "type": "integer",
+                      "description": "Number of endpoints associated with the customer."
+                    },
+                    "filteringEnabledCount": {
+                      "type": "integer",
+                      "description": "Number of customer endpoints with filtering enabled."
+                    },
+                    "cyberSightEnabledCount": {
+                      "type": "integer",
+                      "description": "Number of customer endpoints with CyberSight enabled."
+                    },
+                    "enabledNetworkCount": {
+                      "type": "integer",
+                      "description": "Number of enabled WANs associated with the customer."
+                    },
+                    "networkSeatCount": {
+                      "type": "integer",
+                      "description": "Number of seats in WANs associated with the customer."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Deployment summary for a Zorus customer."
+                },
+                "integrations": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "vendorName": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The integration vendor name."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The integration vendor name."
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "The integration name."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The integration name."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Integration summary for a Zorus customer."
+                      },
+                      "description": "Integrations used by the customer."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Integrations used by the customer."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zorus customer returned by the API."
+            },
+            "description": "Items returned by the Zorus search endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Zorus customer search results."
+      }
+    },
+    {
+      "id": "zorus.search_endpoints",
+      "service": "zorus",
+      "name": "search_endpoints",
+      "description": "Search Zorus endpoints with documented filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page of data to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of items per page."
+          },
+          "sortAscending": {
+            "type": "boolean",
+            "description": "Whether Zorus should sort the result set in ascending order."
+          },
+          "sortProperty": {
+            "type": "string",
+            "enum": [
+              "Name"
+            ],
+            "description": "Endpoint field to sort by."
+          },
+          "nameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include endpoints whose name contains this value."
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "Only include endpoints whose enabled state matches this value."
+          },
+          "uuidEquals": {
+            "type": "string",
+            "description": "Only include the endpoint with this UUID.",
+            "format": "uuid"
+          },
+          "uuidIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Zorus UUID.",
+              "format": "uuid"
+            },
+            "description": "Only include endpoints whose UUID is in this list."
+          },
+          "licenseIdEquals": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include the endpoint with this license ID."
+          },
+          "licenseIdIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One string filter value."
+            },
+            "description": "Only include endpoints whose license ID is in this list."
+          },
+          "customerUuidEquals": {
+            "type": "string",
+            "description": "Only include endpoints whose customer has this UUID.",
+            "format": "uuid"
+          },
+          "customerUuidIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Zorus UUID.",
+              "format": "uuid"
+            },
+            "description": "Only include endpoints whose customer UUID is in this list."
+          },
+          "groupUuidEquals": {
+            "type": "string",
+            "description": "Only include endpoints whose group has this UUID.",
+            "format": "uuid"
+          },
+          "groupUuidIn": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Zorus UUID.",
+              "format": "uuid"
+            },
+            "description": "Only include endpoints whose group UUID is in this list."
+          },
+          "isInErrorState": {
+            "type": "boolean",
+            "description": "Only include endpoints whose error state matches this value."
+          },
+          "agentStateEquals": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include endpoints whose agent state matches this value."
+          },
+          "lastSeenBefore": {
+            "type": "string",
+            "description": "Only include endpoints last seen before this UTC timestamp.",
+            "format": "date-time"
+          },
+          "lastSeenAfter": {
+            "type": "string",
+            "description": "Only include endpoints last seen after this UTC timestamp.",
+            "format": "date-time"
+          },
+          "isInheritingGroupSettings": {
+            "type": "boolean",
+            "description": "Only include endpoints whose group-setting inheritance matches this value."
+          },
+          "isFilteringEnabled": {
+            "type": "boolean",
+            "description": "Only include endpoints whose filtering state matches this value."
+          },
+          "isCyberSightEnabled": {
+            "type": "boolean",
+            "description": "Only include endpoints whose CyberSight state matches this value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search, pagination, and sorting options for Zorus endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint customer name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint customer name."
+                },
+                "customerUuid": {
+                  "type": "string",
+                  "description": "The endpoint customer UUID.",
+                  "format": "uuid"
+                },
+                "groupName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint group name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint group name."
+                },
+                "groupUuid": {
+                  "type": "string",
+                  "description": "The endpoint group UUID.",
+                  "format": "uuid"
+                },
+                "policyUuid": {
+                  "type": "string",
+                  "description": "The endpoint policy UUID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint name."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The endpoint UUID.",
+                  "format": "uuid"
+                },
+                "licenseId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint license ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint license ID."
+                },
+                "createdDateUtc": {
+                  "type": "string",
+                  "description": "Timestamp when the endpoint was created.",
+                  "format": "date-time"
+                },
+                "isEnabled": {
+                  "type": "boolean",
+                  "description": "Whether the endpoint is enabled."
+                },
+                "operatingSystemType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint operating system type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint operating system type."
+                },
+                "operatingSystem": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint operating system."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint operating system."
+                },
+                "localIp": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint local IP address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint local IP address."
+                },
+                "version": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint agent version."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint agent version."
+                },
+                "isInErrorState": {
+                  "type": "boolean",
+                  "description": "Whether the endpoint is in an error state."
+                },
+                "isInheritingGroupSettings": {
+                  "type": "boolean",
+                  "description": "Whether the endpoint inherits group settings."
+                },
+                "isFilteringEnabled": {
+                  "type": "boolean",
+                  "description": "Whether filtering is enabled on the endpoint."
+                },
+                "isCyberSightEnabled": {
+                  "type": "boolean",
+                  "description": "Whether CyberSight is enabled on the endpoint."
+                },
+                "isCyberSightBrowserExtensionEnabled": {
+                  "type": "boolean",
+                  "description": "Whether the CyberSight browser extension is enabled on the endpoint."
+                },
+                "browserExtensionState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint browser extension state."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint browser extension state."
+                },
+                "agentState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The endpoint agent state."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The endpoint agent state."
+                },
+                "lastSeenDateUtc": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Timestamp when the endpoint was last seen.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Timestamp when the endpoint was last seen."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zorus endpoint returned by the API."
+            },
+            "description": "Items returned by the Zorus search endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Zorus endpoint search results."
+      }
+    },
+    {
+      "id": "zorus.search_groups",
+      "service": "zorus",
+      "name": "search_groups",
+      "description": "Search Zorus groups with documented filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page of data to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of items per page."
+          },
+          "sortAscending": {
+            "type": "boolean",
+            "description": "Whether Zorus should sort the result set in ascending order."
+          },
+          "sortProperty": {
+            "type": "string",
+            "enum": [
+              "Name",
+              "CustomerName",
+              "SyncOptionsToMembers",
+              "SyncAddonsToMembers"
+            ],
+            "description": "Group field to sort by."
+          },
+          "nameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include groups whose name contains this value."
+          },
+          "uuidEquals": {
+            "type": "string",
+            "description": "Only include the group with this UUID.",
+            "format": "uuid"
+          },
+          "policyUuidEquals": {
+            "type": "string",
+            "description": "Only include groups assigned to this policy UUID.",
+            "format": "uuid"
+          },
+          "customerUuidEquals": {
+            "type": "string",
+            "description": "Only include groups whose customer has this UUID.",
+            "format": "uuid"
+          },
+          "customerNameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include groups whose customer name contains this value."
+          },
+          "syncOptionsToMembers": {
+            "type": "boolean",
+            "description": "Only include groups whose sync-options-to-members setting matches this value."
+          },
+          "syncAddonsToMembers": {
+            "type": "boolean",
+            "description": "Only include groups whose sync-addons-to-members setting matches this value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search, pagination, and sorting options for Zorus groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The group name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The group name."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The group UUID.",
+                  "format": "uuid"
+                },
+                "policyUuid": {
+                  "type": "string",
+                  "description": "The policy UUID used by the group.",
+                  "format": "uuid"
+                },
+                "customerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The group customer name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The group customer name."
+                },
+                "customerUuid": {
+                  "type": "string",
+                  "description": "The group customer UUID.",
+                  "format": "uuid"
+                },
+                "syncOptionsToMembers": {
+                  "type": "boolean",
+                  "description": "Whether options are synchronized to group members."
+                },
+                "syncAddonsToMembers": {
+                  "type": "boolean",
+                  "description": "Whether addons are synchronized to group members."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zorus group returned by the API."
+            },
+            "description": "Items returned by the Zorus search endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Zorus group search results."
+      }
+    },
+    {
+      "id": "zorus.search_policies",
+      "service": "zorus",
+      "name": "search_policies",
+      "description": "Search Zorus policies with documented filtering, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page of data to return."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of items per page."
+          },
+          "sortAscending": {
+            "type": "boolean",
+            "description": "Whether Zorus should sort the result set in ascending order."
+          },
+          "sortProperty": {
+            "type": "string",
+            "enum": [
+              "CustomerName",
+              "GroupName",
+              "CreatedDateUtc"
+            ],
+            "description": "Policy field to sort by."
+          },
+          "uuidEquals": {
+            "type": "string",
+            "description": "Only include the policy with this UUID.",
+            "format": "uuid"
+          },
+          "groupUuidEquals": {
+            "type": "string",
+            "description": "Only include policies whose group has this UUID.",
+            "format": "uuid"
+          },
+          "groupNameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include policies whose group name contains this value."
+          },
+          "customerNameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only include policies whose customer name contains this value."
+          },
+          "customerUuidEquals": {
+            "type": "string",
+            "description": "Only include policies whose customer has this UUID.",
+            "format": "uuid"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Only include policies created before this UTC timestamp.",
+            "format": "date-time"
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Only include policies created after this UTC timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Search, pagination, and sorting options for Zorus policies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The policy UUID.",
+                  "format": "uuid"
+                },
+                "groupName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The policy group name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The policy group name."
+                },
+                "groupUuid": {
+                  "type": "string",
+                  "description": "The policy group UUID.",
+                  "format": "uuid"
+                },
+                "customerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The policy customer name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The policy customer name."
+                },
+                "customerUuid": {
+                  "type": "string",
+                  "description": "The policy customer UUID.",
+                  "format": "uuid"
+                },
+                "createdDateUtc": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Timestamp when the policy was created.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Timestamp when the policy was created."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zorus policy returned by the API."
+            },
+            "description": "Items returned by the Zorus search endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Zorus policy search results."
+      }
+    }
+  ]
+}

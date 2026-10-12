@@ -1,0 +1,421 @@
+{
+  "service": "mocean",
+  "displayName": "Mocean",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "MOCEAN_API_TOKEN",
+      "description": "Mocean API token sent as an Authorization bearer token. Generate it from Dashboard > API Account > Generate Token: https://dashboard.moceanapi.com/."
+    }
+  ],
+  "homepageUrl": "https://moceanapi.com",
+  "actions": [
+    {
+      "id": "mocean.get_balance",
+      "service": "mocean",
+      "name": "get_balance",
+      "description": "Retrieve the current Mocean account balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Mocean account balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Mocean response status code. Zero indicates a successful request."
+          },
+          "value": {
+            "type": "number",
+            "description": "Current Mocean account balance value returned by Mocean."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "value"
+        ],
+        "description": "Mocean account balance response."
+      }
+    },
+    {
+      "id": "mocean.get_message_status",
+      "service": "mocean",
+      "name": "get_message_status",
+      "description": "Retrieve the delivery status for a Mocean SMS message.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mocean message ID returned by send_sms."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messageId"
+        ],
+        "description": "Input parameters for retrieving the delivery status of an outbound Mocean SMS message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Mocean response status code. Zero indicates a successful request."
+          },
+          "messageStatus": {
+            "type": "integer",
+            "description": "Mocean delivery status code for the message. Documented values include delivered, failed, expired, pending, and not found."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mocean message identifier."
+          },
+          "creditDeducted": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Credits deducted for the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "messageStatus",
+          "messageId",
+          "creditDeducted"
+        ],
+        "description": "Mocean outbound SMS message status response."
+      }
+    },
+    {
+      "id": "mocean.list_pricing",
+      "service": "mocean",
+      "name": "list_pricing",
+      "description": "Retrieve Mocean account pricing for SMS, number lookup, or verify services.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "sms",
+              "number-lookup",
+              "verify"
+            ],
+            "description": "Mocean service type to retrieve pricing for."
+          },
+          "mcc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mobile Country Code to filter pricing by destination."
+          },
+          "mnc": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mobile Network Code to filter pricing by operator."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Mocean account pricing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Mocean response status code. Zero indicates a successful request."
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Destination country name returned by Mocean."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Destination operator name returned by Mocean."
+                },
+                "mcc": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Mobile Country Code returned by Mocean."
+                },
+                "mnc": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Mobile Network Code returned by Mocean."
+                },
+                "price": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Price returned by Mocean for this destination."
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Currency code returned by Mocean for the price."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Pricing entry for one Mocean destination or operator."
+            },
+            "description": "Pricing entries returned by Mocean for the requested destination filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "destinations"
+        ],
+        "description": "Mocean account pricing response."
+      }
+    },
+    {
+      "id": "mocean.lookup_number",
+      "service": "mocean",
+      "name": "lookup_number",
+      "description": "Look up carrier information for a phone number through Mocean.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Phone number to look up, including country code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to"
+        ],
+        "description": "Input parameters for performing a synchronous Mocean number lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "description": "Mocean response status code. Zero indicates a successful request."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mocean message identifier for the lookup."
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Phone number returned by Mocean for the lookup."
+          },
+          "currentCarrier": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier country returned by Mocean."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier name returned by Mocean."
+              },
+              "networkCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier network code returned by Mocean."
+              },
+              "mcc": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier Mobile Country Code returned by Mocean."
+              },
+              "mnc": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier Mobile Network Code returned by Mocean."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "country",
+              "name",
+              "networkCode",
+              "mcc",
+              "mnc"
+            ],
+            "description": "Carrier information returned by Mocean."
+          },
+          "originalCarrier": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier country returned by Mocean."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier name returned by Mocean."
+              },
+              "networkCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier network code returned by Mocean."
+              },
+              "mcc": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier Mobile Country Code returned by Mocean."
+              },
+              "mnc": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Carrier Mobile Network Code returned by Mocean."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "country",
+              "name",
+              "networkCode",
+              "mcc",
+              "mnc"
+            ],
+            "description": "Carrier information returned by Mocean."
+          },
+          "ported": {
+            "type": "string",
+            "enum": [
+              "ported",
+              "not_ported",
+              "unknown"
+            ],
+            "description": "Mocean porting status for the phone number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "Synchronous Mocean number lookup response."
+      }
+    },
+    {
+      "id": "mocean.send_sms",
+      "service": "mocean",
+      "name": "send_sms",
+      "description": "Send an SMS message through Mocean.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SMS sender ID shown to the recipient."
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number including country code."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SMS message text to send to the recipient."
+          },
+          "deliveryReportUrl": {
+            "type": "string",
+            "description": "Callback URL that Mocean should call with delivery report updates.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "text"
+        ],
+        "description": "Input parameters for sending an SMS message with Mocean."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "integer",
+                  "description": "Mocean response status code. Zero indicates a successful request."
+                },
+                "receiver": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Phone number that Mocean accepted for this message."
+                },
+                "messageId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Mocean message identifier returned for status queries."
+                },
+                "errorMessage": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Mocean error message when the recipient submission failed."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "status"
+              ],
+              "description": "Result for one SMS recipient returned by Mocean."
+            },
+            "description": "Per-recipient SMS submission results returned by Mocean."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "Mocean SMS submission response."
+      }
+    }
+  ]
+}

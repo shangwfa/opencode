@@ -1,0 +1,807 @@
+{
+  "service": "clearout",
+  "displayName": "Clearout",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "clearout_api_token",
+      "description": "Clearout API token used with the Authorization Bearer header. Create it from the Developer page in your Clearout dashboard: https://docs.clearout.io/api-overview.html.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.clearout.io/v2",
+          "description": "Optional Clearout API base URL. Only HTTPS Clearout-owned hosts are accepted; defaults to https://api.clearout.io/v2."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://clearout.io",
+  "actions": [
+    {
+      "id": "clearout.get_available_credits",
+      "service": "clearout",
+      "name": "get_available_credits",
+      "description": "Get the current Clearout credit balance and daily verification limits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "available_credits": {
+                "type": "integer",
+                "description": "The remaining available credits."
+              },
+              "credits": {
+                "type": "object",
+                "properties": {
+                  "available": {
+                    "type": "integer",
+                    "description": "The remaining available credits."
+                  },
+                  "subs": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The current subscription label or identifier."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The current subscription label or identifier."
+                  },
+                  "available_daily_verify_limit": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The remaining daily verify limit."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The remaining daily verify limit."
+                  },
+                  "reset_daily_verify_limit_date": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The next daily verify limit reset date."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The next daily verify limit reset date."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "The total credits in the current plan."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Clearout credits detail object."
+              },
+              "low_credit_balance_min_threshold": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The low credit balance alert threshold."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The low credit balance alert threshold."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "available_credits",
+              "credits"
+            ],
+            "description": "The Clearout credits response data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout available credits response."
+      }
+    },
+    {
+      "id": "clearout.instant_verify_email",
+      "service": "clearout",
+      "name": "instant_verify_email",
+      "description": "Verify an email address in real time and return the full Clearout verification result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "safe_to_send": {
+                "type": "string",
+                "description": "Whether Clearout marks the address safe to send."
+              },
+              "status": {
+                "type": "string",
+                "description": "The verification status returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "sub_status": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer",
+                        "description": "The upstream verification sub-status code."
+                      },
+                      "desc": {
+                        "type": "string",
+                        "description": "The upstream verification sub-status description."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "The verification sub-status returned by Clearout."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The verification sub-status returned by Clearout."
+              },
+              "detail_info": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "account": {
+                        "type": "string",
+                        "description": "The account-level verification detail."
+                      },
+                      "domain": {
+                        "type": "string",
+                        "description": "The domain-level verification detail."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Additional verification details returned by Clearout."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional verification details returned by Clearout."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "suggested_email_address": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The suggested corrected email address, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The suggested corrected email address, if any."
+              },
+              "profile": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The associated profile reference, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The associated profile reference, if any."
+              },
+              "bounce_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The bounce type classification, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The bounce type classification, if any."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout instant verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout instant email verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_business_account_email",
+      "service": "clearout",
+      "name": "verify_business_account_email",
+      "description": "Check whether an email address belongs to a business account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_catch_all_email",
+      "service": "clearout",
+      "name": "verify_catch_all_email",
+      "description": "Check whether an email address belongs to a catch-all domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_disposable_email",
+      "service": "clearout",
+      "name": "verify_disposable_email",
+      "description": "Check whether an email address belongs to a disposable email service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_free_account_email",
+      "service": "clearout",
+      "name": "verify_free_account_email",
+      "description": "Check whether an email address belongs to a free email provider.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_gibberish_email",
+      "service": "clearout",
+      "name": "verify_gibberish_email",
+      "description": "Check whether an email address looks like a gibberish account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    },
+    {
+      "id": "clearout.verify_role_account_email",
+      "service": "clearout",
+      "name": "verify_role_account_email",
+      "description": "Check whether an email address is a role-based account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address to verify.",
+            "format": "email"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 180000,
+            "description": "Request wait time in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The upstream Clearout response status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "email_address": {
+                "type": "string",
+                "description": "The email address returned by Clearout."
+              },
+              "verified_on": {
+                "type": "string",
+                "description": "The verification timestamp returned by Clearout."
+              },
+              "time_taken": {
+                "type": "integer",
+                "description": "The verification latency in milliseconds."
+              },
+              "catchall": {
+                "type": "string",
+                "description": "Whether the address is catch-all."
+              },
+              "disposable": {
+                "type": "string",
+                "description": "Whether the address is disposable."
+              },
+              "free": {
+                "type": "string",
+                "description": "Whether the address belongs to a free email provider."
+              },
+              "role": {
+                "type": "string",
+                "description": "Whether the address is role-based."
+              },
+              "gibberish": {
+                "type": "string",
+                "description": "Whether the address looks like gibberish."
+              },
+              "business_account": {
+                "type": "string",
+                "description": "Whether the address is a business account."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Clearout attribute verification result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Clearout attribute verification response."
+      }
+    }
+  ]
+}

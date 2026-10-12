@@ -1,0 +1,489 @@
+{
+  "service": "newscatcher",
+  "displayName": "NewsCatcher",
+  "categories": [
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_NEWSCATCHER_API_KEY",
+      "description": "NewsCatcher News API key sent with the x-api-token header. Request trial access or contact NewsCatcher from https://www.newscatcherapi.com/news-api."
+    }
+  ],
+  "homepageUrl": "https://www.newscatcherapi.com/",
+  "actions": [
+    {
+      "id": "newscatcher.get_latest_headlines",
+      "service": "newscatcher",
+      "name": "get_latest_headlines",
+      "description": "Retrieve recent NewsCatcher headlines with source and publication filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "when": {
+            "type": "string",
+            "description": "The recent time window, such as 1h, 24h, 7d, or 30d."
+          },
+          "lang": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 639-1 language code."
+            },
+            "description": "The article language codes to include.",
+            "minItems": 1
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 3166-1 alpha-2 country code."
+            },
+            "description": "The publisher country codes to include.",
+            "minItems": 1
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One source domain."
+            },
+            "description": "The source domains to include.",
+            "minItems": 1
+          },
+          "not_sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One excluded source domain."
+            },
+            "description": "The source domains to exclude.",
+            "minItems": 1
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of results per page, up to 1000."
+          },
+          "include_nlp_data": {
+            "type": "boolean",
+            "description": "Whether to include available NewsCatcher NLP enrichments."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving NewsCatcher latest headlines."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The response status reported by NewsCatcher."
+          },
+          "total_hits": {
+            "type": "integer",
+            "description": "The number of matching articles, capped by the API search window."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The returned page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The number of available pages."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The NewsCatcher article identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The canonical article URL."
+                },
+                "published_date": {
+                  "type": "string",
+                  "description": "The article publication timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NewsCatcher article. Fields vary with the subscription plan and requested enrichments."
+            },
+            "description": "The matching articles."
+          },
+          "user_input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The effective filters reported by NewsCatcher."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "total_hits",
+          "page",
+          "total_pages",
+          "page_size"
+        ],
+        "description": "A paginated NewsCatcher article response."
+      }
+    },
+    {
+      "id": "newscatcher.get_subscription",
+      "service": "newscatcher",
+      "name": "get_subscription",
+      "description": "Retrieve the active NewsCatcher subscription plan and remaining API allowance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the NewsCatcher subscription."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Whether the NewsCatcher subscription is active."
+          },
+          "concurrent_calls": {
+            "type": "integer",
+            "description": "The plan's concurrent request allowance."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The subscription plan name."
+          },
+          "plan_calls": {
+            "type": "integer",
+            "description": "The plan's total call allowance."
+          },
+          "remaining_calls": {
+            "type": "integer",
+            "description": "The number of calls remaining in the current allowance."
+          },
+          "historical_days": {
+            "type": "integer",
+            "description": "The number of historical news days available to the plan."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "active",
+          "concurrent_calls",
+          "plan",
+          "plan_calls",
+          "remaining_calls",
+          "historical_days"
+        ],
+        "description": "The current NewsCatcher subscription details."
+      }
+    },
+    {
+      "id": "newscatcher.list_sources",
+      "service": "newscatcher",
+      "name": "list_sources",
+      "description": "List news sources indexed by NewsCatcher using language and country filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lang": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 639-1 language code."
+            },
+            "description": "The source language codes to include.",
+            "minItems": 1
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 3166-1 alpha-2 country code."
+            },
+            "description": "The source country codes to include.",
+            "minItems": 1
+          },
+          "predefined_sources": {
+            "type": "string",
+            "description": "A documented NewsCatcher predefined source collection."
+          },
+          "source_name": {
+            "type": "string",
+            "description": "A source name to match."
+          },
+          "source_url": {
+            "type": "string",
+            "description": "A source domain URL to match."
+          },
+          "include_additional_info": {
+            "type": "boolean",
+            "description": "Whether to include rank, country, and domain classification metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing NewsCatcher sources."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The result message reported by NewsCatcher."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "domain_url": {
+                      "type": "string",
+                      "description": "The source domain URL."
+                    },
+                    "name_source": {
+                      "type": "string",
+                      "description": "The source display name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "domain_url"
+                  ],
+                  "description": "One news source indexed by NewsCatcher."
+                },
+                {
+                  "type": "string",
+                  "description": "A source domain returned by NewsCatcher."
+                }
+              ],
+              "description": "A detailed source object or a source domain string."
+            },
+            "description": "The matching news sources."
+          },
+          "user_input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The effective source filters reported by NewsCatcher."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "message",
+          "sources",
+          "user_input"
+        ],
+        "description": "A NewsCatcher source response."
+      }
+    },
+    {
+      "id": "newscatcher.search_articles",
+      "service": "newscatcher",
+      "name": "search_articles",
+      "description": "Search NewsCatcher's global news index with practical publication filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The keyword, phrase, or Boolean query to search for."
+          },
+          "lang": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 639-1 language code."
+            },
+            "description": "The article language codes to include.",
+            "minItems": 1
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One ISO 3166-1 alpha-2 country code."
+            },
+            "description": "The publisher country codes to include.",
+            "minItems": 1
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One source domain."
+            },
+            "description": "The source domains to include.",
+            "minItems": 1
+          },
+          "not_sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One excluded source domain."
+            },
+            "description": "The source domains to exclude.",
+            "minItems": 1
+          },
+          "from_": {
+            "type": "string",
+            "description": "The earliest publication date or relative time accepted by NewsCatcher."
+          },
+          "to_": {
+            "type": "string",
+            "description": "The latest publication date or relative time accepted by NewsCatcher."
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": [
+              "relevancy",
+              "date",
+              "rank"
+            ],
+            "description": "The order used for matching articles."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to return."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of results per page, up to 1000."
+          },
+          "include_nlp_data": {
+            "type": "boolean",
+            "description": "Whether to include available NewsCatcher NLP enrichments."
+          },
+          "exclude_duplicates": {
+            "type": "boolean",
+            "description": "Whether to exclude duplicate articles."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "The input payload for searching NewsCatcher articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The response status reported by NewsCatcher."
+          },
+          "total_hits": {
+            "type": "integer",
+            "description": "The number of matching articles, capped by the API search window."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The returned page number."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "The number of available pages."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The NewsCatcher article identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The article title."
+                },
+                "link": {
+                  "type": "string",
+                  "description": "The canonical article URL."
+                },
+                "published_date": {
+                  "type": "string",
+                  "description": "The article publication timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One NewsCatcher article. Fields vary with the subscription plan and requested enrichments."
+            },
+            "description": "The matching articles."
+          },
+          "user_input": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The effective filters reported by NewsCatcher."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "total_hits",
+          "page",
+          "total_pages",
+          "page_size"
+        ],
+        "description": "A paginated NewsCatcher article response."
+      }
+    }
+  ]
+}

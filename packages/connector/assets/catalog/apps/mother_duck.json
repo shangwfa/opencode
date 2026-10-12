@@ -1,0 +1,685 @@
+{
+  "service": "mother_duck",
+  "displayName": "MotherDuck",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Token",
+      "placeholder": "MOTHERDUCK_TOKEN",
+      "description": "MotherDuck access token used as a Bearer token for the Admin API. Create or view access tokens in MotherDuck settings: https://app.motherduck.com/settings/tokens."
+    }
+  ],
+  "homepageUrl": "https://motherduck.com",
+  "actions": [
+    {
+      "id": "mother_duck.create_token",
+      "service": "mother_duck",
+      "name": "create_token",
+      "description": "Create a MotherDuck access token for a user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The token display name."
+          },
+          "ttl": {
+            "type": "number",
+            "minimum": 300,
+            "maximum": 31536000,
+            "description": "Token expiration in seconds."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "read_write",
+              "read_scaling"
+            ],
+            "description": "The MotherDuck token type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "name"
+        ],
+        "description": "Input for creating a MotherDuck user token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The token UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The token display name."
+              },
+              "token": {
+                "type": "string",
+                "description": "The newly-created token secret when MotherDuck returns it."
+              },
+              "expire_at": {
+                "type": "string",
+                "description": "The timestamp when the token expires."
+              },
+              "created_ts": {
+                "type": "string",
+                "description": "The timestamp when the token was created."
+              },
+              "read_only": {
+                "type": "boolean",
+                "description": "Whether the token is read-only."
+              },
+              "token_type": {
+                "type": "string",
+                "enum": [
+                  "read_write",
+                  "read_scaling"
+                ],
+                "description": "The MotherDuck token type."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw token object returned by MotherDuck."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "raw"
+            ],
+            "description": "A MotherDuck access token."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "token"
+        ],
+        "description": "The newly-created MotherDuck token."
+      }
+    },
+    {
+      "id": "mother_duck.create_user",
+      "service": "mother_duck",
+      "name": "create_user",
+      "description": "Create a MotherDuck member user in the organization.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "Input for creating a MotherDuck user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "The created MotherDuck user."
+      }
+    },
+    {
+      "id": "mother_duck.delete_token",
+      "service": "mother_duck",
+      "name": "delete_token",
+      "description": "Invalidate a MotherDuck access token for a user.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          },
+          "token_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MotherDuck access token identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "token_id"
+        ],
+        "description": "Input for deleting a MotherDuck user token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether MotherDuck accepted the token deletion request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The normalized MotherDuck token deletion result."
+      }
+    },
+    {
+      "id": "mother_duck.delete_user",
+      "service": "mother_duck",
+      "name": "delete_user",
+      "description": "Permanently delete a MotherDuck user and all of their data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "Input for deleting a MotherDuck user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "The deleted MotherDuck user."
+      }
+    },
+    {
+      "id": "mother_duck.get_user_duckling_config",
+      "service": "mother_duck",
+      "name": "get_user_duckling_config",
+      "description": "Retrieve MotherDuck Duckling configuration for a user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "Input for retrieving a MotherDuck user's Duckling configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {
+              "read_write": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size"
+                ],
+                "description": "MotherDuck read-write Duckling configuration."
+              },
+              "read_scaling": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "flock_size": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 64,
+                    "description": "The number of read-scaling Ducklings."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size",
+                  "flock_size"
+                ],
+                "description": "MotherDuck read-scaling Duckling configuration."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MotherDuck Duckling configuration for a user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The MotherDuck Duckling configuration for the user."
+      }
+    },
+    {
+      "id": "mother_duck.list_active_accounts",
+      "service": "mother_duck",
+      "name": "list_active_accounts",
+      "description": "List active MotherDuck accounts and their active Ducklings in the organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list active MotherDuck accounts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255,
+                  "description": "The MotherDuck username within the organization."
+                },
+                "ducklings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The Duckling identifier, such as rw or rs.N."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "read_write",
+                          "read_scaling"
+                        ],
+                        "description": "The MotherDuck Duckling type."
+                      },
+                      "status": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The MotherDuck Duckling status, such as active or cooldown."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A MotherDuck Duckling attached to an active account."
+                  },
+                  "description": "The active Ducklings for the account."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A MotherDuck active account."
+            },
+            "description": "The active accounts in the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "The active MotherDuck accounts returned by the Admin API."
+      }
+    },
+    {
+      "id": "mother_duck.list_tokens",
+      "service": "mother_duck",
+      "name": "list_tokens",
+      "description": "List MotherDuck access tokens for a user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username"
+        ],
+        "description": "Input for listing MotherDuck user tokens."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The token UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The token display name."
+                },
+                "token": {
+                  "type": "string",
+                  "description": "The newly-created token secret when MotherDuck returns it."
+                },
+                "expire_at": {
+                  "type": "string",
+                  "description": "The timestamp when the token expires."
+                },
+                "created_ts": {
+                  "type": "string",
+                  "description": "The timestamp when the token was created."
+                },
+                "read_only": {
+                  "type": "boolean",
+                  "description": "Whether the token is read-only."
+                },
+                "token_type": {
+                  "type": "string",
+                  "enum": [
+                    "read_write",
+                    "read_scaling"
+                  ],
+                  "description": "The MotherDuck token type."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw token object returned by MotherDuck."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "A MotherDuck access token."
+            },
+            "description": "The user's MotherDuck access tokens."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tokens"
+        ],
+        "description": "The MotherDuck access tokens for the user."
+      }
+    },
+    {
+      "id": "mother_duck.set_user_duckling_config",
+      "service": "mother_duck",
+      "name": "set_user_duckling_config",
+      "description": "Set MotherDuck Duckling configuration for a user.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The MotherDuck username within the organization."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "read_write": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size"
+                ],
+                "description": "MotherDuck read-write Duckling configuration."
+              },
+              "read_scaling": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "flock_size": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 64,
+                    "description": "The number of read-scaling Ducklings."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size",
+                  "flock_size"
+                ],
+                "description": "MotherDuck read-scaling Duckling configuration."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MotherDuck Duckling configuration for a user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "config"
+        ],
+        "description": "Input for setting a MotherDuck user's Duckling configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {
+              "read_write": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size"
+                ],
+                "description": "MotherDuck read-write Duckling configuration."
+              },
+              "read_scaling": {
+                "type": "object",
+                "properties": {
+                  "instance_size": {
+                    "type": "string",
+                    "enum": [
+                      "pulse",
+                      "standard",
+                      "jumbo",
+                      "mega",
+                      "giga"
+                    ],
+                    "description": "The MotherDuck instance size."
+                  },
+                  "flock_size": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 64,
+                    "description": "The number of read-scaling Ducklings."
+                  },
+                  "cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "description": "Cooldown duration in seconds."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "instance_size",
+                  "flock_size"
+                ],
+                "description": "MotherDuck read-scaling Duckling configuration."
+              }
+            },
+            "additionalProperties": false,
+            "description": "MotherDuck Duckling configuration for a user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The updated MotherDuck Duckling configuration for the user."
+      }
+    }
+  ]
+}

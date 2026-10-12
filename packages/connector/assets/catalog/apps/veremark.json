@@ -1,0 +1,527 @@
+{
+  "service": "veremark",
+  "displayName": "Veremark",
+  "description": "Manage Veremark background-check candidates and screening workflows.",
+  "categories": [
+    "Security & Identity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "VEREMARK_API_TOKEN",
+      "description": "Veremark API token sent in the Authorization header. Request a token from your Veremark account manager: https://help.veremark.com/how-do-i-obtain-an-api-key-for-testing-and-who-should-i-contact-to-ensure-the-engineering-team-receives-it"
+    }
+  ],
+  "homepageUrl": "https://www.veremark.com/",
+  "actions": [
+    {
+      "id": "veremark.create_request",
+      "service": "veremark",
+      "name": "create_request",
+      "description": "Create a Veremark background-check request for a candidate.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "criteriaGuid": {
+            "type": "string",
+            "description": "The criterion identifier selected for the candidate.",
+            "format": "uuid"
+          },
+          "candidate": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "The candidate's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "The candidate's last name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The candidate's email address.",
+                "format": "email"
+              },
+              "countryCode": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2,
+                "description": "The candidate's ISO 3166-1 alpha-2 country code."
+              },
+              "phoneNumber": {
+                "type": "string",
+                "maxLength": 255,
+                "description": "The candidate's phone number."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "firstName",
+              "lastName",
+              "email"
+            ],
+            "description": "The candidate who will complete the background checks."
+          },
+          "job": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "The role for which the candidate is being screened."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "A caller-defined identifier used to track the request."
+              },
+              "client": {
+                "type": "string",
+                "description": "The client name when screening on behalf of another organization."
+              },
+              "additionalInformation": {
+                "type": "string",
+                "description": "Additional information such as a cost code."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "role"
+            ],
+            "description": "The job associated with the background-check request."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The webhook URL that Veremark should call.",
+                "format": "uri"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "patch",
+                  "put",
+                  "post",
+                  "get"
+                ],
+                "description": "The HTTP method Veremark should use for webhook delivery."
+              },
+              "authenticationType": {
+                "type": "string",
+                "enum": [
+                  "Basic"
+                ],
+                "description": "The webhook authentication method."
+              },
+              "credentials": {
+                "type": "string",
+                "description": "The optional Basic authentication credentials for the webhook."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "method"
+            ],
+            "description": "The webhook Veremark should call when the request status changes."
+          },
+          "sendInitialCandidateEmail": {
+            "type": "boolean",
+            "description": "Whether Veremark should send its initial information-request email to the candidate."
+          },
+          "assignedUserGuid": {
+            "type": "string",
+            "description": "The Veremark organization user to assign to the new request.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "criteriaGuid",
+          "candidate",
+          "job"
+        ],
+        "description": "The input payload for creating a Veremark background-check request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "type": "string",
+                "description": "The background-check request identifier.",
+                "format": "uuid"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current request status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current request status."
+              },
+              "requestUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate request page URL when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate request page URL when available."
+              },
+              "externalId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The caller-defined tracking identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The caller-defined tracking identifier when available."
+              },
+              "candidateGuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate identifier when available."
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One background check returned by Veremark."
+                },
+                "description": "The individual background checks attached to the request."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw request returned by Veremark."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Veremark background-check request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after creating a Veremark request."
+      }
+    },
+    {
+      "id": "veremark.get_request",
+      "service": "veremark",
+      "name": "get_request",
+      "description": "Get the current status and results of one Veremark background-check request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "guid": {
+            "type": "string",
+            "description": "The background-check request identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Veremark request to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "type": "string",
+                "description": "The background-check request identifier.",
+                "format": "uuid"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The current request status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current request status."
+              },
+              "requestUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate request page URL when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate request page URL when available."
+              },
+              "externalId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The caller-defined tracking identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The caller-defined tracking identifier when available."
+              },
+              "candidateGuid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate identifier when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate identifier when available."
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One background check returned by Veremark."
+                },
+                "description": "The individual background checks attached to the request."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw request returned by Veremark."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Veremark background-check request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Veremark background-check request."
+      }
+    },
+    {
+      "id": "veremark.list_criteria",
+      "service": "veremark",
+      "name": "list_criteria",
+      "description": "List background-check criteria available to the Veremark organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Veremark criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "guid": {
+                  "type": "string",
+                  "description": "The criterion identifier.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The criterion name."
+                },
+                "country": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO country code associated with the criterion."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO country code associated with the criterion."
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One check included in the criterion."
+                  },
+                  "description": "The checks included in the criterion."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw criterion returned by Veremark."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Veremark background-check criterion."
+            },
+            "description": "The available Veremark criteria."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Veremark criteria."
+      }
+    },
+    {
+      "id": "veremark.list_requests",
+      "service": "veremark",
+      "name": "list_requests",
+      "description": "List Veremark background-check requests, optionally filtered by status-change date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statusChangeDateFrom": {
+            "type": "string",
+            "description": "Only return requests whose status changed on or after this YYYY-MM-DD date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Veremark requests."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "guid": {
+                  "type": "string",
+                  "description": "The background-check request identifier.",
+                  "format": "uuid"
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The current request status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current request status."
+                },
+                "requestUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The candidate request page URL when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The candidate request page URL when available."
+                },
+                "externalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The caller-defined tracking identifier when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The caller-defined tracking identifier when available."
+                },
+                "candidateGuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The candidate identifier when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The candidate identifier when available."
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One background check returned by Veremark."
+                  },
+                  "description": "The individual background checks attached to the request."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw request returned by Veremark."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Veremark background-check request."
+            },
+            "description": "The matching Veremark requests."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Veremark requests."
+      }
+    }
+  ]
+}

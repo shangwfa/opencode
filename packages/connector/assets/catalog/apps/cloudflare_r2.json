@@ -1,0 +1,4720 @@
+{
+  "service": "cloudflare_r2",
+  "displayName": "Cloudflare R2",
+  "categories": [
+    "Storage",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential",
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "API Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "cloudflare_api_token",
+          "description": "Cloudflare API token sent as a Bearer token. Create one from the Cloudflare API Tokens page: https://dash.cloudflare.com/profile/api-tokens"
+        },
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "023e105f4ecef8ad9ca31a8372d0c353",
+          "description": "Cloudflare account ID used for R2 bucket management. Find it in the Cloudflare dashboard or account ID docs: https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"
+        }
+      ]
+    },
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://dash.cloudflare.com/oauth2/auth",
+      "tokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "refreshTokenUrl": "https://dash.cloudflare.com/oauth2/token",
+      "scopes": [
+        "offline_access",
+        "workers-r2.read",
+        "workers-r2.write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_basic"
+    }
+  ],
+  "homepageUrl": "https://www.cloudflare.com/developer-platform/products/r2/",
+  "actions": [
+    {
+      "id": "cloudflare_r2.add_custom_domain",
+      "service": "cloudflare_r2",
+      "name": "add_custom_domain",
+      "description": "Attach a custom domain from a Cloudflare zone to an R2 bucket.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom domain name."
+          },
+          "zoneId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare zone ID that owns the domain."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to enable public bucket access at the custom domain. Defaults to true."
+          },
+          "minTLS": {
+            "type": "string",
+            "enum": [
+              "1.0",
+              "1.1",
+              "1.2",
+              "1.3"
+            ],
+            "description": "The minimum TLS version accepted for incoming connections."
+          },
+          "ciphers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A cipher name."
+            },
+            "description": "An allowlist of TLS ciphers in BoringSSL format."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "domain",
+          "zoneId"
+        ],
+        "description": "Input for attaching a custom domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string",
+                "description": "The custom domain name."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the bucket is publicly accessible at this custom domain."
+              },
+              "zoneId": {
+                "type": "string",
+                "description": "The Cloudflare zone ID the domain resides in."
+              },
+              "zoneName": {
+                "type": "string",
+                "description": "The Cloudflare zone name the domain resides in."
+              },
+              "minTLS": {
+                "type": "string",
+                "enum": [
+                  "1.0",
+                  "1.1",
+                  "1.2",
+                  "1.3"
+                ],
+                "description": "The minimum TLS version accepted for incoming connections."
+              },
+              "ciphers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A cipher name."
+                },
+                "description": "An allowlist of TLS ciphers in BoringSSL format."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "ownership": {
+                    "type": "string",
+                    "description": "The domain ownership status."
+                  },
+                  "ssl": {
+                    "type": "string",
+                    "description": "The SSL certificate status."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "ownership",
+                  "ssl"
+                ],
+                "description": "The provisioning status of the custom domain."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "domain",
+              "enabled"
+            ],
+            "description": "A custom domain attached to an R2 bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The attached custom domain."
+      }
+    },
+    {
+      "id": "cloudflare_r2.create_bucket",
+      "service": "cloudflare_r2",
+      "name": "create_bucket",
+      "description": "Create an R2 bucket in a Cloudflare account.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "locationHint": {
+            "type": "string",
+            "enum": [
+              "apac",
+              "eeur",
+              "enam",
+              "weur",
+              "wnam",
+              "oc"
+            ],
+            "description": "The R2 bucket region hint."
+          },
+          "storageClass": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "InfrequentAccess"
+            ],
+            "description": "The default storage class for newly uploaded objects."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The bucket name."
+              },
+              "creationDate": {
+                "type": "string",
+                "description": "The bucket creation timestamp."
+              },
+              "location": {
+                "type": "string",
+                "enum": [
+                  "apac",
+                  "eeur",
+                  "enam",
+                  "weur",
+                  "wnam",
+                  "oc"
+                ],
+                "description": "The R2 bucket region hint."
+              },
+              "jurisdiction": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "eu",
+                  "fedramp",
+                  "us"
+                ],
+                "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+              },
+              "storageClass": {
+                "type": "string",
+                "enum": [
+                  "Standard",
+                  "InfrequentAccess"
+                ],
+                "description": "The default storage class for newly uploaded objects."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "A Cloudflare R2 bucket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.create_event_notification_rules",
+      "service": "cloudflare_r2",
+      "name": "create_event_notification_rules",
+      "description": "Add event notification rules that send R2 bucket events to a Cloudflare Queue.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Workers R2 Storage Write",
+        "Queues Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "queueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Queue ID."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "PutObject",
+                      "CopyObject",
+                      "DeleteObject",
+                      "CompleteMultipartUpload",
+                      "LifecycleDeletion"
+                    ],
+                    "description": "An R2 object action that triggers a notification."
+                  },
+                  "description": "The object actions that trigger notifications.",
+                  "minItems": 1
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A description that identifies the rule."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Only send notifications for objects with this key prefix."
+                },
+                "suffix": {
+                  "type": "string",
+                  "description": "Only send notifications for objects with this key suffix."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "actions"
+              ],
+              "description": "An event notification rule to create."
+            },
+            "description": "The rules to add.",
+            "minItems": 1
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queueId",
+          "rules"
+        ],
+        "description": "Input for creating event notification rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket the rules were added to."
+          },
+          "queueId": {
+            "type": "string",
+            "description": "The queue the rules send events to."
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Whether the create request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queueId",
+          "created"
+        ],
+        "description": "The rule creation result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.create_temporary_access_credentials",
+      "service": "cloudflare_r2",
+      "name": "create_temporary_access_credentials",
+      "description": "Create short-lived S3-compatible credentials scoped to one R2 bucket and optionally to prefixes or objects.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "admin-read-write",
+              "admin-read-only",
+              "object-read-write",
+              "object-read-only"
+            ],
+            "description": "The permissions granted to the temporary credentials."
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 604800,
+            "description": "How long the credentials stay valid, in seconds. Defaults to 900."
+          },
+          "parentAccessKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Access Key ID of the R2 API token used to sign the credentials. Defaults to the connected API token."
+          },
+          "prefixes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A key prefix."
+            },
+            "description": "Key prefixes the credentials are limited to."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An object key."
+            },
+            "description": "Object keys the credentials are limited to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "permission"
+        ],
+        "description": "Input for creating temporary access credentials."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accessKeyId": {
+            "type": "string",
+            "description": "The temporary Access Key ID."
+          },
+          "secretAccessKey": {
+            "type": "string",
+            "description": "The temporary Secret Access Key."
+          },
+          "sessionToken": {
+            "type": "string",
+            "description": "The session token that must accompany the credentials."
+          },
+          "estimatedExpiresAt": {
+            "type": "string",
+            "description": "A local estimate of when the credentials expire, computed from the request time plus ttlSeconds. Cloudflare starts the TTL when it issues the credentials, so the real expiry is slightly later, and revoking the parent token expires them early.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accessKeyId",
+          "secretAccessKey",
+          "sessionToken",
+          "estimatedExpiresAt"
+        ],
+        "description": "The temporary S3-compatible credentials."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_bucket",
+      "service": "cloudflare_r2",
+      "name": "delete_bucket",
+      "description": "Delete an R2 bucket by name.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The deleted bucket name."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the bucket delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_bucket_cors_policy",
+      "service": "cloudflare_r2",
+      "name": "delete_bucket_cors_policy",
+      "description": "Delete the bucket-level CORS policy for an R2 bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket whose CORS policy was removed."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_custom_domain",
+      "service": "cloudflare_r2",
+      "name": "delete_custom_domain",
+      "description": "Detach a custom domain from an R2 bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom domain name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "domain"
+        ],
+        "description": "Input for detaching one custom domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The detached custom domain name."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the detach request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "deleted"
+        ],
+        "description": "The detached custom domain."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_event_notification_rules",
+      "service": "cloudflare_r2",
+      "name": "delete_event_notification_rules",
+      "description": "Delete event notification rules bound to one queue. Deletes every rule for the queue when ruleIds is omitted.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Workers R2 Storage Write",
+        "Queues Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "queueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Queue ID."
+          },
+          "ruleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A rule ID."
+            },
+            "description": "The rule IDs to delete. Omit to delete every rule for the queue.",
+            "minItems": 1
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queueId"
+        ],
+        "description": "Input for deleting event notification rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket the rules were removed from."
+          },
+          "queueId": {
+            "type": "string",
+            "description": "The queue whose rules were removed."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queueId",
+          "deleted"
+        ],
+        "description": "The rule deletion result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_object",
+      "service": "cloudflare_r2",
+      "name": "delete_object",
+      "description": "Delete one R2 object by key.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete R2 object key. Slashes are preserved as key delimiters."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKey"
+        ],
+        "description": "Input for deleting one R2 object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket the object was deleted from."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The deleted object key."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKey",
+          "deleted"
+        ],
+        "description": "The deleted R2 object."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_objects",
+      "service": "cloudflare_r2",
+      "name": "delete_objects",
+      "description": "Delete a list of R2 objects by key in one request.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "objectKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The complete R2 object key. Slashes are preserved as key delimiters."
+            },
+            "description": "The object keys to delete.",
+            "minItems": 1
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKeys"
+        ],
+        "description": "Input for deleting several R2 objects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket the objects were deleted from."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The object key."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One delete result."
+            },
+            "description": "Per-key delete results returned by R2, including any per-key error details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "results"
+        ],
+        "description": "The delete results reported by R2."
+      }
+    },
+    {
+      "id": "cloudflare_r2.delete_objects_by_prefix",
+      "service": "cloudflare_r2",
+      "name": "delete_objects_by_prefix",
+      "description": "Start a background job that deletes every object under a key prefix, or empties the whole bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "prefix": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The key prefix to delete. Must end with a slash. Omit and set emptyBucket to delete everything."
+          },
+          "emptyBucket": {
+            "type": "boolean",
+            "description": "Set to true to delete every object in the bucket instead of a prefix."
+          },
+          "rejectWhenDataCatalogEnabled": {
+            "type": "boolean",
+            "description": "Reject the job when R2 Data Catalog is enabled for the bucket."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for a prefix delete or empty bucket job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job identifier used to poll the job."
+          },
+          "jobType": {
+            "type": "string",
+            "description": "The job kind, currently always prefixDelete."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "description": "The job lifecycle status."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When the job was created."
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When the job finished. Absent while the job is still enqueued or running."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The key prefix matched by the job. An empty string means the entire bucket."
+          },
+          "deletedObjects": {
+            "type": "integer",
+            "description": "The number of objects deleted by the job so far."
+          },
+          "isBucketClear": {
+            "type": "boolean",
+            "description": "Whether the job was created to clear the entire bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "jobType",
+          "status"
+        ],
+        "description": "The background job created for the delete request."
+      },
+      "asyncLifecycle": {
+        "startActionId": "cloudflare_r2.delete_objects_by_prefix",
+        "statusActionId": "cloudflare_r2.get_bucket_job"
+      }
+    },
+    {
+      "id": "cloudflare_r2.disable_sippy",
+      "service": "cloudflare_r2",
+      "name": "disable_sippy",
+      "description": "Disable Sippy on an R2 bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for disabling Sippy."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket Sippy was disabled on."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The Sippy state after the request, always false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "enabled"
+        ],
+        "description": "The Sippy disable result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.download_object",
+      "service": "cloudflare_r2",
+      "name": "download_object",
+      "description": "Download one R2 object into local transit file storage.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete R2 object key. Slashes are preserved as key delimiters."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional filename override for the local transit file."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKey"
+        ],
+        "description": "The input payload for downloading one R2 object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The R2 object key."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The filename used for the local transit file."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The downloaded object MIME type."
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The downloaded object size in bytes."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the stored object.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The stored transit file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored transit file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored transit file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "The downloaded object in local transit file storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId",
+          "name",
+          "mimeType",
+          "sizeBytes",
+          "file"
+        ],
+        "description": "A downloaded R2 object stored in local transit storage."
+      }
+    },
+    {
+      "id": "cloudflare_r2.enable_sippy",
+      "service": "cloudflare_r2",
+      "name": "enable_sippy",
+      "description": "Enable Sippy so that objects missing from the R2 bucket are copied on demand from a source bucket on AWS S3, Google Cloud Storage, an S3-compatible service, or Azure Blob Storage.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "const": "aws",
+                    "type": "string",
+                    "description": "The source provider."
+                  },
+                  "bucket": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The AWS S3 bucket name."
+                  },
+                  "region": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The AWS region of the bucket."
+                  },
+                  "accessKeyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Access Key ID of an IAM credential scoped to the bucket."
+                  },
+                  "secretAccessKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Secret Access Key of the same IAM credential."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "provider",
+                  "bucket",
+                  "region",
+                  "accessKeyId",
+                  "secretAccessKey"
+                ],
+                "description": "An AWS S3 source bucket."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "const": "gcs",
+                    "type": "string",
+                    "description": "The source provider."
+                  },
+                  "bucket": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The GCS bucket name."
+                  },
+                  "clientEmail": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The client email of a service account scoped to the bucket."
+                  },
+                  "privateKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The private key of the same service account."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "provider",
+                  "bucket",
+                  "clientEmail",
+                  "privateKey"
+                ],
+                "description": "A Google Cloud Storage source bucket."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "const": "s3",
+                    "type": "string",
+                    "description": "The source provider."
+                  },
+                  "bucketUrl": {
+                    "type": "string",
+                    "description": "The URL of the S3-compatible API endpoint for the bucket.",
+                    "format": "uri"
+                  },
+                  "accessKeyId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Access Key ID of a credential scoped to the bucket."
+                  },
+                  "secretAccessKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Secret Access Key of the same credential."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "provider",
+                  "bucketUrl",
+                  "accessKeyId",
+                  "secretAccessKey"
+                ],
+                "description": "A generic S3-compatible source bucket."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "const": "azure",
+                    "type": "string",
+                    "description": "The source provider."
+                  },
+                  "accountName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Azure Storage account name."
+                  },
+                  "container": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Azure Blob Storage container name."
+                  },
+                  "accountKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The access key of the storage account."
+                  },
+                  "sasToken": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A Shared Access Signature token for the storage account."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "provider",
+                  "accountName",
+                  "container"
+                ],
+                "description": "An Azure Blob Storage source container. Provide exactly one of accountKey or sasToken."
+              }
+            ],
+            "description": "The source bucket Sippy copies objects from."
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "accessKeyId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Access Key ID of an R2 API token scoped to this bucket."
+              },
+              "secretAccessKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Secret Access Key of the same R2 API token."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "accessKeyId",
+              "secretAccessKey"
+            ],
+            "description": "The R2 credentials Sippy uses to write objects into this bucket. Defaults to the connected API token when omitted."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "source"
+        ],
+        "description": "Input for enabling Sippy."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether Sippy is enabled for the bucket."
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The source provider: aws, gcs, s3, or azure."
+              },
+              "bucket": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The source bucket name for AWS and GCS."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The source bucket name for AWS and GCS."
+              },
+              "bucketUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The S3-compatible endpoint URL for generic S3 sources."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The S3-compatible endpoint URL for generic S3 sources."
+              },
+              "container": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Azure Blob Storage container name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Azure Blob Storage container name."
+              },
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The AWS region of the source bucket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The AWS region of the source bucket."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "provider"
+            ],
+            "description": "The configured source bucket."
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The destination provider, always r2."
+              },
+              "account": {
+                "type": "string",
+                "description": "The Cloudflare account ID."
+              },
+              "bucket": {
+                "type": "string",
+                "description": "The destination bucket name."
+              },
+              "accessKeyId": {
+                "type": "string",
+                "description": "The Access Key ID of the R2 API token Sippy writes with."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "provider"
+            ],
+            "description": "The configured R2 destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "description": "The Sippy configuration of an R2 bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.generate_presigned_url",
+      "service": "cloudflare_r2",
+      "name": "generate_presigned_url",
+      "description": "Generate a pre-signed R2 URL for a single GET, PUT, or HEAD request so the caller transfers bytes directly with R2. Preferred over the put_object and download_object relays. Requires a custom API token credential; OAuth connections cannot mint R2 S3 signatures.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read",
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read",
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete R2 object key. Slashes are preserved as key delimiters."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "PUT",
+              "HEAD"
+            ],
+            "description": "The HTTP method that the signed URL should allow.",
+            "default": "GET"
+          },
+          "expiresSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 604800,
+            "description": "How long the signed URL remains valid, in seconds.",
+            "default": 3600
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The Content-Type that must be sent with a signed PUT request. Ignored for GET and HEAD."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKey"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket used to build the signed URL."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The object key used to build the signed URL."
+          },
+          "method": {
+            "type": "string",
+            "description": "The signed HTTP method."
+          },
+          "expiresSeconds": {
+            "type": "integer",
+            "description": "The URL validity duration in seconds."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The timestamp when the signed URL expires.",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "The generated pre-signed URL."
+          },
+          "requiredHeaders": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A signed header value."
+            },
+            "description": "HTTP headers that were included in the signature and must be sent with the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_account_metrics",
+      "service": "cloudflare_r2",
+      "name": "get_account_metrics",
+      "description": "Get object count and storage usage metrics across all R2 buckets in the account. Metrics may lag behind the latest data.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required beyond the connected account."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "standard": {
+            "type": "object",
+            "properties": {
+              "uploaded": {
+                "type": "object",
+                "properties": {
+                  "objects": {
+                    "type": "number",
+                    "description": "The number of objects stored."
+                  },
+                  "payloadSize": {
+                    "type": "number",
+                    "description": "The storage used by object data, in bytes."
+                  },
+                  "metadataSize": {
+                    "type": "number",
+                    "description": "The storage used by object metadata, in bytes."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Object count and storage usage for one object state."
+              },
+              "published": {
+                "type": "object",
+                "properties": {
+                  "objects": {
+                    "type": "number",
+                    "description": "The number of objects stored."
+                  },
+                  "payloadSize": {
+                    "type": "number",
+                    "description": "The storage used by object data, in bytes."
+                  },
+                  "metadataSize": {
+                    "type": "number",
+                    "description": "The storage used by object metadata, in bytes."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Object count and storage usage for one object state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metrics for one storage class, split by whether objects are uploaded or published."
+          },
+          "infrequentAccess": {
+            "type": "object",
+            "properties": {
+              "uploaded": {
+                "type": "object",
+                "properties": {
+                  "objects": {
+                    "type": "number",
+                    "description": "The number of objects stored."
+                  },
+                  "payloadSize": {
+                    "type": "number",
+                    "description": "The storage used by object data, in bytes."
+                  },
+                  "metadataSize": {
+                    "type": "number",
+                    "description": "The storage used by object metadata, in bytes."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Object count and storage usage for one object state."
+              },
+              "published": {
+                "type": "object",
+                "properties": {
+                  "objects": {
+                    "type": "number",
+                    "description": "The number of objects stored."
+                  },
+                  "payloadSize": {
+                    "type": "number",
+                    "description": "The storage used by object data, in bytes."
+                  },
+                  "metadataSize": {
+                    "type": "number",
+                    "description": "The storage used by object metadata, in bytes."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Object count and storage usage for one object state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metrics for one storage class, split by whether objects are uploaded or published."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Account-level R2 metrics grouped by storage class."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket",
+      "service": "cloudflare_r2",
+      "name": "get_bucket",
+      "description": "Get one R2 bucket by name.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The bucket name."
+              },
+              "creationDate": {
+                "type": "string",
+                "description": "The bucket creation timestamp."
+              },
+              "location": {
+                "type": "string",
+                "enum": [
+                  "apac",
+                  "eeur",
+                  "enam",
+                  "weur",
+                  "wnam",
+                  "oc"
+                ],
+                "description": "The R2 bucket region hint."
+              },
+              "jurisdiction": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "eu",
+                  "fedramp",
+                  "us"
+                ],
+                "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+              },
+              "storageClass": {
+                "type": "string",
+                "enum": [
+                  "Standard",
+                  "InfrequentAccess"
+                ],
+                "description": "The default storage class for newly uploaded objects."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "A Cloudflare R2 bucket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket_cors_policy",
+      "service": "cloudflare_r2",
+      "name": "get_bucket_cors_policy",
+      "description": "Fetch the bucket-level CORS policy for an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "allowed": {
+                  "type": "object",
+                  "properties": {
+                    "methods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "GET",
+                          "PUT",
+                          "POST",
+                          "DELETE",
+                          "HEAD"
+                        ],
+                        "description": "An HTTP method allowed by a CORS rule."
+                      },
+                      "description": "The methods allowed by this CORS rule.",
+                      "minItems": 1
+                    },
+                    "origins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The allowed origins for this CORS rule.",
+                      "minItems": 1
+                    },
+                    "headers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The allowed request headers for this CORS rule."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "methods",
+                    "origins"
+                  ],
+                  "description": "The allowed origins, methods, and headers for this CORS rule."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The optional identifier for this CORS rule."
+                },
+                "exposeHeaders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The response headers exposed to browser clients."
+                },
+                "maxAgeSeconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The browser preflight cache duration in seconds."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "allowed"
+              ],
+              "description": "A bucket-level R2 CORS rule."
+            },
+            "description": "The bucket CORS rules."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket_job",
+      "service": "cloudflare_r2",
+      "name": "get_bucket_job",
+      "description": "Get the current status of one R2 bucket background job.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The job identifier returned when the job was submitted."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "jobId"
+        ],
+        "description": "Input for reading one R2 bucket job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job identifier used to poll the job."
+          },
+          "jobType": {
+            "type": "string",
+            "description": "The job kind, currently always prefixDelete."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "description": "The job lifecycle status."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "When the job was created."
+          },
+          "endTime": {
+            "type": "string",
+            "description": "When the job finished. Absent while the job is still enqueued or running."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "The key prefix matched by the job. An empty string means the entire bucket."
+          },
+          "deletedObjects": {
+            "type": "integer",
+            "description": "The number of objects deleted by the job so far."
+          },
+          "isBucketClear": {
+            "type": "boolean",
+            "description": "Whether the job was created to clear the entire bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "jobType",
+          "status"
+        ],
+        "description": "The current job status."
+      },
+      "asyncLifecycle": {
+        "startActionId": "cloudflare_r2.delete_objects_by_prefix",
+        "statusActionId": "cloudflare_r2.get_bucket_job"
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket_lifecycle",
+      "service": "cloudflare_r2",
+      "name": "get_bucket_lifecycle",
+      "description": "Get the object lifecycle rules of an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for reading lifecycle rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the rule."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the rule is in effect."
+                },
+                "conditions": {
+                  "type": "object",
+                  "properties": {
+                    "prefix": {
+                      "type": "string",
+                      "description": "Only objects and uploads whose keys start with this prefix are affected. Use an empty prefix to match everything."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "prefix"
+                  ],
+                  "description": "Conditions that apply to every transition of this rule."
+                },
+                "deleteObjectsTransition": {
+                  "type": "object",
+                  "properties": {
+                    "condition": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "Age",
+                              "type": "string",
+                              "description": "The condition type."
+                            },
+                            "maxAge": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "The object age in seconds after which the transition applies."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "type",
+                            "maxAge"
+                          ],
+                          "description": "Apply the transition once an object reaches an age in seconds."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "Date",
+                              "type": "string",
+                              "description": "The condition type."
+                            },
+                            "date": {
+                              "type": "string",
+                              "description": "The date and time when the transition applies.",
+                              "format": "date-time"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "type",
+                            "date"
+                          ],
+                          "description": "Apply the transition on a specific date."
+                        }
+                      ],
+                      "description": "The condition that triggers the transition."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "condition"
+                  ],
+                  "description": "Transition that deletes matching objects."
+                },
+                "abortMultipartUploadsTransition": {
+                  "type": "object",
+                  "properties": {
+                    "condition": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Age",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "maxAge": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The object age in seconds after which the transition applies."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "maxAge"
+                      ],
+                      "description": "Abort multipart uploads older than this age."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "condition"
+                  ],
+                  "description": "Transition that aborts ongoing multipart uploads."
+                },
+                "storageClassTransitions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "condition": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "Age",
+                                "type": "string",
+                                "description": "The condition type."
+                              },
+                              "maxAge": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The object age in seconds after which the transition applies."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "type",
+                              "maxAge"
+                            ],
+                            "description": "Apply the transition once an object reaches an age in seconds."
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "Date",
+                                "type": "string",
+                                "description": "The condition type."
+                              },
+                              "date": {
+                                "type": "string",
+                                "description": "The date and time when the transition applies.",
+                                "format": "date-time"
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "type",
+                              "date"
+                            ],
+                            "description": "Apply the transition on a specific date."
+                          }
+                        ],
+                        "description": "The condition that triggers the transition."
+                      },
+                      "storageClass": {
+                        "type": "string",
+                        "enum": [
+                          "InfrequentAccess"
+                        ],
+                        "description": "The target storage class."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "condition",
+                      "storageClass"
+                    ],
+                    "description": "A storage class transition."
+                  },
+                  "description": "Transitions that change the storage class of matching objects."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "enabled",
+                "conditions"
+              ],
+              "description": "An object lifecycle rule."
+            },
+            "description": "The configured lifecycle rules."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rules"
+        ],
+        "description": "The lifecycle rules of the bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket_local_uploads",
+      "service": "cloudflare_r2",
+      "name": "get_bucket_local_uploads",
+      "description": "Get whether local uploads are enabled, which writes objects to the nearest region before replicating to the primary region.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for reading the local uploads setting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether local uploads are enabled for the bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "description": "The local uploads setting of the bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_bucket_lock",
+      "service": "cloudflare_r2",
+      "name": "get_bucket_lock",
+      "description": "Get the object lock rules of an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for reading lock rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the rule."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the rule is in effect."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Only objects and uploads whose keys start with this prefix are affected. Use an empty prefix to match everything."
+                },
+                "condition": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Age",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "maxAgeSeconds": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The lock duration in seconds."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "maxAgeSeconds"
+                      ],
+                      "description": "Lock each object for a number of seconds after upload."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Date",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "The date and time until which objects stay locked.",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "date"
+                      ],
+                      "description": "Lock each object until a specific date."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Indefinite",
+                          "type": "string",
+                          "description": "The condition type."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "Lock each object indefinitely."
+                    }
+                  ],
+                  "description": "The condition that defines the lock duration."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "enabled",
+                "condition"
+              ],
+              "description": "A bucket lock rule."
+            },
+            "description": "The configured lock rules."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rules"
+        ],
+        "description": "The lock rules of the bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_custom_domain",
+      "service": "cloudflare_r2",
+      "name": "get_custom_domain",
+      "description": "Get the settings of one custom domain attached to an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom domain name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "domain"
+        ],
+        "description": "Input for reading one custom domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string",
+                "description": "The custom domain name."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the bucket is publicly accessible at this custom domain."
+              },
+              "zoneId": {
+                "type": "string",
+                "description": "The Cloudflare zone ID the domain resides in."
+              },
+              "zoneName": {
+                "type": "string",
+                "description": "The Cloudflare zone name the domain resides in."
+              },
+              "minTLS": {
+                "type": "string",
+                "enum": [
+                  "1.0",
+                  "1.1",
+                  "1.2",
+                  "1.3"
+                ],
+                "description": "The minimum TLS version accepted for incoming connections."
+              },
+              "ciphers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A cipher name."
+                },
+                "description": "An allowlist of TLS ciphers in BoringSSL format."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "ownership": {
+                    "type": "string",
+                    "description": "The domain ownership status."
+                  },
+                  "ssl": {
+                    "type": "string",
+                    "description": "The SSL certificate status."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "ownership",
+                  "ssl"
+                ],
+                "description": "The provisioning status of the custom domain."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "domain",
+              "enabled"
+            ],
+            "description": "A custom domain attached to an R2 bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The custom domain settings."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_event_notification_rules",
+      "service": "cloudflare_r2",
+      "name": "get_event_notification_rules",
+      "description": "Get the event notification rules that send R2 bucket events to one queue.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Workers R2 Storage Read",
+        "Queues Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "queueId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare Queue ID."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queueId"
+        ],
+        "description": "Input for reading the rules bound to one queue."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queueId": {
+            "type": "string",
+            "description": "The queue ID."
+          },
+          "queueName": {
+            "type": "string",
+            "description": "The queue name."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ruleId": {
+                  "type": "string",
+                  "description": "The rule ID."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the rule was created."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A description that identifies the rule."
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "PutObject",
+                      "CopyObject",
+                      "DeleteObject",
+                      "CompleteMultipartUpload",
+                      "LifecycleDeletion"
+                    ],
+                    "description": "An R2 object action that triggers a notification."
+                  },
+                  "description": "The object actions that trigger notifications."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Notifications are only sent for objects with this key prefix."
+                },
+                "suffix": {
+                  "type": "string",
+                  "description": "Notifications are only sent for objects with this key suffix."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "actions"
+              ],
+              "description": "An event notification rule bound to a queue."
+            },
+            "description": "The rules bound to the queue."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queueId",
+          "rules"
+        ],
+        "description": "The notification rules bound to one queue."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_managed_domain",
+      "service": "cloudflare_r2",
+      "name": "get_managed_domain",
+      "description": "Get the r2.dev managed domain and its public access state for an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for reading the managed domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": "string",
+            "description": "The bucket ID."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The r2.dev domain name of the bucket."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the bucket is publicly accessible at the r2.dev domain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketId",
+          "domain",
+          "enabled"
+        ],
+        "description": "The r2.dev managed domain of a bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.get_sippy_config",
+      "service": "cloudflare_r2",
+      "name": "get_sippy_config",
+      "description": "Get the Sippy incremental migration configuration of an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for reading the Sippy configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether Sippy is enabled for the bucket."
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The source provider: aws, gcs, s3, or azure."
+              },
+              "bucket": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The source bucket name for AWS and GCS."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The source bucket name for AWS and GCS."
+              },
+              "bucketUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The S3-compatible endpoint URL for generic S3 sources."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The S3-compatible endpoint URL for generic S3 sources."
+              },
+              "container": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Azure Blob Storage container name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Azure Blob Storage container name."
+              },
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The AWS region of the source bucket."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The AWS region of the source bucket."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "provider"
+            ],
+            "description": "The configured source bucket."
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "description": "The destination provider, always r2."
+              },
+              "account": {
+                "type": "string",
+                "description": "The Cloudflare account ID."
+              },
+              "bucket": {
+                "type": "string",
+                "description": "The destination bucket name."
+              },
+              "accessKeyId": {
+                "type": "string",
+                "description": "The Access Key ID of the R2 API token Sippy writes with."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "provider"
+            ],
+            "description": "The configured R2 destination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "description": "The Sippy configuration of an R2 bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_accounts",
+      "service": "cloudflare_r2",
+      "name": "list_accounts",
+      "description": "List Cloudflare accounts visible to the current credential.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page size."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Cloudflare account ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Cloudflare account name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Cloudflare account type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Cloudflare account summary."
+            },
+            "description": "The visible Cloudflare accounts."
+          },
+          "resultInfo": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of items in the current page."
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "The total number of matching items."
+              },
+              "totalPages": {
+                "type": "integer",
+                "description": "The total number of pages."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cloudflare pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_bucket_jobs",
+      "service": "cloudflare_r2",
+      "name": "list_bucket_jobs",
+      "description": "List background jobs for an R2 bucket, such as prefix delete jobs.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jobType": {
+            "type": "string",
+            "enum": [
+              "prefixDelete"
+            ],
+            "description": "The bucket job kind."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ENQUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ],
+            "description": "Only return jobs with this status. Requires jobType."
+          },
+          "maxKeys": {
+            "type": "integer",
+            "description": "The maximum number of jobs to return."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Pagination token returned as nextContinuationToken by a previous call."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for listing R2 bucket jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "description": "The job identifier used to poll the job."
+                },
+                "jobType": {
+                  "type": "string",
+                  "description": "The job kind, currently always prefixDelete."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ENQUEUED",
+                    "RUNNING",
+                    "COMPLETED",
+                    "FAILED",
+                    "CANCELLED"
+                  ],
+                  "description": "The job lifecycle status."
+                },
+                "startTime": {
+                  "type": "string",
+                  "description": "When the job was created."
+                },
+                "endTime": {
+                  "type": "string",
+                  "description": "When the job finished. Absent while the job is still enqueued or running."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "The key prefix matched by the job. An empty string means the entire bucket."
+                },
+                "deletedObjects": {
+                  "type": "integer",
+                  "description": "The number of objects deleted by the job so far."
+                },
+                "isBucketClear": {
+                  "type": "boolean",
+                  "description": "Whether the job was created to clear the entire bucket."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "jobId",
+                "jobType",
+                "status"
+              ],
+              "description": "A background job running against an R2 bucket."
+            },
+            "description": "The jobs in the current page."
+          },
+          "nextContinuationToken": {
+            "type": "string",
+            "description": "The token to pass as continuationToken for the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobs"
+        ],
+        "description": "The listed R2 bucket jobs."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_buckets",
+      "service": "cloudflare_r2",
+      "name": "list_buckets",
+      "description": "List the R2 buckets in a Cloudflare account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor returned by a previous list_buckets call."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "nameContains": {
+            "type": "string",
+            "description": "Filters buckets whose names contain this phrase."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "name"
+            ],
+            "description": "The field used to order results."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of buckets to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The bucket name."
+                },
+                "creationDate": {
+                  "type": "string",
+                  "description": "The bucket creation timestamp."
+                },
+                "location": {
+                  "type": "string",
+                  "enum": [
+                    "apac",
+                    "eeur",
+                    "enam",
+                    "weur",
+                    "wnam",
+                    "oc"
+                  ],
+                  "description": "The R2 bucket region hint."
+                },
+                "jurisdiction": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "eu",
+                    "fedramp",
+                    "us"
+                  ],
+                  "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+                },
+                "storageClass": {
+                  "type": "string",
+                  "enum": [
+                    "Standard",
+                    "InfrequentAccess"
+                  ],
+                  "description": "The default storage class for newly uploaded objects."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "description": "A Cloudflare R2 bucket."
+            },
+            "description": "The returned R2 buckets."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor for the next page, if the response is truncated."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "buckets"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_custom_domains",
+      "service": "cloudflare_r2",
+      "name": "list_custom_domains",
+      "description": "List the custom domains attached to an R2 bucket.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for listing custom domains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "description": "The custom domain name."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the bucket is publicly accessible at this custom domain."
+                },
+                "zoneId": {
+                  "type": "string",
+                  "description": "The Cloudflare zone ID the domain resides in."
+                },
+                "zoneName": {
+                  "type": "string",
+                  "description": "The Cloudflare zone name the domain resides in."
+                },
+                "minTLS": {
+                  "type": "string",
+                  "enum": [
+                    "1.0",
+                    "1.1",
+                    "1.2",
+                    "1.3"
+                  ],
+                  "description": "The minimum TLS version accepted for incoming connections."
+                },
+                "ciphers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A cipher name."
+                  },
+                  "description": "An allowlist of TLS ciphers in BoringSSL format."
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "ownership": {
+                      "type": "string",
+                      "description": "The domain ownership status."
+                    },
+                    "ssl": {
+                      "type": "string",
+                      "description": "The SSL certificate status."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "ownership",
+                    "ssl"
+                  ],
+                  "description": "The provisioning status of the custom domain."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "domain",
+                "enabled"
+              ],
+              "description": "A custom domain attached to an R2 bucket."
+            },
+            "description": "The attached custom domains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "The custom domains attached to the bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_event_notification_rules",
+      "service": "cloudflare_r2",
+      "name": "list_event_notification_rules",
+      "description": "List every event notification rule of an R2 bucket grouped by target queue.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Workers R2 Storage Read",
+        "Queues Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for listing event notification rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket name."
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "queueId": {
+                  "type": "string",
+                  "description": "The queue ID."
+                },
+                "queueName": {
+                  "type": "string",
+                  "description": "The queue name."
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ruleId": {
+                        "type": "string",
+                        "description": "The rule ID."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "When the rule was created."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "A description that identifies the rule."
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "PutObject",
+                            "CopyObject",
+                            "DeleteObject",
+                            "CompleteMultipartUpload",
+                            "LifecycleDeletion"
+                          ],
+                          "description": "An R2 object action that triggers a notification."
+                        },
+                        "description": "The object actions that trigger notifications."
+                      },
+                      "prefix": {
+                        "type": "string",
+                        "description": "Notifications are only sent for objects with this key prefix."
+                      },
+                      "suffix": {
+                        "type": "string",
+                        "description": "Notifications are only sent for objects with this key suffix."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "actions"
+                    ],
+                    "description": "An event notification rule bound to a queue."
+                  },
+                  "description": "The rules bound to the queue."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "queueId",
+                "rules"
+              ],
+              "description": "The notification rules bound to one queue."
+            },
+            "description": "The queues receiving notifications and their rules."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "queues"
+        ],
+        "description": "The event notification configuration of the bucket."
+      }
+    },
+    {
+      "id": "cloudflare_r2.list_objects",
+      "service": "cloudflare_r2",
+      "name": "list_objects",
+      "description": "List objects in an R2 bucket with optional prefix, delimiter grouping, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "workers-r2.read"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "prefix": {
+            "type": "string",
+            "description": "Only return objects whose keys begin with this prefix."
+          },
+          "delimiter": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1,
+            "description": "A single character used to group keys. Keys sharing the same prefix up to the delimiter are returned as common prefixes."
+          },
+          "startAfter": {
+            "type": "string",
+            "description": "Only return objects whose keys sort after this key in lexicographic order."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor returned by a previous list_objects call."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of objects to return per page."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "Input for listing R2 objects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The object key."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The object size in bytes."
+                },
+                "etag": {
+                  "type": "string",
+                  "description": "The object entity tag as a raw hex digest without quotes."
+                },
+                "lastModified": {
+                  "type": "string",
+                  "description": "When the object was last modified."
+                },
+                "storageClass": {
+                  "type": "string",
+                  "enum": [
+                    "Standard",
+                    "InfrequentAccess"
+                  ],
+                  "description": "The object storage class."
+                },
+                "ssec": {
+                  "type": "boolean",
+                  "description": "Whether the object is encrypted with a customer-supplied encryption key."
+                },
+                "httpMetadata": {
+                  "type": "object",
+                  "properties": {
+                    "contentType": {
+                      "type": "string",
+                      "description": "The object MIME type."
+                    },
+                    "contentLanguage": {
+                      "type": "string",
+                      "description": "The language of the object content."
+                    },
+                    "contentDisposition": {
+                      "type": "string",
+                      "description": "Presentational information for the object."
+                    },
+                    "contentEncoding": {
+                      "type": "string",
+                      "description": "The content encoding applied to the object."
+                    },
+                    "cacheControl": {
+                      "type": "string",
+                      "description": "The caching behavior for the object."
+                    },
+                    "cacheExpiry": {
+                      "type": "string",
+                      "description": "When the object cache entry expires."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "HTTP metadata stored with an R2 object."
+                },
+                "customMetadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "A custom metadata value."
+                  },
+                  "description": "Custom metadata key-value pairs stored with the object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key"
+              ],
+              "description": "An R2 object summary."
+            },
+            "description": "The objects in the current page."
+          },
+          "commonPrefixes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A common prefix."
+            },
+            "description": "Common prefixes grouped by the delimiter, equivalent to S3 CommonPrefixes."
+          },
+          "isTruncated": {
+            "type": "boolean",
+            "description": "Whether more objects remain after this page."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor for the next page, when truncated."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objects",
+          "commonPrefixes",
+          "isTruncated"
+        ],
+        "description": "The listed R2 objects."
+      }
+    },
+    {
+      "id": "cloudflare_r2.put_object",
+      "service": "cloudflare_r2",
+      "name": "put_object",
+      "description": "Upload one R2 object by relaying a public URL, plain text, or base64-encoded content through the connector. This is the fallback for OAuth connections and callers that cannot PUT directly; custom API token connections should prefer generate_presigned_url with method PUT so the bytes go straight to R2 without the connector size cap.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete R2 object key. Slashes are preserved as key delimiters."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "description": "A public URL that the connector can fetch and upload to R2. Provide exactly one of sourceUrl, contentText, or contentBase64.",
+            "format": "uri"
+          },
+          "contentText": {
+            "type": "string",
+            "description": "The plain-text content to upload. Provide exactly one of sourceUrl, contentText, or contentBase64."
+          },
+          "contentBase64": {
+            "type": "string",
+            "description": "Base64-encoded binary content to upload. Provide exactly one of sourceUrl, contentText, or contentBase64."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The Content-Type header to store on the object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "objectKey"
+        ],
+        "description": "The input payload for this action.",
+        "oneOf": [
+          {
+            "required": [
+              "sourceUrl"
+            ]
+          },
+          {
+            "required": [
+              "contentText"
+            ]
+          },
+          {
+            "required": [
+              "contentBase64"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket that received the object."
+          },
+          "objectKey": {
+            "type": "string",
+            "description": "The uploaded object key."
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The uploaded object ETag, or null when R2 did not return it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The uploaded object ETag, or null when R2 did not return it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_bucket",
+      "service": "cloudflare_r2",
+      "name": "update_bucket",
+      "description": "Update mutable R2 bucket properties such as default storage class or jurisdiction.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "storageClass": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "InfrequentAccess"
+            ],
+            "description": "The default storage class for newly uploaded objects."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName"
+        ],
+        "description": "The input payload for this action.",
+        "anyOf": [
+          {
+            "required": [
+              "storageClass"
+            ]
+          },
+          {
+            "required": [
+              "jurisdiction"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The bucket name."
+              },
+              "creationDate": {
+                "type": "string",
+                "description": "The bucket creation timestamp."
+              },
+              "location": {
+                "type": "string",
+                "enum": [
+                  "apac",
+                  "eeur",
+                  "enam",
+                  "weur",
+                  "wnam",
+                  "oc"
+                ],
+                "description": "The R2 bucket region hint."
+              },
+              "jurisdiction": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "eu",
+                  "fedramp",
+                  "us"
+                ],
+                "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+              },
+              "storageClass": {
+                "type": "string",
+                "enum": [
+                  "Standard",
+                  "InfrequentAccess"
+                ],
+                "description": "The default storage class for newly uploaded objects."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "description": "A Cloudflare R2 bucket."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_bucket_cors_policy",
+      "service": "cloudflare_r2",
+      "name": "update_bucket_cors_policy",
+      "description": "Replace the bucket-level CORS policy for an R2 bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare account ID. Custom-credential connections reuse the connected account ID when this is omitted."
+          },
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "allowed": {
+                  "type": "object",
+                  "properties": {
+                    "methods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "GET",
+                          "PUT",
+                          "POST",
+                          "DELETE",
+                          "HEAD"
+                        ],
+                        "description": "An HTTP method allowed by a CORS rule."
+                      },
+                      "description": "The methods allowed by this CORS rule.",
+                      "minItems": 1
+                    },
+                    "origins": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The allowed origins for this CORS rule.",
+                      "minItems": 1
+                    },
+                    "headers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "The allowed request headers for this CORS rule."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "methods",
+                    "origins"
+                  ],
+                  "description": "The allowed origins, methods, and headers for this CORS rule."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The optional identifier for this CORS rule."
+                },
+                "exposeHeaders": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "The response headers exposed to browser clients."
+                },
+                "maxAgeSeconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The browser preflight cache duration in seconds."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "allowed"
+              ],
+              "description": "A bucket-level R2 CORS rule."
+            },
+            "description": "The full CORS rule set to store."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "rules"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket whose CORS policy was updated."
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Whether the update request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_bucket_lifecycle",
+      "service": "cloudflare_r2",
+      "name": "update_bucket_lifecycle",
+      "description": "Replace the object lifecycle rules of an R2 bucket with the given rule set.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the rule."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the rule is in effect."
+                },
+                "conditions": {
+                  "type": "object",
+                  "properties": {
+                    "prefix": {
+                      "type": "string",
+                      "description": "Only objects and uploads whose keys start with this prefix are affected. Use an empty prefix to match everything."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "prefix"
+                  ],
+                  "description": "Conditions that apply to every transition of this rule."
+                },
+                "deleteObjectsTransition": {
+                  "type": "object",
+                  "properties": {
+                    "condition": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "Age",
+                              "type": "string",
+                              "description": "The condition type."
+                            },
+                            "maxAge": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "The object age in seconds after which the transition applies."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "type",
+                            "maxAge"
+                          ],
+                          "description": "Apply the transition once an object reaches an age in seconds."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "const": "Date",
+                              "type": "string",
+                              "description": "The condition type."
+                            },
+                            "date": {
+                              "type": "string",
+                              "description": "The date and time when the transition applies.",
+                              "format": "date-time"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "required": [
+                            "type",
+                            "date"
+                          ],
+                          "description": "Apply the transition on a specific date."
+                        }
+                      ],
+                      "description": "The condition that triggers the transition."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "condition"
+                  ],
+                  "description": "Transition that deletes matching objects."
+                },
+                "abortMultipartUploadsTransition": {
+                  "type": "object",
+                  "properties": {
+                    "condition": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Age",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "maxAge": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The object age in seconds after which the transition applies."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "maxAge"
+                      ],
+                      "description": "Abort multipart uploads older than this age."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "condition"
+                  ],
+                  "description": "Transition that aborts ongoing multipart uploads."
+                },
+                "storageClassTransitions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "condition": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "Age",
+                                "type": "string",
+                                "description": "The condition type."
+                              },
+                              "maxAge": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "The object age in seconds after which the transition applies."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "type",
+                              "maxAge"
+                            ],
+                            "description": "Apply the transition once an object reaches an age in seconds."
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "Date",
+                                "type": "string",
+                                "description": "The condition type."
+                              },
+                              "date": {
+                                "type": "string",
+                                "description": "The date and time when the transition applies.",
+                                "format": "date-time"
+                              }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                              "type",
+                              "date"
+                            ],
+                            "description": "Apply the transition on a specific date."
+                          }
+                        ],
+                        "description": "The condition that triggers the transition."
+                      },
+                      "storageClass": {
+                        "type": "string",
+                        "enum": [
+                          "InfrequentAccess"
+                        ],
+                        "description": "The target storage class."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "condition",
+                      "storageClass"
+                    ],
+                    "description": "A storage class transition."
+                  },
+                  "description": "Transitions that change the storage class of matching objects."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "enabled",
+                "conditions"
+              ],
+              "description": "An object lifecycle rule."
+            },
+            "description": "The full lifecycle rule set to store. An empty array removes all rules."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "rules"
+        ],
+        "description": "Input for replacing lifecycle rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket whose lifecycle rules were replaced."
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Whether the update request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "updated"
+        ],
+        "description": "The lifecycle update result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_bucket_local_uploads",
+      "service": "cloudflare_r2",
+      "name": "update_bucket_local_uploads",
+      "description": "Enable or disable local uploads for an R2 bucket.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to enable local uploads for the bucket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "enabled"
+        ],
+        "description": "Input for updating the local uploads setting."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket whose setting was updated."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The stored local uploads setting."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "enabled"
+        ],
+        "description": "The local uploads update result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_bucket_lock",
+      "service": "cloudflare_r2",
+      "name": "update_bucket_lock",
+      "description": "Replace the object lock rules of an R2 bucket with the given rule set.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the rule."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the rule is in effect."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Only objects and uploads whose keys start with this prefix are affected. Use an empty prefix to match everything."
+                },
+                "condition": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Age",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "maxAgeSeconds": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The lock duration in seconds."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "maxAgeSeconds"
+                      ],
+                      "description": "Lock each object for a number of seconds after upload."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Date",
+                          "type": "string",
+                          "description": "The condition type."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "The date and time until which objects stay locked.",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type",
+                        "date"
+                      ],
+                      "description": "Lock each object until a specific date."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "const": "Indefinite",
+                          "type": "string",
+                          "description": "The condition type."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "Lock each object indefinitely."
+                    }
+                  ],
+                  "description": "The condition that defines the lock duration."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "enabled",
+                "condition"
+              ],
+              "description": "A bucket lock rule."
+            },
+            "description": "The full lock rule set to store. An empty array removes all rules."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "rules"
+        ],
+        "description": "Input for replacing lock rules."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "description": "The bucket whose lock rules were replaced."
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Whether the update request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "updated"
+        ],
+        "description": "The lock update result."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_custom_domain",
+      "service": "cloudflare_r2",
+      "name": "update_custom_domain",
+      "description": "Update the public access, TLS version, or cipher settings of a custom domain.",
+      "operationType": "write",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom domain name."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to enable public bucket access at the custom domain."
+          },
+          "minTLS": {
+            "type": "string",
+            "enum": [
+              "1.0",
+              "1.1",
+              "1.2",
+              "1.3"
+            ],
+            "description": "The minimum TLS version accepted for incoming connections."
+          },
+          "ciphers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A cipher name."
+            },
+            "description": "An allowlist of TLS ciphers in BoringSSL format."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "domain"
+        ],
+        "description": "Input for updating one custom domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "type": "string",
+                "description": "The custom domain name."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the bucket is publicly accessible at this custom domain. Omitted when the upstream response does not report it."
+              },
+              "minTLS": {
+                "type": "string",
+                "enum": [
+                  "1.0",
+                  "1.1",
+                  "1.2",
+                  "1.3"
+                ],
+                "description": "The minimum TLS version accepted for incoming connections."
+              },
+              "ciphers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A cipher name."
+                },
+                "description": "An allowlist of TLS ciphers in BoringSSL format."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "domain"
+            ],
+            "description": "A custom domain after an update. Fields the upstream response omits are left out."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The updated custom domain."
+      }
+    },
+    {
+      "id": "cloudflare_r2.update_managed_domain",
+      "service": "cloudflare_r2",
+      "name": "update_managed_domain",
+      "description": "Enable or disable public access to an R2 bucket through its r2.dev domain.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "workers-r2.write"
+      ],
+      "providerPermissions": [
+        "Workers R2 Storage Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketName": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The R2 bucket name."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to enable public bucket access at the r2.dev domain."
+          },
+          "jurisdiction": {
+            "type": "string",
+            "enum": [
+              "default",
+              "eu",
+              "fedramp",
+              "us"
+            ],
+            "description": "The jurisdiction where objects in the bucket are guaranteed to be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketName",
+          "enabled"
+        ],
+        "description": "Input for updating the managed domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bucketId": {
+            "type": "string",
+            "description": "The bucket ID."
+          },
+          "domain": {
+            "type": "string",
+            "description": "The r2.dev domain name of the bucket."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the bucket is publicly accessible at the r2.dev domain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bucketId",
+          "domain",
+          "enabled"
+        ],
+        "description": "The r2.dev managed domain of a bucket."
+      }
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "service": "triggercmd",
+  "displayName": "TRIGGERcmd",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "TRIGGERCMD_TOKEN",
+      "description": "TRIGGERcmd token sent with Bearer authentication. Copy it from the official Instructions page after signing in: https://www.triggercmd.com/user/computer/create"
+    }
+  ],
+  "homepageUrl": "https://www.triggercmd.com/",
+  "actions": [
+    {
+      "id": "triggercmd.list_commands",
+      "service": "triggercmd",
+      "name": "list_commands",
+      "description": "List the commands available in the connected TRIGGERcmd account and the computer that owns each command.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The configured command name."
+                },
+                "computer": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The configured computer name."
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "The computer identifier."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "name"
+                  ],
+                  "description": "The computer that owns a TRIGGERcmd command."
+                },
+                "voice": {
+                  "type": "string",
+                  "description": "The voice trigger phrase for the command."
+                },
+                "allowParams": {
+                  "type": "boolean",
+                  "description": "Whether the command accepts caller-provided parameters."
+                },
+                "mcpToolDescription": {
+                  "type": "string",
+                  "description": "The optional MCP tool description configured for the command."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "name",
+                "computer"
+              ],
+              "description": "A command configured in the connected TRIGGERcmd account."
+            },
+            "description": "The configured TRIGGERcmd commands."
+          },
+          "queryRecordCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of command records returned."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "records"
+        ],
+        "description": "The commands returned by TRIGGERcmd."
+      }
+    },
+    {
+      "id": "triggercmd.trigger_command",
+      "service": "triggercmd",
+      "name": "trigger_command",
+      "description": "Trigger a saved TRIGGERcmd command on a named computer, with optional parameters when that command permits them.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "computer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target computer name exactly as returned by list_commands."
+          },
+          "trigger": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The saved command name exactly as returned by list_commands."
+          },
+          "params": {
+            "type": "string",
+            "description": "Optional parameters for a saved command that has parameter support enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "computer",
+          "trigger"
+        ],
+        "description": "The TRIGGERcmd command to run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The acknowledgement or command result returned by TRIGGERcmd."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The TRIGGERcmd command acknowledgement."
+      }
+    }
+  ]
+}

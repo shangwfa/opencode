@@ -1,0 +1,2985 @@
+{
+  "service": "futunn",
+  "displayName": "Futunn",
+  "description": "Read Futunn market data, research, account positions, orders, and execution fills.",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://webapi.futunn.com/oauth2/authorize/confirm",
+      "tokenUrl": "https://webapi.futunn.com/oauth2/token",
+      "scopes": [
+        "quote:read",
+        "trade:read"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationOptions": [
+        {
+          "id": "quote:read",
+          "label": "Market data",
+          "description": "Read market data, financial research, and content search results.",
+          "required": true,
+          "defaultSelected": true,
+          "risk": "standard"
+        },
+        {
+          "id": "trade:read",
+          "label": "Account information",
+          "description": "Read authorized accounts, balances, positions, orders, and execution fills.",
+          "required": false,
+          "defaultSelected": true,
+          "risk": "sensitive"
+        }
+      ],
+      "clientSetup": {
+        "docsUrl": "https://open.futunn.com/zh-cn/api/overview/getting-started",
+        "steps": [
+          "Register an OAuth client at https://webapi.futunn.com/oauth2/register using the official getting-started guide.",
+          "Include this runtime's callback URL in redirect_uris and set token_endpoint_auth_method to none.",
+          "Paste the application's Client ID. Futunn PKCE applications do not require a client secret."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://open.futunn.com",
+  "actions": [
+    {
+      "id": "futunn.get_account_funds",
+      "service": "futunn",
+      "name": "get_account_funds",
+      "description": "Get account assets, cash, buying power and margin balances in the requested currency.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trading account ID returned by list_accounts, kept as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display currency, for example USD or HKD; ignored by account types that do not support conversion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "currency"
+        ],
+        "description": "Account funds query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "funds": {
+            "type": "object",
+            "properties": {
+              "total_assets": {
+                "type": "string",
+                "description": "Total net assets."
+              },
+              "cash": {
+                "type": "string",
+                "description": "Cash balance."
+              },
+              "power": {
+                "type": "string",
+                "description": "Maximum buying power."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Display currency."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Account balances; monetary amounts retain upstream decimal strings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "funds"
+        ],
+        "description": "Account fund balances."
+      }
+    },
+    {
+      "id": "futunn.get_capital_distribution",
+      "service": "futunn",
+      "name": "get_capital_distribution",
+      "description": "Get current-day capital inflow and outflow distribution by order size.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Capital distribution query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "distribution": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "capital_in_super": {
+                    "type": "number",
+                    "description": "Inflow for super orders."
+                  },
+                  "capital_in_big": {
+                    "type": "number",
+                    "description": "Inflow for big orders."
+                  },
+                  "capital_in_mid": {
+                    "type": "number",
+                    "description": "Inflow for mid orders."
+                  },
+                  "capital_in_small": {
+                    "type": "number",
+                    "description": "Inflow for small orders."
+                  },
+                  "capital_out_super": {
+                    "type": "number",
+                    "description": "Outflow for super orders."
+                  },
+                  "capital_out_big": {
+                    "type": "number",
+                    "description": "Outflow for big orders."
+                  },
+                  "capital_out_mid": {
+                    "type": "number",
+                    "description": "Outflow for mid orders."
+                  },
+                  "capital_out_small": {
+                    "type": "number",
+                    "description": "Outflow for small orders."
+                  },
+                  "update_time": {
+                    "type": "integer",
+                    "description": "Update timestamp in milliseconds."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Cumulative intraday inflow and outflow in local currency."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cumulative intraday inflow and outflow in local currency."
+          },
+          "noData": {
+            "type": "boolean",
+            "description": "Whether the provider explicitly reported no_data for a valid security."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "distribution",
+          "noData"
+        ],
+        "description": "Capital distribution results."
+      }
+    },
+    {
+      "id": "futunn.get_capital_flow",
+      "service": "futunn",
+      "name": "get_capital_flow",
+      "description": "Get intraday capital flow by order size and trading session.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "FULL",
+              "PREMARKET",
+              "AFTERHOURS"
+            ],
+            "description": "Trading session; default NORMAL."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Intraday capital flow query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "flows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "capital_flow_item_time": {
+                  "type": "integer",
+                  "description": "Observation timestamp in milliseconds."
+                },
+                "in_flow": {
+                  "type": "number",
+                  "description": "Net inflow in the security local currency; negative means outflow."
+                },
+                "super_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from super-large orders."
+                },
+                "big_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from large orders."
+                },
+                "mid_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from medium orders."
+                },
+                "sml_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from small orders."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Capital flow observation."
+            },
+            "description": "Time-ordered capital flow observations."
+          },
+          "lastValidTime": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Last valid data timestamp in milliseconds."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last valid data timestamp in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "flows",
+          "lastValidTime"
+        ],
+        "description": "Intraday capital flow results."
+      }
+    },
+    {
+      "id": "futunn.get_capital_flow_history",
+      "service": "futunn",
+      "name": "get_capital_flow_history",
+      "description": "Get daily, weekly or monthly capital flows; move end earlier to retrieve preceding data.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "periodType": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "WEEK",
+              "MONTH"
+            ],
+            "description": "Aggregation period; default DAY."
+          },
+          "start": {
+            "type": "string",
+            "description": "Inclusive date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "Inclusive date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum observations; default 365, maximum 1000."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Historical capital flow query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "flows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "capital_flow_item_time": {
+                  "type": "integer",
+                  "description": "Observation timestamp in milliseconds."
+                },
+                "in_flow": {
+                  "type": "number",
+                  "description": "Net inflow in the security local currency; negative means outflow."
+                },
+                "super_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from super-large orders."
+                },
+                "big_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from large orders."
+                },
+                "mid_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from medium orders."
+                },
+                "sml_in_flow": {
+                  "type": "number",
+                  "description": "Net inflow from small orders."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Capital flow observation."
+            },
+            "description": "Time-ordered capital flow observations."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata from the response envelope; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata from the response envelope; null when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "flows",
+          "pagination"
+        ],
+        "description": "Historical capital flows and pagination."
+      }
+    },
+    {
+      "id": "futunn.get_financial_statements",
+      "service": "futunn",
+      "name": "get_financial_statements",
+      "description": "Get financial statements or key metrics by reporting period.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "statementType": {
+            "type": "integer",
+            "description": "1=income statement, 2=balance sheet, 3=cash flow, 4=key metrics; default 1.",
+            "enum": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          "financialType": {
+            "type": "integer",
+            "description": "Financial period code: 1=Q1, 2=H1, 3=Q3, 4=Q4, 5=cumulative H1, 6=cumulative Q3, 7=annual, 10=latest; defaults vary by endpoint."
+          },
+          "currencyCode": {
+            "type": "string",
+            "description": "Report currency code, for example USD or CNY; omit for the native currency."
+          },
+          "nextKey": {
+            "type": "string",
+            "description": "Opaque next-page cursor; omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Page size; default 10, maximum 50."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Financial statement query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period_text": {
+                  "type": "string",
+                  "description": "Financial reporting period."
+                },
+                "currency_code": {
+                  "type": "string",
+                  "description": "Report currency code, for example USD or CNY; omit for the native currency."
+                },
+                "item_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field_id": {
+                        "type": "integer",
+                        "description": "Financial field ID."
+                      },
+                      "display_name": {
+                        "type": "string",
+                        "description": "Financial field display name."
+                      },
+                      "data": {
+                        "type": "number",
+                        "description": "Reported financial value."
+                      },
+                      "value_type": {
+                        "type": "string",
+                        "description": "amount for monetary values or percent for percentages."
+                      },
+                      "yoy": {
+                        "type": "number",
+                        "description": "Year-over-year percentage change."
+                      },
+                      "qoq": {
+                        "type": "number",
+                        "description": "Quarter-over-quarter percentage change."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Financial statement field."
+                  },
+                  "description": "Financial statement fields."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Financial report and original accounting metadata."
+            },
+            "description": "Financial reports; empty when no data is available."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "next_key": {
+                    "type": "string",
+                    "description": "Opaque next-page cursor; omit for the first page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata from the response envelope; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata from the response envelope; null when omitted."
+          },
+          "noData": {
+            "type": "boolean",
+            "description": "Whether the provider explicitly reported no_data for a valid security."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reports",
+          "pagination",
+          "noData"
+        ],
+        "description": "Financial reports and pagination."
+      }
+    },
+    {
+      "id": "futunn.get_history_kline",
+      "service": "futunn",
+      "name": "get_history_kline",
+      "description": "Get a page of historical candlesticks, retaining the next-page timestamp and volume precision.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code with market prefix, for example US.AAPL or HK.00700."
+          },
+          "start": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format in the market timezone.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "End date in YYYY-MM-DD format, or the previous nextTime converted to a string for pagination."
+          },
+          "ktype": {
+            "type": "integer",
+            "description": "Candlestick interval: 1=1min, 2=day, 3=week, 4=month, 5=year, 6=5min, 7=15min, 8=30min, 9=60min. Default 2.",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ]
+          },
+          "autype": {
+            "type": "integer",
+            "description": "Price adjustment: 0=none, 1=forward (default), 2=backward.",
+            "enum": [
+              0,
+              1,
+              2
+            ]
+          },
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 370,
+            "description": "Number of bars requested; default and maximum 370."
+          },
+          "extendedTime": {
+            "type": "integer",
+            "description": "Extended session: 0=default, 1=US pre/after market, 2=US overnight.",
+            "enum": [
+              0,
+              1,
+              2
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "end"
+        ],
+        "description": "Historical candlestick query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time_key": {
+                  "type": "integer",
+                  "description": "Candlestick timestamp in milliseconds."
+                },
+                "open": {
+                  "type": "number",
+                  "description": "Opening price."
+                },
+                "close": {
+                  "type": "number",
+                  "description": "Closing price."
+                },
+                "high": {
+                  "type": "number",
+                  "description": "Highest price."
+                },
+                "low": {
+                  "type": "number",
+                  "description": "Lowest price."
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Trading volume before applying volumePrecision."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Historical candlestick with additional provider fields."
+            },
+            "description": "Historical candlesticks in upstream order."
+          },
+          "nextTime": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Next page end timestamp in milliseconds, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next page end timestamp in milliseconds, or null when absent."
+          },
+          "volumePrecision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Divide bar volumes by 10 to this power; null when the provider omits precision."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Divide bar volumes by 10 to this power; null when the provider omits precision."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bars",
+          "nextTime",
+          "volumePrecision"
+        ],
+        "description": "Historical candlesticks and pagination metadata."
+      }
+    },
+    {
+      "id": "futunn.get_market_snapshot",
+      "service": "futunn",
+      "name": "get_market_snapshot",
+      "description": "Get real-time market snapshots and valuation metrics for up to 400 securities.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Security code with market prefix, for example US.AAPL or HK.00700."
+            },
+            "description": "Security codes to query.",
+            "minItems": 1,
+            "maxItems": 400
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbols"
+        ],
+        "description": "Securities to query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code with market prefix, for example US.AAPL or HK.00700."
+                },
+                "last_price": {
+                  "type": "number",
+                  "description": "Latest traded price."
+                },
+                "update_time": {
+                  "type": "integer",
+                  "description": "Quote update timestamp in milliseconds."
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Trading volume in shares or contracts."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Market snapshot with additional category-specific fields."
+            },
+            "description": "Market snapshots with prices, volume, valuation and category-specific fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "snapshots"
+        ],
+        "description": "Market snapshot results."
+      }
+    },
+    {
+      "id": "futunn.get_market_state",
+      "service": "futunn",
+      "name": "get_market_state",
+      "description": "Get trading-session states for a batch of securities.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Security code including market prefix, for example HK.00700."
+            },
+            "description": "Securities to query, up to 400.",
+            "minItems": 1,
+            "maxItems": 400
+          },
+          "includePreAfterMarket": {
+            "type": "boolean",
+            "description": "Include US pre-market and after-hours sessions."
+          },
+          "includeOvernight": {
+            "type": "boolean",
+            "description": "Include US overnight sessions."
+          },
+          "includeCryptoBrokers": {
+            "type": "boolean",
+            "description": "Expand cryptocurrency records by broker."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbols"
+        ],
+        "description": "Market state query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "market_state": {
+                  "type": "string",
+                  "description": "Market state such as open, closed or pre-market."
+                },
+                "trade_section": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Provider record with additional fields preserved."
+                  },
+                  "description": "Trading session details."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Security market state."
+            },
+            "description": "States matched to requested securities."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "states"
+        ],
+        "description": "Market state results."
+      }
+    },
+    {
+      "id": "futunn.get_operational_efficiency",
+      "service": "futunn",
+      "name": "get_operational_efficiency",
+      "description": "Get historical employee counts and per-employee financial metrics.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Page size; default 10, maximum 100."
+          },
+          "financialType": {
+            "type": "integer",
+            "description": "7=annual reports (default), 102=all cumulative quarterly reports.",
+            "enum": [
+              7,
+              102
+            ]
+          },
+          "currencyCode": {
+            "type": "string",
+            "description": "Report currency code, for example USD or CNY; omit for the native currency."
+          },
+          "nextKey": {
+            "type": "string",
+            "description": "Opaque next-page cursor; omit for the first page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Operational efficiency query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "efficiency": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "currency_code": {
+                    "type": "string",
+                    "description": "Report currency code, for example USD or CNY; omit for the native currency."
+                  },
+                  "item_list": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Provider record with additional fields preserved."
+                    },
+                    "description": "Reporting-period employee counts and per-employee metrics."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Efficiency metrics in the reported currency."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Efficiency metrics in the reported currency."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "next_key": {
+                    "type": "string",
+                    "description": "Opaque next-page cursor; omit for the first page."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata from the response envelope; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata from the response envelope; null when omitted."
+          },
+          "noData": {
+            "type": "boolean",
+            "description": "Whether the provider explicitly reported no_data for a valid security."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "efficiency",
+          "pagination",
+          "noData"
+        ],
+        "description": "Operational efficiency results and pagination."
+      }
+    },
+    {
+      "id": "futunn.get_order_details",
+      "service": "futunn",
+      "name": "get_order_details",
+      "description": "Get details of fewer than 50 orders from the same exchange.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Trading account ID as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "exchange": {
+            "type": "string",
+            "enum": [
+              "US",
+              "SEHK",
+              "SGX",
+              "SSE",
+              "SZSE",
+              "JP",
+              "CA",
+              "CME",
+              "CBOT",
+              "NYMEX",
+              "COMEX",
+              "CBOE",
+              "HKFE",
+              "KR",
+              "BMS",
+              "BMD",
+              "ASX"
+            ],
+            "description": "Exchange shared by all requested orders."
+          },
+          "orderIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Order ID."
+            },
+            "description": "Order IDs from the same exchange.",
+            "minItems": 1,
+            "maxItems": 49
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "exchange",
+          "orderIds"
+        ],
+        "description": "Order detail query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "Order ID."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "order_status": {
+                  "type": "string",
+                  "description": "Order status."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Quantity as a decimal string."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Price as a decimal string."
+                },
+                "create_time": {
+                  "type": "integer",
+                  "description": "Creation timestamp in microseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Order with original quantities, prices and status fields."
+            },
+            "description": "Order details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "Order detail results."
+      }
+    },
+    {
+      "id": "futunn.get_revenue_breakdown",
+      "service": "futunn",
+      "name": "get_revenue_breakdown",
+      "description": "Get revenue composition by product, industry, region or business.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "date": {
+            "type": "integer",
+            "description": "Financial period end timestamp in seconds; 0 selects the latest period."
+          },
+          "financialType": {
+            "type": "integer",
+            "description": "Financial period selector; default 0."
+          },
+          "currencyCode": {
+            "type": "string",
+            "description": "Report currency code, for example USD or CNY; omit for the native currency."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Revenue composition query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "period": {
+                    "type": "string",
+                    "description": "Financial reporting period."
+                  },
+                  "currency_code": {
+                    "type": "string",
+                    "description": "Report currency code, for example USD or CNY; omit for the native currency."
+                  },
+                  "breakdown_list": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Provider record with additional fields preserved."
+                    },
+                    "description": "Revenue composition dimensions and items."
+                  },
+                  "screen_date_list": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Provider record with additional fields preserved."
+                    },
+                    "description": "Available period dates in seconds and financial type codes."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Revenue breakdown with available period choices."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revenue breakdown with available period choices."
+          },
+          "noData": {
+            "type": "boolean",
+            "description": "Whether the provider explicitly reported no_data for a valid security."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "revenue",
+          "noData"
+        ],
+        "description": "Revenue composition and available reporting periods."
+      }
+    },
+    {
+      "id": "futunn.get_security_info",
+      "service": "futunn",
+      "name": "get_security_info",
+      "description": "Get basic security information, including listing date and lot size.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Security code including market prefix, for example HK.00700."
+            },
+            "description": "Securities to query, up to 400.",
+            "minItems": 1,
+            "maxItems": 400
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbols"
+        ],
+        "description": "Security information query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Security name."
+                },
+                "lot_size": {
+                  "type": "integer",
+                  "description": "Board lot size or contract multiplier."
+                },
+                "stock_id": {
+                  "type": "integer",
+                  "description": "Provider security identifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Security profile."
+            },
+            "description": "Resolved security profiles."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "securities"
+        ],
+        "description": "Security profiles; unresolved codes may be omitted by the provider."
+      }
+    },
+    {
+      "id": "futunn.get_valuation",
+      "service": "futunn",
+      "name": "get_valuation",
+      "description": "Get PE, PB or PS valuation history and market or sector comparisons.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "valuationType": {
+            "type": "integer",
+            "description": "1=PE (default), 2=PB, 3=PS.",
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          },
+          "intervalType": {
+            "type": "integer",
+            "description": "History span: 1=3mo, 2=6mo, 3=1yr, 4=3yr, 5=since May 2019, 6=5yr, 7=10yr, 8=2yr, 9=20yr, 10=30yr.",
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Valuation query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "valuation": {
+            "type": "object",
+            "properties": {
+              "trend": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Current, historical and forward valuation metrics."
+              },
+              "market_distribution": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider record with additional fields preserved."
+              },
+              "plate_distribution": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider record with additional fields preserved."
+              },
+              "profit_growth_rate": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider record with additional fields preserved."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Valuation trends, distributions and growth analysis."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "valuation"
+        ],
+        "description": "Valuation results."
+      }
+    },
+    {
+      "id": "futunn.list_accounts",
+      "service": "futunn",
+      "name": "list_accounts",
+      "description": "List trading accounts authorized by the connected user.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Authorized account query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "description": "Trading account ID as a lossless decimal string."
+                },
+                "security_firm": {
+                  "type": "string",
+                  "description": "Broker identifier."
+                },
+                "acc_type": {
+                  "type": "string",
+                  "description": "Account type, such as cash or margin."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Authorized account details."
+            },
+            "description": "Authorized accounts; numeric account_id values are returned as lossless decimal strings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "Authorized trading accounts."
+      }
+    },
+    {
+      "id": "futunn.list_history_deals",
+      "service": "futunn",
+      "name": "list_history_deals",
+      "description": "List historical execution fills filtered by update time in microseconds.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Trading account ID as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "market": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HK",
+              "US",
+              "SG",
+              "HKCC",
+              "CA",
+              "FUTURES",
+              "JP",
+              "KR",
+              "MY",
+              "AU"
+            ],
+            "description": "Trading market; HKCC denotes China Stock Connect."
+          },
+          "pageFlag": {
+            "type": "string",
+            "description": "Opaque page flag; omit or use an empty string for the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 50,
+            "description": "Page size; default 50, range 10-50."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "start": {
+            "type": "string",
+            "description": "Unix timestamp in microseconds as a decimal string; 0 uses the provider 90-day default window.",
+            "pattern": "^[0-9]+$"
+          },
+          "end": {
+            "type": "string",
+            "description": "Unix timestamp in microseconds as a decimal string; 0 uses the provider 90-day default window.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "market"
+        ],
+        "description": "Account order or fill query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deal_id": {
+                  "type": "string",
+                  "description": "Case-sensitive base58 fill ID; preserve exactly."
+                },
+                "order_id": {
+                  "type": "string",
+                  "description": "Order ID."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Quantity as a decimal string."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Price as a decimal string."
+                },
+                "create_time": {
+                  "type": "integer",
+                  "description": "Creation timestamp in microseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Execution fill record."
+            },
+            "description": "Returned account records in provider order."
+          },
+          "pageFlag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page flag; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page flag; null when omitted."
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "True means this batch is complete; null means the provider omitted the flag."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True means this batch is complete; null means the provider omitted the flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deals",
+          "pageFlag",
+          "completed"
+        ],
+        "description": "One page of account records."
+      }
+    },
+    {
+      "id": "futunn.list_history_orders",
+      "service": "futunn",
+      "name": "list_history_orders",
+      "description": "List historical orders filtered by creation time in microseconds.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Trading account ID as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "market": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HK",
+              "US",
+              "SG",
+              "HKCC",
+              "CA",
+              "FUTURES",
+              "JP",
+              "KR",
+              "MY",
+              "AU"
+            ],
+            "description": "Trading market; HKCC denotes China Stock Connect."
+          },
+          "pageFlag": {
+            "type": "string",
+            "description": "Opaque page flag; omit or use an empty string for the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100,
+            "description": "Page size; default 50, range 10-100."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code including market prefix, for example HK.00700."
+          },
+          "start": {
+            "type": "string",
+            "description": "Unix timestamp in microseconds as a decimal string; 0 uses the provider 90-day default window.",
+            "pattern": "^[0-9]+$"
+          },
+          "end": {
+            "type": "string",
+            "description": "Unix timestamp in microseconds as a decimal string; 0 uses the provider 90-day default window.",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "market"
+        ],
+        "description": "Account order or fill query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "Order ID."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "order_status": {
+                  "type": "string",
+                  "description": "Order status."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Quantity as a decimal string."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Price as a decimal string."
+                },
+                "create_time": {
+                  "type": "integer",
+                  "description": "Creation timestamp in microseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Order with original quantities, prices and status fields."
+            },
+            "description": "Returned account records in provider order."
+          },
+          "pageFlag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page flag; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page flag; null when omitted."
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "True means this batch is complete; null means the provider omitted the flag."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True means this batch is complete; null means the provider omitted the flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders",
+          "pageFlag",
+          "completed"
+        ],
+        "description": "One page of account records."
+      }
+    },
+    {
+      "id": "futunn.list_open_orders",
+      "service": "futunn",
+      "name": "list_open_orders",
+      "description": "List recent orders, including pending orders and orders filled or cancelled in the last 24 hours.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Trading account ID as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "market": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HK",
+              "US",
+              "SG",
+              "HKCC",
+              "CA",
+              "FUTURES",
+              "JP",
+              "KR",
+              "MY",
+              "AU"
+            ],
+            "description": "Trading market; HKCC denotes China Stock Connect."
+          },
+          "pageFlag": {
+            "type": "string",
+            "description": "Opaque page flag; omit or use an empty string for the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100,
+            "description": "Page size; default 50, range 10-100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "market"
+        ],
+        "description": "Account order or fill query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string",
+                  "description": "Order ID."
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "order_status": {
+                  "type": "string",
+                  "description": "Order status."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Quantity as a decimal string."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Price as a decimal string."
+                },
+                "create_time": {
+                  "type": "integer",
+                  "description": "Creation timestamp in microseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Order with original quantities, prices and status fields."
+            },
+            "description": "Returned account records in provider order."
+          },
+          "pageFlag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page flag; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page flag; null when omitted."
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "True means this batch is complete; null means the provider omitted the flag."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True means this batch is complete; null means the provider omitted the flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders",
+          "pageFlag",
+          "completed"
+        ],
+        "description": "One page of account records."
+      }
+    },
+    {
+      "id": "futunn.list_positions",
+      "service": "futunn",
+      "name": "list_positions",
+      "description": "List account positions, optionally filtered by security code and profit/loss ratio.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trading account ID returned by list_accounts, kept as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Security code with market prefix, for example US.AAPL or HK.00700."
+          },
+          "plRatioMin": {
+            "type": "string",
+            "description": "Minimum profit/loss percentage as a decimal string, for example 10."
+          },
+          "plRatioMax": {
+            "type": "string",
+            "description": "Maximum profit/loss percentage as a decimal string, for example 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId"
+        ],
+        "description": "Account position query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code with market prefix, for example US.AAPL or HK.00700."
+                },
+                "stock_name": {
+                  "type": "string",
+                  "description": "Security name."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Position quantity as a decimal string."
+                },
+                "cost_price": {
+                  "type": "string",
+                  "description": "Position cost price as a decimal string."
+                },
+                "cost_price_valid": {
+                  "type": "boolean",
+                  "description": "Whether the cost price is valid."
+                },
+                "pl_val": {
+                  "type": "string",
+                  "description": "Profit or loss as a decimal string."
+                },
+                "pl_val_valid": {
+                  "type": "boolean",
+                  "description": "Whether the profit or loss value is valid."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Position details with additional provider fields."
+            },
+            "description": "Positions with upstream quantities, prices and profit/loss decimal strings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "positions"
+        ],
+        "description": "Account position results."
+      }
+    },
+    {
+      "id": "futunn.list_today_deals",
+      "service": "futunn",
+      "name": "list_today_deals",
+      "description": "List today's execution fills for a trading account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "trade:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "Trading account ID as a decimal string.",
+            "pattern": "^[0-9]+$"
+          },
+          "market": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HK",
+              "US",
+              "SG",
+              "HKCC",
+              "CA",
+              "FUTURES",
+              "JP",
+              "KR",
+              "MY",
+              "AU"
+            ],
+            "description": "Trading market; HKCC denotes China Stock Connect."
+          },
+          "pageFlag": {
+            "type": "string",
+            "description": "Opaque page flag; omit or use an empty string for the first page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 100,
+            "description": "Page size; default 50, range 10-100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountId",
+          "market"
+        ],
+        "description": "Account order or fill query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deal_id": {
+                  "type": "string",
+                  "description": "Case-sensitive base58 fill ID; preserve exactly."
+                },
+                "order_id": {
+                  "type": "string",
+                  "description": "Order ID."
+                },
+                "qty": {
+                  "type": "string",
+                  "description": "Quantity as a decimal string."
+                },
+                "price": {
+                  "type": "string",
+                  "description": "Price as a decimal string."
+                },
+                "create_time": {
+                  "type": "integer",
+                  "description": "Creation timestamp in microseconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Execution fill record."
+            },
+            "description": "Returned account records in provider order."
+          },
+          "pageFlag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page flag; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page flag; null when omitted."
+          },
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "True means this batch is complete; null means the provider omitted the flag."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True means this batch is complete; null means the provider omitted the flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deals",
+          "pageFlag",
+          "completed"
+        ],
+        "description": "One page of account records."
+      }
+    },
+    {
+      "id": "futunn.list_trading_days",
+      "service": "futunn",
+      "name": "list_trading_days",
+      "description": "List trading days for a market within an inclusive date range.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "enum": [
+              "HK",
+              "US",
+              "SH",
+              "SZ",
+              "BJ",
+              "SG",
+              "JP",
+              "KR",
+              "CA",
+              "AU",
+              "JP_FUTURE",
+              "SG_FUTURE"
+            ],
+            "description": "Market to query."
+          },
+          "start": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format in the market timezone.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "Date in YYYY-MM-DD format in the market timezone.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "market",
+          "start",
+          "end"
+        ],
+        "description": "Market and date range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tradingDays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "description": "Date in YYYY-MM-DD format in the market timezone.",
+                  "format": "date"
+                },
+                "trade_date_type": {
+                  "type": "string",
+                  "description": "Session type, such as WHOLE or MORNING."
+                },
+                "trade_second": {
+                  "type": "integer",
+                  "description": "Total trading seconds in the session."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Trading day and session details."
+            },
+            "description": "Trading dates with session type and trading seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tradingDays"
+        ],
+        "description": "Trading calendar results."
+      }
+    },
+    {
+      "id": "futunn.screen_stocks",
+      "service": "futunn",
+      "name": "screen_stocks",
+      "description": "Screen securities with combined market, financial and technical conditions.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "screenQueries": {
+            "type": "array",
+            "items": {
+              "description": "Exactly one official screening condition branch.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "simple_field_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official simple_field_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "simple_field_query"
+                  ],
+                  "description": "One simple_field_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "plate_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official plate_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "plate_query"
+                  ],
+                  "description": "One plate_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "simple_property_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official simple_property_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "simple_property_query"
+                  ],
+                  "description": "One simple_property_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "cumulative_property_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official cumulative_property_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "cumulative_property_query"
+                  ],
+                  "description": "One cumulative_property_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "financial_property_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official financial_property_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "financial_property_query"
+                  ],
+                  "description": "One financial_property_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "indicator_positional_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official indicator_positional_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "indicator_positional_query"
+                  ],
+                  "description": "One indicator_positional_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "indicator_pattern_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official indicator_pattern_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "indicator_pattern_query"
+                  ],
+                  "description": "One indicator_pattern_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "featured_property_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official featured_property_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "featured_property_query"
+                  ],
+                  "description": "One featured_property_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "broker_holdings_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official broker_holdings_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "broker_holdings_query"
+                  ],
+                  "description": "One broker_holdings_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kline_shape_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official kline_shape_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "kline_shape_query"
+                  ],
+                  "description": "One kline_shape_query branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "option_query": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official option_query payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "option_query"
+                  ],
+                  "description": "One option_query branch."
+                }
+              ]
+            },
+            "description": "Combined screening conditions."
+          },
+          "retrieveQueries": {
+            "type": "array",
+            "items": {
+              "description": "Exactly one official retrieval factor branch.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "basic_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official basic_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "basic_property"
+                  ],
+                  "description": "One basic_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "simple_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official simple_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "simple_property"
+                  ],
+                  "description": "One simple_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "cumulative_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official cumulative_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "cumulative_property"
+                  ],
+                  "description": "One cumulative_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "financial_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official financial_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "financial_property"
+                  ],
+                  "description": "One financial_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "featured_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official featured_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "featured_property"
+                  ],
+                  "description": "One featured_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "indicator_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official indicator_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "indicator_property"
+                  ],
+                  "description": "One indicator_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "broker_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official broker_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "broker_property"
+                  ],
+                  "description": "One broker_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kline_shape_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official kline_shape_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "kline_shape_property"
+                  ],
+                  "description": "One kline_shape_property branch."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "option_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official option_property payload. Preserve provider field IDs, periods and multiplier-scaled ranges."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "option_property"
+                  ],
+                  "description": "One option_property branch."
+                }
+              ]
+            },
+            "description": "Factors to return in matching order."
+          },
+          "sort": {
+            "description": "Sort direction and exactly one supported factor.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "integer",
+                    "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "simple_property": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Official sort factor, including name and any required period."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "direction",
+                  "simple_property"
+                ],
+                "description": "Sort by simple_property."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "integer",
+                    "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "cumulative_property": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Official sort factor, including name and any required period."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "direction",
+                  "cumulative_property"
+                ],
+                "description": "Sort by cumulative_property."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "integer",
+                    "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "financial_property": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Official sort factor, including name and any required period."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "direction",
+                  "financial_property"
+                ],
+                "description": "Sort by financial_property."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "integer",
+                    "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                    "enum": [
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "featured_property": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Official sort factor, including name and any required period."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "direction",
+                  "featured_property"
+                ],
+                "description": "Sort by featured_property."
+              }
+            ]
+          },
+          "sorts": {
+            "type": "array",
+            "items": {
+              "description": "Sort direction and exactly one supported factor.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "direction": {
+                      "type": "integer",
+                      "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        4
+                      ]
+                    },
+                    "simple_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official sort factor, including name and any required period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "direction",
+                    "simple_property"
+                  ],
+                  "description": "Sort by simple_property."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "direction": {
+                      "type": "integer",
+                      "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        4
+                      ]
+                    },
+                    "cumulative_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official sort factor, including name and any required period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "direction",
+                    "cumulative_property"
+                  ],
+                  "description": "Sort by cumulative_property."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "direction": {
+                      "type": "integer",
+                      "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        4
+                      ]
+                    },
+                    "financial_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official sort factor, including name and any required period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "direction",
+                    "financial_property"
+                  ],
+                  "description": "Sort by financial_property."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "direction": {
+                      "type": "integer",
+                      "description": "1=ascending, 2=descending, 3=absolute ascending, 4=absolute descending.",
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        4
+                      ]
+                    },
+                    "featured_property": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Official sort factor, including name and any required period."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "direction",
+                    "featured_property"
+                  ],
+                  "description": "Sort by featured_property."
+                }
+              ]
+            },
+            "description": "Ordered multi-factor sorting; do not combine with sort."
+          },
+          "nextKey": {
+            "type": "string",
+            "description": "Opaque next-page cursor; omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "description": "Page size; default 200, maximum 300."
+          },
+          "watchlistStockIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Provider security ID."
+            },
+            "description": "Security IDs for watchlist mode 1."
+          },
+          "holdingStockIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Provider security ID."
+            },
+            "description": "Security IDs for holdings mode 2."
+          },
+          "userStockListMode": {
+            "type": "integer",
+            "description": "0=all securities, 1=watchlist, 2=holdings.",
+            "enum": [
+              0,
+              1,
+              2
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "screenQueries"
+        ],
+        "description": "Stock screening options. Factor IDs and scaling follow https://open.futunn.com/api/quote/screening/stock-screen.",
+        "not": {
+          "required": [
+            "sort",
+            "sorts"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Security code including market prefix, for example HK.00700."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Security name."
+                },
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Provider record with additional fields preserved."
+                  },
+                  "description": "Returned factor values and type information."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Screening result."
+            },
+            "description": "Matched securities; results align with retrieveQueries and retain provider-scaled values."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "has_more": {
+                    "type": "boolean",
+                    "description": "Whether more results are available."
+                  },
+                  "next_key": {
+                    "type": "string",
+                    "description": "Opaque next-page cursor; omit for the first page."
+                  },
+                  "total": {
+                    "type": "integer",
+                    "description": "Total matching records when provided."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata from the response envelope; null when omitted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata from the response envelope; null when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "description": "Screened securities and pagination."
+      }
+    },
+    {
+      "id": "futunn.search_community",
+      "service": "futunn",
+      "name": "search_community",
+      "description": "Search community discussions, topics and live streams by keyword.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keyword, company name, ticker or topic."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Number of results; default 10, maximum 50."
+          },
+          "type": {
+            "type": "integer",
+            "description": "Content type: 1=news/discussion, 2=announcement/topic, 3=report/live stream; omit for all.",
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          },
+          "sortType": {
+            "type": "integer",
+            "description": "Sort: 1=reads/popularity, 2=latest.",
+            "enum": [
+              1,
+              2
+            ]
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "zh-HK",
+              "en",
+              "ja"
+            ],
+            "description": "Content language."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Content search options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Title; news titles may contain em highlight tags."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Content link."
+                },
+                "publish_time": {
+                  "type": "integer",
+                  "description": "Publication timestamp in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Search result with title, link and timestamp."
+            },
+            "description": "Matching content items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Search results."
+      }
+    },
+    {
+      "id": "futunn.search_news",
+      "service": "futunn",
+      "name": "search_news",
+      "description": "Search news, announcements and research reports by keyword.",
+      "operationType": "read",
+      "requiredScopes": [
+        "quote:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keyword, company name, ticker or topic."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Number of results; default 10, maximum 50."
+          },
+          "type": {
+            "type": "integer",
+            "description": "Content type: 1=news/discussion, 2=announcement/topic, 3=report/live stream; omit for all.",
+            "enum": [
+              1,
+              2,
+              3
+            ]
+          },
+          "sortType": {
+            "type": "integer",
+            "description": "Sort: 1=reads/popularity, 2=latest.",
+            "enum": [
+              1,
+              2
+            ]
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "zh-HK",
+              "en",
+              "ja"
+            ],
+            "description": "Content language."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Content search options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Title; news titles may contain em highlight tags."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Content link."
+                },
+                "publish_time": {
+                  "type": "integer",
+                  "description": "Publication timestamp in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Search result with title, link and timestamp."
+            },
+            "description": "Matching content items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Search results."
+      }
+    }
+  ]
+}

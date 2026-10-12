@@ -1,0 +1,2510 @@
+{
+  "service": "xiaohongshu_store",
+  "displayName": "Xiaohongshu Store",
+  "description": "Manage orders, after-sales, items, and logistics through the Xiaohongshu ARK e-commerce Open API.",
+  "categories": [
+    "E-commerce"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "appId",
+          "label": "App ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "Paste your ARK app ID",
+          "description": "The app ID (app-key) of a Xiaohongshu ARK open-platform app. Find it in the ARK console: https://ark.xiaohongshu.com/"
+        },
+        {
+          "key": "appSecret",
+          "label": "App Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Paste your ARK app secret",
+          "description": "The app secret of the same ARK app, used to sign every request."
+        },
+        {
+          "key": "accessToken",
+          "label": "Access Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Paste the shop access token",
+          "description": "The shop access token issued through the ARK OAuth flow or copied from the ARK console for self-developed merchant apps. Every business API requires it. Access tokens expire after 7 days; refresh with the refresh_token action or re-copy from the console."
+        },
+        {
+          "key": "refreshToken",
+          "label": "Refresh Token",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "Paste the refresh token",
+          "description": "The refresh token issued together with the access token. It expires after 14 days and enables the refresh_token action; once it expires, the app must be re-authorized."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://ark.xiaohongshu.com/",
+  "actions": [
+    {
+      "id": "xiaohongshu_store.adjust_sku_stock",
+      "service": "xiaohongshu_store",
+      "name": "adjust_sku_stock",
+      "description": "Increase or decrease the sellable stock of a Xiaohongshu SKU.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skuId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu SKU ID.",
+            "pattern": "\\S"
+          },
+          "qty": {
+            "type": "integer",
+            "description": "The quantity to add when positive or remove when negative."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The stock adjustment for a Xiaohongshu SKU."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stock": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu SKU stock result, including per-warehouse breakdowns."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The stock adjustment result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.audit_after_sale",
+      "service": "xiaohongshu_store",
+      "name": "audit_after_sale",
+      "description": "Audit a Xiaohongshu after-sale request. Only callable while the after-sale is pending seller audit.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "returnsId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu after-sale ID.",
+            "pattern": "\\S"
+          },
+          "action": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The audit decision: 1 to agree to a direct refund (refund-only requests), 2 to agree to a return shipment (not for refund-only requests), or 3 to reject."
+          },
+          "reason": {
+            "type": "integer",
+            "description": "The reject reason ID from list_after_sale_reject_reasons. Required when action is 3."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reject reason description. Required when the reject reason is other.",
+            "pattern": "\\S"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A message shown to the buyer when agreeing to a return shipment.",
+            "pattern": "\\S"
+          },
+          "sellerAddressRecordId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The seller return address record ID. Required when agreeing to a return shipment."
+          },
+          "droneSnCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A drone SN code.",
+              "pattern": "\\S"
+            },
+            "description": "The drone SN codes copied from the after-sale detail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "returnsId",
+          "action"
+        ],
+        "description": "The audit decision for a Xiaohongshu after-sale request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the audit decision."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The audit result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.confirm_after_sale_receive",
+      "service": "xiaohongshu_store",
+      "name": "confirm_after_sale_receive",
+      "description": "Confirm receipt of a buyer-returned package for a Xiaohongshu after-sale. Only callable while the after-sale waits for seller receipt.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "returnsId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu after-sale ID.",
+            "pattern": "\\S"
+          },
+          "action": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The receipt decision: 1 to confirm receipt, 2 to reject, or 3 to extend the wait."
+          },
+          "reason": {
+            "type": "integer",
+            "description": "The reject reason ID from list_after_sale_reject_reasons. Required when action is 2."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reject reason description.",
+            "pattern": "\\S"
+          },
+          "droneSnCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A drone SN code.",
+              "pattern": "\\S"
+            },
+            "description": "The drone SN codes copied from the after-sale detail."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "returnsId",
+          "action"
+        ],
+        "description": "The receipt decision for a returned Xiaohongshu after-sale package."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the receipt decision."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The receipt decision result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.create_item",
+      "service": "xiaohongshu_store",
+      "name": "create_item",
+      "description": "Create a Xiaohongshu item with its SKUs. Typical setup order: list_categories, get_category_attributes, search_brands, list_carriage_templates, list_logistics_plans, then upload_material for the images.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item title.",
+            "pattern": "\\S"
+          },
+          "categoryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The leaf category ID, from list_categories.",
+            "pattern": "\\S"
+          },
+          "shippingTemplateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The carriage template ID, from list_carriage_templates.",
+            "pattern": "\\S"
+          },
+          "shippingGrossWeight": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The item shipping weight in grams. Required to be positive when the carriage template charges by weight."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "link": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The image URL returned by upload_material.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": true,
+              "description": "One image."
+            },
+            "description": "The main images. Upload files with upload_material first and pass each returned url as link.",
+            "minItems": 1
+          },
+          "createSkuList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU price in fen."
+                },
+                "stock": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU stock."
+                },
+                "logisticsPlanId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The logistics plan ID, from list_logistics_plans.",
+                  "pattern": "\\S"
+                },
+                "deliveryTime": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "integer",
+                      "minimum": 3,
+                      "maximum": 5,
+                      "description": "The delivery time type: 3 for same-day, 4 for relative hours, or 5 for an absolute time."
+                    },
+                    "time": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The delivery time value for the chosen type.",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The SKU delivery time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One SKU to create. Other upstream SKU fields such as originalPrice, variants, barcode, erpCode, and specImage pass through unchanged."
+            },
+            "description": "The SKUs to create. Each needs price (in fen), stock, logisticsPlanId (from list_logistics_plans), and deliveryTime ({ type, time }).",
+            "minItems": 1
+          },
+          "brandId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The brand ID, from search_brands.",
+            "pattern": "\\S"
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One attribute assignment."
+            },
+            "description": "The category attributes, from get_category_attributes: { propertyId, name, value, valueId, valueList }."
+          },
+          "variantIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A spec type ID.",
+              "pattern": "\\S"
+            },
+            "description": "The spec type IDs of the item."
+          },
+          "articleNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant article number.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item description, up to 500 characters.",
+            "pattern": "\\S"
+          },
+          "itemShortTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item short title.",
+            "pattern": "\\S"
+          },
+          "deliveryMode": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The delivery mode: 0 for normal delivery or 1 for no-logistics delivery."
+          },
+          "freeReturn": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The free-return policy: 1 or 2."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One video: { link }."
+            },
+            "description": "The main videos, in the same { link } shape as images."
+          },
+          "imageDescriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One description image: { link }."
+            },
+            "description": "The description images, in the same { link } shape as images."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "categoryId",
+          "shippingTemplateId",
+          "images",
+          "createSkuList"
+        ],
+        "description": "The item and SKU data used to create a Xiaohongshu product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu item record. Available fields depend on the query form."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Xiaohongshu item."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.deliver_order",
+      "service": "xiaohongshu_store",
+      "name": "deliver_order",
+      "description": "Ship a Xiaohongshu order with an express tracking number. Supports split shipments by passing the SKU IDs of one package.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          },
+          "expressNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express tracking number, or the delivery content for no-logistics delivery.",
+            "pattern": "\\S"
+          },
+          "expressCompanyCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express company code, as returned by list_express_companies. Use selfdelivery for no-logistics delivery.",
+            "pattern": "\\S"
+          },
+          "expressCompanyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express company name. Matched from the code when omitted.",
+            "pattern": "\\S"
+          },
+          "deliveringTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "unpack": {
+            "type": "boolean",
+            "description": "Whether this is a split shipment. Requires skuIdList."
+          },
+          "skuIdList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A SKU ID.",
+              "pattern": "\\S"
+            },
+            "description": "The SKU IDs shipped in this package when unpack is true."
+          },
+          "returnAddressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The return address ID used for this shipment.",
+            "pattern": "\\S"
+          },
+          "skuIdentifyCodeInfo": {
+            "type": "object",
+            "properties": {
+              "sNCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The device SN code.",
+                "pattern": "\\S"
+              },
+              "barCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The device barcode.",
+                "pattern": "\\S"
+              },
+              "iMEI1Code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The first IMEI code.",
+                "pattern": "\\S"
+              },
+              "iMEI2Code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The second IMEI code.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The device identification codes required by subsidy or drone orders."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "expressNo",
+          "expressCompanyCode"
+        ],
+        "description": "The shipment details used to deliver a Xiaohongshu order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the shipment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The delivery result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_after_sale",
+      "service": "xiaohongshu_store",
+      "name": "get_after_sale",
+      "description": "Get a Xiaohongshu after-sale record by its after-sale ID, including SKUs, amounts, and logistics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "returnsId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu after-sale ID.",
+            "pattern": "\\S"
+          },
+          "needNegotiateRecord": {
+            "type": "boolean",
+            "description": "Whether to include the buyer-seller negotiation records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "returnsId"
+        ],
+        "description": "The after-sale identifier used to retrieve a Xiaohongshu after-sale record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "afterSale": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu after-sale record. Available fields depend on the after-sale status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu after-sale detail result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_category_attributes",
+      "service": "xiaohongshu_store",
+      "name": "get_category_attributes",
+      "description": "Get the attributes and validation rules of a leaf Xiaohongshu category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The leaf category ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The leaf category whose attributes should be read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu category attribute with its validation rules."
+            },
+            "description": "The attribute records with validation rules."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu category attribute result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_item",
+      "service": "xiaohongshu_store",
+      "name": "get_item",
+      "description": "Get a Xiaohongshu item by its item ID, including its SKU list.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu item ID.",
+            "pattern": "\\S"
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number of the SKU list."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of SKUs per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemId"
+        ],
+        "description": "The item identifier used to retrieve a Xiaohongshu item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu item record. Available fields depend on the query form."
+          },
+          "skus": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu SKU record with price, stock, and logistics details."
+            },
+            "description": "The SKU records of the item."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of SKUs reported by Xiaohongshu."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu item detail result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_order",
+      "service": "xiaohongshu_store",
+      "name": "get_order",
+      "description": "Get a Xiaohongshu order by its order ID, including SKU, amount, and delivery package details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The order identifier used to retrieve a Xiaohongshu order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu order record. Available fields depend on the order type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu order detail result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_order_declare_info",
+      "service": "xiaohongshu_store",
+      "name": "get_order_declare_info",
+      "description": "Get the customs declaration identity information of a cross-border Xiaohongshu order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The order identifier used to retrieve Xiaohongshu customs declaration information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "declarations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu customs declaration record with buyer identity details."
+            },
+            "description": "The customs declaration records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu customs declaration result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_order_receiver_info",
+      "service": "xiaohongshu_store",
+      "name": "get_order_receiver_info",
+      "description": "Get receiver addresses for Xiaohongshu orders. Only available while an order is pending shipment; call it right before printing shipping labels.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "receiverQueries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orderId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Xiaohongshu order ID.",
+                  "pattern": "\\S"
+                },
+                "openAddressId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The address credential returned by get_order as openAddressId.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": false,
+              "description": "A single receiver query."
+            },
+            "description": "Up to 20 receiver queries. Each needs the order ID and the openAddressId returned by get_order."
+          },
+          "isReturn": {
+            "type": "boolean",
+            "description": "Whether the query targets exchange orders instead of regular orders. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "receiverQueries"
+        ],
+        "description": "The receiver queries used to retrieve Xiaohongshu order receiver information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "receivers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu order receiver record. Name, phone, and address are ciphertext until decrypted with the batch-decrypt API."
+            },
+            "description": "The receiver records, one per matched order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu order receiver result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_order_tracking",
+      "service": "xiaohongshu_store",
+      "name": "get_order_tracking",
+      "description": "Get the logistics tracking records of every package in a Xiaohongshu order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The order identifier used to retrieve Xiaohongshu logistics tracking."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu logistics package with tracking records."
+            },
+            "description": "The logistics packages with tracking records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu order tracking result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.get_sku_stock",
+      "service": "xiaohongshu_store",
+      "name": "get_sku_stock",
+      "description": "Get the sellable, total, and occupied stock of a Xiaohongshu SKU, including per-warehouse breakdowns.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skuId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu SKU ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The SKU whose stock should be read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stock": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu SKU stock result, including per-warehouse breakdowns."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu SKU stock result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_address_records",
+      "service": "xiaohongshu_store",
+      "name": "list_address_records",
+      "description": "List the seller address records of the Xiaohongshu shop, including return addresses. sellerAddressRecordId is required when agreeing to a return shipment in audit_after_sale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of address records per page. Defaults to 20 and cannot exceed 200."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pagination used to list seller address records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu seller address record."
+            },
+            "description": "The seller address records."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of address records reported by Xiaohongshu."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu seller address result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_after_sale_reject_reasons",
+      "service": "xiaohongshu_store",
+      "name": "list_after_sale_reject_reasons",
+      "description": "List the reject reason options available when auditing or confirming receipt of a Xiaohongshu after-sale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "returnsId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu after-sale ID.",
+            "pattern": "\\S"
+          },
+          "rejectReasonType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The reject reason group: 1 for audit rejection or 2 for receipt rejection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The after-sale whose reject reasons should be listed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu after-sale reject reason option with reasonType, reasonId, and reasonName."
+            },
+            "description": "The available reject reason options."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The reject reason options result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_after_sales",
+      "service": "xiaohongshu_store",
+      "name": "list_after_sales",
+      "description": "List Xiaohongshu after-sale records by order or by creation/update time. Pass an order ID, or a time window (24 hours by creation time, 30 minutes by update time).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          },
+          "timeType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The time field to filter on: 1 for creation time or 2 for update time. Required with startTime and endTime when orderId is omitted."
+          },
+          "startTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "endTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "An after-sale status code."
+            },
+            "description": "The after-sale statuses to include: 1 pending audit, 2 pending buyer return, 3 pending seller receipt, 4 completed, 5 canceled, 6 closed, 9 audit rejected, 9001 receipt rejected, 12 exchange pending seller shipment, 13 exchange pending buyer confirmation, or 14 platform intervening."
+          },
+          "returnTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6,
+              "description": "An after-sale type code."
+            },
+            "description": "The after-sale types to include: 1 return, 2 exchange, 4 refund only after shipment, 5 refund only before shipment, or 6 price protection."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page. Defaults to 50 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Xiaohongshu after-sale records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "afterSales": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu after-sale record. Available fields depend on the after-sale status."
+            },
+            "description": "The Xiaohongshu after-sale records."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching after-sale records reported by Xiaohongshu."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu after-sale result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_carriage_templates",
+      "service": "xiaohongshu_store",
+      "name": "list_carriage_templates",
+      "description": "List the carriage (freight) templates of the Xiaohongshu shop.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of carriage templates per page. Defaults to 20 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pagination used to list carriage templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu carriage template."
+            },
+            "description": "The carriage template records."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of carriage templates reported by Xiaohongshu."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu carriage template result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_categories",
+      "service": "xiaohongshu_store",
+      "name": "list_categories",
+      "description": "List the Xiaohongshu item categories under a parent category, or the top-level categories.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent category ID. Lists top-level categories when omitted.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The parent category whose children should be listed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu category record."
+            },
+            "description": "The child category records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu category result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_express_companies",
+      "service": "xiaohongshu_store",
+      "name": "list_express_companies",
+      "description": "List the express companies supported by Xiaohongshu for order shipment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list express companies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu express company with code and name."
+            },
+            "description": "The express company records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu express company result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_item_skus",
+      "service": "xiaohongshu_store",
+      "name": "list_item_skus",
+      "description": "List Xiaohongshu items together with their full SKU details such as price, stock, and logistics plan.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact Xiaohongshu SKU ID.",
+            "pattern": "\\S"
+          },
+          "createTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "createTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "updateTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "updateTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "buyable": {
+            "type": "boolean",
+            "description": "Whether to include only items currently on sale."
+          },
+          "stockGte": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum stock quantity to include."
+          },
+          "stockLte": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum stock quantity to include."
+          },
+          "barcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An item barcode.",
+            "pattern": "\\S"
+          },
+          "scSkucode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Xiaohongshu SKU code.",
+            "pattern": "\\S"
+          },
+          "singlePackOnly": {
+            "type": "boolean",
+            "description": "Whether to return only single-item packs."
+          },
+          "lastId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor from the previous page when syncing the whole catalog.",
+            "pattern": "\\S"
+          },
+          "isChannel": {
+            "type": "boolean",
+            "description": "Whether to include only channel items."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page. Defaults to 50 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Xiaohongshu items with SKU details. Passing a SKU ID ignores the other filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu item and SKU pair."
+            },
+            "description": "The item records, each with its item and sku details."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching SKUs reported by Xiaohongshu."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu item and SKU result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_items",
+      "service": "xiaohongshu_store",
+      "name": "list_items",
+      "description": "List Xiaohongshu items with basic fields using ID, time, stock, barcode, or availability filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact Xiaohongshu item ID.",
+            "pattern": "\\S"
+          },
+          "createTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "createTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "updateTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "updateTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "buyable": {
+            "type": "boolean",
+            "description": "Whether to include only items currently on sale."
+          },
+          "stockGte": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum stock quantity to include."
+          },
+          "stockLte": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum stock quantity to include."
+          },
+          "barcode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An item barcode.",
+            "pattern": "\\S"
+          },
+          "skucode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Xiaohongshu item code.",
+            "pattern": "\\S"
+          },
+          "freeze": {
+            "type": "boolean",
+            "description": "Whether to include only frozen items."
+          },
+          "singlePackOnly": {
+            "type": "boolean",
+            "description": "Whether to return only single-item packs."
+          },
+          "lastId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor from the previous page when syncing the whole catalog.",
+            "pattern": "\\S"
+          },
+          "isChannel": {
+            "type": "boolean",
+            "description": "Whether to include only channel items."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page. Defaults to 50 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Xiaohongshu items. Passing an item ID ignores the other filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu item record. Available fields depend on the query form."
+            },
+            "description": "The Xiaohongshu item records."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching items reported by Xiaohongshu."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of items per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu item result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_logistics_plans",
+      "service": "xiaohongshu_store",
+      "name": "list_logistics_plans",
+      "description": "List the logistics plans of the Xiaohongshu shop. planInfoId is the logisticsPlanId used when creating SKUs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list logistics plans."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu logistics plan."
+            },
+            "description": "The logistics plan records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu logistics plan result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_materials",
+      "service": "xiaohongshu_store",
+      "name": "list_materials",
+      "description": "List materials in the Xiaohongshu material center, for example to check an upload status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "materialId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact material ID.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A material file name filter.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "IMAGE",
+              "VIDEO"
+            ],
+            "description": "The material type."
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The upload status: 1 for success, 2 for uploading, or 3 for failed."
+          },
+          "createTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "createTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "ascByCreateTime": {
+            "type": "boolean",
+            "description": "Whether to sort by creation time ascending instead of descending."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of materials per page. Defaults to 50 and cannot exceed 500."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list Xiaohongshu materials."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu material record."
+            },
+            "description": "The material records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu material list."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_orders",
+      "service": "xiaohongshu_store",
+      "name": "list_orders",
+      "description": "List Xiaohongshu orders by creation or update time. startTime and endTime are Unix timestamps in seconds, while the returned order times are in milliseconds. Creation-time windows are limited to 24 hours and update-time windows to 30 minutes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeType": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The time field to filter on: 1 for creation time or 2 for update time."
+          },
+          "startTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "endTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "orderType": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The order type: 0 for all, 1 for in-stock, 2 for deposit presale, 4 for full-payment presale, or 5 for exchange reshipment."
+          },
+          "orderStatus": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "The order status: 0 for all, 1 unpaid, 2 paid processing, 3 in customs clearance, 4 pending shipment, 5 partially shipped, 6 shipped, 7 completed, 8 closed, 9 canceled, or 10 exchange requested."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The one-based page number. Defaults to 1 and cannot exceed 100."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page. Defaults to 50 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeType",
+          "startTime",
+          "endTime"
+        ],
+        "description": "The time range and filters used to list Xiaohongshu orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu order record. Available fields depend on the order type."
+            },
+            "description": "The Xiaohongshu order records."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching orders reported by Xiaohongshu."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of orders per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu order result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.list_supported_ports",
+      "service": "xiaohongshu_store",
+      "name": "list_supported_ports",
+      "description": "List the customs ports supported by Xiaohongshu for cross-border clearance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list supported customs ports."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "platformPorts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu supported customs port with customs_name and customs_code."
+            },
+            "description": "The customs ports supported by the platform."
+          },
+          "sellerPorts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu supported customs port with customs_name and customs_code."
+            },
+            "description": "The customs ports the seller may declare through."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The supported customs ports result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.modify_order_express",
+      "service": "xiaohongshu_store",
+      "name": "modify_order_express",
+      "description": "Change the express tracking number of a shipped Xiaohongshu order. Only available after shipment and before receipt.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          },
+          "expressNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new express tracking number.",
+            "pattern": "\\S"
+          },
+          "expressCompanyCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu express company code, as returned by list_express_companies.",
+            "pattern": "\\S"
+          },
+          "expressCompanyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express company name.",
+            "pattern": "\\S"
+          },
+          "deliveryOrderIndex": {
+            "type": "integer",
+            "description": "The delivery package index from the order detail simpleDeliveryOrderList. Required for split shipments."
+          },
+          "oldExpressNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The tracking number to replace. Takes precedence over deliveryOrderIndex and rewrites every package using it.",
+            "pattern": "\\S"
+          },
+          "expressUrlProofList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A delivery proof URL.",
+              "pattern": "\\S"
+            },
+            "description": "The new delivery links for automatically delivered orders."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "expressNo",
+          "expressCompanyCode",
+          "expressCompanyName"
+        ],
+        "description": "The express update for a shipped Xiaohongshu order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The express update result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.modify_order_remark",
+      "service": "xiaohongshu_store",
+      "name": "modify_order_remark",
+      "description": "Modify the seller remark and flag of a Xiaohongshu order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          },
+          "sellerMarkNote": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seller remark content.",
+            "pattern": "\\S"
+          },
+          "operator": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the operator making the change.",
+            "pattern": "\\S"
+          },
+          "sellerMarkPriority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "The remark flag: 1 gray, 2 red, 3 yellow, 4 green, 5 blue, or 6 purple."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The seller remark update for a Xiaohongshu order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The seller remark update result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.refresh_token",
+      "service": "xiaohongshu_store",
+      "name": "refresh_token",
+      "description": "Refresh the access token using the refresh token stored in the connection credential. Xiaohongshu only issues new tokens when the access token has under 30 minutes left or has expired; otherwise it returns the current ones unchanged. A changed token set must be saved back to the connection, and the old access token stays valid for only 5 more minutes. Access tokens expire after 7 days.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to refresh the token; the refresh token comes from the connection credential."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The token record with accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, sellerId, and sellerName."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The refreshed Xiaohongshu token set."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.resend_payment_record",
+      "service": "xiaohongshu_store",
+      "name": "resend_payment_record",
+      "description": "Ask Xiaohongshu to notify the payment company to push the payment record to customs again for a bonded cross-border order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu order ID.",
+            "pattern": "\\S"
+          },
+          "customsType": {
+            "type": "string",
+            "enum": [
+              "zongshu",
+              "local"
+            ],
+            "description": "The customs system to push to."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The order whose bonded payment record should be pushed again."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The result message returned by Xiaohongshu."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The payment record resend result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.search_brands",
+      "service": "xiaohongshu_store",
+      "name": "search_brands",
+      "description": "Search the brands available for a leaf Xiaohongshu category.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The leaf category ID, from list_categories.",
+            "pattern": "\\S"
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A brand name keyword.",
+            "pattern": "\\S"
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of brands per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categoryId"
+        ],
+        "description": "The category and keyword used to search Xiaohongshu brands."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu brand with id, name, enName, and image."
+            },
+            "description": "The matching brands."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Xiaohongshu brand search result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.search_items",
+      "service": "xiaohongshu_store",
+      "name": "search_items",
+      "description": "Search Xiaohongshu items with full publish fields using keywords, item codes, or availability filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword matched against the item title.",
+            "pattern": "\\S"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An item identifier.",
+              "pattern": "\\S"
+            },
+            "description": "Exact item identifiers to look up, such as item codes, barcodes, item IDs, SPU IDs, or article numbers."
+          },
+          "buyable": {
+            "type": "boolean",
+            "description": "Whether to include only items currently on sale."
+          },
+          "createTimeFrom": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "createTimeTo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in milliseconds."
+          },
+          "lastId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The starting item ID cursor for deep-paging a full-catalog sync.",
+            "pattern": "\\S"
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of records per page. Defaults to 50 and cannot exceed 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The search filters used to find Xiaohongshu items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Xiaohongshu item record. Available fields depend on the query form."
+            },
+            "description": "The Xiaohongshu item records with full publish fields."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching items reported by Xiaohongshu."
+          },
+          "pageNo": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of items per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Xiaohongshu item search result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.set_sku_availability",
+      "service": "xiaohongshu_store",
+      "name": "set_sku_availability",
+      "description": "List or delist a Xiaohongshu SKU.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skuId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu SKU ID.",
+            "pattern": "\\S"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether the SKU should be on sale."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The availability update for a Xiaohongshu SKU."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The availability update result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.ship_after_sale_exchange",
+      "service": "xiaohongshu_store",
+      "name": "ship_after_sale_exchange",
+      "description": "Confirm receipt of the returned package and report the exchange shipment tracking number for a Xiaohongshu exchange after-sale.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "returnsId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu after-sale ID.",
+            "pattern": "\\S"
+          },
+          "expressCompanyCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu express company code, as returned by list_express_companies.",
+            "pattern": "\\S"
+          },
+          "expressNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The express tracking number of the exchange shipment.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The exchange shipment for a Xiaohongshu after-sale."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xiaohongshu accepted the exchange shipment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The exchange shipment result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.sync_sku_stock",
+      "service": "xiaohongshu_store",
+      "name": "sync_sku_stock",
+      "description": "Set the total stock of a Xiaohongshu SKU. Xiaohongshu derives the sellable stock from the difference with occupied and channel stock.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skuId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu SKU ID.",
+            "pattern": "\\S"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The new total stock, including occupied and channel quantities."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The total stock to set for a Xiaohongshu SKU."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stock": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu SKU stock result, including per-warehouse breakdowns."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The stock sync result."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.update_item",
+      "service": "xiaohongshu_store",
+      "name": "update_item",
+      "description": "Update a Xiaohongshu item and its SKUs: edit item fields, change existing SKUs through updateSkuList, add new ones through createSkuList, and remove SKUs through deleteSkuIdList.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xiaohongshu item ID.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item title.",
+            "pattern": "\\S"
+          },
+          "categoryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The leaf category ID, from list_categories.",
+            "pattern": "\\S"
+          },
+          "shippingTemplateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The carriage template ID, from list_carriage_templates.",
+            "pattern": "\\S"
+          },
+          "shippingGrossWeight": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The item shipping weight in grams. Required to be positive when the carriage template charges by weight."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "link": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The image URL returned by upload_material.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": true,
+              "description": "One image."
+            },
+            "description": "The main images. Upload files with upload_material first and pass each returned url as link.",
+            "minItems": 1
+          },
+          "updateSkuList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "skuId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SKU ID, from list_item_skus or get_item.",
+                  "pattern": "\\S"
+                },
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU price in fen."
+                },
+                "stock": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU stock."
+                },
+                "logisticsPlanId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The logistics plan ID, from list_logistics_plans.",
+                  "pattern": "\\S"
+                },
+                "deliveryTime": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "integer",
+                      "minimum": 3,
+                      "maximum": 5,
+                      "description": "The delivery time type: 3 for same-day, 4 for relative hours, or 5 for an absolute time."
+                    },
+                    "time": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The delivery time value for the chosen type.",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The SKU delivery time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One SKU to update. Other upstream SKU fields such as originalPrice, variants, barcode, erpCode, and specImage pass through unchanged."
+            },
+            "description": "The existing SKUs to update. Each needs skuId, price (in fen), stock, logisticsPlanId (from list_logistics_plans), and deliveryTime ({ type, time }).",
+            "minItems": 1
+          },
+          "createSkuList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU price in fen."
+                },
+                "stock": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The SKU stock."
+                },
+                "logisticsPlanId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The logistics plan ID, from list_logistics_plans.",
+                  "pattern": "\\S"
+                },
+                "deliveryTime": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "integer",
+                      "minimum": 3,
+                      "maximum": 5,
+                      "description": "The delivery time type: 3 for same-day, 4 for relative hours, or 5 for an absolute time."
+                    },
+                    "time": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The delivery time value for the chosen type.",
+                      "pattern": "\\S"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The SKU delivery time."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One SKU to create. Other upstream SKU fields such as originalPrice, variants, barcode, erpCode, and specImage pass through unchanged."
+            },
+            "description": "The new SKUs to add to the item, in the same shape as updateSkuList without skuId."
+          },
+          "deleteSkuIdList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A SKU ID.",
+              "pattern": "\\S"
+            },
+            "description": "The SKU IDs to remove from the item."
+          },
+          "brandId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The brand ID, from search_brands.",
+            "pattern": "\\S"
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One attribute assignment."
+            },
+            "description": "The category attributes, from get_category_attributes: { propertyId, name, value, valueId, valueList }."
+          },
+          "variantIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A spec type ID.",
+              "pattern": "\\S"
+            },
+            "description": "The spec type IDs of the item."
+          },
+          "articleNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The merchant article number.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item description, up to 500 characters.",
+            "pattern": "\\S"
+          },
+          "itemShortTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item short title.",
+            "pattern": "\\S"
+          },
+          "deliveryMode": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The delivery mode: 0 for normal delivery or 1 for no-logistics delivery."
+          },
+          "freeReturn": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The free-return policy: 1 or 2."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One video: { link }."
+            },
+            "description": "The main videos, in the same { link } shape as images."
+          },
+          "imageDescriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One description image: { link }."
+            },
+            "description": "The description images, in the same { link } shape as images."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemId",
+          "name",
+          "categoryId",
+          "shippingTemplateId",
+          "images",
+          "updateSkuList"
+        ],
+        "description": "The item and SKU data used to update a Xiaohongshu product."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Xiaohongshu item record. Available fields depend on the query form."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Xiaohongshu item."
+      }
+    },
+    {
+      "id": "xiaohongshu_store.upload_material",
+      "service": "xiaohongshu_store",
+      "name": "upload_material",
+      "description": "Upload an image or video to the Xiaohongshu material center and get its url for use in item images.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The material file name.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "IMAGE",
+              "VIDEO"
+            ],
+            "description": "The material type."
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file content as a base64 string.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The material to upload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "material": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The material record with materialId, url, and upload status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The uploaded material."
+      }
+    }
+  ]
+}

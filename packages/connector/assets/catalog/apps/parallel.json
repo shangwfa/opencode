@@ -1,0 +1,1219 @@
+{
+  "service": "parallel",
+  "displayName": "Parallel",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API key",
+      "placeholder": "PARALLEL_API_KEY",
+      "description": "Parallel API key sent in the x-api-key header. Create or view API keys in the Parallel platform.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://parallel.ai",
+  "actions": [
+    {
+      "id": "parallel.create_task_run",
+      "service": "parallel",
+      "name": "create_task_run",
+      "description": "Create a Parallel task run for web research or structured data enrichment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "processor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Parallel processor to use for the task."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Text input for the task."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by Parallel."
+              }
+            ],
+            "description": "The task input as text or a JSON object."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A metadata string value."
+                },
+                {
+                  "type": "integer",
+                  "description": "A metadata integer value."
+                },
+                {
+                  "type": "number",
+                  "description": "A metadata number value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A metadata boolean value."
+                }
+              ],
+              "description": "One metadata value stored with a Parallel task run."
+            },
+            "description": "User-provided metadata stored with the run."
+          },
+          "source_policy": {
+            "type": "object",
+            "properties": {
+              "include_domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One domain or bare domain extension."
+                },
+                "description": "Domains that Parallel should restrict results to.",
+                "maxItems": 200
+              },
+              "exclude_domains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One domain or bare domain extension."
+                },
+                "description": "Domains that Parallel should exclude from results.",
+                "maxItems": 200
+              },
+              "after_date": {
+                "type": "string",
+                "description": "Only include content published on or after this YYYY-MM-DD date.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Source policy for Parallel web results."
+          },
+          "advanced_settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Advanced Parallel request settings."
+          },
+          "task_spec": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Parallel task specification with input and output schemas."
+          },
+          "previous_interaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Interaction ID to use as context for this request."
+          },
+          "enable_events": {
+            "type": "boolean",
+            "description": "Whether Parallel should record progress events for the run."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Parallel."
+          },
+          "parallel_beta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Parallel beta header value to enable beta features."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processor",
+          "input"
+        ],
+        "description": "The input payload for creating a Parallel task run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Parallel task run ID."
+              },
+              "interaction_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The interaction ID to reuse context in a future task run."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "action_required",
+                  "running",
+                  "completed",
+                  "failed",
+                  "cancelling",
+                  "cancelled"
+                ],
+                "description": "The current task run status."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the run is currently active."
+              },
+              "warnings": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "The warning type."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The human-readable warning message."
+                        },
+                        "detail": {
+                          "description": "Optional detail supporting the warning."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A warning returned by Parallel."
+                    },
+                    "description": "Warnings for the task run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Warnings for the task run."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ref_id": {
+                        "type": "string",
+                        "description": "The Parallel error reference ID."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The human-readable error message."
+                      },
+                      "detail": {
+                        "description": "Optional detail supporting the error."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Parallel error object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Parallel error object."
+              },
+              "processor": {
+                "type": "string",
+                "description": "The processor used by the task run."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A metadata string value."
+                        },
+                        {
+                          "type": "integer",
+                          "description": "A metadata integer value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A metadata number value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A metadata boolean value."
+                        }
+                      ],
+                      "description": "One metadata value stored with a Parallel task run."
+                    },
+                    "description": "User-provided metadata stored with the run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User-provided metadata stored with the run."
+              },
+              "taskgroup_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task group ID, if the run belongs to a group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task group ID, if the run belongs to a group."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run creation timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run creation timestamp as an RFC 3339 string."
+              },
+              "modified_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run modification timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run modification timestamp as an RFC 3339 string."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Parallel task run."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a Parallel task run."
+      }
+    },
+    {
+      "id": "parallel.extract",
+      "service": "parallel",
+      "name": "extract",
+      "description": "Extract relevant markdown excerpts or full content from public URLs with Parallel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One URL to extract.",
+              "format": "uri"
+            },
+            "description": "URLs to extract content from. Parallel supports up to 20 URLs.",
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Natural-language description of the extraction goal used to focus excerpts."
+          },
+          "search_queries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One keyword search query."
+            },
+            "description": "Optional keyword search queries used with objective to focus excerpts.",
+            "minItems": 1
+          },
+          "max_chars_total": {
+            "type": "integer",
+            "description": "Upper bound on total characters across excerpts from all extracted results."
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Session identifier shared across related Search and Extract calls."
+          },
+          "client_model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model generating this request and consuming the results."
+          },
+          "advanced_settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Advanced Parallel request settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "urls"
+        ],
+        "description": "The input payload for Parallel Extract."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "extract_id": {
+            "type": "string",
+            "description": "The Parallel extract request ID."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The extracted URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The webpage title, if available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The webpage title, if available."
+                },
+                "publish_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The webpage publish date in YYYY-MM-DD format."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The webpage publish date in YYYY-MM-DD format."
+                },
+                "excerpts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One excerpt from the extracted URL."
+                  },
+                  "description": "Relevant excerpts from the extracted URL, formatted as markdown."
+                },
+                "full_content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Full content from the URL formatted as markdown, if requested."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Full content from the URL formatted as markdown, if requested."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Parallel extract result."
+            },
+            "description": "Successful extract results."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The URL that failed extraction.",
+                  "format": "uri"
+                },
+                "error_type": {
+                  "type": "string",
+                  "description": "The Parallel extract error type."
+                },
+                "http_status_code": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The upstream HTTP status code, if available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The upstream HTTP status code, if available."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The error content returned by Parallel, if available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The error content returned by Parallel, if available."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Parallel extract error."
+            },
+            "description": "Extract errors for requested URLs not in the results."
+          },
+          "warnings": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The warning type."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "The human-readable warning message."
+                    },
+                    "detail": {
+                      "description": "Optional detail supporting the warning."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A warning returned by Parallel."
+                },
+                "description": "Warnings for the extract request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Warnings for the extract request."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The SKU name reported by Parallel."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "The usage count for the SKU."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Parallel usage item."
+                },
+                "description": "Usage metrics for the extract request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Usage metrics for the extract request."
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session identifier for related Search and Extract calls."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Parallel."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned by Parallel Extract."
+      }
+    },
+    {
+      "id": "parallel.retrieve_task_run",
+      "service": "parallel",
+      "name": "retrieve_task_run",
+      "description": "Retrieve the current status of a Parallel task run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Parallel task run ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a Parallel task run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Parallel task run ID."
+              },
+              "interaction_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The interaction ID to reuse context in a future task run."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "action_required",
+                  "running",
+                  "completed",
+                  "failed",
+                  "cancelling",
+                  "cancelled"
+                ],
+                "description": "The current task run status."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the run is currently active."
+              },
+              "warnings": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "The warning type."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The human-readable warning message."
+                        },
+                        "detail": {
+                          "description": "Optional detail supporting the warning."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A warning returned by Parallel."
+                    },
+                    "description": "Warnings for the task run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Warnings for the task run."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ref_id": {
+                        "type": "string",
+                        "description": "The Parallel error reference ID."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The human-readable error message."
+                      },
+                      "detail": {
+                        "description": "Optional detail supporting the error."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Parallel error object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Parallel error object."
+              },
+              "processor": {
+                "type": "string",
+                "description": "The processor used by the task run."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A metadata string value."
+                        },
+                        {
+                          "type": "integer",
+                          "description": "A metadata integer value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A metadata number value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A metadata boolean value."
+                        }
+                      ],
+                      "description": "One metadata value stored with a Parallel task run."
+                    },
+                    "description": "User-provided metadata stored with the run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User-provided metadata stored with the run."
+              },
+              "taskgroup_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task group ID, if the run belongs to a group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task group ID, if the run belongs to a group."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run creation timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run creation timestamp as an RFC 3339 string."
+              },
+              "modified_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run modification timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run modification timestamp as an RFC 3339 string."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Parallel task run."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Parallel task run."
+      }
+    },
+    {
+      "id": "parallel.retrieve_task_run_result",
+      "service": "parallel",
+      "name": "retrieve_task_run_result",
+      "description": "Retrieve the result of a Parallel task run, blocking until completion or timeout.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Parallel task run ID."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum seconds Parallel should wait for the result."
+          },
+          "parallel_beta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Parallel beta header value to enable beta features."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "run_id"
+        ],
+        "description": "The input payload for retrieving a Parallel task run result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Parallel task run ID."
+              },
+              "interaction_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The interaction ID to reuse context in a future task run."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "action_required",
+                  "running",
+                  "completed",
+                  "failed",
+                  "cancelling",
+                  "cancelled"
+                ],
+                "description": "The current task run status."
+              },
+              "is_active": {
+                "type": "boolean",
+                "description": "Whether the run is currently active."
+              },
+              "warnings": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "The warning type."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The human-readable warning message."
+                        },
+                        "detail": {
+                          "description": "Optional detail supporting the warning."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A warning returned by Parallel."
+                    },
+                    "description": "Warnings for the task run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Warnings for the task run."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "ref_id": {
+                        "type": "string",
+                        "description": "The Parallel error reference ID."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The human-readable error message."
+                      },
+                      "detail": {
+                        "description": "Optional detail supporting the error."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Parallel error object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Parallel error object."
+              },
+              "processor": {
+                "type": "string",
+                "description": "The processor used by the task run."
+              },
+              "metadata": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A metadata string value."
+                        },
+                        {
+                          "type": "integer",
+                          "description": "A metadata integer value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A metadata number value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A metadata boolean value."
+                        }
+                      ],
+                      "description": "One metadata value stored with a Parallel task run."
+                    },
+                    "description": "User-provided metadata stored with the run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User-provided metadata stored with the run."
+              },
+              "taskgroup_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task group ID, if the run belongs to a group."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task group ID, if the run belongs to a group."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run creation timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run creation timestamp as an RFC 3339 string."
+              },
+              "modified_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The task run modification timestamp as an RFC 3339 string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task run modification timestamp as an RFC 3339 string."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Parallel task run."
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "json",
+                  "text"
+                ],
+                "description": "The output type."
+              },
+              "content": {
+                "description": "The output content returned by Parallel."
+              },
+              "basis": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by Parallel."
+                },
+                "description": "Basis entries supporting the output."
+              },
+              "output_schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw object returned by Parallel."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw object returned by Parallel."
+              },
+              "mcp_tool_calls": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw object returned by Parallel."
+                    },
+                    "description": "MCP tool calls made by the task."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "MCP tool calls made by the task."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Output from a completed Parallel task run."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Parallel."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a Parallel task run result."
+      }
+    },
+    {
+      "id": "parallel.search",
+      "service": "parallel",
+      "name": "search",
+      "description": "Search the web with Parallel and return ranked source excerpts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search_queries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One concise keyword search query."
+            },
+            "description": "Concise keyword search queries. Parallel recommends at least one query and 2-3 for best results.",
+            "minItems": 1
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Natural-language description of the search goal used with search_queries to focus results."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "turbo",
+              "basic",
+              "advanced"
+            ],
+            "description": "The Parallel search mode preset."
+          },
+          "max_chars_total": {
+            "type": "integer",
+            "description": "Upper bound on total characters across excerpts from all results."
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Session identifier shared across related Search and Extract calls."
+          },
+          "client_model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model generating this request and consuming the results."
+          },
+          "advanced_settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Advanced Parallel request settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search_queries"
+        ],
+        "description": "The input payload for Parallel Search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "search_id": {
+            "type": "string",
+            "description": "The Parallel search request ID."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The result URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The webpage title, if available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The webpage title, if available."
+                },
+                "publish_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The webpage publish date in YYYY-MM-DD format."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The webpage publish date in YYYY-MM-DD format."
+                },
+                "excerpts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One excerpt from the result."
+                  },
+                  "description": "Relevant excerpts from the result URL, formatted as markdown."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Parallel web search result."
+            },
+            "description": "Search results ordered by decreasing relevance."
+          },
+          "warnings": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The warning type."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "The human-readable warning message."
+                    },
+                    "detail": {
+                      "description": "Optional detail supporting the warning."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A warning returned by Parallel."
+                },
+                "description": "Warnings for the search request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Warnings for the search request."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The SKU name reported by Parallel."
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "The usage count for the SKU."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A Parallel usage item."
+                },
+                "description": "Usage metrics for the search request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Usage metrics for the search request."
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Session identifier for related Search and Extract calls."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by Parallel."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned by Parallel Search."
+      }
+    }
+  ]
+}

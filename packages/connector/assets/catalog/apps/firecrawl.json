@@ -1,0 +1,4189 @@
+{
+  "service": "firecrawl",
+  "displayName": "Firecrawl",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "fc-...",
+      "description": "Firecrawl API key used with the Authorization Bearer header. Create it in Firecrawl API Keys: https://firecrawl.dev/app/api-keys.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://firecrawl.example.com",
+          "description": "Optional base URL of a self-hosted Firecrawl instance, without the /v1 or /v2 path. Leave empty to use https://api.firecrawl.dev. HTTPS is recommended. HTTP sends your API key and request content in plaintext; use it only on a trusted network. Private/overlay targets (RFC 1918, Tailscale, NetBird, private hostnames) require the self-hosted runtime to enable OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.firecrawl.dev",
+  "actions": [
+    {
+      "id": "firecrawl.agent_cancel",
+      "service": "firecrawl",
+      "name": "agent_cancel",
+      "description": "Cancel a running Firecrawl agent job by job ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The final status returned by Firecrawl."
+          },
+          "message": {
+            "type": "string",
+            "description": "The cancellation message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Firecrawl cancel response."
+      }
+    },
+    {
+      "id": "firecrawl.batch_scrape",
+      "service": "firecrawl",
+      "name": "batch_scrape",
+      "description": "Start a Firecrawl batch scrape job for multiple URLs and return the async job ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs to scrape in batch."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The browser action type, such as click, write, wait, or press."
+                },
+                "selector": {
+                  "type": "string",
+                  "description": "The CSS selector targeted by the action."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text to type for write actions."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key to press for press actions."
+                },
+                "milliseconds": {
+                  "type": "integer",
+                  "description": "The duration in milliseconds used by wait-style actions."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "A browser action to perform before scraping."
+            },
+            "description": "The browser actions to run before each scrape."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "rawHtml",
+                    "links",
+                    "screenshot",
+                    "screenshot@fullPage",
+                    "json",
+                    "changeTracking",
+                    "summary"
+                  ],
+                  "description": "A built-in Firecrawl output format."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The structured format type, such as json or screenshot."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A structured Firecrawl format descriptor."
+                }
+              ],
+              "description": "A requested Firecrawl output format."
+            },
+            "description": "The output formats to return."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers to send with the request."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code to request from."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A string value."
+                },
+                "description": "The preferred locales for the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Location settings for the request."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook destination URL."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The webhook events that should trigger notifications."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "url"
+            ],
+            "description": "Webhook callback settings for async jobs."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "The request timeout in milliseconds."
+          },
+          "waitFor": {
+            "type": "integer",
+            "description": "The delay before scraping starts."
+          },
+          "maxAge": {
+            "type": "integer",
+            "description": "The cache max age in milliseconds."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "description": "The maximum concurrency for the batch job."
+          },
+          "onlyMainContent": {
+            "type": "boolean",
+            "description": "Whether to keep only the main content of each page."
+          },
+          "includeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The HTML tags that should be prioritized in the extracted content."
+          },
+          "excludeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The HTML tags that should be removed from the output."
+          },
+          "mobile": {
+            "type": "boolean",
+            "description": "Whether to emulate a mobile device."
+          },
+          "proxy": {
+            "type": "string",
+            "enum": [
+              "basic",
+              "stealth",
+              "auto"
+            ],
+            "description": "The proxy mode to use for the request."
+          },
+          "ignoreInvalidURLs": {
+            "type": "boolean",
+            "description": "Whether invalid URLs should be ignored instead of failing the job."
+          },
+          "blockAds": {
+            "type": "boolean",
+            "description": "Whether ad resources should be blocked."
+          },
+          "storeInCache": {
+            "type": "boolean",
+            "description": "Whether Firecrawl should store the result in cache."
+          },
+          "removeBase64Images": {
+            "type": "boolean",
+            "description": "Whether base64-encoded images should be removed from the output."
+          },
+          "skipTlsVerification": {
+            "type": "boolean",
+            "description": "Whether TLS verification should be skipped."
+          },
+          "zeroDataRetention": {
+            "type": "boolean",
+            "description": "Whether the request should opt into zero data retention."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "urls"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The status URL returned by Firecrawl."
+          },
+          "invalidURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The invalid URLs rejected before the job started."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "A Firecrawl async job start response."
+      }
+    },
+    {
+      "id": "firecrawl.batch_scrape_cancel",
+      "service": "firecrawl",
+      "name": "batch_scrape_cancel",
+      "description": "Cancel a running Firecrawl batch scrape job by job ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The final status returned by Firecrawl."
+          },
+          "message": {
+            "type": "string",
+            "description": "The cancellation message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Firecrawl cancel response."
+      }
+    },
+    {
+      "id": "firecrawl.batch_scrape_get",
+      "service": "firecrawl",
+      "name": "batch_scrape_get",
+      "description": "Get the current status and paged results of a Firecrawl batch scrape job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current job status."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of queued or discovered items."
+          },
+          "completed": {
+            "type": "integer",
+            "description": "The number of completed items in the job."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination URL for the next segment of data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination URL for the next segment of data."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The result items returned by Firecrawl."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "A Firecrawl paged async job status response."
+      }
+    },
+    {
+      "id": "firecrawl.batch_scrape_get_errors",
+      "service": "firecrawl",
+      "name": "batch_scrape_get_errors",
+      "description": "Get the failed URLs and robots.txt blocks from a Firecrawl batch scrape job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The job item ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL that failed."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The Firecrawl error code."
+                },
+                "error": {
+                  "type": "string",
+                  "description": "The error message."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The ISO 8601 failure timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "url",
+                "error"
+              ],
+              "description": "An error item returned by Firecrawl."
+            },
+            "description": "The failed items for the job."
+          },
+          "robotsBlocked": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs blocked by robots.txt."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "errors"
+        ],
+        "description": "The failed Firecrawl job items."
+      }
+    },
+    {
+      "id": "firecrawl.crawl",
+      "service": "firecrawl",
+      "name": "crawl",
+      "description": "Start a Firecrawl crawl job with compatibility input fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seed URL for the crawl."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "A natural-language prompt that guides crawl option generation."
+          },
+          "includePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The path patterns that the crawl should include."
+          },
+          "excludePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The path patterns that the crawl should exclude."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "description": "The maximum traversal depth."
+          },
+          "maxDiscoveryDepth": {
+            "type": "integer",
+            "description": "The maximum depth for link discovery."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of pages to crawl."
+          },
+          "delay": {
+            "type": "integer",
+            "description": "The delay between crawl requests in milliseconds."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "description": "The maximum concurrency for the crawl job."
+          },
+          "allowBackwardLinks": {
+            "type": "boolean",
+            "description": "Whether backward links should be followed for compatibility."
+          },
+          "allowExternalLinks": {
+            "type": "boolean",
+            "description": "Whether external links should be followed."
+          },
+          "allowSubdomains": {
+            "type": "boolean",
+            "description": "Whether subdomains should be followed."
+          },
+          "crawlEntireDomain": {
+            "type": "boolean",
+            "description": "Whether the entire domain should be crawled."
+          },
+          "ignoreSitemap": {
+            "type": "boolean",
+            "description": "Whether the sitemap should be ignored."
+          },
+          "ignoreQueryParameters": {
+            "type": "boolean",
+            "description": "Whether query parameters should be ignored when deduplicating pages."
+          },
+          "sitemap": {
+            "type": "boolean",
+            "description": "Whether sitemap discovery should be enabled."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook destination URL."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The webhook events that should trigger notifications."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "url"
+            ],
+            "description": "Webhook callback settings for async jobs."
+          },
+          "scrapeOptions": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The browser action type, such as click, write, wait, or press."
+                    },
+                    "selector": {
+                      "type": "string",
+                      "description": "The CSS selector targeted by the action."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text to type for write actions."
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "The key to press for press actions."
+                    },
+                    "milliseconds": {
+                      "type": "integer",
+                      "description": "The duration in milliseconds used by wait-style actions."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A browser action to perform before scraping."
+                },
+                "description": "The browser actions to perform before extraction."
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "html",
+                        "rawHtml",
+                        "links",
+                        "screenshot",
+                        "screenshot@fullPage",
+                        "json",
+                        "changeTracking",
+                        "summary"
+                      ],
+                      "description": "A built-in Firecrawl output format."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The structured format type, such as json or screenshot."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "A structured Firecrawl format descriptor."
+                    }
+                  ],
+                  "description": "A requested Firecrawl output format."
+                },
+                "description": "The formats to return from Firecrawl."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "description": "The ISO 3166-1 alpha-2 country code to request from."
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string value."
+                    },
+                    "description": "The preferred locales for the request."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Location settings for the request."
+              },
+              "jsonOptions": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "An extraction prompt that explains the desired JSON structure."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A loose JSON object."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Options for structured JSON output."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The request timeout in milliseconds."
+              },
+              "waitFor": {
+                "type": "integer",
+                "description": "The delay in milliseconds before extraction starts."
+              },
+              "maxAge": {
+                "type": "integer",
+                "description": "The cache max age in milliseconds."
+              },
+              "onlyMainContent": {
+                "type": "boolean",
+                "description": "Whether to keep only the main content of the page."
+              },
+              "mobile": {
+                "type": "boolean",
+                "description": "Whether to emulate a mobile device."
+              },
+              "includeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be prioritized in the extracted content."
+              },
+              "excludeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be removed from the extracted content."
+              },
+              "parsers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The parser plugins to enable for the request."
+              },
+              "parsePDF": {
+                "type": "boolean",
+                "description": "Whether PDF parsing should be enabled."
+              },
+              "proxy": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "stealth",
+                  "auto"
+                ],
+                "description": "The proxy mode to use for the request."
+              },
+              "storeInCache": {
+                "type": "boolean",
+                "description": "Whether Firecrawl should store the result in cache."
+              },
+              "removeBase64Images": {
+                "type": "boolean",
+                "description": "Whether base64-encoded images should be removed from the output."
+              },
+              "blockAds": {
+                "type": "boolean",
+                "description": "Whether ad resources should be blocked."
+              },
+              "skipTlsVerification": {
+                "type": "boolean",
+                "description": "Whether TLS certificate verification should be skipped."
+              },
+              "zeroDataRetention": {
+                "type": "boolean",
+                "description": "Whether the request should opt into zero data retention."
+              },
+              "changeTrackingOptions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Shared Firecrawl scrape options."
+          },
+          "scrapeOptions_actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The browser action type, such as click, write, wait, or press."
+                },
+                "selector": {
+                  "type": "string",
+                  "description": "The CSS selector targeted by the action."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text to type for write actions."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key to press for press actions."
+                },
+                "milliseconds": {
+                  "type": "integer",
+                  "description": "The duration in milliseconds used by wait-style actions."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "A browser action to perform before scraping."
+            },
+            "description": "Compatibility browser actions for nested scrape options."
+          },
+          "scrapeOptions_formats": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "rawHtml",
+                    "links",
+                    "screenshot",
+                    "screenshot@fullPage",
+                    "json",
+                    "changeTracking",
+                    "summary"
+                  ],
+                  "description": "A built-in Firecrawl output format."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The structured format type, such as json or screenshot."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A structured Firecrawl format descriptor."
+                }
+              ],
+              "description": "A requested Firecrawl output format."
+            },
+            "description": "Compatibility formats for nested scrape options."
+          },
+          "scrapeOptions_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers to send with the request."
+          },
+          "scrapeOptions_location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code to request from."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A string value."
+                },
+                "description": "The preferred locales for the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Location settings for the request."
+          },
+          "scrapeOptions_jsonOptions": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "description": "An extraction prompt that explains the desired JSON structure."
+              },
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Options for structured JSON output."
+          },
+          "scrapeOptions_timeout": {
+            "type": "integer",
+            "description": "Compatibility timeout for nested scrape options."
+          },
+          "scrapeOptions_waitFor": {
+            "type": "integer",
+            "description": "Compatibility delay for nested scrape options."
+          },
+          "scrapeOptions_maxAge": {
+            "type": "integer",
+            "description": "Compatibility cache max age for nested scrape options."
+          },
+          "scrapeOptions_onlyMainContent": {
+            "type": "boolean",
+            "description": "Compatibility main-content flag for nested scrape options."
+          },
+          "scrapeOptions_mobile": {
+            "type": "boolean",
+            "description": "Compatibility mobile emulation flag for nested scrape options."
+          },
+          "scrapeOptions_includeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility includeTags for nested scrape options."
+          },
+          "scrapeOptions_excludeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility excludeTags for nested scrape options."
+          },
+          "scrapeOptions_proxy": {
+            "type": "string",
+            "enum": [
+              "basic",
+              "stealth",
+              "auto"
+            ],
+            "description": "Compatibility proxy mode for nested scrape options."
+          },
+          "scrapeOptions_parsers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility parser plugins for nested scrape options."
+          },
+          "scrapeOptions_parsePDF": {
+            "type": "boolean",
+            "description": "Compatibility PDF parsing flag for nested scrape options."
+          },
+          "scrapeOptions_blockAds": {
+            "type": "boolean",
+            "description": "Compatibility ad-blocking flag for nested scrape options."
+          },
+          "scrapeOptions_storeInCache": {
+            "type": "boolean",
+            "description": "Compatibility cache storage flag for nested scrape options."
+          },
+          "scrapeOptions_removeBase64Images": {
+            "type": "boolean",
+            "description": "Compatibility base64 image removal flag for nested scrape options."
+          },
+          "scrapeOptions_skipTlsVerification": {
+            "type": "boolean",
+            "description": "Compatibility TLS verification flag for nested scrape options."
+          },
+          "scrapeOptions_changeTrackingOptions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "zeroDataRetention": {
+            "type": "boolean",
+            "description": "Whether the request should opt into zero data retention."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The status URL returned by Firecrawl."
+          },
+          "invalidURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The invalid URLs rejected before the job started."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "A Firecrawl async job start response."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_cancel",
+      "service": "firecrawl",
+      "name": "crawl_cancel",
+      "description": "Cancel a running Firecrawl crawl job by job ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The final status returned by Firecrawl."
+          },
+          "message": {
+            "type": "string",
+            "description": "The cancellation message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Firecrawl cancel response."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_delete",
+      "service": "firecrawl",
+      "name": "crawl_delete",
+      "description": "Compatibility alias of crawl_cancel for the crawl delete action name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The final status returned by Firecrawl."
+          },
+          "message": {
+            "type": "string",
+            "description": "The cancellation message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Firecrawl cancel response."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_get",
+      "service": "firecrawl",
+      "name": "crawl_get",
+      "description": "Get the current status and paged results of a Firecrawl crawl job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current job status."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of queued or discovered items."
+          },
+          "completed": {
+            "type": "integer",
+            "description": "The number of completed items in the job."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination URL for the next segment of data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination URL for the next segment of data."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The result items returned by Firecrawl."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "A Firecrawl paged async job status response."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_get_errors",
+      "service": "firecrawl",
+      "name": "crawl_get_errors",
+      "description": "Get the failed URLs and robots.txt blocks from a Firecrawl crawl job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The job item ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL that failed."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The Firecrawl error code."
+                },
+                "error": {
+                  "type": "string",
+                  "description": "The error message."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The ISO 8601 failure timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "url",
+                "error"
+              ],
+              "description": "An error item returned by Firecrawl."
+            },
+            "description": "The failed items for the job."
+          },
+          "robotsBlocked": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs blocked by robots.txt."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "errors"
+        ],
+        "description": "The failed Firecrawl job items."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_list_active",
+      "service": "firecrawl",
+      "name": "crawl_list_active",
+      "description": "List the currently active Firecrawl crawl jobs for the authenticated team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "crawls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The active crawl jobs returned by Firecrawl."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "crawls"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_params_preview",
+      "service": "firecrawl",
+      "name": "crawl_params_preview",
+      "description": "Preview the crawl parameters that Firecrawl would infer from a URL and prompt.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seed URL for the crawl preview."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language prompt used for preview generation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "prompt"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the preview request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ],
+        "description": "A Firecrawl preview response."
+      }
+    },
+    {
+      "id": "firecrawl.crawl_v2",
+      "service": "firecrawl",
+      "name": "crawl_v2",
+      "description": "Start a Firecrawl crawl job with the official v2 crawl fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The seed URL for the crawl."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "A natural-language prompt that guides crawl option generation."
+          },
+          "includePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The path patterns that the crawl should include."
+          },
+          "excludePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The path patterns that the crawl should exclude."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "description": "The maximum traversal depth."
+          },
+          "maxDiscoveryDepth": {
+            "type": "integer",
+            "description": "The maximum depth for link discovery."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of pages to crawl."
+          },
+          "delay": {
+            "type": "integer",
+            "description": "The delay between crawl requests in milliseconds."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "description": "The maximum concurrency for the crawl job."
+          },
+          "allowBackwardLinks": {
+            "type": "boolean",
+            "description": "Whether backward links should be followed for compatibility."
+          },
+          "allowExternalLinks": {
+            "type": "boolean",
+            "description": "Whether external links should be followed."
+          },
+          "allowSubdomains": {
+            "type": "boolean",
+            "description": "Whether subdomains should be followed."
+          },
+          "crawlEntireDomain": {
+            "type": "boolean",
+            "description": "Whether the entire domain should be crawled."
+          },
+          "ignoreSitemap": {
+            "type": "boolean",
+            "description": "Whether the sitemap should be ignored."
+          },
+          "ignoreQueryParameters": {
+            "type": "boolean",
+            "description": "Whether query parameters should be ignored when deduplicating pages."
+          },
+          "sitemap": {
+            "type": "boolean",
+            "description": "Whether sitemap discovery should be enabled."
+          },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The webhook destination URL."
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The webhook events that should trigger notifications."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "url"
+            ],
+            "description": "Webhook callback settings for async jobs."
+          },
+          "scrapeOptions": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The browser action type, such as click, write, wait, or press."
+                    },
+                    "selector": {
+                      "type": "string",
+                      "description": "The CSS selector targeted by the action."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text to type for write actions."
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "The key to press for press actions."
+                    },
+                    "milliseconds": {
+                      "type": "integer",
+                      "description": "The duration in milliseconds used by wait-style actions."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A browser action to perform before scraping."
+                },
+                "description": "The browser actions to perform before extraction."
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "html",
+                        "rawHtml",
+                        "links",
+                        "screenshot",
+                        "screenshot@fullPage",
+                        "json",
+                        "changeTracking",
+                        "summary"
+                      ],
+                      "description": "A built-in Firecrawl output format."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The structured format type, such as json or screenshot."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "A structured Firecrawl format descriptor."
+                    }
+                  ],
+                  "description": "A requested Firecrawl output format."
+                },
+                "description": "The formats to return from Firecrawl."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "description": "The ISO 3166-1 alpha-2 country code to request from."
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string value."
+                    },
+                    "description": "The preferred locales for the request."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Location settings for the request."
+              },
+              "jsonOptions": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "An extraction prompt that explains the desired JSON structure."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A loose JSON object."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Options for structured JSON output."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The request timeout in milliseconds."
+              },
+              "waitFor": {
+                "type": "integer",
+                "description": "The delay in milliseconds before extraction starts."
+              },
+              "maxAge": {
+                "type": "integer",
+                "description": "The cache max age in milliseconds."
+              },
+              "onlyMainContent": {
+                "type": "boolean",
+                "description": "Whether to keep only the main content of the page."
+              },
+              "mobile": {
+                "type": "boolean",
+                "description": "Whether to emulate a mobile device."
+              },
+              "includeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be prioritized in the extracted content."
+              },
+              "excludeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be removed from the extracted content."
+              },
+              "parsers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The parser plugins to enable for the request."
+              },
+              "parsePDF": {
+                "type": "boolean",
+                "description": "Whether PDF parsing should be enabled."
+              },
+              "proxy": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "stealth",
+                  "auto"
+                ],
+                "description": "The proxy mode to use for the request."
+              },
+              "storeInCache": {
+                "type": "boolean",
+                "description": "Whether Firecrawl should store the result in cache."
+              },
+              "removeBase64Images": {
+                "type": "boolean",
+                "description": "Whether base64-encoded images should be removed from the output."
+              },
+              "blockAds": {
+                "type": "boolean",
+                "description": "Whether ad resources should be blocked."
+              },
+              "skipTlsVerification": {
+                "type": "boolean",
+                "description": "Whether TLS certificate verification should be skipped."
+              },
+              "zeroDataRetention": {
+                "type": "boolean",
+                "description": "Whether the request should opt into zero data retention."
+              },
+              "changeTrackingOptions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Shared Firecrawl scrape options."
+          },
+          "scrapeOptions_actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The browser action type, such as click, write, wait, or press."
+                },
+                "selector": {
+                  "type": "string",
+                  "description": "The CSS selector targeted by the action."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text to type for write actions."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key to press for press actions."
+                },
+                "milliseconds": {
+                  "type": "integer",
+                  "description": "The duration in milliseconds used by wait-style actions."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "A browser action to perform before scraping."
+            },
+            "description": "Compatibility browser actions for nested scrape options."
+          },
+          "scrapeOptions_formats": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "rawHtml",
+                    "links",
+                    "screenshot",
+                    "screenshot@fullPage",
+                    "json",
+                    "changeTracking",
+                    "summary"
+                  ],
+                  "description": "A built-in Firecrawl output format."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The structured format type, such as json or screenshot."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A structured Firecrawl format descriptor."
+                }
+              ],
+              "description": "A requested Firecrawl output format."
+            },
+            "description": "Compatibility formats for nested scrape options."
+          },
+          "scrapeOptions_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers to send with the request."
+          },
+          "scrapeOptions_location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code to request from."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A string value."
+                },
+                "description": "The preferred locales for the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Location settings for the request."
+          },
+          "scrapeOptions_jsonOptions": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "description": "An extraction prompt that explains the desired JSON structure."
+              },
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Options for structured JSON output."
+          },
+          "scrapeOptions_timeout": {
+            "type": "integer",
+            "description": "Compatibility timeout for nested scrape options."
+          },
+          "scrapeOptions_waitFor": {
+            "type": "integer",
+            "description": "Compatibility delay for nested scrape options."
+          },
+          "scrapeOptions_maxAge": {
+            "type": "integer",
+            "description": "Compatibility cache max age for nested scrape options."
+          },
+          "scrapeOptions_onlyMainContent": {
+            "type": "boolean",
+            "description": "Compatibility main-content flag for nested scrape options."
+          },
+          "scrapeOptions_mobile": {
+            "type": "boolean",
+            "description": "Compatibility mobile emulation flag for nested scrape options."
+          },
+          "scrapeOptions_includeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility includeTags for nested scrape options."
+          },
+          "scrapeOptions_excludeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility excludeTags for nested scrape options."
+          },
+          "scrapeOptions_proxy": {
+            "type": "string",
+            "enum": [
+              "basic",
+              "stealth",
+              "auto"
+            ],
+            "description": "Compatibility proxy mode for nested scrape options."
+          },
+          "scrapeOptions_parsers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Compatibility parser plugins for nested scrape options."
+          },
+          "scrapeOptions_parsePDF": {
+            "type": "boolean",
+            "description": "Compatibility PDF parsing flag for nested scrape options."
+          },
+          "scrapeOptions_blockAds": {
+            "type": "boolean",
+            "description": "Compatibility ad-blocking flag for nested scrape options."
+          },
+          "scrapeOptions_storeInCache": {
+            "type": "boolean",
+            "description": "Compatibility cache storage flag for nested scrape options."
+          },
+          "scrapeOptions_removeBase64Images": {
+            "type": "boolean",
+            "description": "Compatibility base64 image removal flag for nested scrape options."
+          },
+          "scrapeOptions_skipTlsVerification": {
+            "type": "boolean",
+            "description": "Compatibility TLS verification flag for nested scrape options."
+          },
+          "scrapeOptions_changeTrackingOptions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "zeroDataRetention": {
+            "type": "boolean",
+            "description": "Whether the request should opt into zero data retention."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "The status URL returned by Firecrawl."
+          },
+          "invalidURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The invalid URLs rejected before the job started."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "A Firecrawl async job start response."
+      }
+    },
+    {
+      "id": "firecrawl.credit_usage_get",
+      "service": "firecrawl",
+      "name": "credit_usage_get",
+      "description": "Get the authenticated Firecrawl team's current credit usage summary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ],
+        "description": "A Firecrawl usage response."
+      }
+    },
+    {
+      "id": "firecrawl.credit_usage_get_historical",
+      "service": "firecrawl",
+      "name": "credit_usage_get_historical",
+      "description": "Get the authenticated Firecrawl team's historical credit usage summary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "byApiKey": {
+            "type": "boolean",
+            "description": "Whether usage should be grouped by API key."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startDate": {
+                  "type": "string",
+                  "description": "The billing period start timestamp."
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "The billing period end timestamp."
+                },
+                "creditsUsed": {
+                  "type": "integer",
+                  "description": "The credits used in the period."
+                },
+                "tokensUsed": {
+                  "type": "integer",
+                  "description": "The tokens used in the period."
+                },
+                "apiKey": {
+                  "type": "string",
+                  "description": "The API key identifier for the period."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "startDate",
+                "endDate"
+              ],
+              "description": "A historical usage period returned by Firecrawl."
+            },
+            "description": "The historical usage periods returned by Firecrawl."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "periods"
+        ],
+        "description": "A Firecrawl historical usage response."
+      }
+    },
+    {
+      "id": "firecrawl.deep_research",
+      "service": "firecrawl",
+      "name": "deep_research",
+      "description": "Start a Firecrawl deep research job.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The research question or topic."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The output formats requested from deep research."
+          },
+          "jsonOptions": {
+            "type": "object",
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "description": "An extraction prompt that explains the desired JSON structure."
+              },
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Options for structured JSON output."
+          },
+          "maxUrls": {
+            "type": "integer",
+            "description": "The maximum URLs the research job may analyze."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "description": "The maximum research depth for the job."
+          },
+          "timeLimit": {
+            "type": "integer",
+            "description": "The research time limit in seconds."
+          },
+          "systemPrompt": {
+            "type": "string",
+            "description": "A system prompt that guides the research agent."
+          },
+          "analysisPrompt": {
+            "type": "string",
+            "description": "A synthesis prompt that guides the final analysis."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl deep research job ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current deep research status."
+          },
+          "currentDepth": {
+            "type": "integer",
+            "description": "The current research depth."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "description": "The configured maximum research depth."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "firecrawl.extract",
+      "service": "firecrawl",
+      "name": "extract",
+      "description": "Start a Firecrawl extract job that returns structured data for one or more URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs to extract structured data from."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The extraction prompt."
+          },
+          "schema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "scrapeOptions": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The browser action type, such as click, write, wait, or press."
+                    },
+                    "selector": {
+                      "type": "string",
+                      "description": "The CSS selector targeted by the action."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text to type for write actions."
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "The key to press for press actions."
+                    },
+                    "milliseconds": {
+                      "type": "integer",
+                      "description": "The duration in milliseconds used by wait-style actions."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A browser action to perform before scraping."
+                },
+                "description": "The browser actions to perform before extraction."
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "html",
+                        "rawHtml",
+                        "links",
+                        "screenshot",
+                        "screenshot@fullPage",
+                        "json",
+                        "changeTracking",
+                        "summary"
+                      ],
+                      "description": "A built-in Firecrawl output format."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The structured format type, such as json or screenshot."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "A structured Firecrawl format descriptor."
+                    }
+                  ],
+                  "description": "A requested Firecrawl output format."
+                },
+                "description": "The formats to return from Firecrawl."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "description": "The ISO 3166-1 alpha-2 country code to request from."
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string value."
+                    },
+                    "description": "The preferred locales for the request."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Location settings for the request."
+              },
+              "jsonOptions": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "An extraction prompt that explains the desired JSON structure."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A loose JSON object."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Options for structured JSON output."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The request timeout in milliseconds."
+              },
+              "waitFor": {
+                "type": "integer",
+                "description": "The delay in milliseconds before extraction starts."
+              },
+              "maxAge": {
+                "type": "integer",
+                "description": "The cache max age in milliseconds."
+              },
+              "onlyMainContent": {
+                "type": "boolean",
+                "description": "Whether to keep only the main content of the page."
+              },
+              "mobile": {
+                "type": "boolean",
+                "description": "Whether to emulate a mobile device."
+              },
+              "includeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be prioritized in the extracted content."
+              },
+              "excludeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be removed from the extracted content."
+              },
+              "parsers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The parser plugins to enable for the request."
+              },
+              "parsePDF": {
+                "type": "boolean",
+                "description": "Whether PDF parsing should be enabled."
+              },
+              "proxy": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "stealth",
+                  "auto"
+                ],
+                "description": "The proxy mode to use for the request."
+              },
+              "storeInCache": {
+                "type": "boolean",
+                "description": "Whether Firecrawl should store the result in cache."
+              },
+              "removeBase64Images": {
+                "type": "boolean",
+                "description": "Whether base64-encoded images should be removed from the output."
+              },
+              "blockAds": {
+                "type": "boolean",
+                "description": "Whether ad resources should be blocked."
+              },
+              "skipTlsVerification": {
+                "type": "boolean",
+                "description": "Whether TLS certificate verification should be skipped."
+              },
+              "zeroDataRetention": {
+                "type": "boolean",
+                "description": "Whether the request should opt into zero data retention."
+              },
+              "changeTrackingOptions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Shared Firecrawl scrape options."
+          },
+          "enableWebSearch": {
+            "type": "boolean",
+            "description": "Whether web search should be enabled for the extraction."
+          },
+          "ignoreSitemap": {
+            "type": "boolean",
+            "description": "Whether sitemap discovery should be ignored."
+          },
+          "includeSubdomains": {
+            "type": "boolean",
+            "description": "Whether subdomains should be considered for the extraction."
+          },
+          "ignoreInvalidURLs": {
+            "type": "boolean",
+            "description": "Whether invalid URLs should be ignored instead of failing the request."
+          },
+          "showSources": {
+            "type": "boolean",
+            "description": "Whether cited sources should be returned."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "urls"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current extract job status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The source title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The source description."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The source icon URL."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "url"
+              ],
+              "description": "A source object returned by Firecrawl."
+            },
+            "description": "The sources used by the extraction request."
+          },
+          "urlTrace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The trace of URLs visited by the extraction request."
+          },
+          "invalidURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The invalid URLs rejected before extraction started."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the extract job."
+          },
+          "tokensUsed": {
+            "type": "integer",
+            "description": "The LLM tokens used by the extract job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl extract job status response."
+      }
+    },
+    {
+      "id": "firecrawl.extract_get",
+      "service": "firecrawl",
+      "name": "extract_get",
+      "description": "Get the current status and output of a Firecrawl extract job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current extract job status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The source title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The source description."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The source icon URL."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "url"
+              ],
+              "description": "A source object returned by Firecrawl."
+            },
+            "description": "The sources used by the extraction request."
+          },
+          "urlTrace": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The trace of URLs visited by the extraction request."
+          },
+          "invalidURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The invalid URLs rejected before extraction started."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the extract job."
+          },
+          "tokensUsed": {
+            "type": "integer",
+            "description": "The LLM tokens used by the extract job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl extract job status response."
+      }
+    },
+    {
+      "id": "firecrawl.get_agent_status",
+      "service": "firecrawl",
+      "name": "get_agent_status",
+      "description": "Get the current status and output of a Firecrawl agent job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current agent job status."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the agent job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used by the agent job."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "status"
+        ],
+        "description": "A Firecrawl agent status response."
+      }
+    },
+    {
+      "id": "firecrawl.get_deep_research_status",
+      "service": "firecrawl",
+      "name": "get_deep_research_status",
+      "description": "Get the current status and output of a Firecrawl deep research job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl job ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current deep research status."
+          },
+          "currentDepth": {
+            "type": "integer",
+            "description": "The current research depth."
+          },
+          "maxDepth": {
+            "type": "integer",
+            "description": "The configured maximum research depth."
+          },
+          "totalUrls": {
+            "type": "integer",
+            "description": "The total URLs processed by the job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The source URL."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The source title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The source description."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The source icon URL."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "url"
+              ],
+              "description": "A source object returned by Firecrawl."
+            },
+            "description": "The sources gathered during deep research."
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The activity type."
+                },
+                "depth": {
+                  "type": "integer",
+                  "description": "The research depth for the activity."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The activity status."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The activity summary message."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp of the activity."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A deep research activity item."
+            },
+            "description": "The deep research activity timeline."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl deep research status response."
+      }
+    },
+    {
+      "id": "firecrawl.get_the_status_of_a_crawl_job",
+      "service": "firecrawl",
+      "name": "get_the_status_of_a_crawl_job",
+      "description": "Compatibility alias of crawl_get for the crawl status action name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current job status."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of queued or discovered items."
+          },
+          "completed": {
+            "type": "integer",
+            "description": "The number of completed items in the job."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the job."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination URL for the next segment of data."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination URL for the next segment of data."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A loose JSON object."
+            },
+            "description": "The result items returned by Firecrawl."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error message returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "A Firecrawl paged async job status response."
+      }
+    },
+    {
+      "id": "firecrawl.llms_txt_generate",
+      "service": "firecrawl",
+      "name": "llms_txt_generate",
+      "description": "Start an LLMs.txt generation job for a website.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The root URL to turn into LLMs.txt."
+          },
+          "maxUrls": {
+            "type": "integer",
+            "description": "The maximum URLs to analyze."
+          },
+          "showFullText": {
+            "type": "boolean",
+            "description": "Whether the llms-full.txt content should also be generated."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl LLMs.txt job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "firecrawl.llms_txt_get",
+      "service": "firecrawl",
+      "name": "llms_txt_get",
+      "description": "Get the current status and generated content of an LLMs.txt job by job ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Firecrawl job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "status": {
+            "type": "string",
+            "description": "The current LLMs.txt generation status."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The ISO 8601 expiry timestamp for the job data."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "llmstxt": {
+                "type": "string",
+                "description": "The generated llms.txt content."
+              },
+              "llmsfulltxt": {
+                "type": "string",
+                "description": "The generated llms-full.txt content."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The generated LLMs.txt payload."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl LLMs.txt status response."
+      }
+    },
+    {
+      "id": "firecrawl.map_multiple_urls_based_on_options",
+      "service": "firecrawl",
+      "name": "map_multiple_urls_based_on_options",
+      "description": "Discover URLs from a website with Firecrawl's map endpoint using the legacy map action name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The root URL to map."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of links to return."
+          },
+          "search": {
+            "type": "string",
+            "description": "A search term used to filter discovered links."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "The request timeout in milliseconds."
+          },
+          "ignoreCache": {
+            "type": "boolean",
+            "description": "Whether Firecrawl cache should be bypassed."
+          },
+          "ignoreQueryParameters": {
+            "type": "boolean",
+            "description": "Whether query parameters should be ignored when deduplicating links."
+          },
+          "includeSubdomains": {
+            "type": "boolean",
+            "description": "Whether subdomains should be included."
+          },
+          "sitemap": {
+            "type": "boolean",
+            "description": "Whether sitemap discovery should be enabled."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code to request from."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A string value."
+                },
+                "description": "The preferred locales for the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Location settings for the request."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the map request succeeded."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs discovered by the map request."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "links"
+        ],
+        "description": "A Firecrawl map response."
+      }
+    },
+    {
+      "id": "firecrawl.queue_get",
+      "service": "firecrawl",
+      "name": "queue_get",
+      "description": "Get the authenticated Firecrawl team's queue status and concurrency information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "activeJobsInQueue": {
+            "type": "integer",
+            "description": "The number of active jobs in the queue."
+          },
+          "waitingJobsInQueue": {
+            "type": "integer",
+            "description": "The number of waiting jobs in the queue."
+          },
+          "jobsInQueue": {
+            "type": "integer",
+            "description": "The total jobs in the queue."
+          },
+          "maxConcurrency": {
+            "type": "integer",
+            "description": "The queue concurrency limit."
+          },
+          "mostRecentSuccess": {
+            "description": "The most recent successful queue record."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl team queue status response."
+      }
+    },
+    {
+      "id": "firecrawl.scrape",
+      "service": "firecrawl",
+      "name": "scrape",
+      "description": "Scrape a URL with Firecrawl or execute an enabled Alexandria provider tool and return the requested output formats.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to scrape."
+          },
+          "alexandria": {
+            "description": "One Alexandria provider-tool call or an array of up to ten calls."
+          },
+          "domainTools": {
+            "type": "boolean",
+            "description": "Whether to return tool contracts discovered for the scraped domain."
+          },
+          "origin": {
+            "type": "string",
+            "description": "The request origin accepted with Alexandria calls."
+          },
+          "integration": {
+            "type": "string",
+            "description": "The integration identifier accepted with Alexandria calls."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The browser action type, such as click, write, wait, or press."
+                },
+                "selector": {
+                  "type": "string",
+                  "description": "The CSS selector targeted by the action."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text to type for write actions."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The key to press for press actions."
+                },
+                "milliseconds": {
+                  "type": "integer",
+                  "description": "The duration in milliseconds used by wait-style actions."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "A browser action to perform before scraping."
+            },
+            "description": "The browser actions to run before scraping."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "rawHtml",
+                    "rawBase64",
+                    "links",
+                    "images",
+                    "screenshot",
+                    "screenshot@fullPage",
+                    "json",
+                    "changeTracking",
+                    "summary",
+                    "branding",
+                    "product",
+                    "menu",
+                    "audio",
+                    "video"
+                  ],
+                  "description": "A built-in Firecrawl output format."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "summary",
+                        "html",
+                        "rawHtml",
+                        "rawBase64",
+                        "links",
+                        "images",
+                        "screenshot",
+                        "json",
+                        "changeTracking",
+                        "branding",
+                        "product",
+                        "menu",
+                        "audio",
+                        "video",
+                        "question",
+                        "highlights"
+                      ],
+                      "description": "The structured Firecrawl output format type."
+                    },
+                    "schema": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A loose JSON object."
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "The prompt used for structured output."
+                    },
+                    "checkPromptInjection": {
+                      "type": "boolean",
+                      "description": "Whether to reject prompt injection before structured extraction."
+                    },
+                    "fullPage": {
+                      "type": "boolean",
+                      "description": "Whether a screenshot should capture the full page."
+                    },
+                    "quality": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100,
+                      "description": "The screenshot quality from 1 through 100."
+                    },
+                    "viewport": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A loose JSON object."
+                    },
+                    "modes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "git-diff",
+                          "json"
+                        ],
+                        "description": "A change-tracking comparison mode."
+                      },
+                      "description": "The change-tracking comparison modes."
+                    },
+                    "tag": {
+                      "type": "string",
+                      "description": "The change-tracking history tag."
+                    },
+                    "question": {
+                      "type": "string",
+                      "description": "The natural-language question to answer about the page."
+                    },
+                    "query": {
+                      "type": "string",
+                      "description": "The query used to select relevant page highlights."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A structured Firecrawl format descriptor."
+                }
+              ],
+              "description": "A requested Firecrawl output format."
+            },
+            "description": "The output formats to return."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom HTTP header value."
+            },
+            "description": "Custom HTTP headers to send with the request."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "The ISO 3166-1 alpha-2 country code to request from."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A string value."
+                },
+                "description": "The preferred locales for the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Location settings for the request."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 300000,
+            "description": "The request timeout in milliseconds."
+          },
+          "waitFor": {
+            "type": "integer",
+            "description": "The delay before scraping starts."
+          },
+          "maxAge": {
+            "type": "integer",
+            "description": "The cache max age in milliseconds."
+          },
+          "minAge": {
+            "type": "integer",
+            "description": "The minimum acceptable cache age without triggering a fresh scrape."
+          },
+          "onlyMainContent": {
+            "type": "boolean",
+            "description": "Whether to keep only the main content of the page."
+          },
+          "onlyCleanContent": {
+            "type": "boolean",
+            "description": "Whether to run Firecrawl's additional LLM-based content cleanup."
+          },
+          "includeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The HTML tags that should be prioritized in the extracted content."
+          },
+          "excludeTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The HTML tags that should be removed from the output."
+          },
+          "mobile": {
+            "type": "boolean",
+            "description": "Whether to emulate a mobile device."
+          },
+          "proxy": {
+            "type": "string",
+            "enum": [
+              "basic",
+              "enhanced",
+              "auto"
+            ],
+            "description": "The proxy mode to use for the request."
+          },
+          "parsers": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "const": "pdf",
+                  "type": "string",
+                  "description": "The default PDF parser."
+                },
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                }
+              ],
+              "description": "A parser name or configuration."
+            },
+            "description": "The parser configurations to enable for the request."
+          },
+          "blockAds": {
+            "type": "boolean",
+            "description": "Whether ad resources should be blocked."
+          },
+          "storeInCache": {
+            "type": "boolean",
+            "description": "Whether Firecrawl should store the result in cache."
+          },
+          "removeBase64Images": {
+            "type": "boolean",
+            "description": "Whether base64-encoded images should be removed from the output."
+          },
+          "skipTlsVerification": {
+            "type": "boolean",
+            "description": "Whether TLS verification should be skipped."
+          },
+          "zeroDataRetention": {
+            "type": "boolean",
+            "description": "Whether the request should opt into zero data retention."
+          },
+          "lockdown": {
+            "type": "boolean",
+            "description": "Whether to enable Firecrawl lockdown mode."
+          },
+          "redactPII": {
+            "oneOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to enable default PII redaction."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            ],
+            "description": "Whether and how to redact personally identifiable information."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "threatProtection": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "auditMetadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Firecrawl v2 scrape request.",
+        "anyOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "alexandria"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the scrape request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          },
+          "error": {
+            "type": "string",
+            "description": "An error message returned by Firecrawl."
+          },
+          "code": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "A string response code."
+              },
+              {
+                "type": "number",
+                "description": "A numeric response code."
+              }
+            ],
+            "description": "The Firecrawl response code."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success"
+        ],
+        "description": "A Firecrawl scrape response."
+      }
+    },
+    {
+      "id": "firecrawl.search",
+      "service": "firecrawl",
+      "name": "search",
+      "description": "Search the web with Firecrawl and optionally scrape the top results in the requested formats.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query text."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of search results to return."
+          },
+          "country": {
+            "type": "string",
+            "description": "The country code used to localize search results."
+          },
+          "lang": {
+            "type": "string",
+            "description": "The language code used to localize search results."
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "The request timeout in milliseconds."
+          },
+          "formats": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "rawHtml",
+                    "links",
+                    "screenshot",
+                    "screenshot@fullPage",
+                    "json",
+                    "changeTracking",
+                    "summary"
+                  ],
+                  "description": "A built-in Firecrawl output format."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The structured format type, such as json or screenshot."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A structured Firecrawl format descriptor."
+                }
+              ],
+              "description": "A requested Firecrawl output format."
+            },
+            "description": "The scrape formats to apply to each search result."
+          },
+          "scrapeOptions": {
+            "type": "object",
+            "properties": {
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The browser action type, such as click, write, wait, or press."
+                    },
+                    "selector": {
+                      "type": "string",
+                      "description": "The CSS selector targeted by the action."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text to type for write actions."
+                    },
+                    "key": {
+                      "type": "string",
+                      "description": "The key to press for press actions."
+                    },
+                    "milliseconds": {
+                      "type": "integer",
+                      "description": "The duration in milliseconds used by wait-style actions."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A browser action to perform before scraping."
+                },
+                "description": "The browser actions to perform before extraction."
+              },
+              "formats": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "markdown",
+                        "html",
+                        "rawHtml",
+                        "links",
+                        "screenshot",
+                        "screenshot@fullPage",
+                        "json",
+                        "changeTracking",
+                        "summary"
+                      ],
+                      "description": "A built-in Firecrawl output format."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The structured format type, such as json or screenshot."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "required": [
+                        "type"
+                      ],
+                      "description": "A structured Firecrawl format descriptor."
+                    }
+                  ],
+                  "description": "A requested Firecrawl output format."
+                },
+                "description": "The formats to return from Firecrawl."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "A custom HTTP header value."
+                },
+                "description": "Custom HTTP headers to send with the request."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "string",
+                    "description": "The ISO 3166-1 alpha-2 country code to request from."
+                  },
+                  "languages": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A string value."
+                    },
+                    "description": "The preferred locales for the request."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Location settings for the request."
+              },
+              "jsonOptions": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "An extraction prompt that explains the desired JSON structure."
+                  },
+                  "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A loose JSON object."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Options for structured JSON output."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The request timeout in milliseconds."
+              },
+              "waitFor": {
+                "type": "integer",
+                "description": "The delay in milliseconds before extraction starts."
+              },
+              "maxAge": {
+                "type": "integer",
+                "description": "The cache max age in milliseconds."
+              },
+              "onlyMainContent": {
+                "type": "boolean",
+                "description": "Whether to keep only the main content of the page."
+              },
+              "mobile": {
+                "type": "boolean",
+                "description": "Whether to emulate a mobile device."
+              },
+              "includeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be prioritized in the extracted content."
+              },
+              "excludeTags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The HTML tags that should be removed from the extracted content."
+              },
+              "parsers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The parser plugins to enable for the request."
+              },
+              "parsePDF": {
+                "type": "boolean",
+                "description": "Whether PDF parsing should be enabled."
+              },
+              "proxy": {
+                "type": "string",
+                "enum": [
+                  "basic",
+                  "stealth",
+                  "auto"
+                ],
+                "description": "The proxy mode to use for the request."
+              },
+              "storeInCache": {
+                "type": "boolean",
+                "description": "Whether Firecrawl should store the result in cache."
+              },
+              "removeBase64Images": {
+                "type": "boolean",
+                "description": "Whether base64-encoded images should be removed from the output."
+              },
+              "blockAds": {
+                "type": "boolean",
+                "description": "Whether ad resources should be blocked."
+              },
+              "skipTlsVerification": {
+                "type": "boolean",
+                "description": "Whether TLS certificate verification should be skipped."
+              },
+              "zeroDataRetention": {
+                "type": "boolean",
+                "description": "Whether the request should opt into zero data retention."
+              },
+              "changeTrackingOptions": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Shared Firecrawl scrape options."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the search request succeeded."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl search job ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "creditsUsed": {
+            "type": "integer",
+            "description": "The credits used by the search request."
+          },
+          "warning": {
+            "type": "string",
+            "description": "A warning returned by Firecrawl."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "success",
+          "data"
+        ],
+        "description": "A Firecrawl search response."
+      }
+    },
+    {
+      "id": "firecrawl.start_agent",
+      "service": "firecrawl",
+      "name": "start_agent",
+      "description": "Start a Firecrawl agent job for multi-page autonomous browsing and extraction.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language task for the agent."
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The URLs that constrain where the agent can start."
+          },
+          "schema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "maxCredits": {
+            "type": "integer",
+            "description": "The maximum credits the agent may spend."
+          },
+          "strictConstrainToURLs": {
+            "type": "boolean",
+            "description": "Whether the agent must stay strictly within the provided URLs."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "prompt"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the job was accepted successfully."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Firecrawl agent job ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "id"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "firecrawl.token_usage_get",
+      "service": "firecrawl",
+      "name": "token_usage_get",
+      "description": "Get the authenticated Firecrawl team's current token usage summary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "data"
+        ],
+        "description": "A Firecrawl usage response."
+      }
+    },
+    {
+      "id": "firecrawl.token_usage_get_historical",
+      "service": "firecrawl",
+      "name": "token_usage_get_historical",
+      "description": "Get the authenticated Firecrawl team's historical token usage summary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "byApiKey": {
+            "type": "boolean",
+            "description": "Whether usage should be grouped by API key."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the request succeeded."
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "startDate": {
+                  "type": "string",
+                  "description": "The billing period start timestamp."
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "The billing period end timestamp."
+                },
+                "creditsUsed": {
+                  "type": "integer",
+                  "description": "The credits used in the period."
+                },
+                "tokensUsed": {
+                  "type": "integer",
+                  "description": "The tokens used in the period."
+                },
+                "apiKey": {
+                  "type": "string",
+                  "description": "The API key identifier for the period."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "startDate",
+                "endDate"
+              ],
+              "description": "A historical usage period returned by Firecrawl."
+            },
+            "description": "The historical usage periods returned by Firecrawl."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "periods"
+        ],
+        "description": "A Firecrawl historical usage response."
+      }
+    }
+  ]
+}

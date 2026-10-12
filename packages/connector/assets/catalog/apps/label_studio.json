@@ -1,0 +1,640 @@
+{
+  "service": "label_studio",
+  "displayName": "Label Studio",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Legacy Token",
+      "placeholder": "ls_...",
+      "description": "Label Studio legacy access token sent as Authorization: Token. Find or enable access tokens from the Label Studio Account & Settings page: https://labelstud.io/guide/access_tokens.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Label Studio Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://app.humansignal.com",
+          "description": "The root URL of your Label Studio Cloud or self-hosted instance, such as https://app.humansignal.com or https://label-studio.example.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://labelstud.io",
+  "actions": [
+    {
+      "id": "label_studio.create_project",
+      "service": "label_studio",
+      "name": "create_project",
+      "description": "Create a Label Studio project with a title and optional labeling configuration.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project title."
+          },
+          "labelConfig": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Label Studio labeling configuration XML."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The project description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The project description."
+          },
+          "workspace": {
+            "type": "integer",
+            "description": "The workspace ID for the new project."
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The project color value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The project color value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "The input payload for creating a Label Studio project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Label Studio project ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The project title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project description."
+              },
+              "label_config": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project labeling configuration XML."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project labeling configuration XML."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Label Studio project object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Label Studio project creation response."
+      },
+      "followUpActions": [
+        "label_studio.get_project",
+        "label_studio.create_task"
+      ]
+    },
+    {
+      "id": "label_studio.create_task",
+      "service": "label_studio",
+      "name": "create_task",
+      "description": "Create one Label Studio task from JSON task data.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "integer",
+            "description": "The Label Studio project ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The task data object formatted for the project label config."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Task metadata passed to ML backends."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Task metadata passed to ML backends."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The input payload for creating a Label Studio task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Label Studio task ID."
+              },
+              "project": {
+                "type": "integer",
+                "description": "The Label Studio project ID."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The task data object."
+              },
+              "meta": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The task metadata object."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task metadata object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Label Studio task object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Label Studio task creation response."
+      }
+    },
+    {
+      "id": "label_studio.get_current_user",
+      "service": "label_studio",
+      "name": "get_current_user",
+      "description": "Retrieve the Label Studio user associated with the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the current Label Studio user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The user ID."
+              },
+              "username": {
+                "type": "string",
+                "description": "The user name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user email address."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Label Studio user object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Label Studio user response."
+      }
+    },
+    {
+      "id": "label_studio.get_project",
+      "service": "label_studio",
+      "name": "get_project",
+      "description": "Retrieve one Label Studio project by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "description": "The Label Studio project ID."
+          },
+          "membersLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of project members to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "The input payload for reading one Label Studio project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The Label Studio project ID."
+              },
+              "title": {
+                "type": "string",
+                "description": "The project title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project description."
+              },
+              "label_config": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project labeling configuration XML."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project labeling configuration XML."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Label Studio project object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Label Studio project response."
+      },
+      "followUpActions": [
+        "label_studio.list_tasks"
+      ]
+    },
+    {
+      "id": "label_studio.list_projects",
+      "service": "label_studio",
+      "name": "list_projects",
+      "description": "List Label Studio projects visible to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number within the paginated result set."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results to return per page."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return projects that belong to archived workspaces."
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "pinned_only",
+              "exclude_pinned"
+            ],
+            "description": "The pinned project filter."
+          },
+          "ids": {
+            "type": "string",
+            "description": "Comma-separated project IDs to include."
+          },
+          "include": {
+            "type": "string",
+            "description": "Comma-separated count fields to include in the response."
+          },
+          "membersLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of project members to return."
+          },
+          "ordering": {
+            "type": "string",
+            "description": "The project ordering expression."
+          },
+          "search": {
+            "type": "string",
+            "description": "A search term for project title and description."
+          },
+          "state": {
+            "type": "string",
+            "description": "The project state to filter by."
+          },
+          "title": {
+            "type": "string",
+            "description": "A case-insensitive project title substring to filter by."
+          },
+          "workspace": {
+            "type": "integer",
+            "description": "The workspace ID to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Label Studio projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching records when returned by Label Studio."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next page when returned by Label Studio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next page when returned by Label Studio."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous page when returned by Label Studio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous page when returned by Label Studio."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Label Studio project ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The project title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project description."
+                },
+                "label_config": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project labeling configuration XML."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project labeling configuration XML."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Label Studio project object."
+            },
+            "description": "Projects returned by Label Studio."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Label Studio project list response."
+      },
+      "followUpActions": [
+        "label_studio.get_project",
+        "label_studio.list_tasks"
+      ]
+    },
+    {
+      "id": "label_studio.list_tasks",
+      "service": "label_studio",
+      "name": "list_tasks",
+      "description": "List Label Studio tasks, optionally filtered by project and Data Manager query.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number within the paginated result set."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results to return per page."
+          },
+          "fields": {
+            "type": "string",
+            "enum": [
+              "task_only",
+              "all"
+            ],
+            "description": "The task field detail mode."
+          },
+          "include": {
+            "type": "string",
+            "description": "Comma-separated task fields to include."
+          },
+          "onlyAnnotated": {
+            "type": "boolean",
+            "description": "Whether to return only tasks that have annotations."
+          },
+          "project": {
+            "type": "integer",
+            "description": "The Label Studio project ID."
+          },
+          "query": {
+            "type": "string",
+            "description": "A JSON-encoded Label Studio Data Manager query."
+          },
+          "resolveUri": {
+            "type": "boolean",
+            "description": "Whether to resolve task data URIs using cloud storage."
+          },
+          "review": {
+            "type": "boolean",
+            "description": "Whether to return tasks for review."
+          },
+          "selectedItems": {
+            "type": "string",
+            "description": "A JSON string of selected task IDs for review workflow."
+          },
+          "view": {
+            "type": "integer",
+            "description": "The Label Studio view ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Label Studio tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching records when returned by Label Studio."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next page when returned by Label Studio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next page when returned by Label Studio."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous page when returned by Label Studio."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous page when returned by Label Studio."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The Label Studio task ID."
+                },
+                "project": {
+                  "type": "integer",
+                  "description": "The Label Studio project ID."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The task data object."
+                },
+                "meta": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The task metadata object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The task metadata object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Label Studio task object."
+            },
+            "description": "Tasks returned by Label Studio."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Label Studio task list response."
+      },
+      "followUpActions": [
+        "label_studio.create_task"
+      ]
+    }
+  ]
+}

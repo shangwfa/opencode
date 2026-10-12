@@ -1,0 +1,882 @@
+{
+  "service": "clickhouse",
+  "displayName": "ClickHouse",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Enter password",
+          "description": "The password for the ClickHouse database user. For ClickHouse Cloud, use the service password shown when the service user is created or reset."
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "default",
+          "description": "The ClickHouse database user used for HTTP Basic authentication. The default ClickHouse user is usually named default."
+        },
+        {
+          "key": "baseUrl",
+          "label": "Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://your-cluster.clickhouse.cloud:8443",
+          "description": "The HTTP endpoint for your ClickHouse instance, such as https://host:8443 or http://localhost:8123. See the ClickHouse HTTP interface docs: https://clickhouse.com/docs/interfaces/http."
+        },
+        {
+          "key": "defaultDatabase",
+          "label": "Default Database Name",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "default",
+          "description": "Optional default database used by query execution and table schema lookup when an action input does not specify a database."
+        }
+      ],
+      "testAction": {
+        "actionName": "execute_query",
+        "input": {
+          "query": "SELECT 1 AS ok"
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://clickhouse.com",
+  "actions": [
+    {
+      "id": "clickhouse.execute_query",
+      "service": "clickhouse",
+      "name": "execute_query",
+      "description": "Execute a SQL query against a ClickHouse instance and return JSON rows.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SQL query to execute against ClickHouse.",
+            "pattern": "\\S"
+          },
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickHouse database to use for this request. Defaults to the database configured on the connection.",
+            "pattern": "\\S"
+          },
+          "maxExecutionTime": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum query execution time in seconds."
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string setting value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric setting value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean setting value."
+                }
+              ],
+              "description": "One ClickHouse setting value."
+            },
+            "description": "Additional ClickHouse settings to send with the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for executing a ClickHouse SQL query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ClickHouse result row."
+            },
+            "description": "The rows returned by ClickHouse."
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "The number of rows returned in this response."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The column name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ClickHouse column type."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClickHouse result column."
+            },
+            "description": "The result column metadata returned by ClickHouse."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "elapsed": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The query execution time in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The query execution time in seconds."
+              },
+              "rowsRead": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of rows read while executing the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of rows read while executing the query."
+              },
+              "bytesRead": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of bytes read while executing the query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of bytes read while executing the query."
+              }
+            },
+            "additionalProperties": false,
+            "description": "ClickHouse query execution statistics."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickHouse JSON response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for a ClickHouse query."
+      }
+    },
+    {
+      "id": "clickhouse.get_database_schema",
+      "service": "clickhouse",
+      "name": "get_database_schema",
+      "description": "Get an overview of one ClickHouse database with tables and optional column name lists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickHouse database to use for this request. Defaults to the database configured on the connection.",
+            "pattern": "\\S"
+          },
+          "includeTableSchemas": {
+            "type": "boolean",
+            "description": "Whether to include column names for every returned table.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching a ClickHouse database schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "The database whose schema was returned."
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "database": {
+                  "type": "string",
+                  "description": "The database containing the table."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The table or view name."
+                },
+                "engine": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The table engine, if returned by ClickHouse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The table engine, if returned by ClickHouse."
+                },
+                "isTemporary": {
+                  "type": "boolean",
+                  "description": "Whether the table is temporary."
+                },
+                "primaryKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary key expression when requested or returned."
+                },
+                "sortingKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The sorting key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The sorting key expression when requested or returned."
+                },
+                "partitionKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The partition key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The partition key expression when requested or returned."
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One column name."
+                  },
+                  "description": "The table column names when requested."
+                },
+                "totalRows": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The approximate total number of rows, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The approximate total number of rows, if returned."
+                },
+                "totalBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The approximate total number of bytes, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The approximate total number of bytes, if returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickHouse table row."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClickHouse table or view."
+            },
+            "description": "The tables in the database."
+          },
+          "totalTables": {
+            "type": "integer",
+            "description": "The number of tables returned."
+          },
+          "totalRows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The approximate total rows across returned tables, or null when unknown."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The approximate total rows across returned tables, or null when unknown."
+          },
+          "totalBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The approximate total bytes across returned tables, or null when unknown."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The approximate total bytes across returned tables, or null when unknown."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickHouse JSON response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for a ClickHouse database schema."
+      }
+    },
+    {
+      "id": "clickhouse.get_table_schema",
+      "service": "clickhouse",
+      "name": "get_table_schema",
+      "description": "Get column metadata for one ClickHouse table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickHouse database to use for this request. Defaults to the database configured on the connection.",
+            "pattern": "\\S"
+          },
+          "table": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickHouse table name.",
+            "pattern": "\\S"
+          },
+          "includeSampleData": {
+            "type": "boolean",
+            "description": "Whether to include sample rows from the table.",
+            "default": false
+          },
+          "sampleRows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25,
+            "description": "The number of sample rows to return when includeSampleData is true.",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "table"
+        ],
+        "description": "The input payload for fetching a ClickHouse table schema."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "The database containing the table."
+          },
+          "table": {
+            "type": "string",
+            "description": "The table whose schema was returned."
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The table engine, if returned by ClickHouse."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The table engine, if returned by ClickHouse."
+          },
+          "primaryKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The primary key expression, if returned by ClickHouse."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary key expression, if returned by ClickHouse."
+          },
+          "sortingKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The sorting key expression, if returned by ClickHouse."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sorting key expression, if returned by ClickHouse."
+          },
+          "partitionKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The partition key expression, if returned by ClickHouse."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The partition key expression, if returned by ClickHouse."
+          },
+          "totalRows": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The approximate total number of rows, if returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The approximate total number of rows, if returned."
+          },
+          "totalBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The approximate total number of bytes, if returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The approximate total number of bytes, if returned."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The column name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ClickHouse column type."
+                },
+                "defaultKind": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The default expression kind, if any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The default expression kind, if any."
+                },
+                "defaultExpression": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The default expression, if any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The default expression, if any."
+                },
+                "comment": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The column comment, if any."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The column comment, if any."
+                },
+                "compressionCodec": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The column compression codec, if specified."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The column compression codec, if specified."
+                },
+                "isInPrimaryKey": {
+                  "type": "boolean",
+                  "description": "Whether the column is part of the primary key expression."
+                },
+                "isInSortingKey": {
+                  "type": "boolean",
+                  "description": "Whether the column is part of the sorting key expression."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickHouse column row."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClickHouse table column."
+            },
+            "description": "The columns returned by ClickHouse."
+          },
+          "sampleData": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One sample row."
+            },
+            "description": "Sample rows returned from the table when requested."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickHouse JSON response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for a ClickHouse table schema."
+      }
+    },
+    {
+      "id": "clickhouse.list_databases",
+      "service": "clickhouse",
+      "name": "list_databases",
+      "description": "List databases available in the connected ClickHouse instance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional SQL LIKE pattern used to filter database names.",
+            "pattern": "\\S"
+          },
+          "includeTables": {
+            "type": "boolean",
+            "description": "Whether to include table names for each returned database."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickHouse databases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "databases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The database name."
+                },
+                "engine": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The database engine, if returned by ClickHouse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The database engine, if returned by ClickHouse."
+                },
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The database UUID, if returned by ClickHouse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The database UUID, if returned by ClickHouse."
+                },
+                "tables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One table name."
+                  },
+                  "description": "The table names in this database when requested."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickHouse database row."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClickHouse database."
+            },
+            "description": "The databases returned by ClickHouse."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of databases returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickHouse JSON response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for listing ClickHouse databases."
+      }
+    },
+    {
+      "id": "clickhouse.list_tables",
+      "service": "clickhouse",
+      "name": "list_tables",
+      "description": "List tables or views in ClickHouse databases.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickHouse database to list tables from. If omitted, tables from all databases are returned.",
+            "pattern": "\\S"
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional SQL LIKE pattern used to filter table names.",
+            "pattern": "\\S"
+          },
+          "includeViews": {
+            "type": "boolean",
+            "description": "Whether to include ClickHouse views in the returned tables.",
+            "default": true
+          },
+          "includeColumns": {
+            "type": "boolean",
+            "description": "Whether to include column names for each returned table.",
+            "default": false
+          },
+          "includePrimaryKey": {
+            "type": "boolean",
+            "description": "Whether to include primary, sorting, and partition key expressions.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ClickHouse tables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "database": {
+                  "type": "string",
+                  "description": "The database containing the table."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The table or view name."
+                },
+                "engine": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The table engine, if returned by ClickHouse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The table engine, if returned by ClickHouse."
+                },
+                "isTemporary": {
+                  "type": "boolean",
+                  "description": "Whether the table is temporary."
+                },
+                "primaryKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary key expression when requested or returned."
+                },
+                "sortingKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The sorting key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The sorting key expression when requested or returned."
+                },
+                "partitionKey": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The partition key expression when requested or returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The partition key expression when requested or returned."
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One column name."
+                  },
+                  "description": "The table column names when requested."
+                },
+                "totalRows": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The approximate total number of rows, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The approximate total number of rows, if returned."
+                },
+                "totalBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The approximate total number of bytes, if returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The approximate total number of bytes, if returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw ClickHouse table row."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One ClickHouse table or view."
+            },
+            "description": "The tables returned by ClickHouse."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The number of tables returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw ClickHouse JSON response payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for listing ClickHouse tables."
+      }
+    }
+  ]
+}

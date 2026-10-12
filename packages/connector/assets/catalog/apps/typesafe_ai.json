@@ -1,0 +1,440 @@
+{
+  "service": "typesafe_ai",
+  "displayName": "TypeSafe AI",
+  "description": "List TypeSafe models and run typed Choice, Score, and Noul evaluations.",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TYPESAFE_API_KEY",
+      "description": "TypeSafe API key sent as a Bearer token. Create or view keys in the official TypeSafe console: https://console.typesafe.ai/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://typesafe.ai",
+  "actions": [
+    {
+      "id": "typesafe_ai.evaluate",
+      "service": "typesafe_ai",
+      "name": "evaluate",
+      "description": "Evaluate text or structured JSON with TypeSafe Choice, Score, and Noul questions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": [
+              "string",
+              "object",
+              "array"
+            ],
+            "description": "Text or structured JSON state for TypeSafe to evaluate."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TypeSafe model ID or alias to use. Defaults to jev-latest.",
+            "pattern": "\\S"
+          },
+          "questions": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "noul",
+                      "type": "string",
+                      "description": "The TypeSafe question type."
+                    },
+                    "instructions": {
+                      "type": [
+                        "string",
+                        "object",
+                        "array",
+                        "null"
+                      ],
+                      "description": "Text or structured JSON content, or null when the API permits no description."
+                    },
+                    "criteria": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "true": {
+                              "type": [
+                                "string",
+                                "object",
+                                "array",
+                                "null"
+                              ],
+                              "description": "Text or structured JSON content, or null when the API permits no description."
+                            },
+                            "false": {
+                              "type": [
+                                "string",
+                                "object",
+                                "array",
+                                "null"
+                              ],
+                              "description": "Text or structured JSON content, or null when the API permits no description."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Optional descriptions of the true and false outcomes."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Optional descriptions of the true and false outcomes."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A yes-or-no question that returns the probability of a yes answer.",
+                  "anyOf": [
+                    {
+                      "required": [
+                        "instructions"
+                      ],
+                      "properties": {
+                        "instructions": {
+                          "type": [
+                            "string",
+                            "object",
+                            "array"
+                          ],
+                          "description": "Text or structured JSON content."
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "criteria"
+                      ],
+                      "properties": {
+                        "criteria": {
+                          "type": "object",
+                          "anyOf": [
+                            {
+                              "required": [
+                                "true"
+                              ],
+                              "properties": {
+                                "true": {
+                                  "type": [
+                                    "string",
+                                    "object",
+                                    "array"
+                                  ],
+                                  "description": "Text or structured JSON content."
+                                }
+                              }
+                            },
+                            {
+                              "required": [
+                                "false"
+                              ],
+                              "properties": {
+                                "false": {
+                                  "type": [
+                                    "string",
+                                    "object",
+                                    "array"
+                                  ],
+                                  "description": "Text or structured JSON content."
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "choice",
+                      "type": "string",
+                      "description": "The TypeSafe question type."
+                    },
+                    "instructions": {
+                      "type": [
+                        "string",
+                        "object",
+                        "array",
+                        "null"
+                      ],
+                      "description": "Text or structured JSON content, or null when the API permits no description."
+                    },
+                    "criteria": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "object",
+                          "array",
+                          "null"
+                        ],
+                        "description": "Text or structured JSON content, or null when the API permits no description."
+                      },
+                      "description": "Candidate option names mapped to optional descriptions.",
+                      "minProperties": 1,
+                      "maxProperties": 255
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A categorical question that selects one named option."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "score",
+                      "type": "string",
+                      "description": "The TypeSafe question type."
+                    },
+                    "instructions": {
+                      "type": [
+                        "string",
+                        "object",
+                        "array",
+                        "null"
+                      ],
+                      "description": "Text or structured JSON content, or null when the API permits no description."
+                    },
+                    "criteria": {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "string",
+                          "object",
+                          "array",
+                          "null"
+                        ],
+                        "description": "Text or structured JSON content, or null when the API permits no description."
+                      },
+                      "description": "Ordered rubric levels from the lowest to the highest score.",
+                      "minItems": 2,
+                      "maxItems": 10
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An ordinal question that scores the state against ordered rubric levels."
+                }
+              ],
+              "description": "A Noul, Choice, or Score question."
+            },
+            "description": "Named questions evaluated independently against the shared state.",
+            "minProperties": 1,
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A non-empty question ID used to key the matching answer."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "questions"
+        ],
+        "description": "The state, model, and typed questions for a TypeSafe evaluation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The versioned TypeSafe model that produced the answers."
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "noul",
+                      "type": "string",
+                      "description": "The TypeSafe answer type."
+                    },
+                    "noul": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "A probability from 0 to 1."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A binary Noul answer."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "choice",
+                      "type": "string",
+                      "description": "The TypeSafe answer type."
+                    },
+                    "choice": {
+                      "type": "string",
+                      "description": "The selected option name."
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "A probability from 0 to 1."
+                    },
+                    "probabilities": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "A probability from 0 to 1."
+                      },
+                      "description": "Probabilities keyed by option name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A categorical Choice answer."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "score",
+                      "type": "string",
+                      "description": "The TypeSafe answer type."
+                    },
+                    "score": {
+                      "type": "number",
+                      "description": "The probability-weighted score across the rubric levels."
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "A probability from 0 to 1."
+                    },
+                    "legend": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "object",
+                          "array",
+                          "null"
+                        ],
+                        "description": "Text or structured JSON content, or null when the API permits no description."
+                      },
+                      "description": "Score indices mapped to their rubric descriptions."
+                    },
+                    "probabilities": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "A probability from 0 to 1."
+                      },
+                      "description": "Probabilities keyed by score index."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An ordinal Score answer."
+                }
+              ],
+              "description": "A typed TypeSafe answer."
+            },
+            "description": "Typed answers keyed by the input question names."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "input_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of input tokens processed."
+              },
+              "output_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of output tokens reported."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Token usage reported by TypeSafe."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The structured TypeSafe evaluation result."
+      }
+    },
+    {
+      "id": "typesafe_ai.list_models",
+      "service": "typesafe_ai",
+      "name": "list_models",
+      "description": "List the TypeSafe models available to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing TypeSafe models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model ID or alias accepted by the evaluation endpoint."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A description of the model's intended use."
+                },
+                "releaseDate": {
+                  "type": "string",
+                  "description": "The release date reported by TypeSafe."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A TypeSafe model available to the connected account."
+            },
+            "description": "The available TypeSafe models and aliases."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The models available to the connected TypeSafe account."
+      }
+    }
+  ]
+}

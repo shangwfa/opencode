@@ -1,0 +1,642 @@
+{
+  "service": "hyperbrowser",
+  "displayName": "Hyperbrowser",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "hb_...",
+      "description": "Hyperbrowser API key used with the x-api-key header. Create or copy it from the Hyperbrowser Dashboard quickstart page."
+    }
+  ],
+  "homepageUrl": "https://www.hyperbrowser.ai",
+  "actions": [
+    {
+      "id": "hyperbrowser.fetch_page",
+      "service": "hyperbrowser",
+      "name": "fetch_page",
+      "description": "Fetch a web page with Hyperbrowser and return the requested data formats.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Hyperbrowser should load.",
+            "format": "uri"
+          },
+          "stealth": {
+            "type": "string",
+            "enum": [
+              "none",
+              "auto",
+              "ultra"
+            ],
+            "description": "The stealth mode Hyperbrowser should use."
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "formats": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "links",
+                    "screenshot",
+                    "branding"
+                  ],
+                  "description": "The Hyperbrowser fetch output format."
+                },
+                "description": "The output formats Hyperbrowser should return.",
+                "minItems": 1
+              },
+              "sanitize": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "basic",
+                  "advanced"
+                ],
+                "description": "The content sanitization mode."
+              },
+              "includeSelectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A CSS selector to include.",
+                  "pattern": "\\S"
+                },
+                "description": "CSS selectors Hyperbrowser should include in extracted content.",
+                "minItems": 1
+              },
+              "excludeSelectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A CSS selector to exclude.",
+                  "pattern": "\\S"
+                },
+                "description": "CSS selectors Hyperbrowser should exclude from extracted content.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Output options sent to Hyperbrowser."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Request parameters for fetching one web page with Hyperbrowser."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "description": "The Hyperbrowser fetch status."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The error message returned by Hyperbrowser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The error message returned by Hyperbrowser."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hyperbrowser response data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "status"
+        ],
+        "description": "The Hyperbrowser fetch response."
+      }
+    },
+    {
+      "id": "hyperbrowser.get_web_crawl_results",
+      "service": "hyperbrowser",
+      "name": "get_web_crawl_results",
+      "description": "Get paginated results for a Hyperbrowser crawl job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result page to read."
+          },
+          "batchSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of crawl pages to return in one batch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Request parameters for reading Hyperbrowser crawl job results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "stopped"
+            ],
+            "description": "The Hyperbrowser job status."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The error message returned by Hyperbrowser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The error message returned by Hyperbrowser."
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of crawled pages."
+          },
+          "totalPageBatches": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of result batches."
+          },
+          "currentPageBatch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current result batch number."
+          },
+          "batchSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result batch size."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Hyperbrowser response data."
+            },
+            "description": "The crawl page data returned by Hyperbrowser."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "status"
+        ],
+        "description": "The Hyperbrowser crawl job results response."
+      }
+    },
+    {
+      "id": "hyperbrowser.get_web_crawl_status",
+      "service": "hyperbrowser",
+      "name": "get_web_crawl_status",
+      "description": "Get the current status of a Hyperbrowser crawl job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Request parameters for reading a Hyperbrowser crawl job status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "stopped"
+            ],
+            "description": "The Hyperbrowser job status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The Hyperbrowser crawl job status response."
+      }
+    },
+    {
+      "id": "hyperbrowser.search_web",
+      "service": "hyperbrowser",
+      "name": "search_web",
+      "description": "Search the web with Hyperbrowser and return structured search results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The search query.",
+            "pattern": "\\S"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The search results page number."
+          },
+          "maxAgeSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum age of cached search results in seconds."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The country used for search localization.",
+                "pattern": "\\S"
+              },
+              "state": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The state or region used for search localization.",
+                "pattern": "\\S"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The city used for search localization.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "country"
+            ],
+            "description": "Location bias for Hyperbrowser search."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "exactPhrase": {
+                "type": "boolean",
+                "description": "Whether Hyperbrowser should match the exact phrase."
+              },
+              "semanticPhrase": {
+                "type": "boolean",
+                "description": "Whether Hyperbrowser should use semantic phrase matching."
+              },
+              "excludeTerms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A search term to exclude.",
+                  "pattern": "\\S"
+                },
+                "description": "Terms Hyperbrowser should exclude from the search.",
+                "minItems": 1
+              },
+              "boostTerms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A search term to boost.",
+                  "pattern": "\\S"
+                },
+                "description": "Terms Hyperbrowser should boost in the search.",
+                "minItems": 1
+              },
+              "filetype": {
+                "type": "string",
+                "enum": [
+                  "pdf",
+                  "doc",
+                  "docx",
+                  "xls",
+                  "xlsx",
+                  "ppt",
+                  "pptx",
+                  "html"
+                ],
+                "description": "The file type filter for search results."
+              },
+              "site": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The site Hyperbrowser should restrict results to.",
+                "pattern": "\\S"
+              },
+              "excludeSite": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The site Hyperbrowser should exclude from results.",
+                "pattern": "\\S"
+              },
+              "intitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Text that must appear in result titles.",
+                "pattern": "\\S"
+              },
+              "inurl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Text that must appear in result URLs.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Search filters sent to Hyperbrowser."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Request parameters for searching the web with Hyperbrowser."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "stopped"
+            ],
+            "description": "The Hyperbrowser job status."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The error message returned by Hyperbrowser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The error message returned by Hyperbrowser."
+          },
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Hyperbrowser response data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId",
+          "status"
+        ],
+        "description": "The Hyperbrowser search response."
+      }
+    },
+    {
+      "id": "hyperbrowser.start_web_crawl",
+      "service": "hyperbrowser",
+      "name": "start_web_crawl",
+      "description": "Start an asynchronous Hyperbrowser crawl job from a URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL Hyperbrowser should load.",
+            "format": "uri"
+          },
+          "stealth": {
+            "type": "string",
+            "enum": [
+              "none",
+              "auto",
+              "ultra"
+            ],
+            "description": "The stealth mode Hyperbrowser should use."
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "formats": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "markdown",
+                    "html",
+                    "links",
+                    "screenshot",
+                    "branding"
+                  ],
+                  "description": "The Hyperbrowser fetch output format."
+                },
+                "description": "The output formats Hyperbrowser should return.",
+                "minItems": 1
+              },
+              "sanitize": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "basic",
+                  "advanced"
+                ],
+                "description": "The content sanitization mode."
+              },
+              "includeSelectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A CSS selector to include.",
+                  "pattern": "\\S"
+                },
+                "description": "CSS selectors Hyperbrowser should include in extracted content.",
+                "minItems": 1
+              },
+              "excludeSelectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A CSS selector to exclude.",
+                  "pattern": "\\S"
+                },
+                "description": "CSS selectors Hyperbrowser should exclude from extracted content.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Output options sent to Hyperbrowser."
+          },
+          "crawlOptions": {
+            "type": "object",
+            "properties": {
+              "maxPages": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The maximum number of pages Hyperbrowser should crawl."
+              },
+              "followLinks": {
+                "type": "boolean",
+                "description": "Whether Hyperbrowser should follow links from crawled pages."
+              },
+              "ignoreSitemap": {
+                "type": "boolean",
+                "description": "Whether Hyperbrowser should ignore the site's sitemap."
+              },
+              "excludePatterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A URL pattern to exclude.",
+                  "pattern": "\\S"
+                },
+                "description": "URL patterns Hyperbrowser should exclude while crawling.",
+                "minItems": 1
+              },
+              "includePatterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A URL pattern to include.",
+                  "pattern": "\\S"
+                },
+                "description": "URL patterns Hyperbrowser should include while crawling.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "Crawl options sent to Hyperbrowser."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Request parameters for starting a Hyperbrowser web crawl."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Hyperbrowser crawl job ID.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "The response for a started Hyperbrowser crawl job."
+      },
+      "asyncLifecycle": {
+        "startActionId": "hyperbrowser.start_web_crawl",
+        "statusActionId": "hyperbrowser.get_web_crawl_status"
+      }
+    }
+  ]
+}

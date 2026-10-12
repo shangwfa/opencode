@@ -1,0 +1,2586 @@
+{
+  "service": "bilibili",
+  "displayName": "Bilibili",
+  "description": "Submit and manage Bilibili video archives and articles, and read creator operation data.",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://account.bilibili.com/pc/account-pc/auth/oauth",
+      "tokenUrl": "https://api.bilibili.com/x/account-oauth2/v1/token",
+      "refreshTokenUrl": "https://api.bilibili.com/x/account-oauth2/v1/refresh_token",
+      "scopes": [
+        "USER_INFO",
+        "USER_DATA",
+        "ARC_BASE",
+        "ARC_DATA",
+        "ATC_BASE",
+        "ATC_DATA"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationRequestFields": {
+        "redirectUri": "gourl",
+        "responseType": false,
+        "scope": false
+      },
+      "clientConfigFields": [
+        {
+          "key": "appSecret",
+          "label": "App Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "location": "secretExtra",
+          "description": "The application App Secret from the Bilibili open platform (same value as Client Secret). It signs every API request with HMAC-SHA256."
+        }
+      ],
+      "clientSetup": {
+        "docsUrl": "https://open.bilibili.com",
+        "steps": [
+          "Register as a developer on the Bilibili open platform and create an application to receive its Client ID and Client Secret (App Secret).",
+          "In the application settings, set the authorization callback URL (授权回调域) to this runtime's redirect URI.",
+          "Apply for the USER_INFO, USER_DATA, ARC_BASE, ARC_DATA, ATC_BASE, and ATC_DATA interface permissions and wait for Bilibili to approve them.",
+          "Paste the Client ID, Client Secret, and the same value once more as App Secret, which signs API requests."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://www.bilibili.com",
+  "actions": [
+    {
+      "id": "bilibili.create_anthology",
+      "service": "bilibili",
+      "name": "create_anthology",
+      "description": "Create an anthology (文集) that groups articles of the authorized user.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Anthology name."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Anthology summary."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "Anthology cover image URL from bilibili.upload_article_image.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Anthology creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "description": "The new anthology id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The anthology name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created anthology."
+      },
+      "followUpActions": [
+        "bilibili.set_anthology_articles"
+      ]
+    },
+    {
+      "id": "bilibili.delete_anthology",
+      "service": "bilibili",
+      "name": "delete_anthology",
+      "description": "Delete an anthology of the authorized user. This cannot be undone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId"
+        ],
+        "description": "Anthology deletion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "description": "The deleted anthology id."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId",
+          "deleted"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "bilibili.delete_archive",
+      "service": "bilibili",
+      "name": "delete_archive",
+      "description": "Delete one video archive of the authorized user. This cannot be undone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The archive id (BV id) returned by bilibili.upload_video, for example BV17B4y1s7R1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Archive deletion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "description": "The deleted archive id (BV id)."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId",
+          "deleted"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "bilibili.delete_articles",
+      "service": "bilibili",
+      "name": "delete_articles",
+      "description": "Delete one or more articles of the authorized user. This cannot be undone.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "An article id."
+            },
+            "description": "Article ids.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Article deletion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articleIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "A deleted article id."
+            },
+            "description": "The deleted article ids."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Always true when the deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articleIds",
+          "deleted"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "bilibili.edit_anthology",
+      "service": "bilibili",
+      "name": "edit_anthology",
+      "description": "Edit an anthology's name, summary, or cover. Only provided fields change.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "New anthology name."
+          },
+          "summary": {
+            "type": "string",
+            "description": "New anthology summary."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "New anthology cover image URL from bilibili.upload_article_image.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId"
+        ],
+        "description": "Anthology edit input. Only provided fields change; at least one is required.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "summary"
+            ]
+          },
+          {
+            "required": [
+              "imageUrl"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "description": "The edited anthology id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId"
+        ],
+        "description": "The edited anthology."
+      }
+    },
+    {
+      "id": "bilibili.edit_archive",
+      "service": "bilibili",
+      "name": "edit_archive",
+      "description": "Edit descriptive fields of an existing archive (title, partition, cover, description, repost permission). Unchanged fields keep their current values. The video file itself cannot be replaced, and the archive is reviewed again after editing.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The archive id (BV id) returned by bilibili.upload_video, for example BV17B4y1s7R1."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 79,
+            "description": "New archive title, shorter than 80 characters."
+          },
+          "tid": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "New second-level partition id from bilibili.list_archive_types."
+          },
+          "coverUrl": {
+            "type": "string",
+            "description": "New cover URL. Must come from a Bilibili cover upload, not an arbitrary link.",
+            "format": "uri"
+          },
+          "desc": {
+            "type": "string",
+            "maxLength": 249,
+            "description": "New archive description."
+          },
+          "noReprint": {
+            "type": "boolean",
+            "description": "Set true to forbid reposting, false to allow it again."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Archive edit input. Only provided fields change; at least one is required.",
+        "anyOf": [
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "tid"
+            ]
+          },
+          {
+            "required": [
+              "coverUrl"
+            ]
+          },
+          {
+            "required": [
+              "desc"
+            ]
+          },
+          {
+            "required": [
+              "noReprint"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "description": "The edited archive id (BV id)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "The edited archive."
+      }
+    },
+    {
+      "id": "bilibili.edit_article",
+      "service": "bilibili",
+      "name": "edit_article",
+      "description": "Edit an existing article. Only provided fields change; the rest keep their current values. The article is reviewed again after editing. The article detail endpoint does not return the comment-section setting, so omitting upClosedReply resets it to the provider default.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The article id to edit."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Article title; keep it within 40 characters."
+          },
+          "categoryId": {
+            "type": "integer",
+            "description": "Second-level article category id from bilibili.list_article_categories."
+          },
+          "templateId": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 5,
+            "description": "Cover template: 3 = three cover images; 4 = single or no cover image with bannerUrl or topVideoBvid set; 5 = no image at all, Bilibili generates a default cover."
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Article summary."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Article body HTML (200-40000 characters, or at least three images). Embed images with the <figure class=\"img-box\"> template using URLs from bilibili.upload_article_image, and cards from bilibili.get_article_card_snippet."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "Top banner image URL from bilibili.upload_article_image; mutually exclusive with topVideoBvid.",
+            "format": "uri"
+          },
+          "original": {
+            "type": "boolean",
+            "description": "Mark the article as original content."
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A cover image URL from bilibili.upload_article_image.",
+              "format": "uri"
+            },
+            "description": "Cover image URLs. Three images are required when templateId is 3."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated custom tags."
+          },
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id to file the article under."
+          },
+          "upClosedReply": {
+            "type": "boolean",
+            "description": "Close the comment section when true."
+          },
+          "topVideoBvid": {
+            "type": "string",
+            "description": "BV id of the header video; mutually exclusive with bannerUrl."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articleId"
+        ],
+        "description": "Article edit input. Only provided fields change; at least one is required.",
+        "anyOf": [
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "categoryId"
+            ]
+          },
+          {
+            "required": [
+              "templateId"
+            ]
+          },
+          {
+            "required": [
+              "summary"
+            ]
+          },
+          {
+            "required": [
+              "content"
+            ]
+          },
+          {
+            "required": [
+              "bannerUrl"
+            ]
+          },
+          {
+            "required": [
+              "original"
+            ]
+          },
+          {
+            "required": [
+              "imageUrls"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "anthologyId"
+            ]
+          },
+          {
+            "required": [
+              "upClosedReply"
+            ]
+          },
+          {
+            "required": [
+              "topVideoBvid"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "integer",
+            "description": "The edited article id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articleId"
+        ],
+        "description": "The edited article."
+      },
+      "followUpActions": [
+        "bilibili.get_article"
+      ]
+    },
+    {
+      "id": "bilibili.get_anthology",
+      "service": "bilibili",
+      "name": "get_anthology",
+      "description": "Get one anthology with the articles it contains.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId"
+        ],
+        "description": "Anthology lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthology": {
+            "type": "object",
+            "properties": {
+              "anthologyId": {
+                "type": "integer",
+                "description": "Anthology id."
+              },
+              "name": {
+                "type": "string",
+                "description": "Anthology name."
+              },
+              "imageUrl": {
+                "type": "string",
+                "description": "Anthology cover image URL."
+              },
+              "summary": {
+                "type": "string",
+                "description": "Anthology summary."
+              },
+              "words": {
+                "type": "integer",
+                "description": "Total word count of the articles in the anthology."
+              },
+              "read": {
+                "type": "integer",
+                "description": "Total read count of the articles in the anthology."
+              },
+              "state": {
+                "type": "integer",
+                "description": "Review state; 1 means approved."
+              },
+              "reason": {
+                "type": "string",
+                "description": "Review rejection reason, empty when approved."
+              },
+              "total": {
+                "type": "integer",
+                "description": "Number of articles in the anthology."
+              },
+              "ctime": {
+                "type": "integer",
+                "description": "Creation time as a UTC Unix timestamp."
+              },
+              "publishTime": {
+                "type": "integer",
+                "description": "Publication time as a UTC Unix timestamp."
+              },
+              "updateTime": {
+                "type": "integer",
+                "description": "Last modification time as a UTC Unix timestamp."
+              },
+              "applyTime": {
+                "type": "string",
+                "description": "Submission time as an ISO 8601 string."
+              },
+              "checkTime": {
+                "type": "string",
+                "description": "Review time as an ISO 8601 string."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Bilibili anthology (文集)."
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "articleId": {
+                  "type": "integer",
+                  "description": "Article id."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Article title."
+                },
+                "state": {
+                  "type": "integer",
+                  "description": "Review state; 0 means public."
+                },
+                "publishTime": {
+                  "type": "integer",
+                  "description": "Publication time as a UTC Unix timestamp."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An article in the anthology."
+            },
+            "description": "Articles in the anthology."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Number of articles in the anthology."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthology",
+          "articles"
+        ],
+        "description": "The anthology and its articles."
+      },
+      "followUpActions": [
+        "bilibili.set_anthology_articles",
+        "bilibili.edit_anthology"
+      ]
+    },
+    {
+      "id": "bilibili.get_archive",
+      "service": "bilibili",
+      "name": "get_archive",
+      "description": "Get one video archive of the authorized user, including its review state and playback links.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The archive id (BV id) returned by bilibili.upload_video, for example BV17B4y1s7R1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Archive lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "description": "The archive id (BV id)."
+          },
+          "title": {
+            "type": "string",
+            "description": "Archive title."
+          },
+          "cover": {
+            "type": "string",
+            "description": "Cover image URL hosted by Bilibili."
+          },
+          "tid": {
+            "type": "integer",
+            "description": "Partition (二级分区) id of the archive."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Comma-separated archive tags."
+          },
+          "desc": {
+            "type": "string",
+            "description": "Archive description."
+          },
+          "copyright": {
+            "type": "integer",
+            "description": "1 for original content, 2 for reposted content."
+          },
+          "noReprint": {
+            "type": "integer",
+            "description": "1 when reposting is forbidden, 0 otherwise."
+          },
+          "state": {
+            "type": "integer",
+            "description": "Review state; 0 means the archive is public."
+          },
+          "stateDesc": {
+            "type": "string",
+            "description": "Human-readable review state, for example 开放浏览."
+          },
+          "rejectReason": {
+            "type": "string",
+            "description": "Review rejection reason, empty when the archive passed."
+          },
+          "ctime": {
+            "type": "integer",
+            "description": "Creation time as a UTC Unix timestamp."
+          },
+          "ptime": {
+            "type": "integer",
+            "description": "Publication time as a UTC Unix timestamp."
+          },
+          "video": {
+            "type": "object",
+            "properties": {
+              "cid": {
+                "type": "integer",
+                "description": "Video cid."
+              },
+              "filename": {
+                "type": "string",
+                "description": "Uploaded video filename."
+              },
+              "duration": {
+                "type": "integer",
+                "description": "Video duration in seconds."
+              },
+              "shareUrl": {
+                "type": "string",
+                "description": "Public playback page URL."
+              },
+              "iframeUrl": {
+                "type": "string",
+                "description": "Embeddable iframe player URL."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Video playback information, present once the archive is public."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Bilibili video archive."
+      },
+      "followUpActions": [
+        "bilibili.get_archive_stat",
+        "bilibili.edit_archive"
+      ]
+    },
+    {
+      "id": "bilibili.get_archive_inc_stats",
+      "service": "bilibili",
+      "name": "get_archive_inc_stats",
+      "description": "Get the authorized user's overall archive increments over the last 30 days: plays, danmaku, comments, favorites, coins, shares, likes, and charges.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ARC_DATA"
+      ],
+      "providerPermissions": [
+        "ARC_DATA"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incClick": {
+            "type": "integer",
+            "description": "Play count increment."
+          },
+          "incDanmaku": {
+            "type": "integer",
+            "description": "Danmaku count increment."
+          },
+          "incReply": {
+            "type": "integer",
+            "description": "Comment count increment."
+          },
+          "incFavorite": {
+            "type": "integer",
+            "description": "Favorite count increment."
+          },
+          "incCoin": {
+            "type": "integer",
+            "description": "Coin count increment."
+          },
+          "incShare": {
+            "type": "integer",
+            "description": "Share count increment."
+          },
+          "incLike": {
+            "type": "integer",
+            "description": "Like count increment."
+          },
+          "incElec": {
+            "type": "integer",
+            "description": "Charge (充电) count increment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Overall archive increments over the last 30 days."
+      }
+    },
+    {
+      "id": "bilibili.get_archive_stat",
+      "service": "bilibili",
+      "name": "get_archive_stat",
+      "description": "Get engagement counters of one video archive: plays, danmaku, comments, favorites, coins, shares, likes.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ARC_DATA"
+      ],
+      "providerPermissions": [
+        "ARC_DATA"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The archive id (BV id) returned by bilibili.upload_video, for example BV17B4y1s7R1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Archive statistics input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Archive title."
+          },
+          "ptime": {
+            "type": "integer",
+            "description": "Publication time as a UTC Unix timestamp."
+          },
+          "view": {
+            "type": "integer",
+            "description": "Play count."
+          },
+          "danmaku": {
+            "type": "integer",
+            "description": "Danmaku (bullet comment) count."
+          },
+          "reply": {
+            "type": "integer",
+            "description": "Comment count."
+          },
+          "favorite": {
+            "type": "integer",
+            "description": "Favorite count."
+          },
+          "coin": {
+            "type": "integer",
+            "description": "Coin count."
+          },
+          "share": {
+            "type": "integer",
+            "description": "Share count."
+          },
+          "like": {
+            "type": "integer",
+            "description": "Like count."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Engagement counters of one video archive."
+      }
+    },
+    {
+      "id": "bilibili.get_article",
+      "service": "bilibili",
+      "name": "get_article",
+      "description": "Get one article of the authorized user, including body HTML, review state, tags, and counters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The article id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articleId"
+        ],
+        "description": "Article lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "integer",
+            "description": "Article id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Article title."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Article summary."
+          },
+          "content": {
+            "type": "string",
+            "description": "Article body HTML. Only present in bilibili.get_article."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "Top banner image URL."
+          },
+          "templateId": {
+            "type": "integer",
+            "description": "Cover template id."
+          },
+          "state": {
+            "type": "integer",
+            "description": "Review state; 0 means the article is public."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Review rejection reason, empty when the article passed."
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Cover image URLs."
+          },
+          "publishTime": {
+            "type": "integer",
+            "description": "Publication time as a UTC Unix timestamp."
+          },
+          "ctime": {
+            "type": "integer",
+            "description": "Creation time as a UTC Unix timestamp."
+          },
+          "words": {
+            "type": "integer",
+            "description": "Word count."
+          },
+          "original": {
+            "type": "integer",
+            "description": "1 for original content, 0 otherwise."
+          },
+          "topVideoBvid": {
+            "type": "string",
+            "description": "BV id of the header video."
+          },
+          "type": {
+            "type": "integer",
+            "description": "Editor type: 0 legacy editor, 1 note, 2 new editor."
+          },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "Category id."
+              },
+              "parentId": {
+                "type": "integer",
+                "description": "Parent category id."
+              },
+              "name": {
+                "type": "string",
+                "description": "Category name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Article category."
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "integer",
+                "description": "Read count."
+              },
+              "favorite": {
+                "type": "integer",
+                "description": "Favorite count."
+              },
+              "like": {
+                "type": "integer",
+                "description": "Like count."
+              },
+              "dislike": {
+                "type": "integer",
+                "description": "Dislike count."
+              },
+              "reply": {
+                "type": "integer",
+                "description": "Comment count."
+              },
+              "share": {
+                "type": "integer",
+                "description": "Share count."
+              },
+              "coin": {
+                "type": "integer",
+                "description": "Coin count."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Article engagement counters."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tid": {
+                  "type": "integer",
+                  "description": "Tag id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Tag name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A tag."
+            },
+            "description": "Article tags."
+          },
+          "anthology": {
+            "type": "object",
+            "properties": {
+              "anthologyId": {
+                "type": "integer",
+                "description": "Anthology id."
+              },
+              "name": {
+                "type": "string",
+                "description": "Anthology name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The anthology this article belongs to."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Bilibili article."
+      },
+      "followUpActions": [
+        "bilibili.edit_article",
+        "bilibili.get_article_stats"
+      ]
+    },
+    {
+      "id": "bilibili.get_article_card_snippet",
+      "service": "bilibili",
+      "name": "get_article_card_snippet",
+      "description": "Get the card HTML snippet of a video (BV id) or article (cv id) to embed into article content when submitting or editing an article.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A BV id (video) or cv id (article)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "Card lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "snippet": {
+            "type": "string",
+            "description": "The card HTML snippet to embed in article content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The card snippet."
+      },
+      "followUpActions": [
+        "bilibili.submit_article",
+        "bilibili.edit_article"
+      ]
+    },
+    {
+      "id": "bilibili.get_article_inc_stats",
+      "service": "bilibili",
+      "name": "get_article_inc_stats",
+      "description": "Get the authorized user's overall article increments over the last 30 days: reads, comments, favorites, likes, shares, coins.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_DATA"
+      ],
+      "providerPermissions": [
+        "ATC_DATA"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "incRead": {
+            "type": "integer",
+            "description": "Read count increment."
+          },
+          "incReply": {
+            "type": "integer",
+            "description": "Comment count increment."
+          },
+          "incFavorite": {
+            "type": "integer",
+            "description": "Favorite count increment."
+          },
+          "incLikes": {
+            "type": "integer",
+            "description": "Like count increment."
+          },
+          "incShare": {
+            "type": "integer",
+            "description": "Share count increment."
+          },
+          "incCoin": {
+            "type": "integer",
+            "description": "Coin count increment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Overall article increments over the last 30 days."
+      }
+    },
+    {
+      "id": "bilibili.get_article_stats",
+      "service": "bilibili",
+      "name": "get_article_stats",
+      "description": "Get engagement counters of one or more articles: reads, favorites, likes, dislikes, comments, shares, coins.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_DATA"
+      ],
+      "providerPermissions": [
+        "ATC_DATA"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "An article id."
+            },
+            "description": "Article ids.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Article statistics input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "articleId": {
+                  "type": "integer",
+                  "description": "Article id."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Article title."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Article summary."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Article body HTML. Only present in bilibili.get_article."
+                },
+                "bannerUrl": {
+                  "type": "string",
+                  "description": "Top banner image URL."
+                },
+                "templateId": {
+                  "type": "integer",
+                  "description": "Cover template id."
+                },
+                "state": {
+                  "type": "integer",
+                  "description": "Review state; 0 means the article is public."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Review rejection reason, empty when the article passed."
+                },
+                "imageUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Cover image URLs."
+                },
+                "publishTime": {
+                  "type": "integer",
+                  "description": "Publication time as a UTC Unix timestamp."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "Creation time as a UTC Unix timestamp."
+                },
+                "words": {
+                  "type": "integer",
+                  "description": "Word count."
+                },
+                "original": {
+                  "type": "integer",
+                  "description": "1 for original content, 0 otherwise."
+                },
+                "topVideoBvid": {
+                  "type": "string",
+                  "description": "BV id of the header video."
+                },
+                "type": {
+                  "type": "integer",
+                  "description": "Editor type: 0 legacy editor, 1 note, 2 new editor."
+                },
+                "category": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Category id."
+                    },
+                    "parentId": {
+                      "type": "integer",
+                      "description": "Parent category id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Category name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Article category."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {
+                    "view": {
+                      "type": "integer",
+                      "description": "Read count."
+                    },
+                    "favorite": {
+                      "type": "integer",
+                      "description": "Favorite count."
+                    },
+                    "like": {
+                      "type": "integer",
+                      "description": "Like count."
+                    },
+                    "dislike": {
+                      "type": "integer",
+                      "description": "Dislike count."
+                    },
+                    "reply": {
+                      "type": "integer",
+                      "description": "Comment count."
+                    },
+                    "share": {
+                      "type": "integer",
+                      "description": "Share count."
+                    },
+                    "coin": {
+                      "type": "integer",
+                      "description": "Coin count."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Article engagement counters."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tid": {
+                        "type": "integer",
+                        "description": "Tag id."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Tag name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A tag."
+                  },
+                  "description": "Article tags."
+                },
+                "anthology": {
+                  "type": "object",
+                  "properties": {
+                    "anthologyId": {
+                      "type": "integer",
+                      "description": "Anthology id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Anthology name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The anthology this article belongs to."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Bilibili article."
+            },
+            "description": "Per-article data keyed by the requested ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articles"
+        ],
+        "description": "Article statistics."
+      }
+    },
+    {
+      "id": "bilibili.get_user_info",
+      "service": "bilibili",
+      "name": "get_user_info",
+      "description": "Get the authorized Bilibili user's public profile (nickname, avatar, openid).",
+      "operationType": "read",
+      "requiredScopes": [
+        "USER_INFO"
+      ],
+      "providerPermissions": [
+        "USER_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User nickname."
+          },
+          "face": {
+            "type": "string",
+            "description": "Avatar image URL. Cache it yourself before serving it to end users."
+          },
+          "openid": {
+            "type": "string",
+            "description": "The user's openid, unique per Bilibili application."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The authorized user's public profile."
+      }
+    },
+    {
+      "id": "bilibili.get_user_scopes",
+      "service": "bilibili",
+      "name": "get_user_scopes",
+      "description": "List the Bilibili interface permission points (scopes) the authorized user actually granted to this application.",
+      "operationType": "read",
+      "requiredScopes": [
+        "USER_INFO"
+      ],
+      "providerPermissions": [
+        "USER_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "openid": {
+            "type": "string",
+            "description": "The user's openid, unique per Bilibili application."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Granted permission points, for example ARC_BASE."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scopes"
+        ],
+        "description": "The user's granted scope list."
+      }
+    },
+    {
+      "id": "bilibili.get_user_stat",
+      "service": "bilibili",
+      "name": "get_user_stat",
+      "description": "Get account-level counters of the authorized user: followers, followings, and passed video archives.",
+      "operationType": "read",
+      "requiredScopes": [
+        "USER_DATA"
+      ],
+      "providerPermissions": [
+        "USER_DATA"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "following": {
+            "type": "integer",
+            "description": "Number of accounts the user follows."
+          },
+          "follower": {
+            "type": "integer",
+            "description": "Follower count."
+          },
+          "arcPassedTotal": {
+            "type": "integer",
+            "description": "Number of video archives that passed review."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Account-level counters."
+      }
+    },
+    {
+      "id": "bilibili.get_user_union_id",
+      "service": "bilibili",
+      "name": "get_user_union_id",
+      "description": "Get the authorized user's union_id, which is stable across all applications of the same developer. Bilibili must enable this endpoint for your application separately.",
+      "operationType": "read",
+      "requiredScopes": [
+        "USER_INFO"
+      ],
+      "providerPermissions": [
+        "USER_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "unionId": {
+            "type": "string",
+            "description": "The user's union_id within this developer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The union_id of the authorized user."
+      }
+    },
+    {
+      "id": "bilibili.list_anthologies",
+      "service": "bilibili",
+      "name": "list_anthologies",
+      "description": "List all anthologies of the authorized user with review state and article counts.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "anthologyId": {
+                  "type": "integer",
+                  "description": "Anthology id."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Anthology name."
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "description": "Anthology cover image URL."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Anthology summary."
+                },
+                "words": {
+                  "type": "integer",
+                  "description": "Total word count of the articles in the anthology."
+                },
+                "read": {
+                  "type": "integer",
+                  "description": "Total read count of the articles in the anthology."
+                },
+                "state": {
+                  "type": "integer",
+                  "description": "Review state; 1 means approved."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Review rejection reason, empty when approved."
+                },
+                "total": {
+                  "type": "integer",
+                  "description": "Number of articles in the anthology."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "Creation time as a UTC Unix timestamp."
+                },
+                "publishTime": {
+                  "type": "integer",
+                  "description": "Publication time as a UTC Unix timestamp."
+                },
+                "updateTime": {
+                  "type": "integer",
+                  "description": "Last modification time as a UTC Unix timestamp."
+                },
+                "applyTime": {
+                  "type": "string",
+                  "description": "Submission time as an ISO 8601 string."
+                },
+                "checkTime": {
+                  "type": "string",
+                  "description": "Review time as an ISO 8601 string."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Bilibili anthology (文集)."
+            },
+            "description": "The anthologies."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total anthology count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologies"
+        ],
+        "description": "The user's anthologies."
+      }
+    },
+    {
+      "id": "bilibili.list_archive_types",
+      "service": "bilibili",
+      "name": "list_archive_types",
+      "description": "List Bilibili video partitions (分区). Pick a second-level partition id as the tid of bilibili.upload_video; refresh it periodically because partitions change over time.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A partition node with id, parent, name, description, and nested second-level children."
+            },
+            "description": "Top-level partitions with their second-level children."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "types"
+        ],
+        "description": "The partition tree."
+      },
+      "followUpActions": [
+        "bilibili.upload_video"
+      ]
+    },
+    {
+      "id": "bilibili.list_archives",
+      "service": "bilibili",
+      "name": "list_archives",
+      "description": "List the authorized user's video archives with review state, publication time, and playback links.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pn": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1."
+          },
+          "ps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Page size, at most 50."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "all",
+              "is_pubing",
+              "pubed",
+              "not_pubed"
+            ],
+            "description": "Filter by archive status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Archive list query. Defaults to the first page of 20 entries in any status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "archives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resourceId": {
+                  "type": "string",
+                  "description": "The archive id (BV id)."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Archive title."
+                },
+                "cover": {
+                  "type": "string",
+                  "description": "Cover image URL hosted by Bilibili."
+                },
+                "tid": {
+                  "type": "integer",
+                  "description": "Partition (二级分区) id of the archive."
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Comma-separated archive tags."
+                },
+                "desc": {
+                  "type": "string",
+                  "description": "Archive description."
+                },
+                "copyright": {
+                  "type": "integer",
+                  "description": "1 for original content, 2 for reposted content."
+                },
+                "noReprint": {
+                  "type": "integer",
+                  "description": "1 when reposting is forbidden, 0 otherwise."
+                },
+                "state": {
+                  "type": "integer",
+                  "description": "Review state; 0 means the archive is public."
+                },
+                "stateDesc": {
+                  "type": "string",
+                  "description": "Human-readable review state, for example 开放浏览."
+                },
+                "rejectReason": {
+                  "type": "string",
+                  "description": "Review rejection reason, empty when the archive passed."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "Creation time as a UTC Unix timestamp."
+                },
+                "ptime": {
+                  "type": "integer",
+                  "description": "Publication time as a UTC Unix timestamp."
+                },
+                "video": {
+                  "type": "object",
+                  "properties": {
+                    "cid": {
+                      "type": "integer",
+                      "description": "Video cid."
+                    },
+                    "filename": {
+                      "type": "string",
+                      "description": "Uploaded video filename."
+                    },
+                    "duration": {
+                      "type": "integer",
+                      "description": "Video duration in seconds."
+                    },
+                    "shareUrl": {
+                      "type": "string",
+                      "description": "Public playback page URL."
+                    },
+                    "iframeUrl": {
+                      "type": "string",
+                      "description": "Embeddable iframe player URL."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Video playback information, present once the archive is public."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Bilibili video archive."
+            },
+            "description": "Archives on this page."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "pn": {
+                "type": "integer",
+                "description": "Current page number."
+              },
+              "ps": {
+                "type": "integer",
+                "description": "Page size."
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total archive count."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "archives",
+          "page"
+        ],
+        "description": "A page of archives."
+      }
+    },
+    {
+      "id": "bilibili.list_article_categories",
+      "service": "bilibili",
+      "name": "list_article_categories",
+      "description": "List Bilibili article categories. Pick a second-level category id as the categoryId of bilibili.submit_article.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A category node with id, parent_id, name, and nested second-level children."
+            },
+            "description": "Top-level categories with their second-level children."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categories"
+        ],
+        "description": "The article category tree."
+      },
+      "followUpActions": [
+        "bilibili.submit_article"
+      ]
+    },
+    {
+      "id": "bilibili.list_articles",
+      "service": "bilibili",
+      "name": "list_articles",
+      "description": "List the authorized user's articles with review state and counters, plus the account-level counts by review state.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pn": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1."
+          },
+          "ps": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page size; the provider default is 10."
+          },
+          "sort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6,
+            "description": "Sort: 1 creation time (default), 2 likes, 3 comments, 4 reads, 5 favorites, 6 coins."
+          },
+          "group": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3,
+            "description": "Filter by review state: 0 all except drafts and deleted (default), 1 in review, 2 passed, 3 rejected."
+          },
+          "categoryId": {
+            "type": "integer",
+            "description": "Filter by category id."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Article list query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "articleId": {
+                  "type": "integer",
+                  "description": "Article id."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Article title."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Article summary."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Article body HTML. Only present in bilibili.get_article."
+                },
+                "bannerUrl": {
+                  "type": "string",
+                  "description": "Top banner image URL."
+                },
+                "templateId": {
+                  "type": "integer",
+                  "description": "Cover template id."
+                },
+                "state": {
+                  "type": "integer",
+                  "description": "Review state; 0 means the article is public."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Review rejection reason, empty when the article passed."
+                },
+                "imageUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Cover image URLs."
+                },
+                "publishTime": {
+                  "type": "integer",
+                  "description": "Publication time as a UTC Unix timestamp."
+                },
+                "ctime": {
+                  "type": "integer",
+                  "description": "Creation time as a UTC Unix timestamp."
+                },
+                "words": {
+                  "type": "integer",
+                  "description": "Word count."
+                },
+                "original": {
+                  "type": "integer",
+                  "description": "1 for original content, 0 otherwise."
+                },
+                "topVideoBvid": {
+                  "type": "string",
+                  "description": "BV id of the header video."
+                },
+                "type": {
+                  "type": "integer",
+                  "description": "Editor type: 0 legacy editor, 1 note, 2 new editor."
+                },
+                "category": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "Category id."
+                    },
+                    "parentId": {
+                      "type": "integer",
+                      "description": "Parent category id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Category name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Article category."
+                },
+                "stats": {
+                  "type": "object",
+                  "properties": {
+                    "view": {
+                      "type": "integer",
+                      "description": "Read count."
+                    },
+                    "favorite": {
+                      "type": "integer",
+                      "description": "Favorite count."
+                    },
+                    "like": {
+                      "type": "integer",
+                      "description": "Like count."
+                    },
+                    "dislike": {
+                      "type": "integer",
+                      "description": "Dislike count."
+                    },
+                    "reply": {
+                      "type": "integer",
+                      "description": "Comment count."
+                    },
+                    "share": {
+                      "type": "integer",
+                      "description": "Share count."
+                    },
+                    "coin": {
+                      "type": "integer",
+                      "description": "Coin count."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Article engagement counters."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tid": {
+                        "type": "integer",
+                        "description": "Tag id."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Tag name."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A tag."
+                  },
+                  "description": "Article tags."
+                },
+                "anthology": {
+                  "type": "object",
+                  "properties": {
+                    "anthologyId": {
+                      "type": "integer",
+                      "description": "Anthology id."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Anthology name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The anthology this article belongs to."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Bilibili article."
+            },
+            "description": "Articles on this page."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "pn": {
+                "type": "integer",
+                "description": "Current page number."
+              },
+              "ps": {
+                "type": "integer",
+                "description": "Page size."
+              },
+              "total": {
+                "type": "integer",
+                "description": "Total article count."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "integer",
+                "description": "All articles."
+              },
+              "audit": {
+                "type": "integer",
+                "description": "In review."
+              },
+              "passed": {
+                "type": "integer",
+                "description": "Passed."
+              },
+              "notPassed": {
+                "type": "integer",
+                "description": "Rejected."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Account-level article counts by review state."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articles",
+          "page",
+          "counts"
+        ],
+        "description": "A page of articles."
+      }
+    },
+    {
+      "id": "bilibili.set_anthology_articles",
+      "service": "bilibili",
+      "name": "set_anthology_articles",
+      "description": "Replace the article list of an anthology. An article already filed under another anthology is not moved. Pass an empty list to clear the anthology.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id."
+          },
+          "articleIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "An article id."
+            },
+            "description": "The new article list of the anthology; empty clears it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Anthology article replacement input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "anthologyId": {
+            "type": "integer",
+            "description": "The anthology id."
+          },
+          "articleIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "An article id."
+            },
+            "description": "The submitted article ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anthologyId",
+          "articleIds"
+        ],
+        "description": "The updated anthology."
+      }
+    },
+    {
+      "id": "bilibili.submit_article",
+      "service": "bilibili",
+      "name": "submit_article",
+      "description": "Submit a new Bilibili article (专栏). Image URLs in the content and covers must come from bilibili.upload_article_image. The article enters review after submission and becomes public once approved.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Article title; keep it within 40 characters."
+          },
+          "categoryId": {
+            "type": "integer",
+            "description": "Second-level article category id from bilibili.list_article_categories."
+          },
+          "templateId": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 5,
+            "description": "Cover template: 3 = three cover images; 4 = single or no cover image with bannerUrl or topVideoBvid set; 5 = no image at all, Bilibili generates a default cover."
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Article summary."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Article body HTML (200-40000 characters, or at least three images). Embed images with the <figure class=\"img-box\"> template using URLs from bilibili.upload_article_image, and cards from bilibili.get_article_card_snippet."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "Top banner image URL from bilibili.upload_article_image; mutually exclusive with topVideoBvid.",
+            "format": "uri"
+          },
+          "original": {
+            "type": "boolean",
+            "description": "Mark the article as original content."
+          },
+          "imageUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A cover image URL from bilibili.upload_article_image.",
+              "format": "uri"
+            },
+            "description": "Cover image URLs. Three images are required when templateId is 3."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated custom tags."
+          },
+          "anthologyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Anthology (文集) id to file the article under."
+          },
+          "upClosedReply": {
+            "type": "boolean",
+            "description": "Close the comment section when true."
+          },
+          "topVideoBvid": {
+            "type": "string",
+            "description": "BV id of the header video; mutually exclusive with bannerUrl."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "categoryId",
+          "templateId",
+          "summary",
+          "content"
+        ],
+        "description": "Article submission input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "articleId": {
+            "type": "integer",
+            "description": "The new article id (cv number without the prefix)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "articleId"
+        ],
+        "description": "The submitted article."
+      },
+      "followUpActions": [
+        "bilibili.list_articles",
+        "bilibili.get_article_stats"
+      ]
+    },
+    {
+      "id": "bilibili.upload_article_image",
+      "service": "bilibili",
+      "name": "upload_article_image",
+      "description": "Upload an image (jpg/png, up to 5MB) for article content, covers, or banners. The returned Bilibili-hosted URL is what article fields accept.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ATC_BASE"
+      ],
+      "providerPermissions": [
+        "ATC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The image file to upload (jpg/png, up to 5MB)."
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Add a watermark with the Bilibili logo and the uploader's nickname."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "Article image upload input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The Bilibili-hosted image URL."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Image size in bytes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The uploaded image."
+      },
+      "followUpActions": [
+        "bilibili.submit_article"
+      ]
+    },
+    {
+      "id": "bilibili.upload_video",
+      "service": "bilibili",
+      "name": "upload_video",
+      "description": "Upload a video file to Bilibili and submit it as a new archive. Files up to 100MB use a single upload; larger files (up to 4GB) are uploaded in 10MB parts. The archive enters review after submission and becomes public once approved.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ARC_BASE"
+      ],
+      "providerPermissions": [
+        "ARC_BASE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The video file to upload (mp4/mov/mkv recommended, up to 4GB)."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 79,
+            "description": "Archive title, shorter than 80 characters. Identical titles in a short time window are rejected."
+          },
+          "tid": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Second-level partition id from bilibili.list_archive_types."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 199,
+            "description": "Comma-separated tags; total length below 200 characters."
+          },
+          "copyright": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "1 for original content, 2 for reposted content."
+          },
+          "cover": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "Optional cover image (jpeg/png, up to 5MB, at least 960x600). Uploaded before submission."
+          },
+          "desc": {
+            "type": "string",
+            "maxLength": 249,
+            "description": "Archive description, shorter than 250 characters."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repost source. Required when copyright is 2."
+          },
+          "noReprint": {
+            "type": "boolean",
+            "description": "Set true to forbid reposting this archive."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "title",
+          "tid",
+          "tag",
+          "copyright"
+        ],
+        "description": "Video submission input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceId": {
+            "type": "string",
+            "description": "The new archive id (BV id)."
+          },
+          "coverUrl": {
+            "type": "string",
+            "description": "The Bilibili-hosted cover URL, present when a cover was uploaded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceId"
+        ],
+        "description": "The submitted archive."
+      },
+      "followUpActions": [
+        "bilibili.list_archives",
+        "bilibili.get_archive_stat"
+      ]
+    }
+  ]
+}

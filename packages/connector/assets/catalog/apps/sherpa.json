@@ -1,0 +1,404 @@
+{
+  "service": "sherpa",
+  "displayName": "Sherpa",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SHERPA_API_KEY",
+      "description": "Sherpa Requirements API key. Request access at https://www.joinsherpa.com/contact-business."
+    }
+  ],
+  "homepageUrl": "https://www.joinsherpa.com",
+  "actions": [
+    {
+      "id": "sherpa.get_trip_details",
+      "service": "sherpa",
+      "name": "get_trip_details",
+      "description": "Retrieve comprehensive personalized travel restrictions and document requirements for an itinerary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Locale for returned travel requirement content, such as en-US."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "CAD",
+              "GBP",
+              "EUR"
+            ],
+            "description": "Currency used for visa and ETA prices."
+          },
+          "passports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One traveller passport territory code."
+            },
+            "description": "ISO 3166-1 alpha-3 codes for the traveller's passports.",
+            "minItems": 1
+          },
+          "travelNodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ORIGIN",
+                    "DESTINATION",
+                    "TRANSIT"
+                  ],
+                  "description": "Role of this point in the itinerary."
+                },
+                "locationCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ISO 3166-1 alpha-3 territory code, supported region code, or IATA airport code."
+                },
+                "airportCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional IATA airport code for this travel node."
+                },
+                "departure": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "Travel date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "time": {
+                      "type": "string",
+                      "description": "Local travel time in HH:MM format."
+                    },
+                    "flightNumber": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Optional flight number without spaces, including the carrier code."
+                    },
+                    "travelMode": {
+                      "type": "string",
+                      "enum": [
+                        "AIR"
+                      ],
+                      "description": "Travel mode used for this itinerary segment."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "date",
+                    "time",
+                    "travelMode"
+                  ],
+                  "description": "Arrival or departure details for one Sherpa travel node."
+                },
+                "arrival": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "Travel date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "time": {
+                      "type": "string",
+                      "description": "Local travel time in HH:MM format."
+                    },
+                    "flightNumber": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Optional flight number without spaces, including the carrier code."
+                    },
+                    "travelMode": {
+                      "type": "string",
+                      "enum": [
+                        "AIR"
+                      ],
+                      "description": "Travel mode used for this itinerary segment."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "date",
+                    "time",
+                    "travelMode"
+                  ],
+                  "description": "Arrival or departure details for one Sherpa travel node."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "locationCode"
+              ],
+              "description": "One origin, destination, or transit point in the itinerary."
+            },
+            "description": "Ordered origin, transit, and destination points.",
+            "minItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passports",
+          "travelNodes"
+        ],
+        "description": "Traveller and itinerary details used to retrieve personalized Sherpa travel requirements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Personalized trip requirements and information group references."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One expanded Sherpa resource."
+            },
+            "description": "Expanded restrictions, procedures, locations, and products referenced by the trip."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Sherpa response metadata."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Sherpa response links."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Sherpa JSON:API trip response."
+      }
+    },
+    {
+      "id": "sherpa.get_trip_summary",
+      "service": "sherpa",
+      "name": "get_trip_summary",
+      "description": "Retrieve a concise Markdown summary of personalized travel and visa requirements for an itinerary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Locale for returned travel requirement content, such as en-US."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "CAD",
+              "GBP",
+              "EUR"
+            ],
+            "description": "Currency used for visa and ETA prices."
+          },
+          "passports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One traveller passport territory code."
+            },
+            "description": "ISO 3166-1 alpha-3 codes for the traveller's passports.",
+            "minItems": 1
+          },
+          "travelNodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ORIGIN",
+                    "DESTINATION",
+                    "TRANSIT"
+                  ],
+                  "description": "Role of this point in the itinerary."
+                },
+                "locationCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ISO 3166-1 alpha-3 territory code, supported region code, or IATA airport code."
+                },
+                "airportCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional IATA airport code for this travel node."
+                },
+                "departure": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "Travel date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "time": {
+                      "type": "string",
+                      "description": "Local travel time in HH:MM format."
+                    },
+                    "flightNumber": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Optional flight number without spaces, including the carrier code."
+                    },
+                    "travelMode": {
+                      "type": "string",
+                      "enum": [
+                        "AIR"
+                      ],
+                      "description": "Travel mode used for this itinerary segment."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "date",
+                    "time",
+                    "travelMode"
+                  ],
+                  "description": "Arrival or departure details for one Sherpa travel node."
+                },
+                "arrival": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "Travel date in YYYY-MM-DD format.",
+                      "format": "date"
+                    },
+                    "time": {
+                      "type": "string",
+                      "description": "Local travel time in HH:MM format."
+                    },
+                    "flightNumber": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Optional flight number without spaces, including the carrier code."
+                    },
+                    "travelMode": {
+                      "type": "string",
+                      "enum": [
+                        "AIR"
+                      ],
+                      "description": "Travel mode used for this itinerary segment."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "date",
+                    "time",
+                    "travelMode"
+                  ],
+                  "description": "Arrival or departure details for one Sherpa travel node."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "locationCode"
+              ],
+              "description": "One origin, destination, or transit point in the itinerary."
+            },
+            "description": "Ordered origin, transit, and destination points.",
+            "minItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "passports",
+          "travelNodes"
+        ],
+        "description": "Traveller and itinerary details used to retrieve personalized Sherpa travel requirements."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "generatedAt": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when Sherpa generated the summary."
+              },
+              "locale": {
+                "type": "string",
+                "description": "Locale used for the summary."
+              },
+              "LlmModel": {
+                "type": "string",
+                "description": "Model identifier reported by Sherpa."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "generatedAt",
+              "locale",
+              "LlmModel"
+            ],
+            "description": "Metadata for the generated travel requirement summary."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "contentConfidence": {
+                "type": "number",
+                "description": "Confidence score reported for the summary content."
+              },
+              "contentType": {
+                "type": "string",
+                "description": "Media type of the summary content."
+              },
+              "content": {
+                "type": "string",
+                "description": "Token-efficient travel requirement summary in Markdown."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "contentConfidence",
+              "contentType",
+              "content"
+            ],
+            "description": "Sherpa's Markdown travel requirement content and confidence metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Token-efficient Sherpa travel requirement summary."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1696 @@
+{
+  "service": "openstatus",
+  "displayName": "OpenStatus",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "os_...",
+      "description": "OpenStatus API key sent with the x-openstatus-key header. Create it from the OpenStatus dashboard: https://www.openstatus.dev/app."
+    }
+  ],
+  "homepageUrl": "https://www.openstatus.dev",
+  "actions": [
+    {
+      "id": "openstatus.create_http_monitor",
+      "service": "openstatus",
+      "name": "create_http_monitor",
+      "description": "Create a new OpenStatus HTTP monitor.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Monitor name."
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "URL that OpenStatus should monitor.",
+            "format": "uri"
+          },
+          "periodicity": {
+            "type": "string",
+            "enum": [
+              "PERIODICITY_30S",
+              "PERIODICITY_1M",
+              "PERIODICITY_5M",
+              "PERIODICITY_10M",
+              "PERIODICITY_30M",
+              "PERIODICITY_1H"
+            ],
+            "description": "How often OpenStatus should run the monitor."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "HTTP_METHOD_GET",
+              "HTTP_METHOD_POST",
+              "HTTP_METHOD_HEAD",
+              "HTTP_METHOD_PUT",
+              "HTTP_METHOD_PATCH",
+              "HTTP_METHOD_DELETE",
+              "HTTP_METHOD_TRACE",
+              "HTTP_METHOD_CONNECT",
+              "HTTP_METHOD_OPTIONS"
+            ],
+            "description": "HTTP method used by the monitor."
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body to send with the monitor check."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120000,
+            "description": "Timeout in milliseconds."
+          },
+          "degradedAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 120000,
+                "description": "Latency threshold in milliseconds before the monitor is marked degraded."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latency threshold in milliseconds before the monitor is marked degraded."
+          },
+          "retry": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Number of retry attempts."
+          },
+          "followRedirects": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the monitor should follow HTTP redirects."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the monitor should follow HTTP redirects."
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Header name."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Header value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP header key-value pair."
+            },
+            "description": "Custom request headers.",
+            "maxItems": 20
+          },
+          "statusCodeAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599,
+                  "description": "Target HTTP status code."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "NUMBER_COMPARATOR_EQUAL",
+                    "NUMBER_COMPARATOR_NOT_EQUAL",
+                    "NUMBER_COMPARATOR_GREATER_THAN",
+                    "NUMBER_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "NUMBER_COMPARATOR_LESS_THAN",
+                    "NUMBER_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "Numeric assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP status code assertion."
+            },
+            "description": "HTTP status code assertions.",
+            "maxItems": 10
+          },
+          "bodyAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "description": "Target body value to compare against."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "STRING_COMPARATOR_CONTAINS",
+                    "STRING_COMPARATOR_NOT_CONTAINS",
+                    "STRING_COMPARATOR_EQUAL",
+                    "STRING_COMPARATOR_NOT_EQUAL",
+                    "STRING_COMPARATOR_EMPTY",
+                    "STRING_COMPARATOR_NOT_EMPTY",
+                    "STRING_COMPARATOR_GREATER_THAN",
+                    "STRING_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "STRING_COMPARATOR_LESS_THAN",
+                    "STRING_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "String assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP response body assertion."
+            },
+            "description": "HTTP response body assertions.",
+            "maxItems": 10
+          },
+          "headerAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Header name to check."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target header value to compare against."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "STRING_COMPARATOR_CONTAINS",
+                    "STRING_COMPARATOR_NOT_CONTAINS",
+                    "STRING_COMPARATOR_EQUAL",
+                    "STRING_COMPARATOR_NOT_EQUAL",
+                    "STRING_COMPARATOR_EMPTY",
+                    "STRING_COMPARATOR_NOT_EMPTY",
+                    "STRING_COMPARATOR_GREATER_THAN",
+                    "STRING_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "STRING_COMPARATOR_LESS_THAN",
+                    "STRING_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "String assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP response header assertion."
+            },
+            "description": "HTTP response header assertions.",
+            "maxItems": 10
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Monitor description."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the monitor is active."
+          },
+          "public": {
+            "type": "boolean",
+            "description": "Whether the monitor is publicly visible."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REGION_FLY_AMS",
+                "REGION_FLY_ARN",
+                "REGION_FLY_BOM",
+                "REGION_FLY_CDG",
+                "REGION_FLY_DFW",
+                "REGION_FLY_EWR",
+                "REGION_FLY_FRA",
+                "REGION_FLY_GRU",
+                "REGION_FLY_IAD",
+                "REGION_FLY_JNB",
+                "REGION_FLY_LAX",
+                "REGION_FLY_LHR",
+                "REGION_FLY_NRT",
+                "REGION_FLY_ORD",
+                "REGION_FLY_SJC",
+                "REGION_FLY_SIN",
+                "REGION_FLY_SYD",
+                "REGION_FLY_YYZ",
+                "REGION_KOYEB_FRA",
+                "REGION_KOYEB_PAR",
+                "REGION_KOYEB_SFO",
+                "REGION_KOYEB_SIN",
+                "REGION_KOYEB_TYO",
+                "REGION_KOYEB_WAS",
+                "REGION_RAILWAY_US_WEST2",
+                "REGION_RAILWAY_US_EAST4",
+                "REGION_RAILWAY_EUROPE_WEST4",
+                "REGION_RAILWAY_ASIA_SOUTHEAST1"
+              ],
+              "description": "OpenStatus monitor region."
+            },
+            "description": "Regions used to run or filter monitor checks.",
+            "minItems": 1,
+            "maxItems": 28
+          },
+          "openTelemetry": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "maxLength": 2048,
+                "description": "OpenTelemetry endpoint URL.",
+                "format": "uri"
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Header name."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "Header value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "HTTP header key-value pair."
+                },
+                "description": "Headers sent to the OpenTelemetry endpoint.",
+                "maxItems": 20
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint"
+            ],
+            "description": "OpenTelemetry export configuration for monitor metrics."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "url",
+          "periodicity"
+        ],
+        "description": "Input parameters for creating an OpenStatus HTTP monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Monitor ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Monitor name."
+              },
+              "url": {
+                "type": "string",
+                "description": "HTTP monitor URL."
+              },
+              "uri": {
+                "type": "string",
+                "description": "TCP or DNS monitor URI."
+              },
+              "periodicity": {
+                "type": "string",
+                "description": "Monitor check periodicity."
+              },
+              "method": {
+                "type": "string",
+                "description": "HTTP method for HTTP monitors."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the monitor is active."
+              },
+              "public": {
+                "type": "boolean",
+                "description": "Whether the monitor is public."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current monitor status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "OpenStatus monitor returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus HTTP monitor result."
+      }
+    },
+    {
+      "id": "openstatus.delete_monitor",
+      "service": "openstatus",
+      "name": "delete_monitor",
+      "description": "Delete an OpenStatus monitor by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one OpenStatus monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether OpenStatus completed the operation successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus mutation result."
+      }
+    },
+    {
+      "id": "openstatus.get_monitor",
+      "service": "openstatus",
+      "name": "get_monitor",
+      "description": "Retrieve one OpenStatus monitor configuration by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one OpenStatus monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "http": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Monitor ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Monitor name."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "HTTP monitor URL."
+                  },
+                  "uri": {
+                    "type": "string",
+                    "description": "TCP or DNS monitor URI."
+                  },
+                  "periodicity": {
+                    "type": "string",
+                    "description": "Monitor check periodicity."
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method for HTTP monitors."
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is active."
+                  },
+                  "public": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is public."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Current monitor status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "OpenStatus monitor returned by the API."
+              },
+              "tcp": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Monitor ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Monitor name."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "HTTP monitor URL."
+                  },
+                  "uri": {
+                    "type": "string",
+                    "description": "TCP or DNS monitor URI."
+                  },
+                  "periodicity": {
+                    "type": "string",
+                    "description": "Monitor check periodicity."
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method for HTTP monitors."
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is active."
+                  },
+                  "public": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is public."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Current monitor status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "OpenStatus monitor returned by the API."
+              },
+              "dns": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Monitor ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Monitor name."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "HTTP monitor URL."
+                  },
+                  "uri": {
+                    "type": "string",
+                    "description": "TCP or DNS monitor URI."
+                  },
+                  "periodicity": {
+                    "type": "string",
+                    "description": "Monitor check periodicity."
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method for HTTP monitors."
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is active."
+                  },
+                  "public": {
+                    "type": "boolean",
+                    "description": "Whether the monitor is public."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Current monitor status."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "OpenStatus monitor returned by the API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Type-specific OpenStatus monitor configuration."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single OpenStatus monitor."
+      }
+    },
+    {
+      "id": "openstatus.get_monitor_status",
+      "service": "openstatus",
+      "name": "get_monitor_status",
+      "description": "Retrieve the current OpenStatus monitor status for each configured region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one OpenStatus monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Monitor ID."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "description": "OpenStatus region identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current monitor status in this region."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Current monitor status for one region."
+            },
+            "description": "Status entries by region."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus monitor region statuses."
+      }
+    },
+    {
+      "id": "openstatus.get_monitor_summary",
+      "service": "openstatus",
+      "name": "get_monitor_summary",
+      "description": "Retrieve aggregated OpenStatus monitor metrics for a time range and regions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          },
+          "timeRange": {
+            "type": "string",
+            "enum": [
+              "TIME_RANGE_1D",
+              "TIME_RANGE_7D",
+              "TIME_RANGE_14D"
+            ],
+            "description": "Metrics aggregation window."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REGION_FLY_AMS",
+                "REGION_FLY_ARN",
+                "REGION_FLY_BOM",
+                "REGION_FLY_CDG",
+                "REGION_FLY_DFW",
+                "REGION_FLY_EWR",
+                "REGION_FLY_FRA",
+                "REGION_FLY_GRU",
+                "REGION_FLY_IAD",
+                "REGION_FLY_JNB",
+                "REGION_FLY_LAX",
+                "REGION_FLY_LHR",
+                "REGION_FLY_NRT",
+                "REGION_FLY_ORD",
+                "REGION_FLY_SJC",
+                "REGION_FLY_SIN",
+                "REGION_FLY_SYD",
+                "REGION_FLY_YYZ",
+                "REGION_KOYEB_FRA",
+                "REGION_KOYEB_PAR",
+                "REGION_KOYEB_SFO",
+                "REGION_KOYEB_SIN",
+                "REGION_KOYEB_TYO",
+                "REGION_KOYEB_WAS",
+                "REGION_RAILWAY_US_WEST2",
+                "REGION_RAILWAY_US_EAST4",
+                "REGION_RAILWAY_EUROPE_WEST4",
+                "REGION_RAILWAY_ASIA_SOUTHEAST1"
+              ],
+              "description": "OpenStatus monitor region."
+            },
+            "description": "Regions used to run or filter monitor checks.",
+            "minItems": 1,
+            "maxItems": 28
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving OpenStatus monitor metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Monitor ID."
+              },
+              "lastPingAt": {
+                "type": "string",
+                "description": "Timestamp of the latest check."
+              },
+              "totalSuccessful": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "totalDegraded": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "totalFailed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "p50": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "p75": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "p90": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "p95": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "p99": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Integer value returned as a JSON number."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Integer value returned as a string."
+                  }
+                ],
+                "description": "Integer value returned by OpenStatus."
+              },
+              "timeRange": {
+                "type": "string",
+                "description": "Metrics aggregation window."
+              },
+              "regions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "OpenStatus region identifier."
+                },
+                "description": "Regions included in the metrics."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Aggregated monitor metrics returned by OpenStatus."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus monitor metrics summary."
+      }
+    },
+    {
+      "id": "openstatus.list_http_response_logs",
+      "service": "openstatus",
+      "name": "list_http_response_logs",
+      "description": "List recent OpenStatus HTTP response logs for a monitor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          },
+          "fromTimestamp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Integer value returned as a JSON number."
+              },
+              {
+                "type": "string",
+                "description": "Integer value returned as a string."
+              },
+              {
+                "type": "null",
+                "description": "Null value."
+              }
+            ],
+            "description": "Integer value returned by OpenStatus."
+          },
+          "toTimestamp": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Integer value returned as a JSON number."
+              },
+              {
+                "type": "string",
+                "description": "Integer value returned as a string."
+              },
+              {
+                "type": "null",
+                "description": "Null value."
+              }
+            ],
+            "description": "Integer value returned by OpenStatus."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for listing OpenStatus HTTP response logs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Response log ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Response log ID."
+                },
+                "monitorId": {
+                  "type": "string",
+                  "description": "Monitor ID."
+                },
+                "latency": {
+                  "type": "integer",
+                  "description": "Measured latency in milliseconds."
+                },
+                "statusCode": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "HTTP status code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "HTTP status code."
+                },
+                "requestStatus": {
+                  "type": "string",
+                  "description": "Request status classification."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "Region where the check ran."
+                },
+                "timestamp": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Integer value returned as a JSON number."
+                    },
+                    {
+                      "type": "string",
+                      "description": "Integer value returned as a string."
+                    }
+                  ],
+                  "description": "Integer value returned by OpenStatus."
+                }
+              },
+              "additionalProperties": true,
+              "description": "OpenStatus HTTP response log entry."
+            },
+            "description": "HTTP response logs returned by OpenStatus."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "description": "Requested page size."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "Requested page offset."
+                  },
+                  "hasMore": {
+                    "type": "boolean",
+                    "description": "Whether more records are available."
+                  },
+                  "nextOffset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Next offset when more records are available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Next offset when more records are available."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "OpenStatus pagination metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "OpenStatus pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus HTTP response logs."
+      }
+    },
+    {
+      "id": "openstatus.list_monitors",
+      "service": "openstatus",
+      "name": "list_monitors",
+      "description": "List OpenStatus HTTP, TCP, and DNS monitors in the authenticated workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of records to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing OpenStatus monitors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "httpMonitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Monitor ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Monitor name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "HTTP monitor URL."
+                },
+                "uri": {
+                  "type": "string",
+                  "description": "TCP or DNS monitor URI."
+                },
+                "periodicity": {
+                  "type": "string",
+                  "description": "Monitor check periodicity."
+                },
+                "method": {
+                  "type": "string",
+                  "description": "HTTP method for HTTP monitors."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is active."
+                },
+                "public": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is public."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current monitor status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "OpenStatus monitor returned by the API."
+            },
+            "description": "HTTP monitors returned by OpenStatus."
+          },
+          "tcpMonitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Monitor ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Monitor name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "HTTP monitor URL."
+                },
+                "uri": {
+                  "type": "string",
+                  "description": "TCP or DNS monitor URI."
+                },
+                "periodicity": {
+                  "type": "string",
+                  "description": "Monitor check periodicity."
+                },
+                "method": {
+                  "type": "string",
+                  "description": "HTTP method for HTTP monitors."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is active."
+                },
+                "public": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is public."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current monitor status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "OpenStatus monitor returned by the API."
+            },
+            "description": "TCP monitors returned by OpenStatus."
+          },
+          "dnsMonitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Monitor ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Monitor name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "HTTP monitor URL."
+                },
+                "uri": {
+                  "type": "string",
+                  "description": "TCP or DNS monitor URI."
+                },
+                "periodicity": {
+                  "type": "string",
+                  "description": "Monitor check periodicity."
+                },
+                "method": {
+                  "type": "string",
+                  "description": "HTTP method for HTTP monitors."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is active."
+                },
+                "public": {
+                  "type": "boolean",
+                  "description": "Whether the monitor is public."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current monitor status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "OpenStatus monitor returned by the API."
+            },
+            "description": "DNS monitors returned by OpenStatus."
+          },
+          "totalSize": {
+            "type": "integer",
+            "description": "Total number of monitors across all types."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus monitor list."
+      }
+    },
+    {
+      "id": "openstatus.trigger_monitor",
+      "service": "openstatus",
+      "name": "trigger_monitor",
+      "description": "Trigger an immediate OpenStatus monitor check across configured regions.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one OpenStatus monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether OpenStatus completed the operation successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus mutation result."
+      }
+    },
+    {
+      "id": "openstatus.update_http_monitor",
+      "service": "openstatus",
+      "name": "update_http_monitor",
+      "description": "Partially update an existing OpenStatus HTTP monitor.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "OpenStatus monitor ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "description": "Monitor name."
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "URL that OpenStatus should monitor.",
+            "format": "uri"
+          },
+          "periodicity": {
+            "type": "string",
+            "enum": [
+              "PERIODICITY_30S",
+              "PERIODICITY_1M",
+              "PERIODICITY_5M",
+              "PERIODICITY_10M",
+              "PERIODICITY_30M",
+              "PERIODICITY_1H"
+            ],
+            "description": "How often OpenStatus should run the monitor."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "HTTP_METHOD_GET",
+              "HTTP_METHOD_POST",
+              "HTTP_METHOD_HEAD",
+              "HTTP_METHOD_PUT",
+              "HTTP_METHOD_PATCH",
+              "HTTP_METHOD_DELETE",
+              "HTTP_METHOD_TRACE",
+              "HTTP_METHOD_CONNECT",
+              "HTTP_METHOD_OPTIONS"
+            ],
+            "description": "HTTP method used by the monitor."
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body to send with the monitor check."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120000,
+            "description": "Timeout in milliseconds."
+          },
+          "degradedAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 120000,
+                "description": "Latency threshold in milliseconds before the monitor is marked degraded."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latency threshold in milliseconds before the monitor is marked degraded."
+          },
+          "retry": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "description": "Number of retry attempts."
+          },
+          "followRedirects": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the monitor should follow HTTP redirects."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the monitor should follow HTTP redirects."
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Header name."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Header value."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP header key-value pair."
+            },
+            "description": "Custom request headers.",
+            "maxItems": 20
+          },
+          "statusCodeAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599,
+                  "description": "Target HTTP status code."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "NUMBER_COMPARATOR_EQUAL",
+                    "NUMBER_COMPARATOR_NOT_EQUAL",
+                    "NUMBER_COMPARATOR_GREATER_THAN",
+                    "NUMBER_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "NUMBER_COMPARATOR_LESS_THAN",
+                    "NUMBER_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "Numeric assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP status code assertion."
+            },
+            "description": "HTTP status code assertions.",
+            "maxItems": 10
+          },
+          "bodyAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "description": "Target body value to compare against."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "STRING_COMPARATOR_CONTAINS",
+                    "STRING_COMPARATOR_NOT_CONTAINS",
+                    "STRING_COMPARATOR_EQUAL",
+                    "STRING_COMPARATOR_NOT_EQUAL",
+                    "STRING_COMPARATOR_EMPTY",
+                    "STRING_COMPARATOR_NOT_EMPTY",
+                    "STRING_COMPARATOR_GREATER_THAN",
+                    "STRING_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "STRING_COMPARATOR_LESS_THAN",
+                    "STRING_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "String assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP response body assertion."
+            },
+            "description": "HTTP response body assertions.",
+            "maxItems": 10
+          },
+          "headerAssertions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Header name to check."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target header value to compare against."
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "STRING_COMPARATOR_CONTAINS",
+                    "STRING_COMPARATOR_NOT_CONTAINS",
+                    "STRING_COMPARATOR_EQUAL",
+                    "STRING_COMPARATOR_NOT_EQUAL",
+                    "STRING_COMPARATOR_EMPTY",
+                    "STRING_COMPARATOR_NOT_EMPTY",
+                    "STRING_COMPARATOR_GREATER_THAN",
+                    "STRING_COMPARATOR_GREATER_THAN_OR_EQUAL",
+                    "STRING_COMPARATOR_LESS_THAN",
+                    "STRING_COMPARATOR_LESS_THAN_OR_EQUAL"
+                  ],
+                  "description": "String assertion comparator."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HTTP response header assertion."
+            },
+            "description": "HTTP response header assertions.",
+            "maxItems": 10
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Monitor description."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the monitor is active."
+          },
+          "public": {
+            "type": "boolean",
+            "description": "Whether the monitor is publicly visible."
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "REGION_FLY_AMS",
+                "REGION_FLY_ARN",
+                "REGION_FLY_BOM",
+                "REGION_FLY_CDG",
+                "REGION_FLY_DFW",
+                "REGION_FLY_EWR",
+                "REGION_FLY_FRA",
+                "REGION_FLY_GRU",
+                "REGION_FLY_IAD",
+                "REGION_FLY_JNB",
+                "REGION_FLY_LAX",
+                "REGION_FLY_LHR",
+                "REGION_FLY_NRT",
+                "REGION_FLY_ORD",
+                "REGION_FLY_SJC",
+                "REGION_FLY_SIN",
+                "REGION_FLY_SYD",
+                "REGION_FLY_YYZ",
+                "REGION_KOYEB_FRA",
+                "REGION_KOYEB_PAR",
+                "REGION_KOYEB_SFO",
+                "REGION_KOYEB_SIN",
+                "REGION_KOYEB_TYO",
+                "REGION_KOYEB_WAS",
+                "REGION_RAILWAY_US_WEST2",
+                "REGION_RAILWAY_US_EAST4",
+                "REGION_RAILWAY_EUROPE_WEST4",
+                "REGION_RAILWAY_ASIA_SOUTHEAST1"
+              ],
+              "description": "OpenStatus monitor region."
+            },
+            "description": "Regions used to run or filter monitor checks.",
+            "minItems": 1,
+            "maxItems": 28
+          },
+          "openTelemetry": {
+            "type": "object",
+            "properties": {
+              "endpoint": {
+                "type": "string",
+                "maxLength": 2048,
+                "description": "OpenTelemetry endpoint URL.",
+                "format": "uri"
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Header name."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "Header value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "HTTP header key-value pair."
+                },
+                "description": "Headers sent to the OpenTelemetry endpoint.",
+                "maxItems": 20
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "endpoint"
+            ],
+            "description": "OpenTelemetry export configuration for monitor metrics."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for updating an OpenStatus HTTP monitor.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "periodicity"
+            ]
+          },
+          {
+            "required": [
+              "method"
+            ]
+          },
+          {
+            "required": [
+              "body"
+            ]
+          },
+          {
+            "required": [
+              "timeout"
+            ]
+          },
+          {
+            "required": [
+              "degradedAt"
+            ]
+          },
+          {
+            "required": [
+              "retry"
+            ]
+          },
+          {
+            "required": [
+              "followRedirects"
+            ]
+          },
+          {
+            "required": [
+              "headers"
+            ]
+          },
+          {
+            "required": [
+              "statusCodeAssertions"
+            ]
+          },
+          {
+            "required": [
+              "bodyAssertions"
+            ]
+          },
+          {
+            "required": [
+              "headerAssertions"
+            ]
+          },
+          {
+            "required": [
+              "description"
+            ]
+          },
+          {
+            "required": [
+              "active"
+            ]
+          },
+          {
+            "required": [
+              "public"
+            ]
+          },
+          {
+            "required": [
+              "regions"
+            ]
+          },
+          {
+            "required": [
+              "openTelemetry"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Monitor ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Monitor name."
+              },
+              "url": {
+                "type": "string",
+                "description": "HTTP monitor URL."
+              },
+              "uri": {
+                "type": "string",
+                "description": "TCP or DNS monitor URI."
+              },
+              "periodicity": {
+                "type": "string",
+                "description": "Monitor check periodicity."
+              },
+              "method": {
+                "type": "string",
+                "description": "HTTP method for HTTP monitors."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the monitor is active."
+              },
+              "public": {
+                "type": "boolean",
+                "description": "Whether the monitor is public."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current monitor status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "OpenStatus monitor returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OpenStatus HTTP monitor result."
+      }
+    }
+  ]
+}

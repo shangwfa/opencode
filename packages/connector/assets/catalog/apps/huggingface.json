@@ -1,0 +1,1628 @@
+{
+  "service": "huggingface",
+  "displayName": "Hugging Face",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://huggingface.co/oauth/authorize",
+      "tokenUrl": "https://huggingface.co/oauth/token",
+      "scopes": [
+        "openid",
+        "profile",
+        "inference-api",
+        "read-repos"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    },
+    {
+      "type": "api_key",
+      "label": "User Access Token",
+      "placeholder": "hf_...",
+      "description": "Hugging Face user access token sent as a Bearer token. Create one from your Hugging Face access token settings.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://huggingface.co",
+  "actions": [
+    {
+      "id": "huggingface.generate_chat_completion",
+      "service": "huggingface",
+      "name": "generate_chat_completion",
+      "description": "Generate a chat completion with Hugging Face Inference Providers.",
+      "operationType": "read",
+      "requiredScopes": [
+        "inference-api"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A non-empty string."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string",
+                                "description": "The multimodal content type."
+                              },
+                              "text": {
+                                "type": "string",
+                                "description": "The text content for this message part."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "A text message part."
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "image_url",
+                                "type": "string",
+                                "description": "The multimodal content type."
+                              },
+                              "image_url": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "description": "The image URL or data URI."
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "The image reference payload."
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "An image message part."
+                          }
+                        ]
+                      },
+                      "description": "Structured multimodal content."
+                    }
+                  ],
+                  "description": "The content for a chat message."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The optional speaker name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "A single chat message sent to the model."
+            },
+            "description": "The ordered conversation messages.",
+            "minItems": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of output tokens to generate."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The sampling temperature."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          },
+          "stop": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A stop sequence."
+            },
+            "description": "Up to 4 stop sequences.",
+            "maxItems": 4
+          },
+          "seed": {
+            "type": "integer",
+            "description": "A random seed for deterministic generation."
+          },
+          "stream": {
+            "const": false,
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only accepts false or an omitted value."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "function",
+                  "type": "string",
+                  "description": "The tool type."
+                },
+                "function": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The tool function name."
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "A human-readable tool description."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON value."
+                      },
+                      "description": "A JSON-like object with arbitrary string keys."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name"
+                  ],
+                  "description": "The function tool declaration."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A chat completion tool definition."
+            },
+            "description": "The function tools available to the model."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for generating a Hugging Face chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The upstream object type."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The creation timestamp in Unix seconds."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used for generation."
+          },
+          "text": {
+            "type": "string",
+            "description": "The first assistant text content extracted from the response."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The zero-based choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "description": "The role of the generated message."
+                    },
+                    "content": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The generated text content."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The generated text content."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The generated assistant message."
+                },
+                "finishReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Why Hugging Face stopped generating this choice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Why Hugging Face stopped generating this choice."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized chat completion choice."
+            },
+            "description": "The generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "promptTokens": {
+                "type": "integer",
+                "description": "The prompt token count."
+              },
+              "completionTokens": {
+                "type": "integer",
+                "description": "The completion token count."
+              },
+              "totalTokens": {
+                "type": "integer",
+                "description": "The total token count."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized token usage object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "object",
+          "model",
+          "choices"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "huggingface.generate_embeddings",
+      "service": "huggingface",
+      "name": "generate_embeddings",
+      "description": "Generate text embeddings with Hugging Face inference.",
+      "operationType": "read",
+      "requiredScopes": [
+        "inference-api"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The embedding model identifier."
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A text string to embed."
+            },
+            "description": "The list of texts to embed.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inputs"
+        ],
+        "description": "The input payload for generating Hugging Face embeddings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The embedding model identifier."
+          },
+          "embeddings": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "A single embedding dimension value."
+              },
+              "description": "One embedding vector."
+            },
+            "description": "The embedding vectors for each input string."
+          },
+          "dimensions": {
+            "type": "integer",
+            "description": "The embedding dimension count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "embeddings",
+          "dimensions"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "huggingface.get_current_user",
+      "service": "huggingface",
+      "name": "get_current_user",
+      "description": "Get the current authenticated Hugging Face user profile.",
+      "operationType": "read",
+      "requiredScopes": [
+        "openid",
+        "profile"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Hugging Face subject identifier."
+          },
+          "preferredUsername": {
+            "type": "string",
+            "description": "The Hugging Face handle."
+          },
+          "name": {
+            "type": "string",
+            "description": "The display name of the authenticated user."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address returned by Hugging Face."
+          },
+          "avatarUrl": {
+            "type": "string",
+            "description": "The avatar image URL."
+          },
+          "profileUrl": {
+            "type": "string",
+            "description": "The public profile URL."
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "preferredUsername": {
+                  "type": "string",
+                  "description": "The organization handle shown by Hugging Face."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The organization display name."
+                },
+                "avatarUrl": {
+                  "type": "string",
+                  "description": "The organization avatar URL."
+                },
+                "profileUrl": {
+                  "type": "string",
+                  "description": "The organization profile URL."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Hugging Face organization summary."
+            },
+            "description": "The organizations attached to the authenticated user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The current authenticated Hugging Face user."
+      }
+    },
+    {
+      "id": "huggingface.get_dataset_first_rows",
+      "service": "huggingface",
+      "name": "get_dataset_first_rows",
+      "description": "Preview the first rows of a dataset split from the Hugging Face Dataset Viewer.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read-repos"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full dataset identifier, such as owner/dataset."
+          },
+          "config": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset config or subset name."
+          },
+          "split": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset split name to preview."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "config",
+          "split"
+        ],
+        "description": "The input payload for previewing a Hugging Face dataset split."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "description": "The dataset identifier that was queried."
+          },
+          "config": {
+            "type": "string",
+            "description": "The dataset config that was queried."
+          },
+          "split": {
+            "type": "string",
+            "description": "The dataset split that was queried."
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "featureIdx": {
+                  "type": "integer",
+                  "description": "The zero-based feature index."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The feature name."
+                },
+                "type": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A dataset feature summary."
+            },
+            "description": "The feature list returned by the viewer."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rowIdx": {
+                  "type": "integer",
+                  "description": "The zero-based row index."
+                },
+                "row": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                },
+                "truncatedCells": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A truncated column name."
+                  },
+                  "description": "The cells truncated by the upstream dataset viewer."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A dataset row preview item."
+            },
+            "description": "The row previews returned by the viewer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "config",
+          "split",
+          "features",
+          "rows"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "huggingface.get_dataset_info",
+      "service": "huggingface",
+      "name": "get_dataset_info",
+      "description": "Get detailed metadata for a Hugging Face dataset by dataset id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full dataset identifier, such as owner/dataset."
+          },
+          "config": {
+            "type": "string",
+            "description": "The optional dataset config or subset name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "The input payload for retrieving Hugging Face dataset metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "description": "The full dataset identifier."
+          },
+          "config": {
+            "type": "string",
+            "description": "The dataset config name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The dataset description text."
+          },
+          "citation": {
+            "type": "string",
+            "description": "The dataset citation text."
+          },
+          "homepage": {
+            "type": "string",
+            "description": "The dataset homepage URL."
+          },
+          "license": {
+            "type": "string",
+            "description": "The dataset license string."
+          },
+          "features": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          },
+          "splits": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the dataset metadata was computed on a partial source."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "huggingface.get_dataset_statistics",
+      "service": "huggingface",
+      "name": "get_dataset_statistics",
+      "description": "Get column statistics for a dataset split from the Hugging Face Dataset Viewer.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read-repos"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full dataset identifier, such as owner/dataset."
+          },
+          "config": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset config or subset name."
+          },
+          "split": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The dataset split name to analyze."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "config",
+          "split"
+        ],
+        "description": "The input payload for analyzing a Hugging Face dataset split."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "numExamples": {
+            "type": "integer",
+            "description": "The number of examples analyzed."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether the statistics were computed on only a partial source."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "columnName": {
+                  "type": "string",
+                  "description": "The column name."
+                },
+                "columnType": {
+                  "type": "string",
+                  "description": "The upstream column type."
+                },
+                "columnStatistics": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A dataset statistics entry."
+            },
+            "description": "The statistics entries returned by the viewer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "partial",
+          "statistics"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "huggingface.get_model_info",
+      "service": "huggingface",
+      "name": "get_model_info",
+      "description": "Get detailed metadata for a Hugging Face model by modelId.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full model identifier, such as owner/model."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId"
+        ],
+        "description": "The input payload for retrieving Hugging Face model metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "description": "The full model identifier."
+          },
+          "author": {
+            "type": "string",
+            "description": "The model owner handle."
+          },
+          "sha": {
+            "type": "string",
+            "description": "The current repository SHA."
+          },
+          "downloads": {
+            "type": "integer",
+            "description": "The number of model downloads."
+          },
+          "likes": {
+            "type": "integer",
+            "description": "The number of likes on the model card."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether the model repository is private."
+          },
+          "gated": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the repository is gated."
+              },
+              {
+                "type": "string",
+                "description": "The gating mode reported by Hugging Face."
+              }
+            ],
+            "description": "The Hugging Face gating status."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A model tag."
+            },
+            "description": "The tags attached to the model."
+          },
+          "task": {
+            "type": "string",
+            "description": "The primary pipeline task for the model."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "A timestamp returned by Hugging Face."
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "A timestamp returned by Hugging Face."
+          },
+          "libraryName": {
+            "type": "string",
+            "description": "The primary library tag for the model."
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          },
+          "cardData": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId"
+        ],
+        "description": "Detailed metadata for a Hugging Face model."
+      }
+    },
+    {
+      "id": "huggingface.get_space_info",
+      "service": "huggingface",
+      "name": "get_space_info",
+      "description": "Get detailed metadata for a Hugging Face Space by repo id.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read-repos"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full Space identifier, such as owner/space."
+          },
+          "revision": {
+            "type": "string",
+            "description": "The optional git revision to inspect."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "repoId"
+        ],
+        "description": "The input payload for retrieving Hugging Face Space metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The full Space identifier."
+          },
+          "author": {
+            "type": "string",
+            "description": "The Space owner handle."
+          },
+          "sdk": {
+            "type": "string",
+            "description": "The SDK used by the Space."
+          },
+          "host": {
+            "type": "string",
+            "description": "The public host URL for the Space."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether the Space repository is private."
+          },
+          "gated": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether the repository is gated."
+              },
+              {
+                "type": "string",
+                "description": "The gating mode reported by Hugging Face."
+              }
+            ],
+            "description": "The Hugging Face gating status."
+          },
+          "likes": {
+            "type": "integer",
+            "description": "The number of likes on the Space."
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A model identifier."
+            },
+            "description": "The models linked from the Space."
+          },
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A dataset identifier."
+            },
+            "description": "The datasets linked from the Space."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Space tag."
+            },
+            "description": "The tags attached to the Space."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "A timestamp returned by Hugging Face."
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "A timestamp returned by Hugging Face."
+          },
+          "runtime": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          },
+          "cardData": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value."
+            },
+            "description": "A JSON-like object with arbitrary string keys."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Hugging Face Space summary."
+      }
+    },
+    {
+      "id": "huggingface.get_trending",
+      "service": "huggingface",
+      "name": "get_trending",
+      "description": "Get trending Hugging Face repositories across models, datasets, and Spaces.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "model",
+              "dataset",
+              "space"
+            ],
+            "description": "The repository type filter."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of trending items to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Hugging Face trending repositories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recentlyTrending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "repoType": {
+                  "type": "string",
+                  "description": "The repository type for the trending entry."
+                },
+                "repoData": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A trending repository entry."
+            },
+            "description": "The list of trending repositories."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recentlyTrending"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "huggingface.list_datasets",
+      "service": "huggingface",
+      "name": "list_datasets",
+      "description": "List Hugging Face datasets using user-friendly search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "A keyword used to search dataset names and owners."
+          },
+          "author": {
+            "type": "string",
+            "description": "Filter datasets by author or organization."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Filter datasets by a Hub tag expression."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "lastModified",
+              "trending",
+              "likes",
+              "downloads"
+            ],
+            "description": "The property used to sort results."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The direction in which to sort results."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of datasets to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Hugging Face datasets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The full dataset identifier."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The dataset owner handle."
+                },
+                "private": {
+                  "type": "boolean",
+                  "description": "Whether the dataset repository is private."
+                },
+                "gated": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the repository is gated."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gating mode reported by Hugging Face."
+                    }
+                  ],
+                  "description": "The Hugging Face gating status."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the dataset is disabled."
+                },
+                "downloads": {
+                  "type": "integer",
+                  "description": "The number of dataset downloads."
+                },
+                "likes": {
+                  "type": "integer",
+                  "description": "The number of likes on the dataset card."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A dataset tag."
+                  },
+                  "description": "The tags attached to the dataset."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                },
+                "lastModified": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Hugging Face dataset summary."
+            },
+            "description": "The list of matching dataset summaries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasets"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "huggingface.list_endpoints",
+      "service": "huggingface",
+      "name": "list_endpoints",
+      "description": "List Hugging Face Inference Endpoints for a namespace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user or organization namespace."
+          },
+          "search": {
+            "type": "string",
+            "description": "Filter endpoints by a name substring."
+          },
+          "tags": {
+            "type": "string",
+            "description": "Filter endpoints by a comma-separated tag list."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of endpoints to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace"
+        ],
+        "description": "The input payload for listing Hugging Face Inference Endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value."
+              },
+              "description": "A JSON-like object with arbitrary string keys."
+            },
+            "description": "The endpoint records returned by the API."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for the next page of results."
+          },
+          "prevCursor": {
+            "type": "string",
+            "description": "The cursor for the previous page of results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "huggingface.list_models",
+      "service": "huggingface",
+      "name": "list_models",
+      "description": "List Hugging Face models using user-friendly search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "A keyword used to search model names and owners."
+          },
+          "author": {
+            "type": "string",
+            "description": "Filter models by author or organization."
+          },
+          "task": {
+            "type": "string",
+            "description": "Filter models by pipeline task."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of models to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Hugging Face models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The full model identifier."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The model owner handle."
+                },
+                "task": {
+                  "type": "string",
+                  "description": "The primary pipeline task for the model."
+                },
+                "private": {
+                  "type": "boolean",
+                  "description": "Whether the model repository is private."
+                },
+                "gated": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the repository is gated."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gating mode reported by Hugging Face."
+                    }
+                  ],
+                  "description": "The Hugging Face gating status."
+                },
+                "likes": {
+                  "type": "integer",
+                  "description": "The number of likes on the model card."
+                },
+                "downloads": {
+                  "type": "integer",
+                  "description": "The number of model downloads."
+                },
+                "lastModified": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A model tag."
+                  },
+                  "description": "The tags attached to the model."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A Hugging Face model summary."
+            },
+            "description": "The list of matching model summaries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "models"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "huggingface.list_repo_files",
+      "service": "huggingface",
+      "name": "list_repo_files",
+      "description": "List files in a Hugging Face repository tree.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read-repos"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repoType": {
+            "type": "string",
+            "enum": [
+              "model",
+              "dataset",
+              "space"
+            ],
+            "description": "The Hugging Face repository type."
+          },
+          "repoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full repository identifier, such as owner/repo."
+          },
+          "path": {
+            "type": "string",
+            "description": "The optional repository-relative path to list.",
+            "default": ""
+          },
+          "revision": {
+            "type": "string",
+            "description": "The optional git revision to inspect."
+          },
+          "recursive": {
+            "type": "boolean",
+            "description": "Whether to recursively return all nested entries."
+          },
+          "expand": {
+            "type": "boolean",
+            "description": "Whether to request expanded commit and security metadata."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The pagination cursor from a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "repoType",
+          "repoId"
+        ],
+        "description": "The input payload for listing a Hugging Face repository tree."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "The repository-relative path."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The tree entry type."
+                },
+                "oid": {
+                  "type": "string",
+                  "description": "The object identifier for the tree entry."
+                },
+                "size": {
+                  "type": "integer",
+                  "description": "The entry size in bytes."
+                },
+                "lastCommit": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                },
+                "securityFileStatus": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A repository tree item."
+            },
+            "description": "The repository tree items."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for the next page of results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "huggingface.list_spaces",
+      "service": "huggingface",
+      "name": "list_spaces",
+      "description": "List Hugging Face Spaces using user-friendly discovery filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "A keyword used to search Space names and owners."
+          },
+          "author": {
+            "type": "string",
+            "description": "Filter Spaces by author or organization."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Filter Spaces by a Hub tag expression."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The property used to sort results."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "1",
+              "-1"
+            ],
+            "description": "The sort direction used by the Space listing API."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of Spaces to return.",
+            "default": 20
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Hugging Face Spaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The full Space identifier."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The Space owner handle."
+                },
+                "sdk": {
+                  "type": "string",
+                  "description": "The SDK used by the Space."
+                },
+                "host": {
+                  "type": "string",
+                  "description": "The public host URL for the Space."
+                },
+                "private": {
+                  "type": "boolean",
+                  "description": "Whether the Space repository is private."
+                },
+                "gated": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the repository is gated."
+                    },
+                    {
+                      "type": "string",
+                      "description": "The gating mode reported by Hugging Face."
+                    }
+                  ],
+                  "description": "The Hugging Face gating status."
+                },
+                "likes": {
+                  "type": "integer",
+                  "description": "The number of likes on the Space."
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A model identifier."
+                  },
+                  "description": "The models linked from the Space."
+                },
+                "datasets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A dataset identifier."
+                  },
+                  "description": "The datasets linked from the Space."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Space tag."
+                  },
+                  "description": "The tags attached to the Space."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                },
+                "lastModified": {
+                  "type": "string",
+                  "description": "A timestamp returned by Hugging Face."
+                },
+                "runtime": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                },
+                "cardData": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value."
+                  },
+                  "description": "A JSON-like object with arbitrary string keys."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Hugging Face Space summary."
+            },
+            "description": "The list of matching Space summaries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaces"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

@@ -1,0 +1,636 @@
+{
+  "service": "shippo",
+  "displayName": "Shippo",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "SHIPPO_API_TOKEN",
+      "description": "Shippo API token used with the Authorization: ShippoToken header. Create or view tokens in Shippo API settings: https://app.goshippo.com/settings/api/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://goshippo.com",
+  "actions": [
+    {
+      "id": "shippo.create_address",
+      "service": "shippo",
+      "name": "create_address",
+      "description": "Create a Shippo address object and optionally validate it.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first and last name of the addressee."
+          },
+          "company": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company name for the address."
+          },
+          "street1": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first street line."
+          },
+          "street2": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The second street line."
+          },
+          "street3": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The third street line."
+          },
+          "streetNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The street number for carriers that require it."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city name."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state or province code."
+          },
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal code."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO country code."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number for the address."
+          },
+          "email": {
+            "type": "string",
+            "description": "The email address for the address.",
+            "format": "email"
+          },
+          "isResidential": {
+            "type": "boolean",
+            "description": "Whether the address is residential."
+          },
+          "metadata": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Metadata to attach to the address."
+          },
+          "validate": {
+            "type": "boolean",
+            "description": "Whether Shippo should validate the address during creation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "country"
+        ],
+        "description": "Input for creating a Shippo address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "object",
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "description": "The Shippo address object ID."
+              },
+              "is_complete": {
+                "type": "boolean",
+                "description": "Whether Shippo considers the address complete."
+              },
+              "validation_results": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Shippo validation details for the address."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo address object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo address action output."
+      }
+    },
+    {
+      "id": "shippo.create_parcel",
+      "service": "shippo",
+      "name": "create_parcel",
+      "description": "Create a Shippo parcel object from dimensions or a template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "length": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parcel length."
+          },
+          "width": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parcel width."
+          },
+          "height": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parcel height."
+          },
+          "distanceUnit": {
+            "type": "string",
+            "enum": [
+              "cm",
+              "in",
+              "ft",
+              "mm",
+              "m",
+              "yd"
+            ],
+            "description": "The distance unit for parcel dimensions."
+          },
+          "weight": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parcel weight."
+          },
+          "massUnit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "kg",
+              "lb",
+              "oz"
+            ],
+            "description": "The mass unit for parcel weight."
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Shippo parcel template token."
+          },
+          "metadata": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Metadata to attach to the parcel."
+          },
+          "extra": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional Shippo parcel extra services."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "weight",
+          "massUnit"
+        ],
+        "description": "Input for creating a Shippo parcel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "parcel": {
+            "type": "object",
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "description": "The Shippo parcel object ID."
+              },
+              "object_state": {
+                "type": "string",
+                "description": "The validation state of the parcel object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo parcel object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo parcel action output."
+      }
+    },
+    {
+      "id": "shippo.get_address",
+      "service": "shippo",
+      "name": "get_address",
+      "description": "Retrieve a Shippo address by object ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "addressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shippo address object ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Shippo address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "object",
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "description": "The Shippo address object ID."
+              },
+              "is_complete": {
+                "type": "boolean",
+                "description": "Whether Shippo considers the address complete."
+              },
+              "validation_results": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Shippo validation details for the address."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo address object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo address action output."
+      }
+    },
+    {
+      "id": "shippo.get_parcel",
+      "service": "shippo",
+      "name": "get_parcel",
+      "description": "Retrieve a Shippo parcel by object ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parcelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shippo parcel object ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Shippo parcel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "parcel": {
+            "type": "object",
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "description": "The Shippo parcel object ID."
+              },
+              "object_state": {
+                "type": "string",
+                "description": "The validation state of the parcel object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo parcel object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo parcel action output."
+      }
+    },
+    {
+      "id": "shippo.get_tracking_status",
+      "service": "shippo",
+      "name": "get_tracking_status",
+      "description": "Retrieve Shippo tracking status using a carrier and tracking number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shippo carrier token, such as usps or fedex."
+          },
+          "trackingNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The package tracking number."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving Shippo tracking status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "track": {
+            "type": "object",
+            "properties": {
+              "carrier": {
+                "type": "string",
+                "description": "The package carrier."
+              },
+              "tracking_number": {
+                "type": "string",
+                "description": "The tracking number."
+              },
+              "tracking_status": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The latest Shippo tracking status."
+              },
+              "tracking_history": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Shippo object returned by the API."
+                },
+                "description": "The full Shippo tracking event history."
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A message."
+                },
+                "description": "Carrier or Shippo messages for the tracking object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo tracking status object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo tracking action output."
+      }
+    },
+    {
+      "id": "shippo.list_addresses",
+      "service": "shippo",
+      "name": "list_addresses",
+      "description": "List address objects created in the connected Shippo account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "results": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for Shippo list endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object_id": {
+                  "type": "string",
+                  "description": "The Shippo address object ID."
+                },
+                "is_complete": {
+                  "type": "boolean",
+                  "description": "Whether Shippo considers the address complete."
+                },
+                "validation_results": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Shippo validation details for the address."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Shippo address object."
+            },
+            "description": "Shippo address objects on this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching Shippo objects."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, when available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw paginated Shippo response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Shippo address output."
+      }
+    },
+    {
+      "id": "shippo.list_parcels",
+      "service": "shippo",
+      "name": "list_parcels",
+      "description": "List parcel objects created in the connected Shippo account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "results": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for Shippo list endpoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object_id": {
+                  "type": "string",
+                  "description": "The Shippo parcel object ID."
+                },
+                "object_state": {
+                  "type": "string",
+                  "description": "The validation state of the parcel object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Shippo parcel object."
+            },
+            "description": "Shippo parcel objects on this page."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching Shippo objects."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the next page, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the next page, when available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL for the previous page, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL for the previous page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw paginated Shippo response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Shippo parcel output."
+      }
+    },
+    {
+      "id": "shippo.validate_address",
+      "service": "shippo",
+      "name": "validate_address",
+      "description": "Validate an existing Shippo address by object ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "addressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shippo address object ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving a Shippo address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "object",
+            "properties": {
+              "object_id": {
+                "type": "string",
+                "description": "The Shippo address object ID."
+              },
+              "is_complete": {
+                "type": "boolean",
+                "description": "Whether Shippo considers the address complete."
+              },
+              "validation_results": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Shippo validation details for the address."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Shippo address object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Shippo address action output."
+      }
+    }
+  ]
+}

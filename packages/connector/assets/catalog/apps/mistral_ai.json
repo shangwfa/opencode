@@ -1,0 +1,3074 @@
+{
+  "service": "mistral_ai",
+  "displayName": "Mistral AI",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "mistral_api_key",
+      "description": "Mistral API key used with the Authorization Bearer header. Create or manage keys in the Mistral Console: https://console.mistral.ai/api-keys/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://mistral.ai",
+  "actions": [
+    {
+      "id": "mistral_ai.append_to_conversation",
+      "service": "mistral_ai",
+      "name": "append_to_conversation",
+      "description": "Append a new message to an existing conversation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text input."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value accepted by the Mistral API."
+                  },
+                  "description": "Any JSON object accepted by the Mistral API."
+                },
+                "description": "Structured input entries."
+              }
+            ],
+            "description": "Input to append to the conversation."
+          },
+          "completion_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Completion parameter configuration accepted by Mistral."
+          },
+          "handoff_execution": {
+            "type": "string",
+            "enum": [
+              "client",
+              "server"
+            ],
+            "description": "Handoff execution method."
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Whether to persist storage."
+          },
+          "tool_confirmations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the Mistral API."
+              },
+              "description": "Any JSON object accepted by the Mistral API."
+            },
+            "description": "Tool call confirmations."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id",
+          "inputs"
+        ],
+        "description": "Input parameters for appending content to a conversation."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_agent",
+      "service": "mistral_ai",
+      "name": "create_agent",
+      "description": "Create a new Mistral agent.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The default model used by the agent."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent name."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Agent instructions."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tool definition accepted by Mistral."
+            },
+            "description": "Tools available to the agent."
+          },
+          "completion_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Completion parameter configuration accepted by Mistral."
+          },
+          "guardrails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Guardrail configuration accepted by Mistral."
+            },
+            "description": "Guardrails to apply."
+          },
+          "description": {
+            "type": "string",
+            "description": "Agent description."
+          },
+          "handoffs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "A list of strings.",
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "version_message": {
+            "type": "string",
+            "description": "Version message for this update."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "name"
+        ],
+        "description": "Create a Mistral agent."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_agents_completion",
+      "service": "mistral_ai",
+      "name": "create_agents_completion",
+      "description": "Call the Mistral agents completions API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A chat message accepted by Mistral."
+            },
+            "description": "Messages sent to the agent.",
+            "minItems": 1
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5,
+            "description": "Sampling temperature."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Nucleus sampling threshold."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of generated tokens."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to use streaming responses. This connector only supports false or omitted."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Single stop word."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of strings.",
+                "minItems": 1
+              }
+            ],
+            "description": "Stop generating conditions."
+          },
+          "random_seed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Random seed."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Response format configuration accepted by Mistral."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tool definition accepted by Mistral."
+            },
+            "description": "Tools added in this request."
+          },
+          "tool_choice": {
+            "description": "Tool calling strategy."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Presence penalty."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Frequency penalty."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of candidates."
+          },
+          "prediction": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Predictive optimization configuration."
+          },
+          "parallel_tool_calls": {
+            "type": "boolean",
+            "description": "Whether to enable parallel tool invocation."
+          },
+          "prompt_mode": {
+            "type": "string",
+            "description": "Prompt mode."
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "high",
+              "none"
+            ],
+            "description": "Reasoning strength."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id",
+          "messages"
+        ],
+        "description": "Input parameters for agent completion."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_audio_transcription",
+      "service": "mistral_ai",
+      "name": "create_audio_transcription",
+      "description": "Upload or reference audio and create a transcription.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "fileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The transit file identifier returned by POST /api/files."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional filename override to send to the provider."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional MIME type override to send to the provider."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "fileId"
+                ],
+                "description": "A file previously uploaded to the local transit file API."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "A public HTTP or HTTPS URL that the connector can fetch and upload.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "url"
+                ],
+                "description": "A public URL upload source."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Base64-encoded file content."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "content_base64"
+                ],
+                "description": "A base64 upload source."
+              }
+            ],
+            "description": "File content to upload to Mistral."
+          },
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File ID."
+          },
+          "context_bias": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Bias phrase."
+            },
+            "description": "Context bias phrases."
+          },
+          "diarize": {
+            "type": "boolean",
+            "description": "Whether to diarize speakers."
+          },
+          "language": {
+            "type": "string",
+            "description": "Audio language code."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling temperature."
+          },
+          "timestamp_granularities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "segment",
+                "word"
+              ],
+              "description": "Timestamp granularity."
+            },
+            "description": "Timestamp granularities to include."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model"
+        ],
+        "description": "Input parameters for audio transcription."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_chat_completion",
+      "service": "mistral_ai",
+      "name": "create_chat_completion",
+      "description": "Call the Mistral chat completions API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A chat message accepted by Mistral."
+            },
+            "description": "List of chat messages.",
+            "minItems": 1
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5,
+            "description": "Sampling temperature."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Nucleus sampling threshold."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of generated tokens."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to use streaming responses. This connector only supports false or omitted."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Single stop word."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of strings.",
+                "minItems": 1
+              }
+            ],
+            "description": "Stop generating conditions."
+          },
+          "random_seed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Random seed."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Response format configuration accepted by Mistral."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tool definition accepted by Mistral."
+            },
+            "description": "Tools available for the request."
+          },
+          "tool_choice": {
+            "description": "Tool calling strategy."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Presence penalty."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "Frequency penalty."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of candidates."
+          },
+          "prediction": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Predictive optimization configuration."
+          },
+          "parallel_tool_calls": {
+            "type": "boolean",
+            "description": "Whether to enable parallel tool invocation."
+          },
+          "prompt_mode": {
+            "type": "string",
+            "description": "Prompt mode."
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "high",
+              "none"
+            ],
+            "description": "Reasoning strength."
+          },
+          "guardrails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the Mistral API."
+              },
+              "description": "Any JSON object accepted by the Mistral API."
+            },
+            "description": "Guardrail configurations."
+          },
+          "safe_prompt": {
+            "type": "boolean",
+            "description": "Whether to inject safety prompts."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "Input parameters for chat completion."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_chat_moderation",
+      "service": "mistral_ai",
+      "name": "create_chat_moderation",
+      "description": "Detect chat message safety risks with Mistral moderation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A chat message accepted by Mistral."
+                },
+                "description": "Messages for a single chat session."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A chat message accepted by Mistral."
+                  },
+                  "description": "A chat session."
+                },
+                "description": "Multiple chat sessions."
+              }
+            ],
+            "description": "Chat content pending review."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "Moderate chat messages."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_embeddings",
+      "service": "mistral_ai",
+      "name": "create_embeddings",
+      "description": "Generate embeddings with Mistral.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Single text."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of strings.",
+                "minItems": 1
+              }
+            ],
+            "description": "Text to embed."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "output_dimension": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Output vector dimensions."
+          },
+          "output_dtype": {
+            "type": "string",
+            "enum": [
+              "float",
+              "int8",
+              "uint8",
+              "binary",
+              "ubinary"
+            ],
+            "description": "Output vector data type."
+          },
+          "encoding_format": {
+            "type": "string",
+            "enum": [
+              "float",
+              "base64"
+            ],
+            "description": "Vector encoding format."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "Generate embeddings."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_fim_completion",
+      "service": "mistral_ai",
+      "name": "create_fim_completion",
+      "description": "Call the Mistral FIM completions API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "The prefix content to complete."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "Completed suffix context."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1.5,
+            "description": "Sampling temperature."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Nucleus sampling threshold."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of generated tokens."
+          },
+          "min_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum number of generated tokens."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to use streaming responses. This connector only supports false or omitted."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Single stop word."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of strings.",
+                "minItems": 1
+              }
+            ],
+            "description": "Stop generating conditions."
+          },
+          "random_seed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Random seed."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "description": "Input parameters for FIM completion."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_library",
+      "service": "mistral_ai",
+      "name": "create_library",
+      "description": "Create a new Mistral library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Library name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Library description."
+          },
+          "chunk_size": {
+            "type": "integer",
+            "description": "Document chunk size."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "name"
+        ],
+        "description": "Create a library."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_library_share",
+      "service": "mistral_ai",
+      "name": "create_library_share",
+      "description": "Create or update shared access for a library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "Viewer",
+              "Editor"
+            ],
+            "description": "Sharing permission level."
+          },
+          "org_id": {
+            "type": "string",
+            "description": "Organization ID."
+          },
+          "share_with_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UUID of the shared object."
+          },
+          "share_with_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The entity type of the shared object."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "level",
+          "share_with_uuid",
+          "share_with_type"
+        ],
+        "description": "Create or update a library share."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_moderation",
+      "service": "mistral_ai",
+      "name": "create_moderation",
+      "description": "Detect text safety risks with Mistral moderation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Single text."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "A list of strings.",
+                "minItems": 1
+              }
+            ],
+            "description": "Text pending review."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "input"
+        ],
+        "description": "Moderate text."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_ocr",
+      "service": "mistral_ai",
+      "name": "create_ocr",
+      "description": "Run Mistral OCR on a document or image.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          },
+          "id": {
+            "type": "string",
+            "description": "Custom ID for this OCR request."
+          },
+          "document": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "OCR document or image reference accepted by Mistral."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Page number, starting from 0."
+            },
+            "description": "Only process specified pages."
+          },
+          "include_image_base64": {
+            "type": "boolean",
+            "description": "Whether to include extracted image base64 data."
+          },
+          "image_limit": {
+            "type": "integer",
+            "description": "Maximum number of images to extract."
+          },
+          "image_min_size": {
+            "type": "integer",
+            "description": "Minimum image size to extract."
+          },
+          "bbox_annotation_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Response format configuration accepted by Mistral."
+          },
+          "document_annotation_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Response format configuration accepted by Mistral."
+          },
+          "document_annotation_prompt": {
+            "type": "string",
+            "description": "Prompt for structured document extraction."
+          },
+          "confidence_scores_granularity": {
+            "type": "string",
+            "enum": [
+              "word",
+              "page"
+            ],
+            "description": "Confidence granularity."
+          },
+          "table_format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html"
+            ],
+            "description": "Table output format."
+          },
+          "extract_header": {
+            "type": "boolean",
+            "description": "Whether to extract the header."
+          },
+          "extract_footer": {
+            "type": "boolean",
+            "description": "Whether to extract the footer."
+          },
+          "bbox_annotation_format_prompt": {
+            "type": "string",
+            "description": "Prompt for bbox structured extraction."
+          },
+          "document_annotation_prompt_extra": {
+            "type": "string",
+            "description": "Additional document prompt words."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "document"
+        ],
+        "description": "Input parameters for OCR."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.create_or_update_agent_alias",
+      "service": "mistral_ai",
+      "name": "create_or_update_agent_alias",
+      "description": "Create or update an agent version alias.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent alias name."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Version number."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id",
+          "alias",
+          "version"
+        ],
+        "description": "Create or update an agent alias."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_agent",
+      "service": "mistral_ai",
+      "name": "delete_agent",
+      "description": "Delete the specified agent.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id"
+        ],
+        "description": "Delete one agent."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the resource has been deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Delete action response."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_conversation",
+      "service": "mistral_ai",
+      "name": "delete_conversation",
+      "description": "Delete the specified conversation.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id"
+        ],
+        "description": "Delete one conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the resource has been deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Delete action response."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_file",
+      "service": "mistral_ai",
+      "name": "delete_file",
+      "description": "Delete the specified file.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "file_id"
+        ],
+        "description": "Delete one file."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_library",
+      "service": "mistral_ai",
+      "name": "delete_library",
+      "description": "Delete the specified library.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id"
+        ],
+        "description": "Delete one library."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_library_document",
+      "service": "mistral_ai",
+      "name": "delete_library_document",
+      "description": "Delete a library document.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Delete one library document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the resource has been deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Delete action response."
+      }
+    },
+    {
+      "id": "mistral_ai.delete_library_share",
+      "service": "mistral_ai",
+      "name": "delete_library_share",
+      "description": "Remove shared access from a library.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "org_id": {
+            "type": "string",
+            "description": "Organization ID."
+          },
+          "share_with_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The UUID of the object to unshare."
+          },
+          "share_with_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The object entity type to unshare."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "share_with_uuid",
+          "share_with_type"
+        ],
+        "description": "Remove a library share."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.download_file",
+      "service": "mistral_ai",
+      "name": "download_file",
+      "description": "Download Mistral file contents into the local transit file store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "file_id"
+        ],
+        "description": "Download one file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The stored file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The downloaded filename."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The downloaded file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "Downloaded file content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The output of the file download action."
+      }
+    },
+    {
+      "id": "mistral_ai.get_agent",
+      "service": "mistral_ai",
+      "name": "get_agent",
+      "description": "Get a single agent by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Version alias."
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Version number or version alias."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id"
+        ],
+        "description": "Get an agent."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_agent_version",
+      "service": "mistral_ai",
+      "name": "get_agent_version",
+      "description": "Get version details of the specified agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Version alias."
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Version number or version alias."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id",
+          "version"
+        ],
+        "description": "Get one agent version."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_conversation",
+      "service": "mistral_ai",
+      "name": "get_conversation",
+      "description": "Get metadata for a single conversation by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id"
+        ],
+        "description": "Get one conversation."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_conversation_history",
+      "service": "mistral_ai",
+      "name": "get_conversation_history",
+      "description": "Get all history entries in a conversation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id"
+        ],
+        "description": "Get conversation history."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_conversation_messages",
+      "service": "mistral_ai",
+      "name": "get_conversation_messages",
+      "description": "Get all message entries in a conversation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id"
+        ],
+        "description": "Get conversation messages."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_document_extracted_text_url",
+      "service": "mistral_ai",
+      "name": "get_document_extracted_text_url",
+      "description": "Get a temporary signed link to a library document's extracted text file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Get document extracted text URL."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_document_signed_url",
+      "service": "mistral_ai",
+      "name": "get_document_signed_url",
+      "description": "Get a temporary signed link to a library document's original file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Get document signed URL."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_document_status",
+      "service": "mistral_ai",
+      "name": "get_document_status",
+      "description": "Get processing status for a library document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Get document processing status."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_document_text_content",
+      "service": "mistral_ai",
+      "name": "get_document_text_content",
+      "description": "Get extracted text content for a library document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Get document text content."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_file_signed_url",
+      "service": "mistral_ai",
+      "name": "get_file_signed_url",
+      "description": "Get a temporary signed download link for a file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File ID."
+          },
+          "expiry": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of hours the signed link remains valid."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "file_id"
+        ],
+        "description": "Get a file signed URL."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_fine_tuning_jobs",
+      "service": "mistral_ai",
+      "name": "get_fine_tuning_jobs",
+      "description": "List fine-tuning jobs with pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          },
+          "model": {
+            "type": "string",
+            "description": "Filter by base model."
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by task status."
+          },
+          "suffix": {
+            "type": "string",
+            "description": "Filter by model suffix."
+          },
+          "wandb_name": {
+            "type": "string",
+            "description": "Filter by Weights & Biases run name."
+          },
+          "wandb_project": {
+            "type": "string",
+            "description": "Filter by Weights & Biases project."
+          },
+          "created_after": {
+            "type": "string",
+            "description": "Only tasks created after this time are returned."
+          },
+          "created_before": {
+            "type": "string",
+            "description": "Only tasks created before this time are returned."
+          },
+          "created_by_me": {
+            "type": "boolean",
+            "description": "Whether to return only tasks created by the current caller."
+          }
+        },
+        "additionalProperties": true,
+        "description": "List fine-tuning jobs."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_library",
+      "service": "mistral_ai",
+      "name": "get_library",
+      "description": "Get library details by library ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id"
+        ],
+        "description": "Get one library."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_library_document",
+      "service": "mistral_ai",
+      "name": "get_library_document",
+      "description": "Get details of a single library document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Get one library document."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.get_model",
+      "service": "mistral_ai",
+      "name": "get_model",
+      "description": "Get details of a single Mistral model by model ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model_id"
+        ],
+        "description": "Get one model."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_agent_aliases",
+      "service": "mistral_ai",
+      "name": "list_agent_aliases",
+      "description": "List all version aliases for the specified agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id"
+        ],
+        "description": "List agent aliases."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_agent_versions",
+      "service": "mistral_ai",
+      "name": "list_agent_versions",
+      "description": "List all versions of the specified agent.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id"
+        ],
+        "description": "List versions for an agent."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_agents",
+      "service": "mistral_ai",
+      "name": "list_agents",
+      "description": "List agents with pagination, name, source, or metadata filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          },
+          "deployment_chat": {
+            "type": "boolean",
+            "description": "Whether to return only deployment_chat agents."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "A list of strings.",
+            "minItems": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Filter by agent name."
+          },
+          "search": {
+            "type": "string",
+            "description": "Search by name or ID."
+          },
+          "id": {
+            "type": "string",
+            "description": "Filter by exact agent ID."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          }
+        },
+        "additionalProperties": true,
+        "description": "List agents with pagination and filters."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_batch_jobs",
+      "service": "mistral_ai",
+      "name": "list_batch_jobs",
+      "description": "List batch jobs with pagination and filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          },
+          "model": {
+            "type": "string",
+            "description": "Filter by model."
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by task status."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "metadata": {
+            "type": "string",
+            "description": "Filter by metadata string."
+          },
+          "created_after": {
+            "type": "string",
+            "description": "Only tasks created after this time are returned."
+          },
+          "created_by_me": {
+            "type": "boolean",
+            "description": "Whether to return only tasks created by the current caller."
+          }
+        },
+        "additionalProperties": true,
+        "description": "List batch jobs."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_conversations",
+      "service": "mistral_ai",
+      "name": "list_conversations",
+      "description": "List conversations under the current organization with pagination and metadata filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Lists conversations with pagination and metadata filters."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_files",
+      "service": "mistral_ai",
+      "name": "list_files",
+      "description": "List all files under the current organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "string",
+            "description": "The previous page cursor file ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of files."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction."
+          }
+        },
+        "additionalProperties": true,
+        "description": "List files."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_libraries",
+      "service": "mistral_ai",
+      "name": "list_libraries",
+      "description": "List libraries under the current organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of libraries."
+          },
+          "page_token": {
+            "type": "string",
+            "description": "Pagination token."
+          }
+        },
+        "additionalProperties": true,
+        "description": "List libraries."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_library_documents",
+      "service": "mistral_ai",
+      "name": "list_library_documents",
+      "description": "List documents under a library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Page number, starting from 0."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items returned per page."
+          },
+          "search": {
+            "type": "string",
+            "description": "Document search keywords."
+          },
+          "filters_attributes": {
+            "type": "string",
+            "description": "Property filter expression."
+          },
+          "sort_by": {
+            "type": "string",
+            "description": "Sort field."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id"
+        ],
+        "description": "List library documents."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_library_shares",
+      "service": "mistral_ai",
+      "name": "list_library_shares",
+      "description": "List shared access records for a library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id"
+        ],
+        "description": "List library shares."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.list_models",
+      "service": "mistral_ai",
+      "name": "list_models",
+      "description": "List all Mistral models accessible by the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.reprocess_document",
+      "service": "mistral_ai",
+      "name": "reprocess_document",
+      "description": "Reprocess the specified library document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Reprocess a library document."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.restart_conversation",
+      "service": "mistral_ai",
+      "name": "restart_conversation",
+      "description": "Restart a conversation from a historical entry.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Conversation ID."
+          },
+          "from_entry_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entry ID to restart from."
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text input."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value accepted by the Mistral API."
+                  },
+                  "description": "Any JSON object accepted by the Mistral API."
+                },
+                "description": "Structured input entries."
+              }
+            ],
+            "description": "Input to continue after restarting."
+          },
+          "completion_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Completion parameter configuration accepted by Mistral."
+          },
+          "handoff_execution": {
+            "type": "string",
+            "enum": [
+              "client",
+              "server"
+            ],
+            "description": "Handoff execution method."
+          },
+          "guardrails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Guardrail configuration accepted by Mistral."
+            },
+            "description": "Guardrails to apply."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Whether to persist storage."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to use streaming responses. This connector only supports false or omitted."
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Version alias."
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Version number or version alias."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "conversation_id",
+          "from_entry_id"
+        ],
+        "description": "Input parameters for restarting a conversation."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.retrieve_file",
+      "service": "mistral_ai",
+      "name": "retrieve_file",
+      "description": "Get file metadata by file ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "file_id"
+        ],
+        "description": "Retrieve file metadata."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.start_conversation",
+      "service": "mistral_ai",
+      "name": "start_conversation",
+      "description": "Create a new conversation and append initial context.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text input."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "Any JSON value accepted by the Mistral API."
+                  },
+                  "description": "Any JSON object accepted by the Mistral API."
+                },
+                "description": "Structured input entries."
+              }
+            ],
+            "description": "Conversation initial input."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to use streaming responses. This connector only supports false or omitted."
+          },
+          "store": {
+            "type": "boolean",
+            "description": "Whether to persist the conversation."
+          },
+          "handoff_execution": {
+            "type": "string",
+            "enum": [
+              "client",
+              "server"
+            ],
+            "description": "Handoff execution method."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Conversation-level instructions."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tool definition accepted by Mistral."
+            },
+            "description": "Tools available for this conversation."
+          },
+          "completion_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Completion parameter configuration accepted by Mistral."
+          },
+          "guardrails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Guardrail configuration accepted by Mistral."
+            },
+            "description": "Guardrails to apply."
+          },
+          "name": {
+            "type": "string",
+            "description": "Conversation name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Conversation description."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Version alias."
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "description": "Version number or version alias."
+          },
+          "model": {
+            "type": "string",
+            "description": "Direct model identifier to use."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "inputs"
+        ],
+        "description": "Input parameters for creating a conversation."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.update_agent",
+      "service": "mistral_ai",
+      "name": "update_agent",
+      "description": "Update an agent configuration and create a new version.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "model": {
+            "type": "string",
+            "description": "Updated model."
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated agent name."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Updated instructions."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Tool definition accepted by Mistral."
+            },
+            "description": "Updated tool list."
+          },
+          "completion_args": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Completion parameter configuration accepted by Mistral."
+          },
+          "guardrails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Guardrail configuration accepted by Mistral."
+            },
+            "description": "Guardrails to apply."
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description."
+          },
+          "handoffs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "A list of strings.",
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Mistral API."
+            },
+            "description": "Any JSON object accepted by the Mistral API."
+          },
+          "deployment_chat": {
+            "type": "boolean",
+            "description": "Whether to enable deployment chat."
+          },
+          "version_message": {
+            "type": "string",
+            "description": "Version message for this update."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id"
+        ],
+        "description": "Update a Mistral agent and create a new version."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.update_agent_version",
+      "service": "mistral_ai",
+      "name": "update_agent_version",
+      "description": "Switch the current version of an agent.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Agent ID."
+          },
+          "version": {
+            "type": "integer",
+            "description": "The target version number."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "agent_id",
+          "version"
+        ],
+        "description": "Update the current agent version."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.update_library",
+      "service": "mistral_ai",
+      "name": "update_library",
+      "description": "Update a library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated library name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated library description."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id"
+        ],
+        "description": "Update a library."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.update_library_document",
+      "service": "mistral_ai",
+      "name": "update_library_document",
+      "description": "Update a library document.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base document ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated document name."
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "boolean",
+                  "description": "Boolean attribute."
+                },
+                {
+                  "type": "string",
+                  "description": "String attribute."
+                },
+                {
+                  "type": "number",
+                  "description": "Numeric attribute."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "A list of strings.",
+                  "minItems": 1
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "A number."
+                  },
+                  "description": "A list of numbers."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "boolean",
+                    "description": "A boolean."
+                  },
+                  "description": "A list of booleans."
+                }
+              ],
+              "description": "Attribute value."
+            },
+            "description": "Knowledge base document attributes."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "document_id"
+        ],
+        "description": "Update a library document."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.upload_file",
+      "service": "mistral_ai",
+      "name": "upload_file",
+      "description": "Upload a file to Mistral for fine-tuning, batch, or OCR.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "fileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The transit file identifier returned by POST /api/files."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional filename override to send to the provider."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional MIME type override to send to the provider."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "fileId"
+                ],
+                "description": "A file previously uploaded to the local transit file API."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "A public HTTP or HTTPS URL that the connector can fetch and upload.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "url"
+                ],
+                "description": "A public URL upload source."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Base64-encoded file content."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "content_base64"
+                ],
+                "description": "A base64 upload source."
+              }
+            ],
+            "description": "File content to upload to Mistral."
+          },
+          "purpose": {
+            "type": "string",
+            "description": "File usage, such as fine-tune, batch, or ocr."
+          },
+          "visibility": {
+            "type": "string",
+            "description": "File visibility, such as workspace or user."
+          },
+          "expiry": {
+            "type": "integer",
+            "description": "The number of hours before the file expires."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "file"
+        ],
+        "description": "Upload a file to Mistral."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    },
+    {
+      "id": "mistral_ai.upload_library_document",
+      "service": "mistral_ai",
+      "name": "upload_library_document",
+      "description": "Upload a new document to a library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Knowledge base library ID."
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "fileId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The transit file identifier returned by POST /api/files."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional filename override to send to the provider."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Optional MIME type override to send to the provider."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "fileId"
+                ],
+                "description": "A file previously uploaded to the local transit file API."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "A public HTTP or HTTPS URL that the connector can fetch and upload.",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "url"
+                ],
+                "description": "A public URL upload source."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The filename to send to Mistral."
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "mimetype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The MIME type of the uploaded file."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Base64-encoded file content."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "content_base64"
+                ],
+                "description": "A base64 upload source."
+              }
+            ],
+            "description": "File content to upload to Mistral."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "library_id",
+          "file"
+        ],
+        "description": "Upload a document to a library."
+      },
+      "outputSchema": {
+        "description": "Raw response data returned by the Mistral API."
+      }
+    }
+  ]
+}

@@ -1,0 +1,327 @@
+{
+  "service": "line",
+  "displayName": "LINE",
+  "categories": [
+    "Communication",
+    "Social"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Channel Access Token",
+      "placeholder": "LINE_CHANNEL_ACCESS_TOKEN",
+      "description": "LINE Messaging API channel access token sent as a Bearer credential. Manage it at https://developers.line.biz/console/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://line.me",
+  "actions": [
+    {
+      "id": "line.get_bot_info",
+      "service": "line",
+      "name": "get_bot_info",
+      "description": "Get profile and chat settings for the connected LINE Official Account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The empty input for reading LINE bot information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The LINE user ID of the bot."
+          },
+          "basicId": {
+            "type": "string",
+            "description": "The basic ID of the LINE Official Account."
+          },
+          "premiumId": {
+            "type": "string",
+            "description": "The premium ID when one is configured."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The display name of the LINE Official Account."
+          },
+          "pictureUrl": {
+            "type": "string",
+            "description": "The HTTPS profile image URL when one is configured.",
+            "format": "uri"
+          },
+          "chatMode": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "bot"
+            ],
+            "description": "The configured LINE Official Account chat mode."
+          },
+          "markAsReadMode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ],
+            "description": "The automatic read setting for received messages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "basicId",
+          "displayName",
+          "chatMode",
+          "markAsReadMode"
+        ],
+        "description": "The connected LINE Official Account information."
+      }
+    },
+    {
+      "id": "line.get_profile",
+      "service": "line",
+      "name": "get_profile",
+      "description": "Get the LINE profile of a user who can interact with the connected bot.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LINE user ID obtained from a Messaging API webhook."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "The LINE user profile lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The user's LINE display name."
+          },
+          "userId": {
+            "type": "string",
+            "description": "The LINE user ID."
+          },
+          "language": {
+            "type": "string",
+            "description": "The user's BCP 47 language tag when consent permits it."
+          },
+          "pictureUrl": {
+            "type": "string",
+            "description": "The user's HTTPS profile image URL when one is configured.",
+            "format": "uri"
+          },
+          "statusMessage": {
+            "type": "string",
+            "description": "The user's status message when one is configured."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "displayName",
+          "userId"
+        ],
+        "description": "The LINE user's available profile information."
+      }
+    },
+    {
+      "id": "line.send_broadcast_text",
+      "service": "line",
+      "name": "send_broadcast_text",
+      "description": "Send up to five text messages to all friends of the LINE Official Account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 5000,
+              "description": "A non-empty text message preserved exactly as provided."
+            },
+            "description": "The text messages to send in order.",
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "notificationDisabled": {
+            "type": "boolean",
+            "description": "Whether LINE should suppress push notifications for the sent messages."
+          },
+          "retryKey": {
+            "type": "string",
+            "description": "An optional caller-generated UUID used by LINE to deduplicate a retried request.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "texts"
+        ],
+        "description": "The LINE broadcast text request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "LINE's empty broadcast success response."
+      }
+    },
+    {
+      "id": "line.send_multicast_text",
+      "service": "line",
+      "name": "send_multicast_text",
+      "description": "Send up to five text messages to as many as 500 LINE users.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A LINE user ID obtained from the Messaging API."
+            },
+            "description": "The target LINE user IDs.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 5000,
+              "description": "A non-empty text message preserved exactly as provided."
+            },
+            "description": "The text messages to send in order.",
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "notificationDisabled": {
+            "type": "boolean",
+            "description": "Whether LINE should suppress push notifications for the sent messages."
+          },
+          "retryKey": {
+            "type": "string",
+            "description": "An optional caller-generated UUID used by LINE to deduplicate a retried request.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "texts"
+        ],
+        "description": "The LINE multicast text request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "LINE's empty multicast success response."
+      }
+    },
+    {
+      "id": "line.send_push_text",
+      "service": "line",
+      "name": "send_push_text",
+      "description": "Send up to five text messages to one LINE user, group, or multi-person chat.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target LINE user, group, or room ID."
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 5000,
+              "description": "A non-empty text message preserved exactly as provided."
+            },
+            "description": "The text messages to send in order.",
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "notificationDisabled": {
+            "type": "boolean",
+            "description": "Whether LINE should suppress push notifications for the sent messages."
+          },
+          "retryKey": {
+            "type": "string",
+            "description": "An optional caller-generated UUID used by LINE to deduplicate a retried request.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "texts"
+        ],
+        "description": "The LINE push text request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sentMessages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The message identifier assigned by LINE."
+                },
+                "quoteToken": {
+                  "type": "string",
+                  "description": "The token that can be used to quote this message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A message accepted by LINE."
+            },
+            "description": "The accepted LINE messages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sentMessages"
+        ],
+        "description": "The messages accepted by LINE."
+      }
+    }
+  ]
+}

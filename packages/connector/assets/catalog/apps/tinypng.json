@@ -1,0 +1,294 @@
+{
+  "service": "tinypng",
+  "displayName": "TinyPNG",
+  "categories": [
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "tinypng_api_key",
+      "description": "TinyPNG API key used with HTTP Basic authentication. Create it from your TinyPNG API dashboard."
+    }
+  ],
+  "homepageUrl": "https://tinypng.com",
+  "actions": [
+    {
+      "id": "tinypng.output_image",
+      "service": "tinypng",
+      "name": "output_image",
+      "description": "Transform a TinyPNG output image and return a transit URL for the resulting file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TinyPNG image ID returned by `shrink_image`."
+          },
+          "resize": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "scale",
+                  "fit",
+                  "cover",
+                  "thumb"
+                ],
+                "description": "The resize strategy to apply to the image."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The target width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The target height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "method"
+            ],
+            "description": "TinyPNG resize options. Runtime validates width and height requirements for each resize method."
+          },
+          "convert": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "image/avif",
+                      "image/webp",
+                      "image/jpeg",
+                      "image/png",
+                      "*/*"
+                    ],
+                    "description": "One TinyPNG output MIME type."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "image/avif",
+                        "image/webp",
+                        "image/jpeg",
+                        "image/png",
+                        "*/*"
+                      ],
+                      "description": "One TinyPNG output MIME type."
+                    },
+                    "description": "Preferred output MIME types for conversion.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "One or more preferred output MIME types for conversion."
+              }
+            },
+            "additionalProperties": false,
+            "description": "TinyPNG conversion options."
+          },
+          "preserve": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "copyright",
+                "creation",
+                "location"
+              ],
+              "description": "The image metadata fields to preserve in the output."
+            },
+            "description": "Metadata fields to preserve in the output image.",
+            "minItems": 1
+          },
+          "transform": {
+            "type": "object",
+            "properties": {
+              "background": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The background color used when flattening transparency."
+              }
+            },
+            "additionalProperties": false,
+            "description": "TinyPNG transform options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageId"
+        ],
+        "description": "The input payload for retrieving a TinyPNG output image."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "description": "The TinyPNG image ID used for this output request."
+          },
+          "compressionCount": {
+            "type": "integer",
+            "description": "The current monthly compression count."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The MIME type of the generated image."
+          },
+          "contentLength": {
+            "type": "integer",
+            "description": "The size of the generated image in bytes."
+          },
+          "imageWidth": {
+            "type": "integer",
+            "description": "The width of the generated image in pixels."
+          },
+          "imageHeight": {
+            "type": "integer",
+            "description": "The height of the generated image in pixels."
+          },
+          "image": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The filename of the transformed image."
+              },
+              "mimeType": {
+                "type": "string",
+                "description": "The MIME type of the transformed image."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The transit URL for downloading the transformed image."
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The transformed image size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The downloadable transformed image file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageId",
+          "image"
+        ],
+        "description": "The output payload for retrieving a transformed TinyPNG image."
+      }
+    },
+    {
+      "id": "tinypng.shrink_image",
+      "service": "tinypng",
+      "name": "shrink_image",
+      "description": "Create a TinyPNG compressed image resource from a public URL or base64-encoded image bytes.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceUrl": {
+            "type": "string",
+            "description": "The public URL of the source image to compress.",
+            "format": "uri"
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Base64-encoded image bytes to compress."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for shrinking an image with TinyPNG. Provide exactly one of sourceUrl or contentBase64."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "imageId": {
+            "type": "string",
+            "description": "The TinyPNG image ID for later output requests."
+          },
+          "outputUrl": {
+            "type": "string",
+            "description": "The TinyPNG output URL for the compressed image.",
+            "format": "uri"
+          },
+          "compressionCount": {
+            "type": "integer",
+            "description": "The current monthly compression count."
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "integer",
+                "description": "The image size in bytes."
+              },
+              "type": {
+                "type": "string",
+                "description": "The MIME type of the image."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The image width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The image height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata for the original input image."
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "integer",
+                "description": "The image size in bytes."
+              },
+              "type": {
+                "type": "string",
+                "description": "The MIME type of the image."
+              },
+              "width": {
+                "type": "integer",
+                "description": "The image width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "description": "The image height in pixels."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Metadata for the compressed output image."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageId",
+          "outputUrl"
+        ],
+        "description": "The output payload for shrinking an image."
+      }
+    }
+  ]
+}

@@ -1,0 +1,672 @@
+{
+  "service": "together_ai",
+  "displayName": "Together AI",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "description": "Together AI project API key used with the Authorization Bearer header. Create or manage keys in project API key settings: https://api.together.ai/settings/projects/~current/api-keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.together.ai",
+  "actions": [
+    {
+      "id": "together_ai.create_chat_completion",
+      "service": "together_ai",
+      "name": "create_chat_completion",
+      "description": "Create a non-streaming Together AI chat completion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Together AI model identifier to use."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the upstream API."
+                        },
+                        "description": "A JSON object with arbitrary upstream fields."
+                      },
+                      "description": "Structured message content blocks."
+                    },
+                    {
+                      "type": "null",
+                      "description": "Null content for assistant tool call messages."
+                    }
+                  ],
+                  "description": "The message content sent to the model."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The optional participant name for the message."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "The identifier of the tool call that this tool message responds to."
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "description": "Any JSON value accepted by the upstream API."
+                    },
+                    "description": "A JSON object with arbitrary upstream fields."
+                  },
+                  "description": "Tool calls emitted by the assistant."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "role"
+              ],
+              "description": "A message in the Together AI chat completion request."
+            },
+            "description": "The ordered conversation history sent to the model.",
+            "minItems": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of tokens to generate."
+          },
+          "stop": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A stop sequence."
+            },
+            "description": "The stop sequences where generation should stop."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The sampling temperature."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of next-token choices to consider."
+          },
+          "context_length_exceeded_behavior": {
+            "type": "string",
+            "enum": [
+              "truncate",
+              "error"
+            ],
+            "description": "How the API should behave when max_tokens exceeds the model context length."
+          },
+          "repetition_penalty": {
+            "type": "number",
+            "description": "The repetition penalty applied to generated text."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only accepts false or an omitted value."
+          },
+          "logprobs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "The number of top token log probabilities to include."
+          },
+          "echo": {
+            "type": "boolean",
+            "description": "Whether the response should include the prompt."
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128,
+            "description": "The number of completions to generate for each prompt."
+          },
+          "min_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "An alternative probability threshold to top_p and top_k."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The presence penalty applied to newly introduced topics."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The frequency penalty applied to repeated tokens."
+          },
+          "logit_bias": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "description": "The bias to apply to this token."
+            },
+            "description": "Token bias adjustments keyed by token id."
+          },
+          "seed": {
+            "type": "integer",
+            "description": "A seed for reproducible sampling."
+          },
+          "function_call": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "auto"
+                ],
+                "description": "A predefined function-call selection mode."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The function name to call."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A specific function-call selection."
+              }
+            ],
+            "description": "How a legacy function call should be selected."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json_object",
+                  "json_schema"
+                ],
+                "description": "The requested response format type."
+              },
+              "json_schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "A JSON object with arbitrary upstream fields."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "type"
+            ],
+            "description": "Response format configuration."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the upstream API."
+              },
+              "description": "A JSON object with arbitrary upstream fields."
+            },
+            "description": "Tools available to the model."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A tool name or predefined tool selection mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the upstream API."
+                },
+                "description": "A JSON object with arbitrary upstream fields."
+              }
+            ],
+            "description": "Tool selection strategy for the request."
+          },
+          "compliance": {
+            "const": "hipaa",
+            "type": "string",
+            "description": "The compliance mode accepted by the API."
+          },
+          "chat_template_kwargs": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the upstream API."
+            },
+            "description": "A JSON object with arbitrary upstream fields."
+          },
+          "safety_model": {
+            "type": "string",
+            "description": "The moderation model used to validate tokens."
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "The reasoning effort level to apply."
+          },
+          "reasoning": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether reasoning should be enabled."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Reasoning configuration for models that support toggling reasoning."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for creating a non-streaming Together AI chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion identifier."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant",
+                        "tool"
+                      ],
+                      "description": "The role of the message author."
+                    },
+                    "content": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Plain text message content."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "description": "Any JSON value accepted by the upstream API."
+                            },
+                            "description": "A JSON object with arbitrary upstream fields."
+                          },
+                          "description": "Structured message content blocks."
+                        },
+                        {
+                          "type": "null",
+                          "description": "Null content for assistant tool call messages."
+                        }
+                      ],
+                      "description": "The message content sent to the model."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The optional participant name for the message."
+                    },
+                    "tool_call_id": {
+                      "type": "string",
+                      "description": "The identifier of the tool call that this tool message responds to."
+                    },
+                    "tool_calls": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "description": "Any JSON value accepted by the upstream API."
+                        },
+                        "description": "A JSON object with arbitrary upstream fields."
+                      },
+                      "description": "Tool calls emitted by the assistant."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "role"
+                  ],
+                  "description": "A message in the Together AI chat completion request."
+                },
+                "finish_reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reason generation finished for this choice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reason generation finished for this choice."
+                },
+                "logprobs": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "Any JSON value accepted by the upstream API."
+                      },
+                      "description": "A JSON object with arbitrary upstream fields."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A JSON object with arbitrary upstream fields."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "index",
+                "message"
+              ],
+              "description": "A chat completion choice."
+            },
+            "description": "The generated completion choices."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "prompt_tokens": {
+                "type": "integer",
+                "description": "The number of prompt tokens consumed."
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "The number of completion tokens generated."
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "The total number of tokens consumed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage information."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the completion was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used to generate the completion."
+          },
+          "object": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "choices",
+          "model"
+        ],
+        "description": "The response payload for a Together AI chat completion."
+      }
+    },
+    {
+      "id": "together_ai.create_embedding",
+      "service": "together_ai",
+      "name": "create_embedding",
+      "description": "Create Together AI embeddings for one or more text inputs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Together AI embedding model identifier to use."
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A single text input to embed."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One text input."
+                },
+                "description": "Multiple text inputs to embed.",
+                "minItems": 1
+              }
+            ],
+            "description": "The text input or inputs to embed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating Together AI embeddings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "const": "list",
+            "type": "string",
+            "description": "The object type, which is always list."
+          },
+          "model": {
+            "type": "string",
+            "description": "The embedding model used to generate the vectors."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "const": "embedding",
+                  "type": "string",
+                  "description": "The object type, which is always embedding."
+                },
+                "embedding": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One embedding vector value."
+                  },
+                  "description": "The embedding vector."
+                },
+                "index": {
+                  "type": "integer",
+                  "description": "The zero-based index of this embedding result."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Together AI embedding result."
+            },
+            "description": "The generated embedding results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response payload for Together AI embeddings."
+      }
+    },
+    {
+      "id": "together_ai.list_models",
+      "service": "together_ai",
+      "name": "list_models",
+      "description": "List the Together AI models available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The model identifier."
+            },
+            "object": {
+              "const": "model",
+              "type": "string",
+              "description": "The object type, which is always model."
+            },
+            "created": {
+              "type": "integer",
+              "description": "The Unix timestamp when the model was created."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "chat",
+                "language",
+                "code",
+                "image",
+                "embedding",
+                "moderation",
+                "rerank"
+              ],
+              "description": "The model capability type."
+            },
+            "display_name": {
+              "type": "string",
+              "description": "The display name for the model."
+            },
+            "organization": {
+              "type": "string",
+              "description": "The organization that published the model."
+            },
+            "link": {
+              "type": "string",
+              "description": "The upstream model information URL."
+            },
+            "license": {
+              "type": "string",
+              "description": "The model license."
+            },
+            "context_length": {
+              "type": "integer",
+              "description": "The model context length."
+            },
+            "pricing": {
+              "type": "object",
+              "properties": {
+                "base": {
+                  "type": "number",
+                  "description": "The base price component."
+                },
+                "finetune": {
+                  "type": "number",
+                  "description": "The fine-tuning price component."
+                },
+                "hourly": {
+                  "type": "number",
+                  "description": "The hourly price component."
+                },
+                "input": {
+                  "type": "number",
+                  "description": "The input token price component."
+                },
+                "output": {
+                  "type": "number",
+                  "description": "The output token price component."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "base",
+                "finetune",
+                "hourly",
+                "input",
+                "output"
+              ],
+              "description": "Together AI model pricing metadata."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "id",
+            "object",
+            "created",
+            "type"
+          ],
+          "description": "A Together AI model record."
+        },
+        "description": "The list of Together AI models available to the current API key."
+      }
+    }
+  ]
+}

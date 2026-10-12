@@ -1,0 +1,1474 @@
+{
+  "service": "mcdonalds_cn",
+  "displayName": "McDonald's China",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "appId",
+          "label": "App ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "McDonald's China AppId",
+          "description": "McDonald's China merchant application ID from the Open Platform at https://open.mcd.cn."
+        },
+        {
+          "key": "merchantId",
+          "label": "Merchant ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "McDonald's China MerchantId",
+          "description": "McDonald's China merchant ID from the Open Platform at https://open.mcd.cn."
+        },
+        {
+          "key": "signingKey",
+          "label": "Signing Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "McDonald's China signing key",
+          "description": "Signing key paired with the AppId and MerchantId from the Open Platform at https://open.mcd.cn. It is used to generate the Sign header."
+        },
+        {
+          "key": "environment",
+          "label": "Environment",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "prod or uat",
+          "description": "McDonald's China API environment. Use prod for https://api.open.mcd.cn or uat for https://api-uat.open.mcdchina.net. Defaults to prod."
+        }
+      ],
+      "testAction": {
+        "actionName": "get_cities",
+        "input": {
+          "getCurrent": "0"
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://open.mcd.cn",
+  "actions": [
+    {
+      "id": "mcdonalds_cn.get_cities",
+      "service": "mcdonalds_cn",
+      "name": "get_cities",
+      "description": "Get McDonald's China cities that support restaurant and menu lookup.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "getCurrent": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "McDonald's China flag value: 0 for no, 1 for yes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "City lookup options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "cities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "City code."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "City name."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "City center latitude."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "City center longitude."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "code",
+                    "name"
+                  ],
+                  "description": "A McDonald's China city."
+                },
+                "description": "Available cities."
+              },
+              "currentCity": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "City code."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "City name."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "City center latitude."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "City center longitude."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "code",
+                  "name"
+                ],
+                "description": "A McDonald's China city."
+              }
+            },
+            "additionalProperties": true,
+            "description": "McDonald's China cities response data."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China city lookup result."
+      }
+    },
+    {
+      "id": "mcdonalds_cn.get_menu",
+      "service": "mcdonalds_cn",
+      "name": "get_menu",
+      "description": "Get a McDonald's China store menu for an order type, daypart, and sales channel.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Store code."
+          },
+          "channelCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sales channel code."
+          },
+          "orderType": {
+            "type": "integer",
+            "description": "Order type."
+          },
+          "dayPartCode": {
+            "type": "integer",
+            "description": "Daypart code."
+          },
+          "beCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in yyyyMMdd format. When omitted, McDonald's China defaults to the current day.",
+            "pattern": "^\\d{8}$"
+          },
+          "time": {
+            "type": "string",
+            "description": "Time in HH:mm format. When omitted, McDonald's China defaults to the current time.",
+            "pattern": "^\\d{2}:\\d{2}$"
+          },
+          "isGroupMeal": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Group meal flag: 0 for no, 1 for yes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeCode",
+          "channelCode",
+          "orderType",
+          "dayPartCode"
+        ],
+        "description": "Menu lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "menu": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "categoryCode": {
+                      "type": "string",
+                      "description": "Menu category code."
+                    },
+                    "categoryName": {
+                      "type": "string",
+                      "description": "Menu category name."
+                    },
+                    "image": {
+                      "type": "string",
+                      "description": "Menu category image URL.",
+                      "format": "uri"
+                    },
+                    "products": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productCode": {
+                            "type": "string",
+                            "description": "Product code."
+                          },
+                          "productName": {
+                            "type": "string",
+                            "description": "Product name."
+                          },
+                          "productLongName": {
+                            "type": "string",
+                            "description": "Full product name."
+                          },
+                          "productImage": {
+                            "type": "string",
+                            "description": "Product image URL.",
+                            "format": "uri"
+                          },
+                          "productType": {
+                            "type": "integer",
+                            "description": "Product type code."
+                          },
+                          "saleStatus": {
+                            "type": "integer",
+                            "description": "Sale status code."
+                          },
+                          "maxPurchaseQuantity": {
+                            "type": "integer",
+                            "description": "Maximum purchase quantity."
+                          },
+                          "priceInfo": {
+                            "type": "object",
+                            "properties": {
+                              "eatInPriceText": {
+                                "type": "string",
+                                "description": "Eat-in price text in yuan."
+                              },
+                              "takeOutPriceText": {
+                                "type": "string",
+                                "description": "Take-out price text in yuan."
+                              },
+                              "deliveryPriceText": {
+                                "type": "string",
+                                "description": "Delivery price text in yuan."
+                              },
+                              "eatInPrice": {
+                                "type": "integer",
+                                "description": "Eat-in price in cents."
+                              },
+                              "takeOutPrice": {
+                                "type": "integer",
+                                "description": "Take-out price in cents."
+                              },
+                              "deliveryPrice": {
+                                "type": "integer",
+                                "description": "Delivery price in cents."
+                              },
+                              "discountPrice": {
+                                "type": "integer",
+                                "description": "Discount price in cents."
+                              },
+                              "discountPriceText": {
+                                "type": "string",
+                                "description": "Discount price text in yuan."
+                              },
+                              "priceShowStyle": {
+                                "type": "integer",
+                                "description": "Price display style."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "McDonald's China product price information."
+                          },
+                          "categoryCodeList": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Category codes that include this product."
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "description": "One product tag."
+                            },
+                            "description": "Product tags."
+                          },
+                          "groupList": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": true,
+                              "description": "One group item."
+                            },
+                            "description": "Products in this group or combo."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A McDonald's China menu product."
+                      },
+                      "description": "Products in this category."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A McDonald's China menu category."
+                },
+                "description": "Menu categories."
+              }
+            },
+            "additionalProperties": true,
+            "description": "McDonald's China menu response data."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China menu result."
+      },
+      "followUpActions": [
+        "mcdonalds_cn.get_product_detail",
+        "mcdonalds_cn.search_products"
+      ]
+    },
+    {
+      "id": "mcdonalds_cn.get_product_detail",
+      "service": "mcdonalds_cn",
+      "name": "get_product_detail",
+      "description": "Get detailed McDonald's China menu product information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Product code."
+          },
+          "storeCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Store code."
+          },
+          "channelCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sales channel code."
+          },
+          "daypartCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "orderType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "beCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "cardId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A McDonald's China query parameter value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A McDonald's China query parameter value."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in yyyyMMdd format. When omitted, McDonald's China defaults to the current day.",
+            "pattern": "^\\d{8}$"
+          },
+          "time": {
+            "type": "string",
+            "description": "Time in HH:mm format. When omitted, McDonald's China defaults to the current time.",
+            "pattern": "^\\d{2}:\\d{2}$"
+          },
+          "isGroupMeal": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "McDonald's China flag value: 0 for no, 1 for yes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "storeCode",
+          "channelCode",
+          "daypartCode",
+          "orderType"
+        ],
+        "description": "Product detail lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "maxPurchaseQuantity": {
+                "type": "integer",
+                "description": "Maximum purchase quantity."
+              },
+              "product": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Product image URL.",
+                    "format": "uri"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "Product code."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Product name."
+                  },
+                  "longName": {
+                    "type": "string",
+                    "description": "Full product name."
+                  },
+                  "desc": {
+                    "type": "string",
+                    "description": "Product description."
+                  },
+                  "price": {
+                    "type": "integer",
+                    "description": "Product price in cents."
+                  },
+                  "priceText": {
+                    "type": "string",
+                    "description": "Product price text in yuan."
+                  },
+                  "type": {
+                    "type": "integer",
+                    "description": "Product type code."
+                  },
+                  "customizationMode": {
+                    "type": "integer",
+                    "description": "Customization mode."
+                  },
+                  "specTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "One product spec group."
+                    },
+                    "description": "Product spec groups."
+                  },
+                  "choices": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "One product choice group."
+                    },
+                    "description": "Product choices."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A McDonald's China product detail object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "McDonald's China product detail response data."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China product detail result."
+      }
+    },
+    {
+      "id": "mcdonalds_cn.get_store",
+      "service": "mcdonalds_cn",
+      "name": "get_store",
+      "description": "Get one McDonald's China store by store code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Store code."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "storeCode"
+        ],
+        "description": "Store lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Store code."
+              },
+              "name": {
+                "type": "string",
+                "description": "Store name."
+              },
+              "shortName": {
+                "type": "string",
+                "description": "Store short name."
+              },
+              "beCode": {
+                "type": "string",
+                "description": "Store business entity code."
+              },
+              "beType": {
+                "type": "integer",
+                "description": "Store business entity type."
+              },
+              "cityCode": {
+                "type": "string",
+                "description": "City code."
+              },
+              "cityName": {
+                "type": "string",
+                "description": "City name."
+              },
+              "address": {
+                "type": "string",
+                "description": "Store address."
+              },
+              "latitude": {
+                "type": "number",
+                "description": "Store latitude."
+              },
+              "longitude": {
+                "type": "number",
+                "description": "Store longitude."
+              },
+              "businessStatus": {
+                "type": "integer",
+                "description": "Business status code."
+              },
+              "telephone": {
+                "type": "string",
+                "description": "Store phone number."
+              },
+              "distance": {
+                "type": "integer",
+                "description": "Distance in meters."
+              },
+              "distanceText": {
+                "type": "string",
+                "description": "Human-readable distance."
+              },
+              "dayparts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "daypartCode": {
+                      "type": "integer",
+                      "description": "Daypart code."
+                    },
+                    "daypartFlag": {
+                      "type": "boolean",
+                      "description": "Whether this is the default daypart."
+                    },
+                    "daypartName": {
+                      "type": "string",
+                      "description": "Daypart name."
+                    },
+                    "startTime": {
+                      "type": "string",
+                      "description": "Daypart start time."
+                    },
+                    "endTime": {
+                      "type": "string",
+                      "description": "Daypart end time."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A store daypart."
+                },
+                "description": "Available dayparts."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A McDonald's China store."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China store detail result."
+      },
+      "followUpActions": [
+        "mcdonalds_cn.get_store_business",
+        "mcdonalds_cn.get_menu"
+      ]
+    },
+    {
+      "id": "mcdonalds_cn.get_store_business",
+      "service": "mcdonalds_cn",
+      "name": "get_store_business",
+      "description": "Get McDonald's China business details for a store business entity code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "beCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Store business entity code."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in yyyyMMdd format. When omitted, McDonald's China defaults to the current day.",
+            "pattern": "^\\d{8}$"
+          },
+          "isGroupMeal": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "McDonald's China flag value: 0 for no, 1 for yes."
+          },
+          "time": {
+            "type": "string",
+            "description": "Time in HH:mm format. When omitted, McDonald's China defaults to the current time.",
+            "pattern": "^\\d{2}:\\d{2}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "beCode"
+        ],
+        "description": "Store business detail input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Store code."
+              },
+              "name": {
+                "type": "string",
+                "description": "Store name."
+              },
+              "shortName": {
+                "type": "string",
+                "description": "Store short name."
+              },
+              "beCode": {
+                "type": "string",
+                "description": "Store business entity code."
+              },
+              "beType": {
+                "type": "integer",
+                "description": "Store business entity type."
+              },
+              "cityCode": {
+                "type": "string",
+                "description": "City code."
+              },
+              "cityName": {
+                "type": "string",
+                "description": "City name."
+              },
+              "address": {
+                "type": "string",
+                "description": "Store address."
+              },
+              "latitude": {
+                "type": "number",
+                "description": "Store latitude."
+              },
+              "longitude": {
+                "type": "number",
+                "description": "Store longitude."
+              },
+              "businessStatus": {
+                "type": "integer",
+                "description": "Business status code."
+              },
+              "telephone": {
+                "type": "string",
+                "description": "Store phone number."
+              },
+              "distance": {
+                "type": "integer",
+                "description": "Distance in meters."
+              },
+              "distanceText": {
+                "type": "string",
+                "description": "Human-readable distance."
+              },
+              "dayparts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "daypartCode": {
+                      "type": "integer",
+                      "description": "Daypart code."
+                    },
+                    "daypartFlag": {
+                      "type": "boolean",
+                      "description": "Whether this is the default daypart."
+                    },
+                    "daypartName": {
+                      "type": "string",
+                      "description": "Daypart name."
+                    },
+                    "startTime": {
+                      "type": "string",
+                      "description": "Daypart start time."
+                    },
+                    "endTime": {
+                      "type": "string",
+                      "description": "Daypart end time."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A store daypart."
+                },
+                "description": "Available dayparts."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A McDonald's China store."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China store business detail result."
+      },
+      "followUpActions": [
+        "mcdonalds_cn.get_menu"
+      ]
+    },
+    {
+      "id": "mcdonalds_cn.search_products",
+      "service": "mcdonalds_cn",
+      "name": "search_products",
+      "description": "Search McDonald's China menu products for one store, daypart, and order type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search keyword."
+          },
+          "storeCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Store code."
+          },
+          "daypartCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "orderType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "beCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in yyyyMMdd format. When omitted, McDonald's China defaults to the current day.",
+            "pattern": "^\\d{8}$"
+          },
+          "time": {
+            "type": "string",
+            "description": "Time in HH:mm format. When omitted, McDonald's China defaults to the current time.",
+            "pattern": "^\\d{2}:\\d{2}$"
+          },
+          "isGroupMeal": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "McDonald's China flag value: 0 for no, 1 for yes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword",
+          "storeCode",
+          "daypartCode",
+          "orderType"
+        ],
+        "description": "Product search input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "maxPurchaseQuantity": {
+                "type": "integer",
+                "description": "Maximum purchase quantity."
+              },
+              "productList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "productCode": {
+                      "type": "string",
+                      "description": "Product code."
+                    },
+                    "productName": {
+                      "type": "string",
+                      "description": "Product name."
+                    },
+                    "productLongName": {
+                      "type": "string",
+                      "description": "Full product name."
+                    },
+                    "productImage": {
+                      "type": "string",
+                      "description": "Product image URL.",
+                      "format": "uri"
+                    },
+                    "productType": {
+                      "type": "integer",
+                      "description": "Product type code."
+                    },
+                    "saleStatus": {
+                      "type": "integer",
+                      "description": "Sale status code."
+                    },
+                    "maxPurchaseQuantity": {
+                      "type": "integer",
+                      "description": "Maximum purchase quantity."
+                    },
+                    "priceInfo": {
+                      "type": "object",
+                      "properties": {
+                        "eatInPriceText": {
+                          "type": "string",
+                          "description": "Eat-in price text in yuan."
+                        },
+                        "takeOutPriceText": {
+                          "type": "string",
+                          "description": "Take-out price text in yuan."
+                        },
+                        "deliveryPriceText": {
+                          "type": "string",
+                          "description": "Delivery price text in yuan."
+                        },
+                        "eatInPrice": {
+                          "type": "integer",
+                          "description": "Eat-in price in cents."
+                        },
+                        "takeOutPrice": {
+                          "type": "integer",
+                          "description": "Take-out price in cents."
+                        },
+                        "deliveryPrice": {
+                          "type": "integer",
+                          "description": "Delivery price in cents."
+                        },
+                        "discountPrice": {
+                          "type": "integer",
+                          "description": "Discount price in cents."
+                        },
+                        "discountPriceText": {
+                          "type": "string",
+                          "description": "Discount price text in yuan."
+                        },
+                        "priceShowStyle": {
+                          "type": "integer",
+                          "description": "Price display style."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "McDonald's China product price information."
+                    },
+                    "categoryCodeList": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Category codes that include this product."
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "One product tag."
+                      },
+                      "description": "Product tags."
+                    },
+                    "groupList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "One group item."
+                      },
+                      "description": "Products in this group or combo."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A McDonald's China menu product."
+                },
+                "description": "Products matching the search."
+              }
+            },
+            "additionalProperties": true,
+            "description": "McDonald's China product search response data."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China product search result."
+      },
+      "followUpActions": [
+        "mcdonalds_cn.get_product_detail"
+      ]
+    },
+    {
+      "id": "mcdonalds_cn.search_stores",
+      "service": "mcdonalds_cn",
+      "name": "search_stores",
+      "description": "Search McDonald's China stores by delivery address, city, location, keyword, or order filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "addressId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "beType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "cityCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "date": {
+            "type": "string",
+            "description": "Date in yyyyMMdd format. When omitted, McDonald's China defaults to the current day.",
+            "pattern": "^\\d{8}$"
+          },
+          "distance": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "hotTagCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "isCityCenter": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1"
+            ],
+            "description": "McDonald's China flag value: 0 for no, 1 for yes."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "latitude": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "longitude": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "orderType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "showType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A McDonald's China query parameter value."
+          },
+          "time": {
+            "type": "string",
+            "description": "Time in HH:mm format. When omitted, McDonald's China defaults to the current time.",
+            "pattern": "^\\d{2}:\\d{2}$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Nearby store search filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "description": "McDonald's China trace identifier."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "Server datetime."
+          },
+          "code": {
+            "type": "integer",
+            "description": "Provider status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "stores": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Store code."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Store name."
+                    },
+                    "shortName": {
+                      "type": "string",
+                      "description": "Store short name."
+                    },
+                    "beCode": {
+                      "type": "string",
+                      "description": "Store business entity code."
+                    },
+                    "beType": {
+                      "type": "integer",
+                      "description": "Store business entity type."
+                    },
+                    "cityCode": {
+                      "type": "string",
+                      "description": "City code."
+                    },
+                    "cityName": {
+                      "type": "string",
+                      "description": "City name."
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Store address."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "Store latitude."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "Store longitude."
+                    },
+                    "businessStatus": {
+                      "type": "integer",
+                      "description": "Business status code."
+                    },
+                    "telephone": {
+                      "type": "string",
+                      "description": "Store phone number."
+                    },
+                    "distance": {
+                      "type": "integer",
+                      "description": "Distance in meters."
+                    },
+                    "distanceText": {
+                      "type": "string",
+                      "description": "Human-readable distance."
+                    },
+                    "dayparts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "daypartCode": {
+                            "type": "integer",
+                            "description": "Daypart code."
+                          },
+                          "daypartFlag": {
+                            "type": "boolean",
+                            "description": "Whether this is the default daypart."
+                          },
+                          "daypartName": {
+                            "type": "string",
+                            "description": "Daypart name."
+                          },
+                          "startTime": {
+                            "type": "string",
+                            "description": "Daypart start time."
+                          },
+                          "endTime": {
+                            "type": "string",
+                            "description": "Daypart end time."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A store daypart."
+                      },
+                      "description": "Available dayparts."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A McDonald's China store."
+                },
+                "description": "Nearby stores."
+              },
+              "storeList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "description": "Store code."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Store name."
+                    },
+                    "shortName": {
+                      "type": "string",
+                      "description": "Store short name."
+                    },
+                    "beCode": {
+                      "type": "string",
+                      "description": "Store business entity code."
+                    },
+                    "beType": {
+                      "type": "integer",
+                      "description": "Store business entity type."
+                    },
+                    "cityCode": {
+                      "type": "string",
+                      "description": "City code."
+                    },
+                    "cityName": {
+                      "type": "string",
+                      "description": "City name."
+                    },
+                    "address": {
+                      "type": "string",
+                      "description": "Store address."
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "description": "Store latitude."
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "description": "Store longitude."
+                    },
+                    "businessStatus": {
+                      "type": "integer",
+                      "description": "Business status code."
+                    },
+                    "telephone": {
+                      "type": "string",
+                      "description": "Store phone number."
+                    },
+                    "distance": {
+                      "type": "integer",
+                      "description": "Distance in meters."
+                    },
+                    "distanceText": {
+                      "type": "string",
+                      "description": "Human-readable distance."
+                    },
+                    "dayparts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "daypartCode": {
+                            "type": "integer",
+                            "description": "Daypart code."
+                          },
+                          "daypartFlag": {
+                            "type": "boolean",
+                            "description": "Whether this is the default daypart."
+                          },
+                          "daypartName": {
+                            "type": "string",
+                            "description": "Daypart name."
+                          },
+                          "startTime": {
+                            "type": "string",
+                            "description": "Daypart start time."
+                          },
+                          "endTime": {
+                            "type": "string",
+                            "description": "Daypart end time."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A store daypart."
+                      },
+                      "description": "Available dayparts."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A McDonald's China store."
+                },
+                "description": "Nearby stores."
+              },
+              "datetime": {
+                "type": "string",
+                "description": "Server datetime."
+              }
+            },
+            "additionalProperties": true,
+            "description": "McDonald's China nearby store response data."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the provider request succeeded."
+          },
+          "message": {
+            "type": "string",
+            "description": "Provider status message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "data"
+        ],
+        "description": "McDonald's China nearby store lookup result."
+      },
+      "followUpActions": [
+        "mcdonalds_cn.get_store",
+        "mcdonalds_cn.get_store_business",
+        "mcdonalds_cn.get_menu"
+      ]
+    }
+  ]
+}

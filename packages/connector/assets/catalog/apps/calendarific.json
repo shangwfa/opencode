@@ -1,0 +1,414 @@
+{
+  "service": "calendarific",
+  "displayName": "Calendarific",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CALENDARIFIC_API_KEY",
+      "description": "Calendarific API key passed as the api_key query parameter. Get it from your Calendarific account pages: https://calendarific.com/api-documentation",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://calendarific.com/",
+  "actions": [
+    {
+      "id": "calendarific.get_holidays",
+      "service": "calendarific",
+      "name": "get_holidays",
+      "description": "List Calendarific holidays for a given country and year with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "The ISO 3166-1 alpha-2 country code used by Calendarific.",
+            "pattern": "^\\s*[A-Za-z]{2}\\s*$"
+          },
+          "year": {
+            "type": "integer",
+            "minimum": 1900,
+            "maximum": 2049,
+            "description": "The holiday year to query. Calendarific supports years up to 2049."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "The month number used to limit holiday results."
+          },
+          "day": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31,
+            "description": "The day of month used to limit holiday results."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The state, county, or region code used to narrow holiday results.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Calendarific holiday type such as national, local, or religious.",
+              "pattern": "\\S"
+            },
+            "description": "The holiday types used to filter Calendarific holiday results.",
+            "minItems": 1
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ISO 639 language code used to localize holiday names.",
+            "pattern": "\\S"
+          },
+          "uuid": {
+            "type": "boolean",
+            "description": "Whether Calendarific should include UUID values in each holiday record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "country",
+          "year"
+        ],
+        "description": "The input payload for listing Calendarific holidays."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "The HTTP-like status code reported by Calendarific."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The top-level metadata returned by Calendarific."
+          },
+          "holidays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The holiday name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The holiday description when provided."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The holiday description when provided."
+                },
+                "dateIso": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO date string extracted from the holiday date object."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO date string extracted from the holiday date object."
+                },
+                "date": {
+                  "type": "object",
+                  "properties": {
+                    "iso": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The ISO date string returned by Calendarific."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The ISO date string returned by Calendarific."
+                    },
+                    "datetime": {
+                      "type": "object",
+                      "properties": {
+                        "year": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "description": "The holiday year."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The holiday year."
+                        },
+                        "month": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "description": "The holiday month."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The holiday month."
+                        },
+                        "day": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "description": "The holiday day."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The holiday day."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The split date fields returned by Calendarific."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The holiday date object returned by Calendarific."
+                },
+                "type": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One holiday type returned by Calendarific."
+                  },
+                  "description": "The holiday type list returned by Calendarific."
+                },
+                "primaryType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The first holiday type when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The first holiday type when available."
+                },
+                "locations": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The locations string returned by Calendarific."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The locations string returned by Calendarific."
+                },
+                "states": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The states string returned by Calendarific."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The states string returned by Calendarific."
+                },
+                "uuid": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The holiday UUID when requested and available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The holiday UUID when requested and available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw holiday object returned by Calendarific."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Calendarific holiday."
+            },
+            "description": "The holidays returned by Calendarific."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Calendarific holidays."
+      }
+    },
+    {
+      "id": "calendarific.list_supported_countries",
+      "service": "calendarific",
+      "name": "list_supported_countries",
+      "description": "List countries currently supported by Calendarific.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Calendarific supported countries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "The HTTP-like status code reported by Calendarific."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The top-level metadata returned by Calendarific."
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The country name returned by Calendarific."
+                },
+                "isoCode": {
+                  "type": "string",
+                  "description": "The ISO 3166-1 alpha-2 country code."
+                },
+                "totalHolidays": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of holidays Calendarific reports for the country when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of holidays Calendarific reports for the country when present."
+                },
+                "supportedLanguages": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of languages Calendarific reports for the country when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of languages Calendarific reports for the country when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw country object returned by Calendarific."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Calendarific supported country."
+            },
+            "description": "The countries returned by Calendarific."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Calendarific supported countries."
+      }
+    },
+    {
+      "id": "calendarific.list_supported_languages",
+      "service": "calendarific",
+      "name": "list_supported_languages",
+      "description": "List languages currently supported by Calendarific.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Calendarific supported languages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "integer",
+                "description": "The HTTP-like status code reported by Calendarific."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The top-level metadata returned by Calendarific."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The language code returned by Calendarific."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the language."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw language object returned by Calendarific."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Calendarific supported language."
+            },
+            "description": "The languages returned by Calendarific."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Calendarific supported languages."
+      }
+    }
+  ]
+}

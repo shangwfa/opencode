@@ -1,0 +1,408 @@
+{
+  "service": "rewiser",
+  "displayName": "Rewiser",
+  "categories": [
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "rwsk_live_...",
+      "description": "Rewiser API key sent as a Bearer token. Generate one in Settings > API Keys at https://app.rewiser.io."
+    }
+  ],
+  "homepageUrl": "https://rewiser.io",
+  "actions": [
+    {
+      "id": "rewiser.create_multiple_transactions",
+      "service": "rewiser",
+      "name": "create_multiple_transactions",
+      "description": "Create one or more Rewiser transactions in a single request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "folder_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The identifier of the target Rewiser folder."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Expense",
+                    "Income"
+                  ],
+                  "description": "The transaction type."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The transaction name or description."
+                },
+                "amount": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "The positive transaction amount."
+                },
+                "planned_date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The planned transaction date in a format accepted by Rewiser."
+                },
+                "is_paid": {
+                  "type": "boolean",
+                  "description": "Whether the transaction has already been paid."
+                },
+                "paid_date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The payment date as an ISO 8601 date string."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "An optional note for the transaction."
+                },
+                "repeat_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "monthly",
+                        "weekly",
+                        "yearly",
+                        "daily"
+                      ],
+                      "description": "The optional recurrence interval."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional recurrence interval."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "folder_id",
+                "type",
+                "name",
+                "amount",
+                "planned_date"
+              ],
+              "description": "A transaction to create in Rewiser."
+            },
+            "description": "The transactions to create.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Transactions to create in Rewiser."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Rewiser completed the batch request successfully."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "The identifier assigned to the batch request."
+          },
+          "inserted_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of transactions inserted."
+          },
+          "failed_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of transactions that failed."
+          },
+          "duplicate_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of duplicate transactions detected."
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of transactions skipped."
+          },
+          "total_processed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of transactions processed."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "The server timestamp for the response."
+          },
+          "inserted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The transaction identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The transaction name or description."
+                },
+                "amount": {
+                  "type": "number",
+                  "description": "The transaction amount."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Expense",
+                    "Income"
+                  ],
+                  "description": "The transaction type."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the transaction was created."
+                },
+                "folder_id": {
+                  "type": "string",
+                  "description": "The identifier of the folder containing the transaction."
+                },
+                "is_paid": {
+                  "type": "boolean",
+                  "description": "Whether the transaction has been paid."
+                },
+                "planned_date": {
+                  "type": "string",
+                  "description": "The planned transaction date."
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional transaction note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional transaction note."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Rewiser transaction. Documented transaction fields are exposed directly while additional provider fields are preserved."
+            },
+            "description": "Transactions inserted by Rewiser."
+          },
+          "duplicates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A duplicate transaction result returned by Rewiser."
+            },
+            "description": "Duplicate details returned by Rewiser."
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A skipped transaction result returned by Rewiser."
+            },
+            "description": "Skipped transaction details returned by Rewiser."
+          },
+          "rate_limit_info": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Rate-limit counters and reset details returned by Rewiser."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete Rewiser batch response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The batch creation result returned by Rewiser."
+      }
+    },
+    {
+      "id": "rewiser.get_folders",
+      "service": "rewiser",
+      "name": "get_folders",
+      "description": "List the Rewiser folders available to the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Rewiser folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The folder identifier."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The folder display label."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Rewiser folder option."
+            },
+            "description": "The available Rewiser folders."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The folders returned by Rewiser."
+      }
+    },
+    {
+      "id": "rewiser.get_recent_transactions",
+      "service": "rewiser",
+      "name": "get_recent_transactions",
+      "description": "Get recent Rewiser transactions, optionally filtered by transaction type or folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "Expense",
+              "Income"
+            ],
+            "description": "The transaction type."
+          },
+          "folder_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder identifier used when folder_mode is single."
+          },
+          "folder_mode": {
+            "type": "string",
+            "enum": [
+              "all",
+              "single"
+            ],
+            "description": "Whether to search all folders or one specific folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for recent Rewiser transactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Rewiser completed the request successfully."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of transactions returned."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "The server timestamp for the response."
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The transaction identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The transaction name or description."
+                },
+                "amount": {
+                  "type": "number",
+                  "description": "The transaction amount."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "Expense",
+                    "Income"
+                  ],
+                  "description": "The transaction type."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the transaction was created."
+                },
+                "folder_id": {
+                  "type": "string",
+                  "description": "The identifier of the folder containing the transaction."
+                },
+                "is_paid": {
+                  "type": "boolean",
+                  "description": "Whether the transaction has been paid."
+                },
+                "planned_date": {
+                  "type": "string",
+                  "description": "The planned transaction date."
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional transaction note."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional transaction note."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Rewiser transaction. Documented transaction fields are exposed directly while additional provider fields are preserved."
+            },
+            "description": "The recent transactions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Recent transactions returned by Rewiser."
+      }
+    }
+  ]
+}

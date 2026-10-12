@@ -1,0 +1,637 @@
+{
+  "service": "tuskr",
+  "displayName": "Tuskr",
+  "description": "Manage projects, test cases, test runs, and results in Tuskr.",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Permanent Access Token",
+      "placeholder": "tuskr_access_token",
+      "description": "Tuskr permanent access token sent with the Authorization: Bearer <token> header. Create it from Top Menu > profile icon > API in Tuskr: https://tuskr.app/kb/latest/api",
+      "extraFields": [
+        {
+          "key": "tenantId",
+          "label": "Tenant ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "5f465f45-37d2-4209-8764-3b0f8aee1754",
+          "description": "Tuskr tenant ID used in every API path. Find it from Top Menu > profile icon > API in Tuskr: https://tuskr.app/kb/latest/api"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://tuskr.app",
+  "actions": [
+    {
+      "id": "tuskr.add_test_run_results",
+      "service": "tuskr",
+      "name": "add_test_run_results",
+      "description": "Add the same Tuskr result to multiple test cases in a test run.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr result status key, such as PASSED or FAILED."
+          },
+          "testRun": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testCases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tuskr ID, key, name, or email accepted by the API."
+            },
+            "description": "Test case IDs, keys, or names to update.",
+            "minItems": 1
+          },
+          "assignedTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "comments": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Result comments."
+          },
+          "timeSpentInMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Time spent in minutes."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom fields keyed by Tuskr custom field key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "testRun",
+          "testCases"
+        ],
+        "description": "The input payload for adding Tuskr results to test cases in a test run."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Provider-specific object returned by Tuskr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "Tuskr object response."
+      }
+    },
+    {
+      "id": "tuskr.create_project",
+      "service": "tuskr",
+      "name": "create_project",
+      "description": "Create a Tuskr project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the Tuskr project to create."
+          },
+          "team": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Role name."
+            },
+            "description": "Project team members keyed by user email."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Tuskr active or archived status."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project description."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External ID to associate with the project."
+          },
+          "integrationData": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Integration data to associate with the project."
+          },
+          "issueUrlTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Issue URL template for the project."
+          },
+          "referenceUrlTemplate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Reference URL template for the project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for creating a Tuskr project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Provider-specific object returned by Tuskr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "Tuskr object response."
+      }
+    },
+    {
+      "id": "tuskr.create_test_case",
+      "service": "tuskr",
+      "name": "create_test_case",
+      "description": "Create a Tuskr test case in a project suite section.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the Tuskr test case to create."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testSuite": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testSuiteSection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test case description."
+          },
+          "testCaseType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "estimatedTimeInMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Estimated execution time in minutes."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom fields keyed by Tuskr custom field key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "project",
+          "testSuite",
+          "testSuiteSection"
+        ],
+        "description": "The input payload for creating a Tuskr test case."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Provider-specific object returned by Tuskr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "Tuskr object response."
+      }
+    },
+    {
+      "id": "tuskr.create_test_run",
+      "service": "tuskr",
+      "name": "create_test_run",
+      "description": "Create a Tuskr test run.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the Tuskr test run to create."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testCaseInclusionType": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SPECIFIC"
+            ],
+            "description": "Which test cases to include in the run."
+          },
+          "testCases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tuskr ID, key, name, or email accepted by the API."
+            },
+            "description": "Test case IDs, keys, or names to include.",
+            "minItems": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test run description."
+          },
+          "deadline": {
+            "type": "string",
+            "description": "Test run deadline in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "assignedTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "project",
+          "testCaseInclusionType"
+        ],
+        "description": "The input payload for creating a Tuskr test run.",
+        "if": {
+          "properties": {
+            "testCaseInclusionType": {
+              "const": "SPECIFIC"
+            }
+          },
+          "required": [
+            "testCaseInclusionType"
+          ]
+        },
+        "then": {
+          "required": [
+            "testCases"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Provider-specific object returned by Tuskr."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "raw"
+        ],
+        "description": "Tuskr object response."
+      }
+    },
+    {
+      "id": "tuskr.list_projects",
+      "service": "tuskr",
+      "name": "list_projects",
+      "description": "List Tuskr projects with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project name substring to filter by."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Tuskr active or archived status."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Tuskr projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Provider-specific object returned by Tuskr."
+            },
+            "description": "Rows returned by Tuskr."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of rows returned in this response."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of records matching the request."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "Total number of pages matching the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Tuskr pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows",
+          "count",
+          "meta"
+        ],
+        "description": "Paginated Tuskr list response."
+      }
+    },
+    {
+      "id": "tuskr.list_test_cases",
+      "service": "tuskr",
+      "name": "list_test_cases",
+      "description": "List Tuskr test cases for a project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testSuite": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "testSuiteSection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test case key substring to filter by."
+          },
+          "testCaseType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test case name substring to filter by."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom fields keyed by Tuskr custom field key."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "The input payload for listing Tuskr test cases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Provider-specific object returned by Tuskr."
+            },
+            "description": "Rows returned by Tuskr."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of rows returned in this response."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of records matching the request."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "Total number of pages matching the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Tuskr pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows",
+          "count",
+          "meta"
+        ],
+        "description": "Paginated Tuskr list response."
+      }
+    },
+    {
+      "id": "tuskr.list_test_runs",
+      "service": "tuskr",
+      "name": "list_test_runs",
+      "description": "List Tuskr test runs for a project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test run name substring to filter by."
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Test run key substring to filter by."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "description": "Tuskr active or archived status."
+          },
+          "assignedTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tuskr ID, key, name, or email accepted by the API."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to fetch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "The input payload for listing Tuskr test runs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Provider-specific object returned by Tuskr."
+            },
+            "description": "Rows returned by Tuskr."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of rows returned in this response."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total number of records matching the request."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "Total number of pages matching the request."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Tuskr pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows",
+          "count",
+          "meta"
+        ],
+        "description": "Paginated Tuskr list response."
+      }
+    }
+  ]
+}

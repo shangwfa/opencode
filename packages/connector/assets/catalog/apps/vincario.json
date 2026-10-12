@@ -1,0 +1,367 @@
+{
+  "service": "vincario",
+  "displayName": "Vincario",
+  "categories": [
+    "Data",
+    "Location"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "VINCARIO_API_KEY",
+          "description": "Vincario API key included in signed request paths. Request API access at https://vincario.com/vin-decoder/#request-free-trial-api-key."
+        },
+        {
+          "key": "secretKey",
+          "label": "Secret Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "VINCARIO_SECRET_KEY",
+          "description": "Vincario secret key used locally to calculate request control sums; it is never sent upstream."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://vincario.com/",
+  "actions": [
+    {
+      "id": "vincario.check_stolen",
+      "service": "vincario",
+      "name": "check_stolen",
+      "description": "Check a VIN against the stolen-vehicle sources available through Vincario.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 17,
+            "description": "The 17-character vehicle identification number to look up."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Vincario VIN lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "The number of credits charged for the request."
+          },
+          "price_currency": {
+            "type": "string",
+            "description": "The currency or credit unit reported for the request price."
+          },
+          "balance": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Remaining credits grouped by Vincario service."
+          },
+          "vin": {
+            "type": "string",
+            "description": "The VIN checked by Vincario."
+          },
+          "stolen": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The country or Vincario database source code."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "stolen",
+                    "not-stolen",
+                    "could-not-verify"
+                  ],
+                  "description": "The stolen-vehicle status reported by the source."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "code",
+                "status"
+              ],
+              "description": "A stolen-vehicle source result."
+            },
+            "description": "Stolen-vehicle checks returned by each available source."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "price",
+          "price_currency",
+          "balance",
+          "vin",
+          "stolen"
+        ],
+        "description": "The stolen-vehicle check returned by Vincario."
+      }
+    },
+    {
+      "id": "vincario.decode_vin",
+      "service": "vincario",
+      "name": "decode_vin",
+      "description": "Decode a VIN into detailed vehicle specifications with Vincario.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 17,
+            "description": "The 17-character vehicle identification number to look up."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Vincario VIN lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "The number of credits charged for the request."
+          },
+          "price_currency": {
+            "type": "string",
+            "description": "The currency or credit unit reported for the request price."
+          },
+          "balance": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Remaining credits grouped by Vincario service."
+          },
+          "decode": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "The vehicle attribute label."
+                },
+                "value": {
+                  "description": "The decoded value, whose type depends on the attribute."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "label",
+                "value"
+              ],
+              "description": "A decoded vehicle attribute."
+            },
+            "description": "Decoded vehicle attributes."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "price",
+          "price_currency",
+          "balance",
+          "decode"
+        ],
+        "description": "The decoded vehicle data returned by Vincario."
+      }
+    },
+    {
+      "id": "vincario.get_balance",
+      "service": "vincario",
+      "name": "get_balance",
+      "description": "Get the remaining Vincario credits for each API service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The remaining Vincario service balances."
+      }
+    },
+    {
+      "id": "vincario.get_vehicle_market_value",
+      "service": "vincario",
+      "name": "get_vehicle_market_value",
+      "description": "Estimate a vehicle's market price and odometer statistics from its VIN.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 17,
+            "description": "The 17-character vehicle identification number to look up."
+          },
+          "odometer": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Optional odometer reading used for the price-adjusted estimate."
+          },
+          "odometerUnit": {
+            "type": "string",
+            "enum": [
+              "km",
+              "mi"
+            ],
+            "description": "Unit of the odometer reading."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vin"
+        ],
+        "description": "Input parameters for estimating a vehicle's market value."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "The number of credits charged for the request."
+          },
+          "price_currency": {
+            "type": "string",
+            "description": "The currency or credit unit reported for the request price."
+          },
+          "balance": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Remaining credits grouped by Vincario service."
+          },
+          "vin": {
+            "type": "string",
+            "description": "The VIN evaluated by Vincario."
+          },
+          "vehicle": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Decoded vehicle details used for the estimate."
+          },
+          "period": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The market-data period used for the estimate."
+          },
+          "market_price": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Market price statistics grouped by region."
+          },
+          "market_odometer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Market odometer statistics grouped by region."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "price",
+          "price_currency",
+          "balance",
+          "vin",
+          "vehicle",
+          "period",
+          "market_price",
+          "market_odometer"
+        ],
+        "description": "The vehicle identity and market-value estimates returned by Vincario."
+      }
+    },
+    {
+      "id": "vincario.get_vin_decode_info",
+      "service": "vincario",
+      "name": "get_vin_decode_info",
+      "description": "List the vehicle fields Vincario can decode for a VIN without charging credits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vin": {
+            "type": "string",
+            "minLength": 17,
+            "maxLength": 17,
+            "description": "The 17-character vehicle identification number to look up."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Vincario VIN lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "The number of credits charged for the request."
+          },
+          "price_currency": {
+            "type": "string",
+            "description": "The currency or credit unit reported for the request price."
+          },
+          "balance": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Remaining credits grouped by Vincario service."
+          },
+          "decode": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A decode field label."
+            },
+            "description": "Decode field labels available for the VIN."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "price",
+          "price_currency",
+          "balance",
+          "decode"
+        ],
+        "description": "The available decode fields for the supplied VIN."
+      }
+    }
+  ]
+}

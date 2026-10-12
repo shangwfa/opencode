@@ -1,0 +1,969 @@
+{
+  "service": "callpage",
+  "displayName": "CallPage",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "CALLPAGE_API_TOKEN",
+      "description": "CallPage API token sent with the Authorization header. Generate or view it in the CallPage dashboard API settings: https://core.callpage.io/settings/api",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.callpage.io",
+  "actions": [
+    {
+      "id": "callpage.create_widget_call",
+      "service": "callpage",
+      "name": "create_widget_call",
+      "description": "Create a CallPage callback request for one widget and phone number.",
+      "operationType": "write",
+      "requiredScopes": [
+        "widgets.call"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "widget_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage widget identifier."
+          },
+          "tel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number to call in E.164 format."
+          },
+          "department_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage department identifier."
+          },
+          "manager_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage manager identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "widget_id",
+          "tel"
+        ],
+        "description": "Input parameters for creating a CallPage widget callback request.",
+        "not": {
+          "required": [
+            "department_id",
+            "manager_id"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "call_request_id": {
+            "type": "integer",
+            "description": "The CallPage callback request identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The CallPage widget callback creation result."
+      }
+    },
+    {
+      "id": "callpage.get_call",
+      "service": "callpage",
+      "name": "get_call",
+      "description": "Get one CallPage call by identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "calls.view"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "call_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage call identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single CallPage call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "call": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The CallPage call history entry identifier."
+              },
+              "data": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The nested CallPage call payload returned by the API."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A CallPage call history entry as returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The CallPage single-call result."
+      }
+    },
+    {
+      "id": "callpage.get_user",
+      "service": "callpage",
+      "name": "get_user",
+      "description": "Get one CallPage user by identifier or email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage user identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The CallPage user email address.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single CallPage user.",
+        "oneOf": [
+          {
+            "required": [
+              "id"
+            ],
+            "not": {
+              "required": [
+                "email"
+              ]
+            }
+          },
+          {
+            "required": [
+              "email"
+            ],
+            "not": {
+              "required": [
+                "id"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The CallPage user identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The CallPage user name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The CallPage user email address."
+              },
+              "tel": {
+                "type": "string",
+                "description": "The CallPage user phone number."
+              },
+              "tel_formatted": {
+                "type": "string",
+                "description": "The formatted CallPage user phone number."
+              },
+              "tel_extension": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CallPage user phone extension."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CallPage user phone extension."
+              },
+              "last_online": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last time the CallPage user was online."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last time the CallPage user was online."
+              },
+              "parent_id": {
+                "type": "integer",
+                "description": "The parent user identifier in CallPage."
+              },
+              "activated_at": {
+                "type": "string",
+                "description": "The CallPage user activation timestamp."
+              },
+              "role": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "description": "The CallPage role slug."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A CallPage user role summary."
+              },
+              "avatar": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CallPage user avatar URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CallPage user avatar URL."
+              },
+              "caller_id": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "The CallPage caller ID identifier."
+                  },
+                  "activated_at": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The CallPage caller ID activation timestamp."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The CallPage caller ID activation timestamp."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "The CallPage caller ID update timestamp."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A CallPage caller ID object."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "A CallPage user record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The CallPage single-user result."
+      }
+    },
+    {
+      "id": "callpage.get_widget",
+      "service": "callpage",
+      "name": "get_widget",
+      "description": "Get one CallPage widget by identifier.",
+      "operationType": "read",
+      "requiredScopes": [
+        "widgets.view"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "widget_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CallPage widget identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for reading a single CallPage widget."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "widget": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The CallPage widget identifier."
+              },
+              "description": {
+                "type": "string",
+                "description": "The CallPage widget description."
+              },
+              "url": {
+                "type": "string",
+                "description": "The installation URL configured for the CallPage widget."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the CallPage widget is enabled."
+              },
+              "locale_code": {
+                "type": "string",
+                "description": "The locale code configured for the CallPage widget."
+              },
+              "installation_status": {
+                "type": "integer",
+                "description": "The CallPage widget installation status code."
+              },
+              "installed_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The CallPage widget installation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The CallPage widget installation timestamp."
+              },
+              "company_sms_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The company SMS sender name for the widget."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The company SMS sender name for the widget."
+              },
+              "call_requests_count": {
+                "type": "integer",
+                "description": "The number of call requests recorded for the widget."
+              },
+              "managers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A CallPage widget manager record."
+                },
+                "description": "The widget managers returned by CallPage."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "A CallPage widget record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The CallPage single-widget result."
+      }
+    },
+    {
+      "id": "callpage.list_calls",
+      "service": "callpage",
+      "name": "list_calls",
+      "description": "List CallPage calls with optional filters such as widget, user, status, phone number, and time range.",
+      "operationType": "read",
+      "requiredScopes": [
+        "calls.view"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "display_hidden": {
+            "type": "boolean",
+            "description": "Whether hidden CallPage calls should be included."
+          },
+          "call_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive CallPage identifier."
+            },
+            "description": "The CallPage call identifiers to filter by.",
+            "minItems": 1
+          },
+          "phone_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number to filter by in E.164 format."
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive CallPage identifier."
+            },
+            "description": "The CallPage user identifiers to filter by.",
+            "minItems": 1
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A CallPage status slug."
+            },
+            "description": "The CallPage human status slugs to filter by.",
+            "minItems": 1
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive CallPage identifier."
+            },
+            "description": "The CallPage tag identifiers to filter by.",
+            "minItems": 1
+          },
+          "date_from": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The inclusive CallPage start timestamp filter."
+          },
+          "date_to": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The inclusive CallPage end timestamp filter."
+          },
+          "widget_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive CallPage identifier."
+            },
+            "description": "The CallPage widget identifiers to filter by.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of CallPage calls to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The CallPage offset for pagination."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The widget installation URL to filter by."
+          },
+          "incoming_number_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A positive CallPage identifier."
+            },
+            "description": "The incoming CallPage number identifiers to filter by.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input filters for listing CallPage calls."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The CallPage call history entry identifier."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The nested CallPage call payload returned by the API."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A CallPage call history entry as returned by the API."
+            },
+            "description": "The CallPage calls returned by the history query."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage offset value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage offset value."
+                      }
+                    ],
+                    "description": "The current CallPage offset value."
+                  },
+                  "limit": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage limit value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage limit value."
+                      }
+                    ],
+                    "description": "The current CallPage limit value."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total number of items matching the query."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The total number of items matching the query."
+                      }
+                    ],
+                    "description": "The total number of items matching the query."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by CallPage list endpoints."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by CallPage list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calls"
+        ],
+        "description": "The CallPage call history list result."
+      }
+    },
+    {
+      "id": "callpage.list_users",
+      "service": "callpage",
+      "name": "list_users",
+      "description": "List CallPage users with pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The CallPage offset for pagination."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of CallPage users to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing CallPage users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The CallPage user identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The CallPage user name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The CallPage user email address."
+                },
+                "tel": {
+                  "type": "string",
+                  "description": "The CallPage user phone number."
+                },
+                "tel_formatted": {
+                  "type": "string",
+                  "description": "The formatted CallPage user phone number."
+                },
+                "tel_extension": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The CallPage user phone extension."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The CallPage user phone extension."
+                },
+                "last_online": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The last time the CallPage user was online."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last time the CallPage user was online."
+                },
+                "parent_id": {
+                  "type": "integer",
+                  "description": "The parent user identifier in CallPage."
+                },
+                "activated_at": {
+                  "type": "string",
+                  "description": "The CallPage user activation timestamp."
+                },
+                "role": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "The CallPage role slug."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A CallPage user role summary."
+                },
+                "avatar": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The CallPage user avatar URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The CallPage user avatar URL."
+                },
+                "caller_id": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "description": "The CallPage caller ID identifier."
+                    },
+                    "activated_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The CallPage caller ID activation timestamp."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The CallPage caller ID activation timestamp."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "The CallPage caller ID update timestamp."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A CallPage caller ID object."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A CallPage user record."
+            },
+            "description": "The CallPage users returned by the list endpoint."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage offset value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage offset value."
+                      }
+                    ],
+                    "description": "The current CallPage offset value."
+                  },
+                  "limit": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage limit value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage limit value."
+                      }
+                    ],
+                    "description": "The current CallPage limit value."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total number of items matching the query."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The total number of items matching the query."
+                      }
+                    ],
+                    "description": "The total number of items matching the query."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by CallPage list endpoints."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by CallPage list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users"
+        ],
+        "description": "The CallPage users list result."
+      }
+    },
+    {
+      "id": "callpage.list_widgets",
+      "service": "callpage",
+      "name": "list_widgets",
+      "description": "List CallPage widgets with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "widgets.view"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The CallPage offset for pagination."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of CallPage widgets to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing CallPage widgets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The CallPage widget identifier."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The CallPage widget description."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The installation URL configured for the CallPage widget."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the CallPage widget is enabled."
+                },
+                "locale_code": {
+                  "type": "string",
+                  "description": "The locale code configured for the CallPage widget."
+                },
+                "installation_status": {
+                  "type": "integer",
+                  "description": "The CallPage widget installation status code."
+                },
+                "installed_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The CallPage widget installation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The CallPage widget installation timestamp."
+                },
+                "company_sms_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The company SMS sender name for the widget."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The company SMS sender name for the widget."
+                },
+                "call_requests_count": {
+                  "type": "integer",
+                  "description": "The number of call requests recorded for the widget."
+                },
+                "managers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A CallPage widget manager record."
+                  },
+                  "description": "The widget managers returned by CallPage."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A CallPage widget record."
+            },
+            "description": "The CallPage widgets returned by the list endpoint."
+          },
+          "pagination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage offset value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage offset value."
+                      }
+                    ],
+                    "description": "The current CallPage offset value."
+                  },
+                  "limit": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The current CallPage limit value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The current CallPage limit value."
+                      }
+                    ],
+                    "description": "The current CallPage limit value."
+                  },
+                  "count": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total number of items matching the query."
+                      },
+                      {
+                        "type": "string",
+                        "description": "The total number of items matching the query."
+                      }
+                    ],
+                    "description": "The total number of items matching the query."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination metadata returned by CallPage list endpoints."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pagination metadata returned by CallPage list endpoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "widgets"
+        ],
+        "description": "The CallPage widgets list result."
+      }
+    }
+  ]
+}

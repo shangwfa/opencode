@@ -1,0 +1,348 @@
+{
+  "service": "apple_notary",
+  "displayName": "Apple Notary",
+  "description": "Submit macOS software to Apple's Notary API and inspect notarization results.",
+  "categories": [
+    "Developer Tools",
+    "Security"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "keyId",
+          "label": "Key ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "2X9R4HXF34",
+          "description": "The App Store Connect API key identifier."
+        },
+        {
+          "key": "issuerId",
+          "label": "Issuer ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "57246542-96fe-1a63-e053-0824d011072a",
+          "description": "The issuer ID for a team key. Leave empty for an individual key."
+        },
+        {
+          "key": "privateKey",
+          "label": "Private Key (.p8)",
+          "inputType": "textarea",
+          "required": true,
+          "secret": true,
+          "placeholder": "-----BEGIN PRIVATE KEY-----",
+          "description": "The complete PKCS#8 PEM private key used locally to sign short-lived ES256 tokens."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://developer.apple.com/documentation/notaryapi",
+  "actions": [
+    {
+      "id": "apple_notary.get_submission_log",
+      "service": "apple_notary",
+      "name": "get_submission_log",
+      "description": "Get a temporary download URL for a notarization submission log.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "The submission identifier returned by Apple.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The submission whose log should be read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "The submission identifier returned by Apple.",
+            "format": "uuid"
+          },
+          "developerLogUrl": {
+            "type": "string",
+            "description": "The temporary notarization log URL.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The temporary log location."
+      }
+    },
+    {
+      "id": "apple_notary.get_submission_status",
+      "service": "apple_notary",
+      "name": "get_submission_status",
+      "description": "Read the state of one notarization submission.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "The submission identifier returned by Apple.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The submission to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "The submission identifier returned by Apple.",
+            "format": "uuid"
+          },
+          "submission": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The submission identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The submitted file name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The submitted file name."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Accepted",
+                      "In Progress",
+                      "Invalid",
+                      "Rejected"
+                    ],
+                    "description": "The current notarization status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current notarization status."
+              },
+              "createdDate": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The submission creation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The submission creation timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "One Apple notarization submission."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested submission."
+      },
+      "asyncLifecycle": {
+        "startActionId": "apple_notary.submit_software",
+        "statusActionId": "apple_notary.get_submission_status"
+      }
+    },
+    {
+      "id": "apple_notary.list_submissions",
+      "service": "apple_notary",
+      "name": "list_submissions",
+      "description": "List up to the 100 most recent notarization submissions for the connected team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The submission identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The submitted file name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The submitted file name."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "Accepted",
+                        "In Progress",
+                        "Invalid",
+                        "Rejected"
+                      ],
+                      "description": "The current notarization status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current notarization status."
+                },
+                "createdDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The submission creation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The submission creation timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "One Apple notarization submission."
+            },
+            "description": "The submissions Apple returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The recent submissions."
+      }
+    },
+    {
+      "id": "apple_notary.submit_software",
+      "service": "apple_notary",
+      "name": "submit_software",
+      "description": "Create a notarization submission and return temporary Amazon S3 upload credentials.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name, including its .zip, .dmg, or .pkg extension.",
+            "pattern": "\\S"
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "The 64-character hexadecimal SHA-256 digest of the uploaded file.",
+            "pattern": "^[0-9a-fA-F]+$"
+          },
+          "notificationWebhookUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A publicly reachable webhook URL.",
+              "format": "uri"
+            },
+            "description": "Webhook URLs Apple should notify when notarization finishes.",
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "submissionName",
+          "sha256"
+        ],
+        "description": "The software to submit for notarization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "The new submission identifier."
+          },
+          "upload": {
+            "type": "object",
+            "properties": {
+              "bucket": {
+                "type": "string",
+                "description": "The S3 bucket."
+              },
+              "object": {
+                "type": "string",
+                "description": "The S3 object key."
+              },
+              "awsAccessKeyId": {
+                "type": "string",
+                "description": "The temporary access key ID."
+              },
+              "awsSecretAccessKey": {
+                "type": "string",
+                "description": "The temporary secret access key."
+              },
+              "awsSessionToken": {
+                "type": "string",
+                "description": "The temporary session token."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Temporary Amazon S3 upload credentials."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The submission and temporary upload credentials."
+      },
+      "asyncLifecycle": {
+        "startActionId": "apple_notary.submit_software",
+        "statusActionId": "apple_notary.get_submission_status"
+      }
+    }
+  ]
+}

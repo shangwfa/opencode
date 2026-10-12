@@ -1,0 +1,327 @@
+{
+  "service": "context7",
+  "displayName": "Context7",
+  "description": "Search and retrieve up-to-date library documentation context for coding agents.",
+  "categories": [
+    "Developer Tools",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ctx7sk-...",
+      "description": "Context7 API key sent as a Bearer token. Create and manage keys in the Context7 dashboard: https://context7.com/dashboard.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://context7.com",
+  "actions": [
+    {
+      "id": "context7.get_documentation_context",
+      "service": "context7",
+      "name": "get_documentation_context",
+      "description": "Retrieve relevant Context7 documentation and code snippets for a library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The Context7 library ID, such as /vercel/next.js.",
+            "pattern": "^/[^/]+/[^/]+([/@][^/]+)?$"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The original question or task used to rank results by relevance."
+          },
+          "fast": {
+            "type": "boolean",
+            "description": "Whether to skip LLM reranking and return faster vector-search results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "libraryId",
+          "query"
+        ],
+        "description": "Input for retrieving Context7 documentation context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "codeSnippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codeTitle": {
+                  "type": "string",
+                  "description": "The title of the code snippet."
+                },
+                "codeDescription": {
+                  "type": "string",
+                  "description": "A description of what the code snippet demonstrates."
+                },
+                "codeLanguage": {
+                  "type": "string",
+                  "description": "The primary programming language of the snippet."
+                },
+                "codeTokens": {
+                  "type": "integer",
+                  "description": "The token count of the snippet."
+                },
+                "codeId": {
+                  "type": "string",
+                  "description": "The source URL or identifier for the code snippet."
+                },
+                "pageTitle": {
+                  "type": "string",
+                  "description": "The title of the documentation page."
+                },
+                "codeList": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "language": {
+                        "type": "string",
+                        "description": "The programming language of the example."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "The example source code."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "required": [
+                      "language",
+                      "code"
+                    ],
+                    "description": "One code example from a documentation snippet."
+                  },
+                  "description": "The code examples included in the snippet."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "codeTitle",
+                "codeDescription",
+                "codeLanguage",
+                "codeTokens",
+                "codeId",
+                "pageTitle",
+                "codeList"
+              ],
+              "description": "A relevant code snippet."
+            },
+            "description": "The relevant code snippets."
+          },
+          "infoSnippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "The documentation content."
+                },
+                "contentTokens": {
+                  "type": "integer",
+                  "description": "The token count of the documentation content."
+                },
+                "pageId": {
+                  "type": "string",
+                  "description": "The source page URL or identifier."
+                },
+                "breadcrumb": {
+                  "type": "string",
+                  "description": "The documentation navigation breadcrumb."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "content",
+                "contentTokens"
+              ],
+              "description": "A relevant documentation text snippet."
+            },
+            "description": "The relevant documentation text snippets."
+          },
+          "rules": {
+            "type": "object",
+            "properties": {
+              "global": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A global rule."
+                },
+                "description": "Global team rules."
+              },
+              "libraryOwn": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A library owner rule."
+                },
+                "description": "Rules defined by the library owner."
+              },
+              "libraryTeam": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A library team rule."
+                },
+                "description": "Team rules for the library."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional rules associated with the library or teamspace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "codeSnippets",
+          "infoSnippets"
+        ],
+        "description": "The Context7 documentation context response."
+      }
+    },
+    {
+      "id": "context7.search_libraries",
+      "service": "context7",
+      "name": "search_libraries",
+      "description": "Search Context7 for libraries ranked against a question or task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The library name to search for."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "The original question or task used to rank results by relevance."
+          },
+          "fast": {
+            "type": "boolean",
+            "description": "Whether to skip LLM reranking and return faster vector-search results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "libraryName",
+          "query"
+        ],
+        "description": "Input for searching Context7 libraries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Context7 library ID."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The display name of the library."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "A short description of the library."
+                },
+                "branch": {
+                  "type": "string",
+                  "description": "The source branch tracked by Context7."
+                },
+                "lastUpdateDate": {
+                  "type": "string",
+                  "description": "The date and time when the library was last updated.",
+                  "format": "date-time"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "finalized",
+                    "initial",
+                    "processing",
+                    "error",
+                    "delete"
+                  ],
+                  "description": "The current Context7 processing state."
+                },
+                "totalTokens": {
+                  "type": "integer",
+                  "description": "The total number of documentation tokens."
+                },
+                "totalSnippets": {
+                  "type": "integer",
+                  "description": "The total number of documentation snippets."
+                },
+                "stars": {
+                  "type": "integer",
+                  "description": "The GitHub star count when available."
+                },
+                "trustScore": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10,
+                  "description": "The source reputation score from 0 to 10."
+                },
+                "benchmarkScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "The documentation quality score from 0 to 100."
+                },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A version tag."
+                  },
+                  "description": "The available library version tags."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A library matched by Context7."
+            },
+            "description": "The matching libraries ranked by relevance."
+          },
+          "searchFilterApplied": {
+            "type": "boolean",
+            "description": "Whether teamspace public-library access settings filtered the results."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results",
+          "searchFilterApplied"
+        ],
+        "description": "The ranked Context7 library search response."
+      }
+    }
+  ]
+}

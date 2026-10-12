@@ -1,0 +1,287 @@
+{
+  "service": "sanity",
+  "displayName": "Sanity",
+  "categories": [
+    "Documents",
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "sk...",
+      "description": "Sanity robot or personal token sent as a Bearer credential. Create a project token in Settings > API > Tokens: https://www.sanity.io/docs/content-lake/http-auth",
+      "extraFields": [
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-project-id",
+          "description": "Sanity project identifier used to select the Content Lake API origin. Find it in your project management settings at https://www.sanity.io/manage."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.sanity.io",
+  "actions": [
+    {
+      "id": "sanity.get_documents",
+      "service": "sanity",
+      "name": "get_documents",
+      "description": "Retrieve the latest Sanity documents by ID while bypassing the query cache.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sanity dataset name."
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Sanity document identifier."
+            },
+            "description": "One or more Sanity document identifiers to retrieve.",
+            "minItems": 1
+          },
+          "includeAllVersions": {
+            "type": "boolean",
+            "description": "Whether to include drafts and release versions matching published document IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "documentIds"
+        ],
+        "description": "Dataset and document identifiers for a direct Sanity document read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Sanity document with its system fields and schema-defined content."
+            },
+            "description": "Matching Sanity documents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents"
+        ],
+        "description": "Documents returned by the direct Sanity document endpoint."
+      }
+    },
+    {
+      "id": "sanity.mutate_documents",
+      "service": "sanity",
+      "name": "mutate_documents",
+      "description": "Execute an atomic transaction of Sanity document mutations.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sanity dataset name."
+          },
+          "mutations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Sanity create, createOrReplace, createIfNotExists, delete, or patch mutation."
+            },
+            "description": "Ordered mutations in the atomic transaction.",
+            "minItems": 1
+          },
+          "returnIds": {
+            "type": "boolean",
+            "description": "Whether to return identifiers of modified documents."
+          },
+          "returnDocuments": {
+            "type": "boolean",
+            "description": "Whether to return the changed documents."
+          },
+          "autoGenerateArrayKeys": {
+            "type": "boolean",
+            "description": "Whether Sanity should add unique _key values to array items."
+          },
+          "transactionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Caller-supplied transaction identifier."
+          },
+          "skipCrossDatasetReferencesValidation": {
+            "type": "boolean",
+            "description": "Whether to treat cross-dataset references as weak during validation."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "sync",
+              "async",
+              "deferred"
+            ],
+            "description": "When committed mutations become visible to queries."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Whether to validate the transaction without committing it."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Request tag used in Sanity Content Lake request logs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "mutations"
+        ],
+        "description": "A Sanity dataset, mutation transaction, and response options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "Unique identifier of the mutation transaction."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Mutation operation performed."
+                },
+                "documentId": {
+                  "type": "string",
+                  "description": "Identifier of the affected document."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "operation",
+                "documentId"
+              ],
+              "description": "A Sanity mutation result."
+            },
+            "description": "Mutation results in transaction order."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "transactionId",
+          "results"
+        ],
+        "description": "The committed Sanity mutation transaction response."
+      }
+    },
+    {
+      "id": "sanity.query_documents",
+      "service": "sanity",
+      "name": "query_documents",
+      "description": "Run a GROQ query against a Sanity Content Lake dataset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sanity dataset name."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "GROQ query to execute."
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible GROQ parameter value."
+            },
+            "description": "Named GROQ parameters without the leading dollar sign."
+          },
+          "perspective": {
+            "type": "string",
+            "description": "Query perspective, such as published, drafts, raw, or a release stack."
+          },
+          "tag": {
+            "type": "string",
+            "description": "Request tag used in Sanity Content Lake request logs."
+          },
+          "resultSourceMap": {
+            "type": "boolean",
+            "description": "Whether to include content source map metadata."
+          },
+          "returnQuery": {
+            "type": "boolean",
+            "description": "Whether the response should include the submitted query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataset",
+          "query"
+        ],
+        "description": "A GROQ query and optional parameters for a Sanity dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON value produced by the GROQ query."
+          },
+          "ms": {
+            "type": "number",
+            "description": "Server-side query processing time in milliseconds."
+          },
+          "query": {
+            "type": "string",
+            "description": "The submitted GROQ query when returned by Sanity."
+          },
+          "syncTags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A synchronization tag."
+            },
+            "description": "Synchronization tags associated with the query result."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "result"
+        ],
+        "description": "The Sanity query response, including its JSON result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,405 @@
+{
+  "service": "linkedin",
+  "displayName": "LinkedIn",
+  "categories": [
+    "Social",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://www.linkedin.com/oauth/v2/authorization",
+      "tokenUrl": "https://www.linkedin.com/oauth/v2/accessToken",
+      "scopes": [
+        "openid",
+        "profile",
+        "email",
+        "w_member_social"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://www.linkedin.com",
+  "actions": [
+    {
+      "id": "linkedin.create_article_post",
+      "service": "linkedin",
+      "name": "create_article_post",
+      "description": "Create a LinkedIn article or link post with explicit source URL metadata using the Posts API.",
+      "operationType": "write",
+      "requiredScopes": [
+        "w_member_social"
+      ],
+      "providerPermissions": [
+        "w_member_social"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member author URN, such as urn:li:person:{personId}.",
+            "pattern": "^urn:li:person:.+"
+          },
+          "commentary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000,
+            "description": "The plain text commentary for the post."
+          },
+          "sourceUrl": {
+            "type": "string",
+            "description": "The article or link URL to attach to the post.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The article title to send to LinkedIn."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The article description to send to LinkedIn."
+          },
+          "thumbnailUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The LinkedIn image URN to use as the article thumbnail."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "CONNECTIONS",
+              "LOGGED_IN",
+              "CONTAINER"
+            ],
+            "description": "Who can see the LinkedIn post."
+          },
+          "disableReshare": {
+            "type": "boolean",
+            "description": "Whether resharing should be disabled for the post."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorUrn",
+          "commentary",
+          "sourceUrl"
+        ],
+        "description": "Request parameters for creating a LinkedIn article post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "description": "The URN of the created LinkedIn post."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the LinkedIn API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postUrn",
+          "raw"
+        ],
+        "description": "The created LinkedIn article post identifier."
+      }
+    },
+    {
+      "id": "linkedin.create_reshare",
+      "service": "linkedin",
+      "name": "create_reshare",
+      "description": "Create a LinkedIn reshare of an existing post using the Posts API.",
+      "operationType": "write",
+      "requiredScopes": [
+        "w_member_social"
+      ],
+      "providerPermissions": [
+        "w_member_social"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member author URN, such as urn:li:person:{personId}.",
+            "pattern": "^urn:li:person:.+"
+          },
+          "parentPostUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The raw LinkedIn post URN, such as urn:li:share:{id}."
+          },
+          "commentary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000,
+            "description": "The plain text commentary for the post."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "CONNECTIONS",
+              "LOGGED_IN",
+              "CONTAINER"
+            ],
+            "description": "Who can see the LinkedIn post."
+          },
+          "disableReshare": {
+            "type": "boolean",
+            "description": "Whether resharing should be disabled for the new post."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorUrn",
+          "parentPostUrn"
+        ],
+        "description": "Request parameters for resharing a LinkedIn post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "description": "The URN of the created LinkedIn reshare."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the LinkedIn API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postUrn",
+          "raw"
+        ],
+        "description": "The created LinkedIn reshare identifier."
+      }
+    },
+    {
+      "id": "linkedin.create_text_post",
+      "service": "linkedin",
+      "name": "create_text_post",
+      "description": "Create a text-only organic LinkedIn post for a member author.",
+      "operationType": "write",
+      "requiredScopes": [
+        "w_member_social"
+      ],
+      "providerPermissions": [
+        "w_member_social"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member author URN, such as urn:li:person:{personId}.",
+            "pattern": "^urn:li:person:.+"
+          },
+          "commentary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000,
+            "description": "The plain text commentary for the post."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "CONNECTIONS",
+              "LOGGED_IN",
+              "CONTAINER"
+            ],
+            "description": "Who can see the LinkedIn post."
+          },
+          "disableReshare": {
+            "type": "boolean",
+            "description": "Whether resharing should be disabled for the post."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "authorUrn",
+          "commentary"
+        ],
+        "description": "Request parameters for creating a text-only LinkedIn post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "description": "The URN of the created LinkedIn post."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the LinkedIn API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postUrn",
+          "raw"
+        ],
+        "description": "The created LinkedIn post identifier."
+      }
+    },
+    {
+      "id": "linkedin.delete_post",
+      "service": "linkedin",
+      "name": "delete_post",
+      "description": "Delete a LinkedIn post by raw post URN using the Posts API.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "w_member_social"
+      ],
+      "providerPermissions": [
+        "w_member_social"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The raw LinkedIn post URN, such as urn:li:share:{id}."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postUrn"
+        ],
+        "description": "Request parameters for deleting a LinkedIn post."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "description": "The URN of the deleted LinkedIn post."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the delete request completed successfully."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the LinkedIn API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postUrn",
+          "deleted",
+          "raw"
+        ],
+        "description": "The deleted LinkedIn post identifier."
+      }
+    },
+    {
+      "id": "linkedin.get_current_member",
+      "service": "linkedin",
+      "name": "get_current_member",
+      "description": "Retrieve the authenticated LinkedIn member's OpenID Connect profile.",
+      "operationType": "read",
+      "requiredScopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "providerPermissions": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve the current LinkedIn member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "member": {
+            "type": "object",
+            "properties": {
+              "sub": {
+                "type": "string",
+                "description": "The LinkedIn subject identifier for the authenticated member."
+              },
+              "name": {
+                "type": "string",
+                "description": "The member's full display name."
+              },
+              "givenName": {
+                "type": "string",
+                "description": "The member's given name."
+              },
+              "familyName": {
+                "type": "string",
+                "description": "The member's family name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The member's primary email address.",
+                "format": "email"
+              },
+              "emailVerified": {
+                "type": "boolean",
+                "description": "Whether LinkedIn reports the email address as verified."
+              },
+              "locale": {
+                "type": "string",
+                "description": "The member's locale."
+              },
+              "picture": {
+                "type": "string",
+                "description": "The member's profile picture URL.",
+                "format": "uri"
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the LinkedIn API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "sub",
+              "raw"
+            ],
+            "description": "A normalized LinkedIn OpenID Connect member profile."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "member"
+        ],
+        "description": "The current LinkedIn member profile."
+      }
+    }
+  ]
+}

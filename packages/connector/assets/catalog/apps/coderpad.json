@@ -1,0 +1,784 @@
+{
+  "service": "coderpad",
+  "displayName": "CoderPad",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Interview API Key",
+      "placeholder": "YOUR_CODERPAD_INTERVIEW_API_KEY",
+      "description": "CoderPad Interview API key used with the Authorization header. Enterprise administrators can view or generate it at https://app.coderpad.io/dashboard/settings.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://coderpad.io",
+  "actions": [
+    {
+      "id": "coderpad.create_pad",
+      "service": "coderpad",
+      "name": "create_pad",
+      "description": "Create a CoderPad interview pad with optional initial content and notes.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title displayed for the new pad."
+          },
+          "language": {
+            "type": "string",
+            "description": "The CoderPad language identifier for the new pad."
+          },
+          "contents": {
+            "type": "string",
+            "description": "The initial source code placed in the pad editor."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Private interviewer notes stored with the pad."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Initial settings for a new CoderPad interview pad."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique pad identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "The user-assigned pad title."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current pad state."
+          },
+          "owner_email": {
+            "type": "string",
+            "description": "The email address of the pad owner."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The active programming language, or null before selection."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The active programming language, or null before selection."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether guests need authorization to view the pad."
+          },
+          "execution_enabled": {
+            "type": "boolean",
+            "description": "Whether code execution is enabled."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The pad creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The most recent pad update timestamp."
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the interview ended, or null while active."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the interview ended, or null while active."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the pad editing interface."
+          },
+          "playback": {
+            "type": "string",
+            "description": "The URL of the pad playback interface."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "title"
+        ],
+        "description": "A CoderPad interview pad returned by the API."
+      }
+    },
+    {
+      "id": "coderpad.get_organization",
+      "service": "coderpad",
+      "name": "get_organization",
+      "description": "Retrieve profile, users, teams, and sign-on settings for the CoderPad organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve the organization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status string returned by CoderPad."
+          },
+          "organization_name": {
+            "type": "string",
+            "description": "The organization display name."
+          },
+          "user_count": {
+            "type": "integer",
+            "description": "The number of users in the organization."
+          },
+          "organization_default_language": {
+            "type": "string",
+            "description": "The default language for organization users."
+          },
+          "single_sign_on_supported": {
+            "type": "boolean",
+            "description": "Whether the organization supports single sign-on."
+          },
+          "single_sign_in_url": {
+            "type": "string",
+            "description": "The organization single sign-on URL."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "organization_name"
+        ],
+        "description": "The authenticated CoderPad organization."
+      }
+    },
+    {
+      "id": "coderpad.get_organization_stats",
+      "service": "coderpad",
+      "name": "get_organization_stats",
+      "description": "Retrieve CoderPad pad usage statistics for an optional time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": "string",
+            "description": "The ISO 8601 start timestamp; endTime is required with it."
+          },
+          "endTime": {
+            "type": "string",
+            "description": "The ISO 8601 end timestamp; startTime is required with it."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional inclusive usage-statistics time range."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status string returned by CoderPad."
+          },
+          "start_time": {
+            "type": "string",
+            "description": "The start timestamp used for the statistics window."
+          },
+          "end_time": {
+            "type": "string",
+            "description": "The end timestamp used for the statistics window."
+          },
+          "pads_created": {
+            "type": "integer",
+            "description": "The number of pads created in the statistics window."
+          }
+        },
+        "additionalProperties": true,
+        "description": "CoderPad organization pad usage statistics."
+      }
+    },
+    {
+      "id": "coderpad.get_pad",
+      "service": "coderpad",
+      "name": "get_pad",
+      "description": "Retrieve current details for one CoderPad interview pad.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "padId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique CoderPad pad identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pad to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique pad identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "The user-assigned pad title."
+          },
+          "state": {
+            "type": "string",
+            "description": "The current pad state."
+          },
+          "owner_email": {
+            "type": "string",
+            "description": "The email address of the pad owner."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The active programming language, or null before selection."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The active programming language, or null before selection."
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Whether guests need authorization to view the pad."
+          },
+          "execution_enabled": {
+            "type": "boolean",
+            "description": "Whether code execution is enabled."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The pad creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The most recent pad update timestamp."
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the interview ended, or null while active."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the interview ended, or null while active."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL of the pad editing interface."
+          },
+          "playback": {
+            "type": "string",
+            "description": "The URL of the pad playback interface."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "title"
+        ],
+        "description": "A CoderPad interview pad returned by the API."
+      }
+    },
+    {
+      "id": "coderpad.get_question",
+      "service": "coderpad",
+      "name": "get_question",
+      "description": "Retrieve one CoderPad interview question by its numeric identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique CoderPad question identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The question to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The unique question identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "The question title."
+          },
+          "owner_email": {
+            "type": "string",
+            "description": "The email address of the question owner."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The programming language used by the question."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The programming language used by the question."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The question description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The question description."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether the question is shared with the organization."
+          },
+          "used": {
+            "type": "integer",
+            "description": "The number of times the question has been used."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The question creation timestamp."
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "The most recent question update timestamp."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "title"
+        ],
+        "description": "A CoderPad interview question returned by the API."
+      }
+    },
+    {
+      "id": "coderpad.list_pad_events",
+      "service": "coderpad",
+      "name": "list_pad_events",
+      "description": "List recorded participant and execution events for a CoderPad interview pad.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "padId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique CoderPad pad identifier."
+          },
+          "sort": {
+            "type": "string",
+            "description": "The pad or question field and direction to sort by, such as created_at,desc or updated_at,asc."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "padId"
+        ],
+        "description": "The pad and pagination options for retrieving events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status string returned by CoderPad."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The human-readable event message."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "The event kind."
+                },
+                "metadata": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Additional information associated with the event."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Additional information associated with the event."
+                },
+                "user_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The name of the user associated with the event."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The name of the user associated with the event."
+                },
+                "user_email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email address of the user associated with the event."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email address of the user associated with the event."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The event timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "message",
+                "kind",
+                "created_at"
+              ],
+              "description": "A recorded pad event."
+            },
+            "description": "The events on this result page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of recorded events."
+          },
+          "next_page": {
+            "type": "string",
+            "description": "The URL of the next result page."
+          },
+          "prev_page": {
+            "type": "string",
+            "description": "The URL of the previous result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "events",
+          "total"
+        ],
+        "description": "A paginated list of events recorded for a pad."
+      }
+    },
+    {
+      "id": "coderpad.list_pads",
+      "service": "coderpad",
+      "name": "list_pads",
+      "description": "List interview pads owned by the authenticated CoderPad user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sort": {
+            "type": "string",
+            "description": "The pad or question field and direction to sort by, such as created_at,desc or updated_at,asc."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for listing pads."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status string returned by CoderPad."
+          },
+          "pads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique pad identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The user-assigned pad title."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The current pad state."
+                },
+                "owner_email": {
+                  "type": "string",
+                  "description": "The email address of the pad owner."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The active programming language, or null before selection."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The active programming language, or null before selection."
+                },
+                "private": {
+                  "type": "boolean",
+                  "description": "Whether guests need authorization to view the pad."
+                },
+                "execution_enabled": {
+                  "type": "boolean",
+                  "description": "Whether code execution is enabled."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The pad creation timestamp."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The most recent pad update timestamp."
+                },
+                "ended_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp when the interview ended, or null while active."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp when the interview ended, or null while active."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL of the pad editing interface."
+                },
+                "playback": {
+                  "type": "string",
+                  "description": "The URL of the pad playback interface."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "A CoderPad interview pad returned by the API."
+            },
+            "description": "The pads on this result page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching pads."
+          },
+          "next_page": {
+            "type": "string",
+            "description": "The URL of the next result page."
+          },
+          "prev_page": {
+            "type": "string",
+            "description": "The URL of the previous result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "pads",
+          "total"
+        ],
+        "description": "A paginated list of CoderPad interview pads."
+      }
+    },
+    {
+      "id": "coderpad.list_questions",
+      "service": "coderpad",
+      "name": "list_questions",
+      "description": "List interview questions owned by the authenticated CoderPad user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sort": {
+            "type": "string",
+            "description": "The pad or question field and direction to sort by, such as created_at,desc or updated_at,asc."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and sorting options for listing questions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The status string returned by CoderPad."
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique question identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The question title."
+                },
+                "owner_email": {
+                  "type": "string",
+                  "description": "The email address of the question owner."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The programming language used by the question."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The programming language used by the question."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The question description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The question description."
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "Whether the question is shared with the organization."
+                },
+                "used": {
+                  "type": "integer",
+                  "description": "The number of times the question has been used."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The question creation timestamp."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The most recent question update timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "title"
+              ],
+              "description": "A CoderPad interview question returned by the API."
+            },
+            "description": "The questions on this result page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching questions."
+          },
+          "next_page": {
+            "type": "string",
+            "description": "The URL of the next result page."
+          },
+          "prev_page": {
+            "type": "string",
+            "description": "The URL of the previous result page."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "questions",
+          "total"
+        ],
+        "description": "A paginated list of CoderPad interview questions."
+      }
+    }
+  ]
+}

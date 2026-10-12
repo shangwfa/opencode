@@ -1,0 +1,374 @@
+{
+  "service": "doubao_speech",
+  "displayName": "Doubao Speech",
+  "categories": [
+    "AI",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Doubao Speech APP Key",
+      "placeholder": "Your Doubao Speech APP Key",
+      "description": "APP Key from the Doubao Speech console, sent only in the X-Api-Key header. Keys from the Ark console are not supported."
+    }
+  ],
+  "homepageUrl": "https://www.volcengine.com/product/doubao-voice",
+  "actions": [
+    {
+      "id": "doubao_speech.get_stt",
+      "service": "doubao_speech",
+      "name": "get_stt",
+      "description": "Retrieve a Doubao recording-file speech recognition task state and output.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A speech recognition task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is queued or processing."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The task progress percentage when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A queued or running speech recognition task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "text": {
+                "type": "string",
+                "description": "The complete recognized text."
+              },
+              "utterances": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "The recognized segment text."
+                    },
+                    "startTime": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The segment start time in milliseconds."
+                    },
+                    "endTime": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The segment end time in milliseconds."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "text",
+                    "startTime",
+                    "endTime"
+                  ],
+                  "description": "A recognized speech segment."
+                },
+                "description": "Recognized speech segments."
+              },
+              "duration": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The source audio duration in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "text"
+            ],
+            "description": "A completed speech recognition task."
+          }
+        ],
+        "description": "The normalized Doubao speech recognition task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "doubao_speech.submit_stt",
+        "statusActionId": "doubao_speech.get_stt"
+      }
+    },
+    {
+      "id": "doubao_speech.get_tts",
+      "service": "doubao_speech",
+      "name": "get_tts",
+      "description": "Retrieve a Doubao Speech 2.0 text-to-speech task state and output.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A speech synthesis task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is processing."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The task progress percentage when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A queued or running speech synthesis task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "audioUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The temporary synthesized audio URL."
+              },
+              "urlExpiresAt": {
+                "type": "integer",
+                "description": "The Unix timestamp when the audio URL expires."
+              },
+              "requestedTextLength": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The requested text length reported by Doubao Speech."
+              },
+              "synthesizedTextLength": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The synthesized text length reported by Doubao Speech."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "audioUrl"
+            ],
+            "description": "A completed speech synthesis task."
+          }
+        ],
+        "description": "The normalized Doubao speech synthesis task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "doubao_speech.submit_tts",
+        "statusActionId": "doubao_speech.get_tts"
+      }
+    },
+    {
+      "id": "doubao_speech.submit_stt",
+      "service": "doubao_speech",
+      "name": "submit_stt",
+      "description": "Submit an asynchronous Doubao recording-file speech recognition task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "audioUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A public URL for the audio file to recognize."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "wav",
+              "mp3",
+              "ogg"
+            ],
+            "description": "The audio container format."
+          },
+          "language": {
+            "type": "string",
+            "description": "The recognition language code, such as zh-CN or en-US."
+          },
+          "enableSpeakerInfo": {
+            "type": "boolean",
+            "description": "Whether to return speaker clustering information.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audioUrl",
+          "format"
+        ],
+        "description": "A Doubao recording-file speech recognition request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted speech recognition task handle."
+      },
+      "followUpActions": [
+        "doubao_speech.get_stt"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "doubao_speech.submit_stt",
+        "statusActionId": "doubao_speech.get_stt"
+      }
+    },
+    {
+      "id": "doubao_speech.submit_tts",
+      "service": "doubao_speech",
+      "name": "submit_tts",
+      "description": "Submit an asynchronous Doubao Speech 2.0 text-to-speech task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000,
+            "description": "The text to synthesize."
+          },
+          "voice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Doubao Speech speaker ID."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "mp3",
+              "wav",
+              "pcm",
+              "ogg_opus"
+            ],
+            "description": "The synthesized audio format.",
+            "default": "mp3"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "voice"
+        ],
+        "description": "A Doubao Speech 2.0 synthesis request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Doubao Speech task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted speech synthesis task handle."
+      },
+      "followUpActions": [
+        "doubao_speech.get_tts"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "doubao_speech.submit_tts",
+        "statusActionId": "doubao_speech.get_tts"
+      }
+    }
+  ]
+}

@@ -1,0 +1,3041 @@
+{
+  "service": "slackbot",
+  "displayName": "Slack Bot",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://slack.com/oauth/v2/authorize",
+      "tokenUrl": "https://slack.com/api/oauth.v2.access",
+      "scopes": [
+        "channels:read",
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "users:read",
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history",
+        "files:read",
+        "reactions:read",
+        "chat:write",
+        "im:write",
+        "files:write",
+        "reactions:write"
+      ],
+      "scopeSeparator": ",",
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://slack.com",
+  "actions": [
+    {
+      "id": "slackbot.add_reaction",
+      "service": "slackbot",
+      "name": "add_reaction",
+      "description": "Add an emoji reaction to a Slack message.",
+      "operationType": "write",
+      "requiredScopes": [
+        "reactions:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The emoji reaction name without surrounding colons."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs",
+          "name"
+        ],
+        "description": "Input parameters for adding a Slack reaction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Slack accepted the reaction request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.conversations_members",
+      "service": "slackbot",
+      "name": "conversations_members",
+      "description": "List the member user IDs of a Slack conversation. Returns one page; pass the cursor from nextCursor until it comes back empty.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:read",
+        "groups:read",
+        "im:read",
+        "mpim:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor from a previous page. Omit for the first page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of members to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId"
+        ],
+        "description": "Input parameters for listing Slack conversation members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Slack user ID."
+            },
+            "description": "The Slack user IDs that are members of the conversation."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for the next page, or an empty string when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memberIds",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.delete_file",
+      "service": "slackbot",
+      "name": "delete_file",
+      "description": "Delete a Slack file.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "files:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack file ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ],
+        "description": "Input parameters for deleting a Slack file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Slack accepted the file delete request."
+          },
+          "fileId": {
+            "type": "string",
+            "description": "The Slack file ID that was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "fileId"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.delete_message",
+      "service": "slackbot",
+      "name": "delete_message",
+      "description": "Delete a Slack message posted through this connection.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "Input parameters for deleting a Slack message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The conversation identifier containing the message."
+          },
+          "messageTs": {
+            "type": "string",
+            "description": "The timestamp identifier of the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "The output payload for a Slack message reference."
+      }
+    },
+    {
+      "id": "slackbot.download_file",
+      "service": "slackbot",
+      "name": "download_file",
+      "description": "Download a Slack-hosted file into transit storage using the connected identity's access.",
+      "operationType": "read",
+      "requiredScopes": [
+        "files:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack file ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ],
+        "description": "The Slack file to download."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack file ID."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The transit URL for downloading the stored file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The stored file size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The stored file MIME type."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "The downloaded file in transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId",
+          "file"
+        ],
+        "description": "A Slack file downloaded into transit storage."
+      }
+    },
+    {
+      "id": "slackbot.get_channel_messages",
+      "service": "slackbot",
+      "name": "get_channel_messages",
+      "description": "Get recent messages from a Slack conversation.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999,
+            "description": "The maximum number of messages to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor from a previous page. Omit for the first page."
+          },
+          "oldest": {
+            "type": "string",
+            "description": "Only return messages after this Slack timestamp, for example '1700000000.123456'. The message at exactly this timestamp is included only when inclusive is true."
+          },
+          "latest": {
+            "type": "string",
+            "description": "Only return messages before this Slack timestamp. Defaults to now. The message at exactly this timestamp is included only when inclusive is true."
+          },
+          "inclusive": {
+            "type": "boolean",
+            "description": "Include messages whose timestamp equals oldest or latest. Slack ignores this unless one of those bounds is set."
+          },
+          "includeRaw": {
+            "type": "boolean",
+            "description": "When true, each returned message also carries the untouched Slack record under raw, including its blocks, attachments, files and message metadata. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId"
+        ],
+        "description": "Input parameters for reading Slack conversation history."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ts": {
+                  "type": "string",
+                  "description": "The message timestamp identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Slack message type, normally 'message'."
+                },
+                "subtype": {
+                  "type": "string",
+                  "description": "The Slack message subtype ('channel_join', 'bot_message', …) when the message has one."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The user ID of the message author."
+                },
+                "botId": {
+                  "type": "string",
+                  "description": "The bot ID of the message author when a bot posted it."
+                },
+                "appId": {
+                  "type": "string",
+                  "description": "The Slack app ID that posted the message when an app posted it."
+                },
+                "username": {
+                  "type": "string",
+                  "description": "The display username Slack attached to a bot or app message."
+                },
+                "teamId": {
+                  "type": "string",
+                  "description": "The Slack team ID the message belongs to."
+                },
+                "clientMsgId": {
+                  "type": "string",
+                  "description": "The client-generated message identifier when Slack returns one."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text content of the message."
+                },
+                "editedTs": {
+                  "type": "string",
+                  "description": "The timestamp of the most recent edit, when the message was edited."
+                },
+                "editedUserId": {
+                  "type": "string",
+                  "description": "The user ID of the most recent editor, when the message was edited."
+                },
+                "threadTs": {
+                  "type": "string",
+                  "description": "The timestamp of the thread parent. Equal to ts on a thread parent, and absent on a message that is not in a thread."
+                },
+                "parentUserId": {
+                  "type": "string",
+                  "description": "The author of the thread parent, on a threaded reply."
+                },
+                "replyCount": {
+                  "type": "integer",
+                  "description": "The number of replies to this thread parent."
+                },
+                "replyUsersCount": {
+                  "type": "integer",
+                  "description": "The number of distinct users who replied to this thread parent."
+                },
+                "replyUserIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Slack user ID."
+                  },
+                  "description": "Up to five user IDs of people who replied to this thread parent. Slack caps this list; use replyUsersCount for the total."
+                },
+                "latestReply": {
+                  "type": "string",
+                  "description": "The timestamp of the most recent reply to this thread parent."
+                },
+                "isLocked": {
+                  "type": "boolean",
+                  "description": "Whether the thread is locked."
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The emoji name of the reaction."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "How many users added this reaction."
+                      },
+                      "userIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A Slack user ID."
+                        },
+                        "description": "The users who added this reaction, as far as Slack reports them."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A reaction summary on a Slack message."
+                  },
+                  "description": "Reaction summaries attached to the message."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The untouched Slack record, exactly as the Slack API returned it. Present only when includeRaw is true."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Slack message record."
+            },
+            "description": "The list of messages in the conversation."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more messages are available beyond this page."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for the next page, or an empty string when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "hasMore",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_conversation",
+      "service": "slackbot",
+      "name": "get_conversation",
+      "description": "Get metadata for a Slack conversation.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:read",
+        "groups:read",
+        "im:read",
+        "mpim:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "includeLocale": {
+            "type": "boolean",
+            "description": "Whether Slack should include the locale field."
+          },
+          "includeNumMembers": {
+            "type": "boolean",
+            "description": "Whether Slack should include the member count field."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId"
+        ],
+        "description": "Input parameters for fetching a Slack conversation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string",
+                "description": "The unique identifier of the conversation."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The name of the conversation when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The name of the conversation when available."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel",
+                  "im",
+                  "mpim",
+                  "unknown"
+                ],
+                "description": "The normalized Slack conversation type."
+              },
+              "isArchived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the conversation is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the conversation is archived."
+              },
+              "isPrivate": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the conversation is private."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the conversation is private."
+              },
+              "isMember": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the connected Slack identity is a member."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the connected Slack identity is a member."
+              },
+              "memberCount": {
+                "type": "integer",
+                "description": "The member count when Slack provides it."
+              },
+              "topic": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The conversation topic."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The conversation topic."
+              },
+              "purpose": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The conversation purpose."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The conversation purpose."
+              },
+              "userId": {
+                "type": "string",
+                "description": "The linked user identifier for IM conversations."
+              },
+              "locale": {
+                "type": "string",
+                "description": "The locale returned by Slack when requested."
+              },
+              "created": {
+                "type": "integer",
+                "description": "Creation time as a Unix timestamp in seconds when Slack provides it."
+              },
+              "updated": {
+                "type": "integer",
+                "description": "Last settings update time, passed through as Slack returns it. Slack documents epoch milliseconds for channels (unlike created) and a Unix timestamp for legacy IM and MPIM objects."
+              },
+              "creatorId": {
+                "type": "string",
+                "description": "The user who created the conversation when Slack provides it."
+              },
+              "isShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared with another workspace."
+              },
+              "isExtShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared with an external organization."
+              },
+              "isOrgShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared between workspaces of the same Enterprise organization."
+              },
+              "contextTeamId": {
+                "type": "string",
+                "description": "The ID of the workspace the conversation is within when Slack provides it."
+              },
+              "lastRead": {
+                "type": "string",
+                "description": "The last-read message timestamp when Slack provides it."
+              },
+              "unreadCount": {
+                "type": "integer",
+                "description": "The unread message count when Slack provides it."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "channelId",
+              "name",
+              "type",
+              "isArchived",
+              "isPrivate",
+              "isMember",
+              "topic",
+              "purpose"
+            ],
+            "description": "A normalized Slack conversation record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversation"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_file",
+      "service": "slackbot",
+      "name": "get_file",
+      "description": "Get metadata for a Slack file.",
+      "operationType": "read",
+      "requiredScopes": [
+        "files:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack file ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ],
+        "description": "Input parameters for fetching a Slack file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "description": "The Slack file ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The file name."
+              },
+              "title": {
+                "type": "string",
+                "description": "The file title."
+              },
+              "mimetype": {
+                "type": "string",
+                "description": "The file MIME type."
+              },
+              "urlPrivate": {
+                "type": "string",
+                "description": "The private Slack URL for the file when returned."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Slack file object returned by the Web API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_message_permalink",
+      "service": "slackbot",
+      "name": "get_message_permalink",
+      "description": "Get a permalink for a Slack message.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "Input parameters for fetching a Slack message permalink."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The conversation identifier containing the target message."
+          },
+          "messageTs": {
+            "type": "string",
+            "description": "The timestamp identifier of the target message."
+          },
+          "permalink": {
+            "type": "string",
+            "description": "The permalink URL returned by Slack."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs",
+          "permalink"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_reactions",
+      "service": "slackbot",
+      "name": "get_reactions",
+      "description": "Get reactions for a Slack message.",
+      "operationType": "read",
+      "requiredScopes": [
+        "reactions:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          },
+          "full": {
+            "type": "boolean",
+            "description": "Whether Slack should return the complete reaction user lists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "Input parameters for reading Slack reactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Slack item with reactions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_thread",
+      "service": "slackbot",
+      "name": "get_thread",
+      "description": "Get messages in a Slack thread.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "threadTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timestamp of the parent message."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999,
+            "description": "The maximum number of messages to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor from a previous page. Omit for the first page."
+          },
+          "oldest": {
+            "type": "string",
+            "description": "Only return messages after this Slack timestamp, for example '1700000000.123456'. The message at exactly this timestamp is included only when inclusive is true."
+          },
+          "latest": {
+            "type": "string",
+            "description": "Only return messages before this Slack timestamp. Defaults to now. The message at exactly this timestamp is included only when inclusive is true."
+          },
+          "inclusive": {
+            "type": "boolean",
+            "description": "Include messages whose timestamp equals oldest or latest. Slack ignores this unless one of those bounds is set."
+          },
+          "includeRaw": {
+            "type": "boolean",
+            "description": "When true, each returned message also carries the untouched Slack record under raw, including its blocks, attachments, files and message metadata. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "threadTs"
+        ],
+        "description": "Input parameters for reading a Slack thread."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ts": {
+                  "type": "string",
+                  "description": "The message timestamp identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Slack message type, normally 'message'."
+                },
+                "subtype": {
+                  "type": "string",
+                  "description": "The Slack message subtype ('channel_join', 'bot_message', …) when the message has one."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The user ID of the message author."
+                },
+                "botId": {
+                  "type": "string",
+                  "description": "The bot ID of the message author when a bot posted it."
+                },
+                "appId": {
+                  "type": "string",
+                  "description": "The Slack app ID that posted the message when an app posted it."
+                },
+                "username": {
+                  "type": "string",
+                  "description": "The display username Slack attached to a bot or app message."
+                },
+                "teamId": {
+                  "type": "string",
+                  "description": "The Slack team ID the message belongs to."
+                },
+                "clientMsgId": {
+                  "type": "string",
+                  "description": "The client-generated message identifier when Slack returns one."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The text content of the message."
+                },
+                "editedTs": {
+                  "type": "string",
+                  "description": "The timestamp of the most recent edit, when the message was edited."
+                },
+                "editedUserId": {
+                  "type": "string",
+                  "description": "The user ID of the most recent editor, when the message was edited."
+                },
+                "threadTs": {
+                  "type": "string",
+                  "description": "The timestamp of the thread parent. Equal to ts on a thread parent, and absent on a message that is not in a thread."
+                },
+                "parentUserId": {
+                  "type": "string",
+                  "description": "The author of the thread parent, on a threaded reply."
+                },
+                "replyCount": {
+                  "type": "integer",
+                  "description": "The number of replies to this thread parent."
+                },
+                "replyUsersCount": {
+                  "type": "integer",
+                  "description": "The number of distinct users who replied to this thread parent."
+                },
+                "replyUserIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Slack user ID."
+                  },
+                  "description": "Up to five user IDs of people who replied to this thread parent. Slack caps this list; use replyUsersCount for the total."
+                },
+                "latestReply": {
+                  "type": "string",
+                  "description": "The timestamp of the most recent reply to this thread parent."
+                },
+                "isLocked": {
+                  "type": "boolean",
+                  "description": "Whether the thread is locked."
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The emoji name of the reaction."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "How many users added this reaction."
+                      },
+                      "userIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A Slack user ID."
+                        },
+                        "description": "The users who added this reaction, as far as Slack reports them."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A reaction summary on a Slack message."
+                  },
+                  "description": "Reaction summaries attached to the message."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The untouched Slack record, exactly as the Slack API returned it. Present only when includeRaw is true."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Slack message record."
+            },
+            "description": "The list of messages in the thread."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more messages are available beyond this page."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for the next page, or an empty string when this is the last page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "hasMore",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.get_user",
+      "service": "slackbot",
+      "name": "get_user",
+      "description": "Get metadata for a Slack user.",
+      "operationType": "read",
+      "requiredScopes": [
+        "users:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack user ID."
+          },
+          "includeLocale": {
+            "type": "boolean",
+            "description": "Whether Slack should include the locale field."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Input parameters for fetching a Slack user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "The unique identifier of the user."
+              },
+              "username": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The username of the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The username of the user."
+              },
+              "realName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The real name of the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The real name of the user."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The display name of the user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The display name of the user."
+              },
+              "isBot": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is a bot user."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is a bot user."
+              },
+              "isDeleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is deleted."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is deleted."
+              },
+              "isAdmin": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is an admin."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is an admin."
+              },
+              "isOwner": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the user is an owner."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the user is an owner."
+              },
+              "locale": {
+                "type": "string",
+                "description": "The locale returned by Slack when requested."
+              },
+              "email": {
+                "type": "string",
+                "description": "The profile email. Slack returns it only when the token holds the users:read.email scope."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The user's time zone identifier when Slack provides it."
+              },
+              "tzOffset": {
+                "type": "integer",
+                "description": "The user's UTC offset in seconds when Slack provides it."
+              },
+              "updated": {
+                "type": "integer",
+                "description": "When the user object was last updated, as a Unix timestamp in seconds."
+              },
+              "teamId": {
+                "type": "string",
+                "description": "The user's team ID when Slack provides it."
+              },
+              "isRestricted": {
+                "type": "boolean",
+                "description": "Whether the user is a guest. Single-channel guests also set isUltraRestricted."
+              },
+              "isUltraRestricted": {
+                "type": "boolean",
+                "description": "Whether the user is a single-channel guest."
+              },
+              "isAppUser": {
+                "type": "boolean",
+                "description": "Whether the user is an authorized user of the calling app."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "userId",
+              "username",
+              "realName",
+              "displayName",
+              "isBot",
+              "isDeleted",
+              "isAdmin",
+              "isOwner"
+            ],
+            "description": "A normalized Slack user record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.list_channels",
+      "service": "slackbot",
+      "name": "list_channels",
+      "description": "List Slack public channels visible to the connected Slack identity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of channels to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Slack channels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channelId": {
+                  "type": "string",
+                  "description": "The unique identifier of the channel."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name of the channel."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "channelId",
+                "name"
+              ],
+              "description": "A Slack channel summary."
+            },
+            "description": "The list of Slack channels."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.list_conversations",
+      "service": "slackbot",
+      "name": "list_conversations",
+      "description": "List Slack conversations visible to the connected Slack identity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "channels:read",
+        "groups:read",
+        "im:read",
+        "mpim:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of conversations to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "public_channel",
+                "private_channel",
+                "im",
+                "mpim"
+              ],
+              "description": "A Slack conversation type."
+            },
+            "description": "Conversation types to include.",
+            "minItems": 1
+          },
+          "excludeArchived": {
+            "type": "boolean",
+            "description": "Whether archived conversations should be excluded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Slack conversations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channelId": {
+                  "type": "string",
+                  "description": "The unique identifier of the conversation."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The name of the conversation when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The name of the conversation when available."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "public_channel",
+                    "private_channel",
+                    "im",
+                    "mpim",
+                    "unknown"
+                  ],
+                  "description": "The normalized Slack conversation type."
+                },
+                "isArchived": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the conversation is archived."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the conversation is archived."
+                },
+                "isPrivate": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the conversation is private."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the conversation is private."
+                },
+                "isMember": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the connected Slack identity is a member."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the connected Slack identity is a member."
+                },
+                "memberCount": {
+                  "type": "integer",
+                  "description": "The member count when Slack provides it."
+                },
+                "topic": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The conversation topic."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The conversation topic."
+                },
+                "purpose": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The conversation purpose."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The conversation purpose."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The linked user identifier for IM conversations."
+                },
+                "locale": {
+                  "type": "string",
+                  "description": "The locale returned by Slack when requested."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "Creation time as a Unix timestamp in seconds when Slack provides it."
+                },
+                "updated": {
+                  "type": "integer",
+                  "description": "Last settings update time, passed through as Slack returns it. Slack documents epoch milliseconds for channels (unlike created) and a Unix timestamp for legacy IM and MPIM objects."
+                },
+                "creatorId": {
+                  "type": "string",
+                  "description": "The user who created the conversation when Slack provides it."
+                },
+                "isShared": {
+                  "type": "boolean",
+                  "description": "Whether the conversation is shared with another workspace."
+                },
+                "isExtShared": {
+                  "type": "boolean",
+                  "description": "Whether the conversation is shared with an external organization."
+                },
+                "isOrgShared": {
+                  "type": "boolean",
+                  "description": "Whether the conversation is shared between workspaces of the same Enterprise organization."
+                },
+                "contextTeamId": {
+                  "type": "string",
+                  "description": "The ID of the workspace the conversation is within when Slack provides it."
+                },
+                "lastRead": {
+                  "type": "string",
+                  "description": "The last-read message timestamp when Slack provides it."
+                },
+                "unreadCount": {
+                  "type": "integer",
+                  "description": "The unread message count when Slack provides it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "channelId",
+                "name",
+                "type",
+                "isArchived",
+                "isPrivate",
+                "isMember",
+                "topic",
+                "purpose"
+              ],
+              "description": "A normalized Slack conversation record."
+            },
+            "description": "The list of Slack conversations."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "conversations",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.list_files",
+      "service": "slackbot",
+      "name": "list_files",
+      "description": "List Slack files visible to the connected Slack identity, optionally filtered by channel or user.",
+      "operationType": "read",
+      "requiredScopes": [
+        "files:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack user ID."
+          },
+          "types": {
+            "type": "string",
+            "description": "Comma-separated Slack file type filters, for example 'images,pdfs'."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to fetch."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of files to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Slack files."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "description": "The Slack file ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The file name."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The file title."
+                },
+                "mimetype": {
+                  "type": "string",
+                  "description": "The file MIME type."
+                },
+                "urlPrivate": {
+                  "type": "string",
+                  "description": "The private Slack URL for the file when returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Slack file object returned by the Web API."
+            },
+            "description": "The Slack files returned by Slack."
+          },
+          "paging": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack paging metadata when returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files",
+          "paging"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.list_reactions",
+      "service": "slackbot",
+      "name": "list_reactions",
+      "description": "List the messages and files a Slack user reacted to, with the reactions on each. Defaults to the connected user.",
+      "operationType": "read",
+      "requiredScopes": [
+        "reactions:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack user whose reactions to list. Defaults to the connected user."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor."
+          },
+          "full": {
+            "type": "boolean",
+            "description": "Whether Slack should return the complete reaction user lists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Slack reactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "message",
+                    "file",
+                    "file_comment"
+                  ],
+                  "description": "The kind of item reacted to."
+                },
+                "channelId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Slack conversation or channel ID."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "ts": {
+                      "type": "string",
+                      "description": "The message timestamp identifier."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The Slack message type, normally 'message'."
+                    },
+                    "subtype": {
+                      "type": "string",
+                      "description": "The Slack message subtype ('channel_join', 'bot_message', …) when the message has one."
+                    },
+                    "userId": {
+                      "type": "string",
+                      "description": "The user ID of the message author."
+                    },
+                    "botId": {
+                      "type": "string",
+                      "description": "The bot ID of the message author when a bot posted it."
+                    },
+                    "appId": {
+                      "type": "string",
+                      "description": "The Slack app ID that posted the message when an app posted it."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "The display username Slack attached to a bot or app message."
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "description": "The Slack team ID the message belongs to."
+                    },
+                    "clientMsgId": {
+                      "type": "string",
+                      "description": "The client-generated message identifier when Slack returns one."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text content of the message."
+                    },
+                    "editedTs": {
+                      "type": "string",
+                      "description": "The timestamp of the most recent edit, when the message was edited."
+                    },
+                    "editedUserId": {
+                      "type": "string",
+                      "description": "The user ID of the most recent editor, when the message was edited."
+                    },
+                    "threadTs": {
+                      "type": "string",
+                      "description": "The timestamp of the thread parent. Equal to ts on a thread parent, and absent on a message that is not in a thread."
+                    },
+                    "parentUserId": {
+                      "type": "string",
+                      "description": "The author of the thread parent, on a threaded reply."
+                    },
+                    "replyCount": {
+                      "type": "integer",
+                      "description": "The number of replies to this thread parent."
+                    },
+                    "replyUsersCount": {
+                      "type": "integer",
+                      "description": "The number of distinct users who replied to this thread parent."
+                    },
+                    "replyUserIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A Slack user ID."
+                      },
+                      "description": "Up to five user IDs of people who replied to this thread parent. Slack caps this list; use replyUsersCount for the total."
+                    },
+                    "latestReply": {
+                      "type": "string",
+                      "description": "The timestamp of the most recent reply to this thread parent."
+                    },
+                    "isLocked": {
+                      "type": "boolean",
+                      "description": "Whether the thread is locked."
+                    },
+                    "reactions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "The emoji name of the reaction."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "description": "How many users added this reaction."
+                          },
+                          "userIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "description": "A Slack user ID."
+                            },
+                            "description": "The users who added this reaction, as far as Slack reports them."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A reaction summary on a Slack message."
+                      },
+                      "description": "Reaction summaries attached to the message."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The untouched Slack record, exactly as the Slack API returned it. Present only when includeRaw is true."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Slack message record.",
+                  "required": [
+                    "ts"
+                  ]
+                },
+                "permalink": {
+                  "type": "string",
+                  "description": "A Slack permalink for the message, when Slack returns one."
+                },
+                "fileId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Slack file ID."
+                },
+                "commentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The file comment ID, on a file comment item."
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The emoji name of the reaction."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "How many users added this reaction."
+                      },
+                      "userIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "A Slack user ID."
+                        },
+                        "description": "The users who added this reaction, as far as Slack reports them."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A reaction summary on a Slack message."
+                  },
+                  "description": "Reaction summaries on a file or file comment item. A message item carries them on message."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "type"
+              ],
+              "description": "An item the user reacted to, with the reactions on it.",
+              "oneOf": [
+                {
+                  "properties": {
+                    "type": {
+                      "const": "message",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "channelId",
+                    "message"
+                  ]
+                },
+                {
+                  "properties": {
+                    "type": {
+                      "const": "file",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fileId"
+                  ]
+                },
+                {
+                  "properties": {
+                    "type": {
+                      "const": "file_comment",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fileId",
+                    "commentId"
+                  ]
+                }
+              ]
+            },
+            "description": "The items the user reacted to."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.list_users",
+      "service": "slackbot",
+      "name": "list_users",
+      "description": "List Slack users visible to the connected Slack identity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "users:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of users to return."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The Slack pagination cursor."
+          },
+          "includeLocale": {
+            "type": "boolean",
+            "description": "Whether Slack should include the locale field."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Slack users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "description": "The unique identifier of the user."
+                },
+                "username": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The username of the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The username of the user."
+                },
+                "realName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The real name of the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The real name of the user."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The display name of the user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The display name of the user."
+                },
+                "isBot": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is a bot user."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is a bot user."
+                },
+                "isDeleted": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is deleted."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is deleted."
+                },
+                "isAdmin": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is an admin."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is an admin."
+                },
+                "isOwner": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the user is an owner."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the user is an owner."
+                },
+                "locale": {
+                  "type": "string",
+                  "description": "The locale returned by Slack when requested."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The profile email. Slack returns it only when the token holds the users:read.email scope."
+                },
+                "tz": {
+                  "type": "string",
+                  "description": "The user's time zone identifier when Slack provides it."
+                },
+                "tzOffset": {
+                  "type": "integer",
+                  "description": "The user's UTC offset in seconds when Slack provides it."
+                },
+                "updated": {
+                  "type": "integer",
+                  "description": "When the user object was last updated, as a Unix timestamp in seconds."
+                },
+                "teamId": {
+                  "type": "string",
+                  "description": "The user's team ID when Slack provides it."
+                },
+                "isRestricted": {
+                  "type": "boolean",
+                  "description": "Whether the user is a guest. Single-channel guests also set isUltraRestricted."
+                },
+                "isUltraRestricted": {
+                  "type": "boolean",
+                  "description": "Whether the user is a single-channel guest."
+                },
+                "isAppUser": {
+                  "type": "boolean",
+                  "description": "Whether the user is an authorized user of the calling app."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "username",
+                "realName",
+                "displayName",
+                "isBot",
+                "isDeleted",
+                "isAdmin",
+                "isOwner"
+              ],
+              "description": "A normalized Slack user record."
+            },
+            "description": "The list of Slack users."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "nextCursor"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.open_conversation",
+      "service": "slackbot",
+      "name": "open_conversation",
+      "description": "Open or resume a direct message with one Slack user.",
+      "operationType": "write",
+      "requiredScopes": [
+        "im:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Slack user ID."
+            },
+            "description": "The single Slack user to include in the DM.",
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "preventCreation": {
+            "type": "boolean",
+            "description": "Whether Slack should avoid creating a new conversation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userIds"
+        ],
+        "description": "Input parameters for opening a Slack DM."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The opened Slack conversation ID."
+          },
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "channelId": {
+                "type": "string",
+                "description": "The unique identifier of the conversation."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The name of the conversation when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The name of the conversation when available."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "public_channel",
+                  "private_channel",
+                  "im",
+                  "mpim",
+                  "unknown"
+                ],
+                "description": "The normalized Slack conversation type."
+              },
+              "isArchived": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the conversation is archived."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the conversation is archived."
+              },
+              "isPrivate": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the conversation is private."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the conversation is private."
+              },
+              "isMember": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the connected Slack identity is a member."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the connected Slack identity is a member."
+              },
+              "memberCount": {
+                "type": "integer",
+                "description": "The member count when Slack provides it."
+              },
+              "topic": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The conversation topic."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The conversation topic."
+              },
+              "purpose": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The conversation purpose."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The conversation purpose."
+              },
+              "userId": {
+                "type": "string",
+                "description": "The linked user identifier for IM conversations."
+              },
+              "locale": {
+                "type": "string",
+                "description": "The locale returned by Slack when requested."
+              },
+              "created": {
+                "type": "integer",
+                "description": "Creation time as a Unix timestamp in seconds when Slack provides it."
+              },
+              "updated": {
+                "type": "integer",
+                "description": "Last settings update time, passed through as Slack returns it. Slack documents epoch milliseconds for channels (unlike created) and a Unix timestamp for legacy IM and MPIM objects."
+              },
+              "creatorId": {
+                "type": "string",
+                "description": "The user who created the conversation when Slack provides it."
+              },
+              "isShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared with another workspace."
+              },
+              "isExtShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared with an external organization."
+              },
+              "isOrgShared": {
+                "type": "boolean",
+                "description": "Whether the conversation is shared between workspaces of the same Enterprise organization."
+              },
+              "contextTeamId": {
+                "type": "string",
+                "description": "The ID of the workspace the conversation is within when Slack provides it."
+              },
+              "lastRead": {
+                "type": "string",
+                "description": "The last-read message timestamp when Slack provides it."
+              },
+              "unreadCount": {
+                "type": "integer",
+                "description": "The unread message count when Slack provides it."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "channelId",
+              "name",
+              "type",
+              "isArchived",
+              "isPrivate",
+              "isMember",
+              "topic",
+              "purpose"
+            ],
+            "description": "A normalized Slack conversation record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "conversation"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.post_ephemeral_message",
+      "service": "slackbot",
+      "name": "post_ephemeral_message",
+      "description": "Post an ephemeral Slack message visible only to one user in a conversation.",
+      "operationType": "write",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text message content. When blocks are provided, Slack uses this as notification and accessibility fallback text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack Block Kit block object. Pass the block exactly as Slack documents it."
+            },
+            "description": "Slack Block Kit blocks to render in the message.",
+            "minItems": 1
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack legacy attachment object. Prefer blocks for new messages when possible."
+            },
+            "description": "Slack legacy attachments to include in the message.",
+            "minItems": 1
+          },
+          "unfurlLinks": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl links in the message."
+          },
+          "unfurlMedia": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl media in the message."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack message metadata to attach to the message."
+          },
+          "userId": {
+            "type": "string",
+            "description": "The user who should receive the ephemeral message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "userId"
+        ],
+        "description": "Input parameters for posting an ephemeral Slack message.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "blocks"
+            ]
+          },
+          {
+            "required": [
+              "attachments"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The conversation identifier where the message was sent."
+          },
+          "messageTs": {
+            "type": "string",
+            "description": "The timestamp identifier of the ephemeral message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.post_message",
+      "service": "slackbot",
+      "name": "post_message",
+      "description": "Post a Slack message. Use text for plain messages, or blocks for rich Block Kit layouts with text as fallback.",
+      "operationType": "write",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text message content. When blocks are provided, Slack uses this as notification and accessibility fallback text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack Block Kit block object. Pass the block exactly as Slack documents it."
+            },
+            "description": "Slack Block Kit blocks to render in the message.",
+            "minItems": 1
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack legacy attachment object. Prefer blocks for new messages when possible."
+            },
+            "description": "Slack legacy attachments to include in the message.",
+            "minItems": 1
+          },
+          "unfurlLinks": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl links in the message."
+          },
+          "unfurlMedia": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl media in the message."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack message metadata to attach to the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId"
+        ],
+        "description": "Input parameters for posting a Slack message.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "blocks"
+            ]
+          },
+          {
+            "required": [
+              "attachments"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "description": "The timestamp identifier of the posted message."
+          },
+          "channelId": {
+            "type": "string",
+            "description": "The channel ID where the message was posted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ts",
+          "channelId"
+        ],
+        "description": "The output payload for a posted Slack message."
+      }
+    },
+    {
+      "id": "slackbot.remove_reaction",
+      "service": "slackbot",
+      "name": "remove_reaction",
+      "description": "Remove an emoji reaction from a Slack message.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "reactions:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The emoji reaction name without surrounding colons."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs",
+          "name"
+        ],
+        "description": "Input parameters for removing a Slack reaction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Slack accepted the reaction removal request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.reply_message",
+      "service": "slackbot",
+      "name": "reply_message",
+      "description": "Reply to a Slack thread. Use text, blocks, or attachments for the reply content.",
+      "operationType": "write",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text message content. When blocks are provided, Slack uses this as notification and accessibility fallback text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack Block Kit block object. Pass the block exactly as Slack documents it."
+            },
+            "description": "Slack Block Kit blocks to render in the message.",
+            "minItems": 1
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack legacy attachment object. Prefer blocks for new messages when possible."
+            },
+            "description": "Slack legacy attachments to include in the message.",
+            "minItems": 1
+          },
+          "unfurlLinks": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl links in the message."
+          },
+          "unfurlMedia": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl media in the message."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack message metadata to attach to the message."
+          },
+          "threadTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timestamp of the parent message to reply to."
+          },
+          "replyBroadcast": {
+            "type": "boolean",
+            "description": "Whether Slack should also broadcast the reply to the channel."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "threadTs"
+        ],
+        "description": "Input parameters for replying to a Slack thread.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "blocks"
+            ]
+          },
+          {
+            "required": [
+              "attachments"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "description": "The timestamp identifier of the posted message."
+          },
+          "channelId": {
+            "type": "string",
+            "description": "The channel ID where the message was posted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ts",
+          "channelId"
+        ],
+        "description": "The output payload for a posted Slack message."
+      }
+    },
+    {
+      "id": "slackbot.schedule_message",
+      "service": "slackbot",
+      "name": "schedule_message",
+      "description": "Schedule a Slack message to be posted later. Use text or blocks for the scheduled content.",
+      "operationType": "write",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text message content. When blocks are provided, Slack uses this as notification and accessibility fallback text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack Block Kit block object. Pass the block exactly as Slack documents it."
+            },
+            "description": "Slack Block Kit blocks to render in the message.",
+            "minItems": 1
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack legacy attachment object. Prefer blocks for new messages when possible."
+            },
+            "description": "Slack legacy attachments to include in the message.",
+            "minItems": 1
+          },
+          "unfurlLinks": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl links in the message."
+          },
+          "unfurlMedia": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl media in the message."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack message metadata to attach to the message."
+          },
+          "postAt": {
+            "type": "integer",
+            "description": "The Unix timestamp when Slack should post the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "postAt"
+        ],
+        "description": "Input parameters for scheduling a Slack message.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "blocks"
+            ]
+          },
+          {
+            "required": [
+              "attachments"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The conversation identifier where the message will be posted."
+          },
+          "scheduledMessageId": {
+            "type": "string",
+            "description": "The scheduled message identifier returned by Slack."
+          },
+          "postAt": {
+            "type": "integer",
+            "description": "The Unix timestamp when Slack will post the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "scheduledMessageId",
+          "postAt"
+        ],
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "slackbot.update_message",
+      "service": "slackbot",
+      "name": "update_message",
+      "description": "Update a Slack message posted through this connection. Provide text, blocks, or attachments as the new message content.",
+      "operationType": "write",
+      "requiredScopes": [
+        "chat:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text message content. When blocks are provided, Slack uses this as notification and accessibility fallback text."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack Block Kit block object. Pass the block exactly as Slack documents it."
+            },
+            "description": "Slack Block Kit blocks to render in the message.",
+            "minItems": 1
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Slack legacy attachment object. Prefer blocks for new messages when possible."
+            },
+            "description": "Slack legacy attachments to include in the message.",
+            "minItems": 1
+          },
+          "unfurlLinks": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl links in the message."
+          },
+          "unfurlMedia": {
+            "type": "boolean",
+            "description": "Whether Slack should unfurl media in the message."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Slack message metadata to attach to the message."
+          },
+          "messageTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "Input parameters for updating a Slack message.",
+        "anyOf": [
+          {
+            "required": [
+              "text"
+            ]
+          },
+          {
+            "required": [
+              "blocks"
+            ]
+          },
+          {
+            "required": [
+              "attachments"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "description": "The conversation identifier containing the message."
+          },
+          "messageTs": {
+            "type": "string",
+            "description": "The timestamp identifier of the message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId",
+          "messageTs"
+        ],
+        "description": "The output payload for a Slack message reference."
+      }
+    },
+    {
+      "id": "slackbot.upload_file",
+      "service": "slackbot",
+      "name": "upload_file",
+      "description": "Upload a file to Slack using the current external upload flow. Provide fileUrl; binary content is fetched by the connector runtime.",
+      "operationType": "write",
+      "requiredScopes": [
+        "files:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name Slack should display."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "A URL whose response body should be uploaded to Slack.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional file title shown in Slack."
+          },
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack conversation or channel ID."
+          },
+          "initialComment": {
+            "type": "string",
+            "description": "Optional message text to post with the file."
+          },
+          "threadTs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Slack message timestamp, for example '1711.0001'."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type to send while uploading the file."
+          },
+          "altText": {
+            "type": "string",
+            "description": "Alternative text for the uploaded file when Slack supports it."
+          },
+          "snippetType": {
+            "type": "string",
+            "description": "Slack snippet type for text snippets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "fileUrl"
+        ],
+        "description": "Input parameters for uploading a Slack file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The uploaded Slack file ID."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "description": "The Slack file ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The file name."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The file title."
+                },
+                "mimetype": {
+                  "type": "string",
+                  "description": "The file MIME type."
+                },
+                "urlPrivate": {
+                  "type": "string",
+                  "description": "The private Slack URL for the file when returned."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Slack file object returned by the Web API."
+            },
+            "description": "Files returned by Slack after completing the upload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId",
+          "files"
+        ],
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

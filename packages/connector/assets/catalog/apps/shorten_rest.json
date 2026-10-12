@@ -1,0 +1,626 @@
+{
+  "service": "shorten_rest",
+  "displayName": "Shorten.REST",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "shorten_rest_api_key",
+      "description": "Shorten.REST API key sent with the x-api-key header. Create or copy it from the Shorten.REST dashboard: https://dash.shorten.rest."
+    }
+  ],
+  "homepageUrl": "https://shorten.rest",
+  "actions": [
+    {
+      "id": "shorten_rest.create_alias",
+      "service": "shorten_rest",
+      "name": "create_alias",
+      "description": "Create a Shorten.REST alias for one or more destination URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain name without http://, https://, or a trailing slash.",
+            "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?://)[^/]+$"
+          },
+          "aliasName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The alias value without a leading slash.",
+            "pattern": "^(?!/).+$"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The destination URL where the alias redirects.",
+                  "format": "uri"
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO alpha-2 country code for this destination."
+                },
+                "os": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The operating system selector for this destination."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "A destination URL with optional geo-targeting rules."
+            },
+            "description": "The destination URLs for the alias. At least one destination is required when creating an alias.",
+            "minItems": 1
+          },
+          "metatags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The metatag name."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The metatag content."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A metatag override for an alias."
+            },
+            "description": "The metatag overrides for the alias."
+          },
+          "snippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The snippet identifier."
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "A parameter value."
+                  },
+                  "description": "The snippet parameters as string key-value pairs."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A tracking snippet override for an alias."
+            },
+            "description": "The tracking snippet overrides for the alias."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "destinations"
+        ],
+        "description": "The input payload for creating a Shorten.REST alias."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "aliasName": {
+            "type": "string",
+            "description": "The generated or requested alias name."
+          },
+          "domainName": {
+            "type": "string",
+            "description": "The domain name for the short URL."
+          },
+          "shortUrl": {
+            "type": "string",
+            "description": "The complete short URL.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The alias created by Shorten.REST."
+      }
+    },
+    {
+      "id": "shorten_rest.delete_alias",
+      "service": "shorten_rest",
+      "name": "delete_alias",
+      "description": "Delete one Shorten.REST alias by alias name and optional domain.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain name without http://, https://, or a trailing slash.",
+            "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?://)[^/]+$"
+          },
+          "aliasName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The alias value without a leading slash.",
+            "pattern": "^(?!/).+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "aliasName"
+        ],
+        "description": "The input payload for identifying one Shorten.REST alias."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Shorten.REST accepted the deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shorten.REST alias deletion result."
+      }
+    },
+    {
+      "id": "shorten_rest.get_alias",
+      "service": "shorten_rest",
+      "name": "get_alias",
+      "description": "Get detailed information for one Shorten.REST alias.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain name without http://, https://, or a trailing slash.",
+            "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?://)[^/]+$"
+          },
+          "aliasName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The alias value without a leading slash.",
+            "pattern": "^(?!/).+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "aliasName"
+        ],
+        "description": "The input payload for identifying one Shorten.REST alias."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The alias name."
+                  },
+                  "domainName": {
+                    "type": "string",
+                    "description": "The domain name for the alias."
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "description": "The alias creation timestamp in Unix milliseconds."
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "description": "The alias update timestamp in Unix milliseconds."
+                  },
+                  "destinations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "description": "The destination URL where the alias redirects.",
+                          "format": "uri"
+                        },
+                        "country": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The ISO alpha-2 country code for this destination."
+                        },
+                        "os": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The operating system selector for this destination."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "url"
+                      ],
+                      "description": "A destination URL with optional geo-targeting rules."
+                    },
+                    "description": "The destination URLs configured on the alias."
+                  },
+                  "metatags": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The metatag name."
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The metatag content."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A metatag override for an alias."
+                    },
+                    "description": "The metatag overrides configured on the alias."
+                  },
+                  "snippets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The snippet identifier."
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "description": "A parameter value."
+                          },
+                          "description": "The snippet parameters as string key-value pairs."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "id"
+                      ],
+                      "description": "A tracking snippet override for an alias."
+                    },
+                    "description": "The tracking snippet overrides configured on the alias."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "description": "A Shorten.REST alias returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Shorten.REST alias returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The alias lookup result returned by Shorten.REST."
+      }
+    },
+    {
+      "id": "shorten_rest.list_aliases",
+      "service": "shorten_rest",
+      "name": "list_aliases",
+      "description": "List Shorten.REST alias names for a domain with official pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain name without http://, https://, or a trailing slash.",
+            "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?://)[^/]+$"
+          },
+          "continueFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The previous response lastId value used to fetch the next page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Shorten.REST alias names by domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "An alias name."
+            },
+            "description": "The alias names returned for the selected domain."
+          },
+          "lastId": {
+            "type": "string",
+            "description": "The last alias ID for fetching the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "aliases"
+        ],
+        "description": "The paginated Shorten.REST alias-name list."
+      }
+    },
+    {
+      "id": "shorten_rest.list_clicks",
+      "service": "shorten_rest",
+      "name": "list_clicks",
+      "description": "List raw Shorten.REST click records with official pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "continueFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The previous response lastId value used to fetch the next page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return, from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Shorten.REST click records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clicks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country": {
+                  "type": "string",
+                  "description": "The visitor country code."
+                },
+                "os": {
+                  "type": "string",
+                  "description": "The visitor operating system."
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "description": "The click creation timestamp in Unix milliseconds."
+                },
+                "domain": {
+                  "type": "string",
+                  "description": "The clicked domain."
+                },
+                "aliasId": {
+                  "type": "string",
+                  "description": "The internal alias identifier."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "The clicked alias name."
+                },
+                "destination": {
+                  "type": "string",
+                  "description": "The resolved destination URL."
+                },
+                "userAgent": {
+                  "type": "string",
+                  "description": "The visitor user agent."
+                },
+                "browser": {
+                  "type": "string",
+                  "description": "The visitor browser."
+                },
+                "referrer": {
+                  "type": "string",
+                  "description": "The referrer URL."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Shorten.REST click record."
+            },
+            "description": "The click records returned by Shorten.REST."
+          },
+          "lastId": {
+            "type": "string",
+            "description": "The last click ID for fetching the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clicks"
+        ],
+        "description": "The paginated Shorten.REST click list."
+      }
+    },
+    {
+      "id": "shorten_rest.update_alias",
+      "service": "shorten_rest",
+      "name": "update_alias",
+      "description": "Update destinations, metatags, or snippets on an existing Shorten.REST alias.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domainName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain name without http://, https://, or a trailing slash.",
+            "pattern": "^(?![Hh][Tt][Tt][Pp][Ss]?://)[^/]+$"
+          },
+          "aliasName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The alias value without a leading slash.",
+            "pattern": "^(?!/).+$"
+          },
+          "destinations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The destination URL where the alias redirects.",
+                  "format": "uri"
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO alpha-2 country code for this destination."
+                },
+                "os": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The operating system selector for this destination."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "A destination URL with optional geo-targeting rules."
+            },
+            "description": "The destination URLs for the alias. At least one destination is required when creating an alias.",
+            "minItems": 1
+          },
+          "metatags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The metatag name."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The metatag content."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A metatag override for an alias."
+            },
+            "description": "The metatag overrides for the alias."
+          },
+          "snippets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The snippet identifier."
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "A parameter value."
+                  },
+                  "description": "The snippet parameters as string key-value pairs."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id"
+              ],
+              "description": "A tracking snippet override for an alias."
+            },
+            "description": "The tracking snippet overrides for the alias."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "aliasName"
+        ],
+        "description": "The input payload for updating a Shorten.REST alias.",
+        "anyOf": [
+          {
+            "required": [
+              "destinations"
+            ]
+          },
+          {
+            "required": [
+              "metatags"
+            ]
+          },
+          {
+            "required": [
+              "snippets"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Shorten.REST accepted the update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Shorten.REST alias update result."
+      }
+    }
+  ]
+}

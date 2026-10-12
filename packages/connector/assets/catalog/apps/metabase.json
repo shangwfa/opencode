@@ -1,0 +1,2661 @@
+{
+  "service": "metabase",
+  "displayName": "Metabase",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "mb_api_key_...",
+      "description": "Metabase API key sent with the X-API-Key header. Create an API key from Admin settings > Authentication > API keys in Metabase.",
+      "extraFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://metabase.example.com",
+          "description": "Your public HTTPS Metabase instance URL. URLs ending in /api are also accepted."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.metabase.com",
+  "actions": [
+    {
+      "id": "metabase.construct_native_query",
+      "service": "metabase",
+      "name": "construct_native_query",
+      "description": "Construct SQL for saving as a question. This handle cannot be run by execute_query or query; use execute_sql to execute SQL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "sql": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw SQL text.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "sql"
+        ],
+        "description": "Native SQL and its target database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryHandle"
+        ],
+        "description": "Constructed query handle; construction does not execute the query."
+      }
+    },
+    {
+      "id": "metabase.construct_query",
+      "service": "metabase",
+      "name": "construct_query",
+      "description": "Construct portable MBQL 5 without executing it; returns a stored query handle.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Portable MBQL 5 query. Discover exact names with search_content/read_resource and read metabase://docs/construct-query.md; nested native query keys are passed unchanged."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Exact original user message, if available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Structured query construction."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryHandle"
+        ],
+        "description": "Constructed query handle; construction does not execute the query."
+      }
+    },
+    {
+      "id": "metabase.create_collection",
+      "service": "metabase",
+      "name": "create_collection",
+      "description": "Create a collection, optionally nested under a parent.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "parentCollectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Collection creation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Materialized collection path."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Description."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "parentId",
+          "location",
+          "description"
+        ],
+        "description": "Created collection."
+      }
+    },
+    {
+      "id": "metabase.create_dashboard",
+      "service": "metabase",
+      "name": "create_dashboard",
+      "description": "Create a dashboard with optional saved questions, automatically positioned.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "questionIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Metabase numeric ID."
+            },
+            "description": "Questions to add."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Dashboard creation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "url": {
+            "type": "string",
+            "description": "Dashboard URL, possibly relative."
+          },
+          "dashcardIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Metabase numeric ID."
+            },
+            "description": "Saved dashboard-card IDs."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "url",
+          "dashcardIds"
+        ],
+        "description": "Created dashboard."
+      }
+    },
+    {
+      "id": "metabase.create_metric",
+      "service": "metabase",
+      "name": "create_metric",
+      "description": "Save constructed MBQL as a metric: one aggregation and at most one date/datetime grouping.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "table",
+              "bar",
+              "line",
+              "pie",
+              "scatter",
+              "area",
+              "row",
+              "combo",
+              "pivot",
+              "scalar",
+              "smartscalar",
+              "gauge",
+              "progress",
+              "funnel",
+              "map",
+              "waterfall",
+              "sankey"
+            ],
+            "description": "Visualization display type."
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "visualizationSettings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Metabase visualization settings. Keys are passed unchanged."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "queryHandle"
+        ],
+        "description": "Save a constructed query. Native SQL handles may be saved as questions, not metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "display": {
+            "type": "string",
+            "description": "Saved display type."
+          },
+          "url": {
+            "type": "string",
+            "description": "Metabase question URL, possibly relative."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "display",
+          "url"
+        ],
+        "description": "Saved question or metric."
+      }
+    },
+    {
+      "id": "metabase.create_question",
+      "service": "metabase",
+      "name": "create_question",
+      "description": "Save a constructed MBQL or SQL query as a question.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "table",
+              "bar",
+              "line",
+              "pie",
+              "scatter",
+              "area",
+              "row",
+              "combo",
+              "pivot",
+              "scalar",
+              "smartscalar",
+              "gauge",
+              "progress",
+              "funnel",
+              "map",
+              "waterfall",
+              "sankey"
+            ],
+            "description": "Visualization display type."
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "visualizationSettings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Metabase visualization settings. Keys are passed unchanged."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "queryHandle"
+        ],
+        "description": "Save a constructed query. Native SQL handles may be saved as questions, not metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "display": {
+            "type": "string",
+            "description": "Saved display type."
+          },
+          "url": {
+            "type": "string",
+            "description": "Metabase question URL, possibly relative."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "display",
+          "url"
+        ],
+        "description": "Saved question or metric."
+      }
+    },
+    {
+      "id": "metabase.execute_query",
+      "service": "metabase",
+      "name": "execute_query",
+      "description": "Execute constructed MBQL and return rows and columns. Native SQL handles are not supported.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base64-encoded MBQL query; prefer queryHandle.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply exactly one handle or base64-encoded MBQL query.",
+        "anyOf": [
+          {
+            "required": [
+              "queryHandle"
+            ]
+          },
+          {
+            "required": [
+              "query"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "completed",
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Human-readable name."
+                },
+                "baseType": {
+                  "type": "string",
+                  "description": "Metabase base type."
+                },
+                "effectiveType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Effective type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Effective type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "displayName",
+                "baseType"
+              ],
+              "description": "Column metadata."
+            },
+            "description": "Result columns in row order."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "Cell value."
+              },
+              "description": "Values in column order."
+            },
+            "description": "Result rows."
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Reported number of rows."
+          },
+          "runningTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Execution time in milliseconds."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Pass to query for the next page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "columns",
+          "rows"
+        ],
+        "description": "Successful query results. Tool and query failures raise provider errors."
+      }
+    },
+    {
+      "id": "metabase.execute_question",
+      "service": "metabase",
+      "name": "execute_question",
+      "description": "Run a saved question. Parameterized questions and input template tags are not supported by native MCP.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Saved question."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "completed",
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Human-readable name."
+                },
+                "baseType": {
+                  "type": "string",
+                  "description": "Metabase base type."
+                },
+                "effectiveType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Effective type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Effective type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "displayName",
+                "baseType"
+              ],
+              "description": "Column metadata."
+            },
+            "description": "Result columns in row order."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "Cell value."
+              },
+              "description": "Values in column order."
+            },
+            "description": "Result rows."
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Reported number of rows."
+          },
+          "runningTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Execution time in milliseconds."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Pass to query for the next page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "columns",
+          "rows"
+        ],
+        "description": "Successful query results. Tool and query failures raise provider errors."
+      }
+    },
+    {
+      "id": "metabase.execute_sql",
+      "service": "metabase",
+      "name": "execute_sql",
+      "description": "Execute native SQL. Requires native-query permission and the instance's execute-SQL setting to be enabled.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "databaseId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "sql": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw SQL text.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "databaseId",
+          "sql"
+        ],
+        "description": "Native SQL and its target database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "completed",
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Human-readable name."
+                },
+                "baseType": {
+                  "type": "string",
+                  "description": "Metabase base type."
+                },
+                "effectiveType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Effective type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Effective type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "displayName",
+                "baseType"
+              ],
+              "description": "Column metadata."
+            },
+            "description": "Result columns in row order."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "Cell value."
+              },
+              "description": "Values in column order."
+            },
+            "description": "Result rows."
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Reported number of rows."
+          },
+          "runningTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Execution time in milliseconds."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Pass to query for the next page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "columns",
+          "rows"
+        ],
+        "description": "Successful query results. Tool and query failures raise provider errors."
+      }
+    },
+    {
+      "id": "metabase.get_card",
+      "service": "metabase",
+      "name": "get_card",
+      "description": "Retrieve one Metabase card by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive numeric Metabase ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Metabase entity ID string."
+              }
+            ],
+            "description": "A Metabase numeric ID or entity ID string."
+          },
+          "legacyMbql": {
+            "type": "boolean",
+            "description": "Whether to request the legacy MBQL response shape."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Metabase card."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "card": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Metabase entity object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for one Metabase card."
+      }
+    },
+    {
+      "id": "metabase.get_collection",
+      "service": "metabase",
+      "name": "get_collection",
+      "description": "Retrieve one Metabase collection by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive numeric Metabase ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Metabase entity ID string."
+              }
+            ],
+            "description": "A Metabase numeric ID or entity ID string."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Metabase collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Metabase entity object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for one Metabase collection."
+      }
+    },
+    {
+      "id": "metabase.get_current_user",
+      "service": "metabase",
+      "name": "get_current_user",
+      "description": "Get the Metabase user associated with the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Metabase entity object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for the current Metabase user."
+      }
+    },
+    {
+      "id": "metabase.get_dashboard",
+      "service": "metabase",
+      "name": "get_dashboard",
+      "description": "Retrieve one Metabase dashboard by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive numeric Metabase ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Metabase entity ID string."
+              }
+            ],
+            "description": "A Metabase numeric ID or entity ID string."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Metabase dashboard."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dashboard": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Metabase entity object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for one Metabase dashboard."
+      }
+    },
+    {
+      "id": "metabase.get_database",
+      "service": "metabase",
+      "name": "get_database",
+      "description": "Retrieve one Metabase database by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive numeric Metabase ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Metabase entity ID string."
+              }
+            ],
+            "description": "A Metabase numeric ID or entity ID string."
+          },
+          "include": {
+            "type": "string",
+            "enum": [
+              "tables",
+              "tables.fields"
+            ],
+            "description": "Related database data to include."
+          },
+          "includeEditableDataModel": {
+            "type": "boolean",
+            "description": "Whether to include editable data model metadata."
+          },
+          "excludeUneditableDetails": {
+            "type": "boolean",
+            "description": "Whether to exclude details the API key cannot edit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Metabase database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Metabase entity object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for one Metabase database."
+      }
+    },
+    {
+      "id": "metabase.list_cards",
+      "service": "metabase",
+      "name": "list_cards",
+      "description": "List Metabase cards, also known as questions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "archived",
+              "table",
+              "using_model",
+              "bookmarked",
+              "using_segment",
+              "all",
+              "mine",
+              "database"
+            ],
+            "description": "Card list filter."
+          },
+          "modelId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Model ID to filter cards by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Metabase cards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Metabase entity object."
+            },
+            "description": "Metabase cards returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for Metabase cards."
+      }
+    },
+    {
+      "id": "metabase.list_collections",
+      "service": "metabase",
+      "name": "list_collections",
+      "description": "List Metabase collections visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to include archived collections."
+          },
+          "excludeOtherUserCollections": {
+            "type": "boolean",
+            "description": "Whether to exclude other users' personal collections."
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Collection namespace to filter by."
+          },
+          "personalOnly": {
+            "type": "boolean",
+            "description": "Whether to return only personal collections."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Metabase collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Metabase entity object."
+            },
+            "description": "Metabase collections returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for Metabase collections."
+      }
+    },
+    {
+      "id": "metabase.list_dashboards",
+      "service": "metabase",
+      "name": "list_dashboards",
+      "description": "List Metabase dashboards visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "all",
+              "mine",
+              "archived"
+            ],
+            "description": "Dashboard list filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Metabase dashboards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dashboards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Metabase entity object."
+            },
+            "description": "Metabase dashboards returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for Metabase dashboards."
+      }
+    },
+    {
+      "id": "metabase.list_databases",
+      "service": "metabase",
+      "name": "list_databases",
+      "description": "List Metabase databases visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "string",
+            "enum": [
+              "tables",
+              "schemas"
+            ],
+            "description": "Related database data to include."
+          },
+          "includeAnalytics": {
+            "type": "boolean",
+            "description": "Whether to include analytics database metadata."
+          },
+          "saved": {
+            "type": "boolean",
+            "description": "Whether to return saved query databases."
+          },
+          "includeEditableDataModel": {
+            "type": "boolean",
+            "description": "Whether to include editable data model metadata."
+          },
+          "excludeUneditableDetails": {
+            "type": "boolean",
+            "description": "Whether to exclude details the API key cannot edit."
+          },
+          "includeOnlyUploadable": {
+            "type": "boolean",
+            "description": "Whether to return only uploadable databases."
+          },
+          "routerDatabaseId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Router database ID to filter by."
+          },
+          "canQuery": {
+            "type": "boolean",
+            "description": "Whether to return databases the API key can query."
+          },
+          "canWriteMetadata": {
+            "type": "boolean",
+            "description": "Whether to return databases the API key can edit metadata for."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Metabase databases."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "databases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Metabase entity object."
+            },
+            "description": "Metabase databases returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for Metabase databases."
+      }
+    },
+    {
+      "id": "metabase.list_mcp_resources",
+      "service": "metabase",
+      "name": "list_mcp_resources",
+      "description": "Discover native MCP resources. Only documentation resources can be read by this connector; Apps are not supported.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "Resource URI."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Resource name."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description."
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "Media type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uri",
+                "name"
+              ],
+              "description": "Resource definition."
+            },
+            "description": "Resource definitions."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resources"
+        ],
+        "description": "Native resources across all discovery pages."
+      }
+    },
+    {
+      "id": "metabase.list_mcp_tools",
+      "service": "metabase",
+      "name": "list_mcp_tools",
+      "description": "Discover native MCP tools and their upstream schemas. Unknown tools are discoverable, not automatically executable.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Native tool name (search maps to search_content)."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Tool title."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Tool description."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Upstream JSON input schema."
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Upstream JSON output schema."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Native tool annotations."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "Tool definition."
+            },
+            "description": "Native tools."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "Available native tools across all discovery pages."
+      }
+    },
+    {
+      "id": "metabase.query",
+      "service": "metabase",
+      "name": "query",
+      "description": "Execute MBQL or fetch its next page. Native MCP returns pages of 200 rows within a 2,000-row total budget.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Portable MBQL 5 query. Discover exact names with search_content/read_resource and read metabase://docs/construct-query.md; nested native query keys are passed unchanged."
+          },
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "continuationToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Token from a previous query page.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supply exactly one query, queryHandle, or continuationToken.",
+        "anyOf": [
+          {
+            "required": [
+              "query"
+            ]
+          },
+          {
+            "required": [
+              "queryHandle"
+            ]
+          },
+          {
+            "required": [
+              "continuationToken"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "completed",
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "Human-readable name."
+                },
+                "baseType": {
+                  "type": "string",
+                  "description": "Metabase base type."
+                },
+                "effectiveType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Effective type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Effective type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "displayName",
+                "baseType"
+              ],
+              "description": "Column metadata."
+            },
+            "description": "Result columns in row order."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "Cell value."
+              },
+              "description": "Values in column order."
+            },
+            "description": "Result rows."
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Reported number of rows."
+          },
+          "runningTime": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Execution time in milliseconds."
+          },
+          "continuationToken": {
+            "type": "string",
+            "description": "Pass to query for the next page, when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "columns",
+          "rows"
+        ],
+        "description": "Successful query results. Tool and query failures raise provider errors."
+      }
+    },
+    {
+      "id": "metabase.read_mcp_resource",
+      "service": "metabase",
+      "name": "read_mcp_resource",
+      "description": "Read native metabase://docs/ documentation, not entities or MCP Apps resources.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "minLength": 17,
+            "description": "URI from list_mcp_resources.",
+            "pattern": "^metabase://docs/"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uri"
+        ],
+        "description": "Documentation resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "Resource URI."
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "Media type."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Documentation text."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uri",
+                "text"
+              ],
+              "description": "Documentation content."
+            },
+            "description": "Text resource contents."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contents"
+        ],
+        "description": "Documentation contents."
+      }
+    },
+    {
+      "id": "metabase.read_resource",
+      "service": "metabase",
+      "name": "read_resource",
+      "description": "Read up to five Metabase entity URIs. Preserves individual resource errors; list endpoints cap at 25 items.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uris": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Metabase entity URI.",
+              "pattern": "\\S"
+            },
+            "description": "For example metabase://databases or metabase://table/1/fields.",
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uris"
+        ],
+        "description": "Entity resource URIs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string",
+                  "description": "Requested URI."
+                },
+                "content": {
+                  "description": "Resource content; shape depends on URI."
+                },
+                "error": {
+                  "type": "string",
+                  "description": "Per-resource error."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uri"
+              ],
+              "description": "Resource outcome."
+            },
+            "description": "Per-URI successes or failures."
+          },
+          "output": {
+            "type": "string",
+            "description": "Native formatted XML representation."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resources",
+          "output"
+        ],
+        "description": "Entity resources and their formatted representation."
+      }
+    },
+    {
+      "id": "metabase.search",
+      "service": "metabase",
+      "name": "search",
+      "description": "Search Metabase content visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search text."
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "search-bar",
+              "search-app",
+              "command-palette",
+              "entity-picker",
+              "data-picker",
+              "type-filter",
+              "basic-actions",
+              "browse",
+              "embedding-setup",
+              "document",
+              "library",
+              "dependencies",
+              "model-migration",
+              "api",
+              "metabot"
+            ],
+            "description": "Metabase search context."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to search archived content."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Collection ID to search within."
+          },
+          "tableDatabaseId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Database ID to filter table search results by."
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dashboard",
+                "table",
+                "dataset",
+                "segment",
+                "collection",
+                "measure",
+                "transform",
+                "document",
+                "database",
+                "action",
+                "indexed-entity",
+                "metric",
+                "card"
+              ],
+              "description": "Metabase model type to include in search results."
+            },
+            "description": "Metabase model types to include."
+          },
+          "includeDashboardQuestions": {
+            "type": "boolean",
+            "description": "Whether to include dashboard questions."
+          },
+          "includeMetadata": {
+            "type": "boolean",
+            "description": "Whether to include result metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for searching Metabase content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Metabase entity object."
+            },
+            "description": "Metabase search results returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Metabase API response object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Output payload for Metabase search results."
+      }
+    },
+    {
+      "id": "metabase.search_content",
+      "service": "metabase",
+      "name": "search_content",
+      "description": "Search native Metabase MCP content using keyword or semantic queries (not the REST search action). Requires native MCP on the instance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "termQueries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Keyword query.",
+              "pattern": "\\S"
+            },
+            "description": "Keyword queries."
+          },
+          "semanticQueries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Semantic query.",
+              "pattern": "\\S"
+            },
+            "description": "Natural-language queries; availability depends on instance search configuration."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Native search queries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Entity ID."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "table",
+                    "metric",
+                    "model",
+                    "question",
+                    "dashboard",
+                    "collection"
+                  ],
+                  "description": "Entity type."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Entity name.",
+                  "pattern": "\\S"
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Display name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Display name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Description."
+                },
+                "databaseId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Database ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Database ID."
+                },
+                "databaseSchema": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Database schema."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Database schema."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type",
+                "name"
+              ],
+              "description": "Search match."
+            },
+            "description": "Matching content."
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matches."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results",
+          "totalCount"
+        ],
+        "description": "Native search results."
+      }
+    },
+    {
+      "id": "metabase.update_dashboard",
+      "service": "metabase",
+      "name": "update_dashboard",
+      "description": "Patch a dashboard and apply ordered add/remove/move card mutations.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Archive or restore."
+          },
+          "dashcards": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "add",
+                      "type": "string"
+                    },
+                    "cardId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Metabase numeric ID."
+                    },
+                    "displaySize": {
+                      "type": "string",
+                      "enum": [
+                        "wide",
+                        "tall",
+                        "full"
+                      ],
+                      "description": "Optional layout size."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "cardId"
+                  ],
+                  "description": "Add a saved question."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "remove",
+                      "type": "string"
+                    },
+                    "dashcardId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Metabase numeric ID."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "dashcardId"
+                  ],
+                  "description": "Remove a dashboard card."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "move",
+                      "type": "string"
+                    },
+                    "dashcardId": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Metabase numeric ID."
+                    },
+                    "position": {
+                      "type": "string",
+                      "enum": [
+                        "top",
+                        "bottom"
+                      ],
+                      "description": "Placement."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "dashcardId",
+                    "position"
+                  ],
+                  "description": "Move a dashboard card."
+                }
+              ]
+            },
+            "description": "Ordered dashboard-card mutations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Dashboard patch."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether archived."
+          },
+          "dashcardIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Metabase numeric ID."
+            },
+            "description": "Saved dashboard-card IDs."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "archived",
+          "dashcardIds"
+        ],
+        "description": "Updated dashboard."
+      }
+    },
+    {
+      "id": "metabase.update_metric",
+      "service": "metabase",
+      "name": "update_metric",
+      "description": "Patch a metric; replacement queries must still meet metric requirements.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "table",
+              "bar",
+              "line",
+              "pie",
+              "scatter",
+              "area",
+              "row",
+              "combo",
+              "pivot",
+              "scalar",
+              "smartscalar",
+              "gauge",
+              "progress",
+              "funnel",
+              "map",
+              "waterfall",
+              "sankey"
+            ],
+            "description": "Visualization display type."
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "visualizationSettings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Metabase visualization settings. Keys are passed unchanged."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Archive or restore."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Patch only supplied fields. Null-clearing is not supported by native MCP."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "display": {
+            "type": "string",
+            "description": "Saved display type."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether archived."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "display",
+          "archived"
+        ],
+        "description": "Updated question or metric."
+      }
+    },
+    {
+      "id": "metabase.update_question",
+      "service": "metabase",
+      "name": "update_question",
+      "description": "Patch a saved question, optionally replacing its query with a stored handle.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "queryHandle": {
+            "type": "string",
+            "description": "Stored query handle from construct_query or construct_native_query. Subject to server expiry and caller ownership.",
+            "format": "uuid"
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "table",
+              "bar",
+              "line",
+              "pie",
+              "scatter",
+              "area",
+              "row",
+              "combo",
+              "pivot",
+              "scalar",
+              "smartscalar",
+              "gauge",
+              "progress",
+              "funnel",
+              "map",
+              "waterfall",
+              "sankey"
+            ],
+            "description": "Visualization display type."
+          },
+          "description": {
+            "type": "string",
+            "description": "Entity description."
+          },
+          "collectionId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Destination collection. On creation, omission uses the API-key caller's default (root on v0.63.16); on update it leaves the collection unchanged. MCP cannot move existing content to root with null."
+          },
+          "visualizationSettings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Metabase visualization settings. Keys are passed unchanged."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Archive or restore."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Patch only supplied fields. Null-clearing is not supported by native MCP."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Metabase numeric ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Entity name.",
+            "pattern": "\\S"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Metabase numeric ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metabase numeric ID."
+          },
+          "collectionPath": {
+            "type": "string",
+            "description": "Saved collection breadcrumb."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Saved description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved description."
+          },
+          "display": {
+            "type": "string",
+            "description": "Saved display type."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether archived."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete native MCP response, including content blocks and metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "collectionId",
+          "collectionPath",
+          "description",
+          "display",
+          "archived"
+        ],
+        "description": "Updated question or metric."
+      }
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "service": "appdrag",
+  "displayName": "AppDrag",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "APPDRAG_API_KEY",
+      "description": "AppDrag project API key forwarded as the APIKey request parameter. Open the official AppDrag dashboard, then use the \"API\" or \"Databases\" dashboard to copy or regenerate the shared project API key described here: https://support.appdrag.com/doc/Authentication-and-Access-Control.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://appdrag.com",
+  "actions": [
+    {
+      "id": "appdrag.execute_function",
+      "service": "appdrag",
+      "name": "execute_function",
+      "description": "Execute one AppDrag Cloud Backend API function by folder, function name, HTTP method, and optional parameters.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AppDrag function folder name used in the route."
+          },
+          "functionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AppDrag function name used in the route."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "description": "The HTTP method configured for the AppDrag API function."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "default",
+              "dev",
+              "preprod",
+              "prod"
+            ],
+            "description": "The AppDrag environment segment to call when using an environment-specific route."
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean value."
+                },
+                {
+                  "type": "null",
+                  "description": "A null value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "description": "One array item."
+                  },
+                  "description": "An array value."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "One object property value."
+                  },
+                  "description": "An object value."
+                }
+              ],
+              "description": "A JSON-compatible value accepted by the AppDrag connector."
+            },
+            "description": "Key-value pairs forwarded to the AppDrag function as request parameters."
+          },
+          "rawResponse": {
+            "type": "boolean",
+            "description": "Whether to return the raw response body instead of the standard AppDrag wrapper payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folder",
+          "functionName"
+        ],
+        "description": "The input payload for executing one AppDrag Cloud Backend API function."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "successful": {
+            "type": "boolean",
+            "description": "Whether the upstream HTTP request completed with a 2xx status code."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "A boolean status returned by AppDrag."
+                  },
+                  {
+                    "type": "string",
+                    "description": "A string status returned by AppDrag."
+                  }
+                ],
+                "description": "The AppDrag execution status field."
+              },
+              "execTime": {
+                "type": "number",
+                "description": "The AppDrag function execution time in milliseconds."
+              },
+              "billedTime": {
+                "type": "number",
+                "description": "The AppDrag billed time in milliseconds."
+              },
+              "payload": {
+                "description": "The upstream payload returned by the AppDrag function."
+              },
+              "logs": {
+                "description": "Optional logs or error details returned by the AppDrag function."
+              },
+              "affectedRows": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The affected row count as a string."
+                  },
+                  {
+                    "type": "integer",
+                    "description": "The affected row count as an integer."
+                  },
+                  {
+                    "type": "number",
+                    "description": "The affected row count as a number."
+                  }
+                ],
+                "description": "Optional affected row count returned by Visual SQL actions."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "execTime",
+              "billedTime",
+              "payload"
+            ],
+            "description": "The standard AppDrag response wrapper returned by most Cloud Backend functions."
+          },
+          "error": {
+            "type": "string",
+            "description": "The top-level AppDrag error string when it is present."
+          },
+          "rawBody": {
+            "description": "The parsed response body returned when rawResponse is enabled."
+          },
+          "responseFormat": {
+            "type": "string",
+            "enum": [
+              "json",
+              "text",
+              "empty"
+            ],
+            "description": "The response body format detected by the connector."
+          },
+          "route": {
+            "type": "string",
+            "description": "The final AppDrag route that was called."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "successful",
+          "responseFormat",
+          "route"
+        ],
+        "description": "The normalized output payload for an AppDrag Cloud Backend API function execution."
+      }
+    }
+  ]
+}

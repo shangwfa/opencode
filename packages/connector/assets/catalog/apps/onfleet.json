@@ -1,0 +1,679 @@
+{
+  "service": "onfleet",
+  "displayName": "Onfleet",
+  "categories": [
+    "Productivity",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ONFLEET_API_KEY",
+      "description": "Onfleet API key used as the Basic Auth username. Create or manage it in Configuration > API & Webhook: https://docs.onfleet.com/reference/scope-api-key.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://onfleet.com/",
+  "actions": [
+    {
+      "id": "onfleet.clone_task",
+      "service": "onfleet",
+      "name": "clone_task",
+      "description": "Clone an existing Onfleet task with optional metadata and field overrides.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Onfleet task identifier.",
+            "pattern": "\\S"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "includeMetadata": {
+                "type": "boolean",
+                "description": "Whether to copy metadata to the cloned task."
+              },
+              "includeBarcodes": {
+                "type": "boolean",
+                "description": "Whether to copy barcodes to the cloned task."
+              },
+              "includeDependencies": {
+                "type": "boolean",
+                "description": "Whether to copy dependencies to the cloned task."
+              },
+              "overrides": {
+                "type": "object",
+                "properties": {
+                  "destination": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "An existing Onfleet destination identifier.",
+                        "pattern": "\\S"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "An inline Onfleet destination object."
+                      }
+                    ],
+                    "description": "An existing destination ID or an inline destination object."
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "An existing Onfleet recipient identifier.",
+                          "pattern": "\\S"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": true,
+                          "description": "An inline Onfleet recipient object."
+                        }
+                      ],
+                      "description": "An existing recipient ID or an inline recipient object."
+                    },
+                    "description": "Zero or one recipients for the task.",
+                    "maxItems": 1
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 10000,
+                    "description": "Notes for the cloned task."
+                  },
+                  "pickupTask": {
+                    "type": "boolean",
+                    "description": "Whether the cloned task is a pickup task."
+                  },
+                  "serviceTime": {
+                    "type": "number",
+                    "description": "The service time for the cloned task in minutes."
+                  },
+                  "metadata": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "An Onfleet metadata entry."
+                    },
+                    "description": "Provider-defined metadata entries attached to the task."
+                  },
+                  "completeAfter": {
+                    "type": "integer",
+                    "description": "The earliest completion time for the cloned task in Unix milliseconds."
+                  },
+                  "completeBefore": {
+                    "type": "integer",
+                    "description": "The latest completion time for the cloned task in Unix milliseconds."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Values that replace fields copied from the source task."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Options controlling which task data is copied and overridden."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The input payload for cloning an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The task object returned by Onfleet."
+      }
+    },
+    {
+      "id": "onfleet.complete_task",
+      "service": "onfleet",
+      "name": "complete_task",
+      "description": "Force complete an active Onfleet task as successful or failed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Onfleet task identifier.",
+            "pattern": "\\S"
+          },
+          "completionDetails": {
+            "type": "object",
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "description": "Whether the task completion was successful."
+              },
+              "notes": {
+                "type": "string",
+                "description": "Optional completion notes."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "success"
+            ],
+            "description": "The outcome recorded for the completed task."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for completing an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Onfleet accepted the task completion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The completion result returned by Onfleet."
+      }
+    },
+    {
+      "id": "onfleet.create_task",
+      "service": "onfleet",
+      "name": "create_task",
+      "description": "Create a pickup or delivery task in Onfleet.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "An existing Onfleet destination identifier.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "An inline Onfleet destination object."
+              }
+            ],
+            "description": "An existing destination ID or an inline destination object."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An existing Onfleet recipient identifier.",
+                  "pattern": "\\S"
+                },
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "An inline Onfleet recipient object."
+                }
+              ],
+              "description": "An existing recipient ID or an inline recipient object."
+            },
+            "description": "Zero or one recipients for the task.",
+            "maxItems": 1
+          },
+          "merchant": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization ID displayed to the recipient.",
+            "pattern": "\\S"
+          },
+          "executor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization ID responsible for fulfilling the task.",
+            "pattern": "\\S"
+          },
+          "completeAfter": {
+            "type": "integer",
+            "description": "The earliest completion time in Unix milliseconds."
+          },
+          "completeBefore": {
+            "type": "integer",
+            "description": "The latest completion time in Unix milliseconds."
+          },
+          "pickupTask": {
+            "type": "boolean",
+            "description": "Whether this is a pickup task instead of a delivery task."
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Task IDs that must be completed before this task."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 10000,
+            "description": "Notes for the task."
+          },
+          "autoAssign": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Automatic worker assignment options."
+          },
+          "container": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The organization, team, or worker container for the task."
+          },
+          "quantity": {
+            "type": "number",
+            "description": "The quantity associated with the task."
+          },
+          "serviceTime": {
+            "type": "number",
+            "description": "The expected service time at the destination in minutes."
+          },
+          "recipientName": {
+            "type": "string",
+            "description": "A task-level recipient name override."
+          },
+          "recipientNotes": {
+            "type": "string",
+            "description": "Task-level recipient notes."
+          },
+          "recipientSkipSMSNotifications": {
+            "type": "boolean",
+            "description": "Whether to suppress SMS notifications for this task recipient."
+          },
+          "useMerchantForProxy": {
+            "type": "boolean",
+            "description": "Whether to use the merchant organization for recipient-facing proxy communication."
+          },
+          "requirements": {
+            "type": "object",
+            "properties": {
+              "signature": {
+                "type": "boolean",
+                "description": "Whether a signature is required to complete the task."
+              },
+              "photo": {
+                "type": "boolean",
+                "description": "Whether a photo is required to complete the task."
+              },
+              "notes": {
+                "type": "boolean",
+                "description": "Whether notes are required to complete the task."
+              },
+              "minimumAge": {
+                "type": "number",
+                "description": "The minimum recipient age required to complete the task."
+              },
+              "pin": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether PIN verification is required for the task."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether PIN verification is required for the task."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Completion requirements for the task."
+          },
+          "scanOnlyRequiredBarcodes": {
+            "type": "boolean",
+            "description": "Whether workers may scan only barcodes required by this task."
+          },
+          "barcode": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Onfleet barcode requirement."
+            },
+            "description": "Barcode requirements attached to the task."
+          },
+          "appearance": {
+            "type": "object",
+            "properties": {
+              "triangleColor": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "The map-pin color: 0 teal, 1 orange, or 2 magenta."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Map-pin appearance settings for the task."
+          },
+          "metadata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Onfleet metadata entry."
+            },
+            "description": "Provider-defined metadata entries attached to the task."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Onfleet task custom field value."
+            },
+            "description": "Custom field values attached to the task."
+          },
+          "additionalQuantities": {
+            "type": "object",
+            "properties": {
+              "quantityA": {
+                "type": "number",
+                "description": "The arbitrary quantity for capacity type A."
+              },
+              "quantityB": {
+                "type": "number",
+                "description": "The arbitrary quantity for capacity type B."
+              },
+              "quantityC": {
+                "type": "number",
+                "description": "The arbitrary quantity for capacity type C."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Additional route optimization quantities attached to the task."
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 499,
+            "description": "The route optimization priority for the task."
+          },
+          "group": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The route optimization group for the task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "destination",
+          "recipients"
+        ],
+        "description": "The input payload for creating an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The task object returned by Onfleet."
+      }
+    },
+    {
+      "id": "onfleet.delete_task",
+      "service": "onfleet",
+      "name": "delete_task",
+      "description": "Delete an unstarted Onfleet task.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Onfleet task identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for deleting an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Onfleet accepted the task deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion result returned by Onfleet."
+      }
+    },
+    {
+      "id": "onfleet.get_task",
+      "service": "onfleet",
+      "name": "get_task",
+      "description": "Get one Onfleet task by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Onfleet task identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The task object returned by Onfleet."
+      }
+    },
+    {
+      "id": "onfleet.list_tasks",
+      "service": "onfleet",
+      "name": "list_tasks",
+      "description": "List Onfleet tasks in a time range with cursor pagination and task filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "description": "The inclusive start time in Unix milliseconds."
+          },
+          "to": {
+            "type": "integer",
+            "description": "The exclusive end time in Unix milliseconds."
+          },
+          "lastId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by the previous page.",
+            "pattern": "\\S"
+          },
+          "state": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3,
+              "description": "An Onfleet task state."
+            },
+            "description": "Task states to include: 0 unassigned, 1 assigned, 2 active, or 3 completed."
+          },
+          "worker": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The worker ID used to filter tasks.",
+            "pattern": "\\S"
+          },
+          "completeBeforeBefore": {
+            "type": "integer",
+            "description": "Only include tasks whose completeBefore is before this Unix millisecond timestamp."
+          },
+          "completeAfterAfter": {
+            "type": "integer",
+            "description": "Only include tasks whose completeAfter is after this Unix millisecond timestamp."
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Dependency task IDs used to filter tasks."
+          },
+          "containers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Worker, team, or organization container IDs used to filter tasks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from"
+        ],
+        "description": "The input payload for listing Onfleet tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The task object returned by Onfleet."
+            },
+            "description": "The tasks returned for this page."
+          },
+          "lastId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor for the next page, when another page exists.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks"
+        ],
+        "description": "A page of Onfleet tasks."
+      }
+    },
+    {
+      "id": "onfleet.update_task",
+      "service": "onfleet",
+      "name": "update_task",
+      "description": "Update supported fields on an Onfleet task.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Onfleet task identifier.",
+            "pattern": "\\S"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 10000,
+            "description": "Updated notes for the task."
+          },
+          "metadata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Onfleet metadata entry."
+            },
+            "description": "Provider-defined metadata entries attached to the task."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Onfleet task custom field value."
+            },
+            "description": "Custom field values attached to the task."
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the updated destination for the task.",
+            "pattern": "\\S"
+          },
+          "container": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The organization, team, or worker container for the task."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The input payload for updating an Onfleet task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The task object returned by Onfleet."
+      }
+    }
+  ]
+}

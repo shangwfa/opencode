@@ -1,0 +1,909 @@
+{
+  "service": "teable",
+  "displayName": "Teable",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "TEABLE_PERSONAL_ACCESS_TOKEN",
+      "description": "Create a personal access token at app.teable.cn/setting/personal-access-token and paste it here."
+    }
+  ],
+  "homepageUrl": "https://teable.cn",
+  "actions": [
+    {
+      "id": "teable.create_records",
+      "service": "teable",
+      "name": "create_records",
+      "description": "Create one or more records in a Teable table using provider-defined field values.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable table where records should be created."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Teable cell value using the field's documented value shape."
+                  },
+                  "description": "Record values keyed by Teable field name, field ID, or database field name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Teable record creation payload."
+            },
+            "description": "The records to create.",
+            "minItems": 1
+          },
+          "fieldKeyType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name",
+              "dbFieldName"
+            ],
+            "description": "The key type used for record fields in the request or response."
+          },
+          "typecast": {
+            "type": "boolean",
+            "description": "Whether Teable should automatically convert supplied values to each field's data type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "records"
+        ],
+        "description": "Input for creating records in a Teable table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Teable record ID."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Teable cell value using the field's documented value shape."
+                  },
+                  "description": "Record values keyed by Teable field name, field ID, or database field name."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The primary field value rendered as text."
+                },
+                "autoNumber": {
+                  "type": "number",
+                  "description": "The table-wide auto number assigned to the record."
+                },
+                "createdTime": {
+                  "type": "string",
+                  "description": "The ISO 8601 time when the record was created.",
+                  "format": "date-time"
+                },
+                "lastModifiedTime": {
+                  "type": "string",
+                  "description": "The ISO 8601 time when the record was last modified.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "string",
+                  "description": "The name of the user who created the record."
+                },
+                "lastModifiedBy": {
+                  "type": "string",
+                  "description": "The name of the user who last modified the record."
+                },
+                "permissions": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Provider-defined permissions for the record."
+                },
+                "undeletable": {
+                  "type": "boolean",
+                  "description": "Whether Teable prevents this record from being deleted."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "A Teable record. Provider-added fields are preserved."
+            },
+            "description": "The newly created Teable records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Records created by Teable."
+      }
+    },
+    {
+      "id": "teable.delete_record",
+      "service": "teable",
+      "name": "delete_record",
+      "description": "Permanently delete one Teable record by table ID and record ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable table containing the record."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable record to permanently delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for permanently deleting a Teable record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Teable accepted the delete request."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the deleted Teable record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connector's acknowledgement of the Teable delete operation."
+      }
+    },
+    {
+      "id": "teable.get_current_user",
+      "service": "teable",
+      "name": "get_current_user",
+      "description": "Get the Teable user associated with the connected personal access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get the current Teable user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Teable user ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's display name."
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The user's avatar URL, when configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's avatar URL, when configured."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's email address, when returned by Teable.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "The Teable user associated with the connected token."
+      }
+    },
+    {
+      "id": "teable.get_record",
+      "service": "teable",
+      "name": "get_record",
+      "description": "Get one Teable record by table ID and record ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable table containing the record."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable record to retrieve."
+          },
+          "projection": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A field name, field ID, or database field name."
+            },
+            "description": "The field names or IDs to include, interpreted according to fieldKeyType.",
+            "minItems": 1
+          },
+          "cellFormat": {
+            "type": "string",
+            "enum": [
+              "json",
+              "text"
+            ],
+            "description": "The format used for record cell values."
+          },
+          "fieldKeyType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name",
+              "dbFieldName"
+            ],
+            "description": "The key type used for record fields in the request or response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "recordId"
+        ],
+        "description": "Input for getting a single Teable record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Teable record ID."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A Teable cell value using the field's documented value shape."
+                },
+                "description": "Record values keyed by Teable field name, field ID, or database field name."
+              },
+              "name": {
+                "type": "string",
+                "description": "The primary field value rendered as text."
+              },
+              "autoNumber": {
+                "type": "number",
+                "description": "The table-wide auto number assigned to the record."
+              },
+              "createdTime": {
+                "type": "string",
+                "description": "The ISO 8601 time when the record was created.",
+                "format": "date-time"
+              },
+              "lastModifiedTime": {
+                "type": "string",
+                "description": "The ISO 8601 time when the record was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "string",
+                "description": "The name of the user who created the record."
+              },
+              "lastModifiedBy": {
+                "type": "string",
+                "description": "The name of the user who last modified the record."
+              },
+              "permissions": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provider-defined permissions for the record."
+              },
+              "undeletable": {
+                "type": "boolean",
+                "description": "Whether Teable prevents this record from being deleted."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "A Teable record. Provider-added fields are preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Teable record."
+      }
+    },
+    {
+      "id": "teable.list_bases",
+      "service": "teable",
+      "name": "list_bases",
+      "description": "List the Teable bases in a space accessible to the connected token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable space whose bases should be listed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Teable bases in a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Teable base ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name of the base."
+                },
+                "spaceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ID of the space containing the base."
+                },
+                "icon": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The base icon, when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The base icon, when configured."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "creator",
+                    "editor",
+                    "commenter",
+                    "viewer"
+                  ],
+                  "description": "The current user's role in the base."
+                },
+                "createdBy": {
+                  "type": "string",
+                  "description": "The ID of the user who created the base."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "spaceId"
+              ],
+              "description": "A Teable base. Provider-added fields are preserved."
+            },
+            "description": "The Teable bases returned for the space."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Bases in the requested Teable space."
+      }
+    },
+    {
+      "id": "teable.list_records",
+      "service": "teable",
+      "name": "list_records",
+      "description": "List records in a Teable table with optional projection, view, filtering, sorting, and offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable table whose records should be listed."
+          },
+          "projection": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A field name, field ID, or database field name."
+            },
+            "description": "The field names or IDs to include, interpreted according to fieldKeyType.",
+            "minItems": 1
+          },
+          "cellFormat": {
+            "type": "string",
+            "enum": [
+              "json",
+              "text"
+            ],
+            "description": "The format used for record cell values."
+          },
+          "fieldKeyType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name",
+              "dbFieldName"
+            ],
+            "description": "The key type used for record fields in the request or response."
+          },
+          "viewId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The view whose filters and sorting should be applied."
+          },
+          "ignoreViewQuery": {
+            "type": "boolean",
+            "description": "Whether to ignore the selected view's filter and sorting configuration."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "and",
+                  "or"
+                ],
+                "description": "How the filter entries are combined."
+              },
+              "filterSet": {
+                "type": "array",
+                "items": {
+                  "description": "A Teable field condition or nested filter group."
+                },
+                "description": "The field conditions or nested filter groups to apply."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "conjunction",
+              "filterSet"
+            ],
+            "description": "A Teable filter object containing field conditions or nested filter groups."
+          },
+          "orderBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ID of the field used for sorting."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The direction used to sort the field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Teable record sort definition."
+            },
+            "description": "The Teable sort definitions applied in priority order."
+          },
+          "take": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of records to return, up to 1000."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId"
+        ],
+        "description": "Input for listing records from a Teable table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Teable record ID."
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A Teable cell value using the field's documented value shape."
+                  },
+                  "description": "Record values keyed by Teable field name, field ID, or database field name."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The primary field value rendered as text."
+                },
+                "autoNumber": {
+                  "type": "number",
+                  "description": "The table-wide auto number assigned to the record."
+                },
+                "createdTime": {
+                  "type": "string",
+                  "description": "The ISO 8601 time when the record was created.",
+                  "format": "date-time"
+                },
+                "lastModifiedTime": {
+                  "type": "string",
+                  "description": "The ISO 8601 time when the record was last modified.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "string",
+                  "description": "The name of the user who created the record."
+                },
+                "lastModifiedBy": {
+                  "type": "string",
+                  "description": "The name of the user who last modified the record."
+                },
+                "permissions": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Provider-defined permissions for the record."
+                },
+                "undeletable": {
+                  "type": "boolean",
+                  "description": "Whether Teable prevents this record from being deleted."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fields"
+              ],
+              "description": "A Teable record. Provider-added fields are preserved."
+            },
+            "description": "The Teable records returned by the query."
+          },
+          "extra": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Provider-defined grouping or search metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Records returned by Teable and optional provider-defined query metadata."
+      }
+    },
+    {
+      "id": "teable.list_spaces",
+      "service": "teable",
+      "name": "list_spaces",
+      "description": "List the Teable spaces accessible to the connected personal access token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list accessible Teable spaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Teable space ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name of the space."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "creator",
+                    "editor",
+                    "commenter",
+                    "viewer"
+                  ],
+                  "description": "The current user's role in the space."
+                },
+                "organization": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "The organization associated with the space, when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "role"
+              ],
+              "description": "A Teable space. Provider-added fields are preserved."
+            },
+            "description": "The accessible Teable spaces."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Spaces accessible to the connected Teable token."
+      }
+    },
+    {
+      "id": "teable.list_tables",
+      "service": "teable",
+      "name": "list_tables",
+      "description": "List the Teable tables in a base accessible to the connected token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable base whose tables should be listed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Teable tables in a base."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Teable table ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name of the table."
+                },
+                "dbTableName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The physical database table name managed by Teable."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The table description."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The emoji icon configured for the table."
+                },
+                "order": {
+                  "type": "number",
+                  "description": "The table's display order within the base."
+                },
+                "lastModifiedTime": {
+                  "type": "string",
+                  "description": "The ISO 8601 time when the table was last modified.",
+                  "format": "date-time"
+                },
+                "defaultViewId": {
+                  "type": "string",
+                  "description": "The ID of the table's default view."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "dbTableName"
+              ],
+              "description": "A Teable table. Provider-added fields are preserved."
+            },
+            "description": "The Teable tables returned for the base."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tables in the requested Teable base."
+      }
+    },
+    {
+      "id": "teable.update_record",
+      "service": "teable",
+      "name": "update_record",
+      "description": "Update the fields of one Teable record by table ID and record ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable table containing the record."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Teable record to update."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A Teable cell value using the field's documented value shape."
+            },
+            "description": "Record values keyed by Teable field name, field ID, or database field name."
+          },
+          "fieldKeyType": {
+            "type": "string",
+            "enum": [
+              "id",
+              "name",
+              "dbFieldName"
+            ],
+            "description": "The key type used for record fields in the request or response."
+          },
+          "typecast": {
+            "type": "boolean",
+            "description": "Whether Teable should automatically convert supplied values to each field's data type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableId",
+          "recordId",
+          "fields"
+        ],
+        "description": "Input for updating a Teable record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Teable record ID."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A Teable cell value using the field's documented value shape."
+                },
+                "description": "Record values keyed by Teable field name, field ID, or database field name."
+              },
+              "name": {
+                "type": "string",
+                "description": "The primary field value rendered as text."
+              },
+              "autoNumber": {
+                "type": "number",
+                "description": "The table-wide auto number assigned to the record."
+              },
+              "createdTime": {
+                "type": "string",
+                "description": "The ISO 8601 time when the record was created.",
+                "format": "date-time"
+              },
+              "lastModifiedTime": {
+                "type": "string",
+                "description": "The ISO 8601 time when the record was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "string",
+                "description": "The name of the user who created the record."
+              },
+              "lastModifiedBy": {
+                "type": "string",
+                "description": "The name of the user who last modified the record."
+              },
+              "permissions": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provider-defined permissions for the record."
+              },
+              "undeletable": {
+                "type": "boolean",
+                "description": "Whether Teable prevents this record from being deleted."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "fields"
+            ],
+            "description": "A Teable record. Provider-added fields are preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Teable record after the update."
+      }
+    }
+  ]
+}

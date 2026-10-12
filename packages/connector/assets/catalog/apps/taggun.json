@@ -1,0 +1,652 @@
+{
+  "service": "taggun",
+  "displayName": "Taggun",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TAGGUN_API_KEY",
+      "description": "Taggun API key sent with the apikey header. Sign up for a Taggun account and receive the key by email: https://www.taggun.io/register."
+    }
+  ],
+  "homepageUrl": "https://www.taggun.io/",
+  "actions": [
+    {
+      "id": "taggun.extract_receipt_simple_url",
+      "service": "taggun",
+      "name": "extract_receipt_simple_url",
+      "description": "Extract basic receipt or invoice data from a public HTTPS file URL with Taggun.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public HTTPS URL containing the receipt or invoice file.",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A header value to send while Taggun downloads the receipt URL."
+            },
+            "description": "Optional headers Taggun should forward while downloading the receipt URL."
+          },
+          "extractTime": {
+            "type": "boolean",
+            "description": "Whether Taggun should return the receipt time when it is found instead of defaulting to noon."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end user's IP address associated with this receipt request."
+          },
+          "near": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A geographic hint such as city, state, or country to help merchant search."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es",
+              "fr",
+              "jp",
+              "he",
+              "iw",
+              "et",
+              "lv",
+              "lt",
+              "fi",
+              "el",
+              "zh",
+              "th"
+            ],
+            "description": "Optional language hint for Taggun OCR. Leave unset for automatic detection."
+          },
+          "ignoreMerchantName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Merchant name Taggun should ignore if detected on the receipt."
+          },
+          "refresh": {
+            "type": "boolean",
+            "description": "Whether Taggun should reprocess a receipt that is already stored."
+          },
+          "incognito": {
+            "type": "boolean",
+            "description": "Whether Taggun should avoid saving the receipt in storage."
+          },
+          "subAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Sub-account ID used by Taggun for billing or reporting segmentation."
+          },
+          "referenceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Unique reference ID used by Taggun for feedback or training."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input parameters for extracting basic receipt or invoice data by URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "receipt": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The full receipt OCR payload returned by Taggun."
+          },
+          "trackingId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Taggun tracking ID when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taggun tracking ID when returned."
+          },
+          "confidenceLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Overall Taggun confidence level when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overall Taggun confidence level when returned."
+          },
+          "totalAmount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Extracted receipt total amount when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt total amount when returned."
+          },
+          "taxAmount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Extracted receipt tax amount when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt tax amount when returned."
+          },
+          "merchantName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted merchant name when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted merchant name when returned."
+          },
+          "merchantCountryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted merchant country code when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted merchant country code when returned."
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted receipt transaction date when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt transaction date when returned."
+          },
+          "rawText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Raw OCR text when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw OCR text when returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Taggun receipt OCR output with the full upstream receipt payload preserved."
+      }
+    },
+    {
+      "id": "taggun.extract_receipt_verbose_url",
+      "service": "taggun",
+      "name": "extract_receipt_verbose_url",
+      "description": "Extract detailed receipt or invoice OCR data from a public HTTPS file URL with Taggun.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public HTTPS URL containing the receipt or invoice file.",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "extractLineItems": {
+            "type": "boolean",
+            "description": "Whether Taggun should return product line items when found on the receipt."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A header value to send while Taggun downloads the receipt URL."
+            },
+            "description": "Optional headers Taggun should forward while downloading the receipt URL."
+          },
+          "extractTime": {
+            "type": "boolean",
+            "description": "Whether Taggun should return the receipt time when it is found instead of defaulting to noon."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end user's IP address associated with this receipt request."
+          },
+          "near": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A geographic hint such as city, state, or country to help merchant search."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es",
+              "fr",
+              "jp",
+              "he",
+              "iw",
+              "et",
+              "lv",
+              "lt",
+              "fi",
+              "el",
+              "zh",
+              "th"
+            ],
+            "description": "Optional language hint for Taggun OCR. Leave unset for automatic detection."
+          },
+          "ignoreMerchantName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Merchant name Taggun should ignore if detected on the receipt."
+          },
+          "refresh": {
+            "type": "boolean",
+            "description": "Whether Taggun should reprocess a receipt that is already stored."
+          },
+          "incognito": {
+            "type": "boolean",
+            "description": "Whether Taggun should avoid saving the receipt in storage."
+          },
+          "subAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Sub-account ID used by Taggun for billing or reporting segmentation."
+          },
+          "referenceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Unique reference ID used by Taggun for feedback or training."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Input parameters for extracting detailed receipt or invoice data by URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "receipt": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The full receipt OCR payload returned by Taggun."
+          },
+          "trackingId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Taggun tracking ID when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taggun tracking ID when returned."
+          },
+          "confidenceLevel": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Overall Taggun confidence level when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overall Taggun confidence level when returned."
+          },
+          "totalAmount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Extracted receipt total amount when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt total amount when returned."
+          },
+          "taxAmount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Extracted receipt tax amount when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt tax amount when returned."
+          },
+          "merchantName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted merchant name when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted merchant name when returned."
+          },
+          "merchantCountryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted merchant country code when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted merchant country code when returned."
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Extracted receipt transaction date when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extracted receipt transaction date when returned."
+          },
+          "rawText": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Raw OCR text when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw OCR text when returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Taggun receipt OCR output with the full upstream receipt payload preserved."
+      }
+    },
+    {
+      "id": "taggun.get_campaign_settings",
+      "service": "taggun",
+      "name": "get_campaign_settings",
+      "description": "Get Taggun validation settings for an existing campaign ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The Taggun campaign ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId"
+        ],
+        "description": "Input parameters for retrieving Taggun campaign settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "description": "The Taggun campaign ID that was requested."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Taggun campaign settings object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId",
+          "settings"
+        ],
+        "description": "The campaign settings returned by Taggun."
+      }
+    },
+    {
+      "id": "taggun.list_campaign_ids",
+      "service": "taggun",
+      "name": "list_campaign_ids",
+      "description": "List Taggun campaign IDs linked to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Taggun campaign IDs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One Taggun campaign ID."
+            },
+            "description": "Campaign IDs linked to the connected Taggun account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignIds"
+        ],
+        "description": "The campaign ID list returned by Taggun."
+      }
+    },
+    {
+      "id": "taggun.validate_receipt_url",
+      "service": "taggun",
+      "name": "validate_receipt_url",
+      "description": "Validate a public HTTPS receipt or invoice URL against existing Taggun campaign settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public HTTPS URL containing the receipt or invoice file.",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "The Taggun campaign ID."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A header value to send while Taggun downloads the receipt URL."
+            },
+            "description": "Optional headers Taggun should forward while downloading the receipt URL."
+          },
+          "referenceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Receipt reference ID for duplicate handling and tracking."
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "End-user identifier used by Taggun fraud checks."
+          },
+          "subAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Sub-account ID used by Taggun for reporting or billing segmentation."
+          },
+          "incognito": {
+            "type": "boolean",
+            "description": "Whether Taggun should avoid saving the receipt in storage."
+          },
+          "ipAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end user's IP address associated with this validation request."
+          },
+          "near": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A geographic hint such as city, state, or country to help merchant search."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "es",
+              "fr",
+              "jp",
+              "he",
+              "iw",
+              "et",
+              "lv",
+              "lt",
+              "fi",
+              "el",
+              "zh",
+              "th"
+            ],
+            "description": "Optional language hint for Taggun OCR. Leave unset for automatic detection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "campaignId"
+        ],
+        "description": "Input parameters for validating a receipt URL against Taggun campaign settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "validation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The full validation payload returned by Taggun."
+          },
+          "successful": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether all enabled campaign validation checks passed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether all enabled campaign validation checks passed."
+          },
+          "failedValidations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One failed validation key returned by Taggun."
+            },
+            "description": "Validation keys that failed."
+          },
+          "passedValidations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One passed validation key returned by Taggun."
+            },
+            "description": "Validation keys that passed."
+          },
+          "trackingId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Taggun tracking ID for this validation request."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Taggun tracking ID for this validation request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Taggun receipt validation output with the full upstream validation payload preserved."
+      }
+    }
+  ]
+}

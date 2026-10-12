@@ -1,0 +1,463 @@
+{
+  "service": "photoroom",
+  "displayName": "Photoroom",
+  "description": "Apply controlled ecommerce image edits with Photoroom and store the generated result in local transit storage.",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "PHOTOROOM_API_KEY",
+      "description": "Photoroom API key sent with the x-api-key header. Activate the API and create or manage keys in the Photoroom API dashboard: https://app.photoroom.com/api-dashboard."
+    }
+  ],
+  "homepageUrl": "https://www.photoroom.com",
+  "actions": [
+    {
+      "id": "photoroom.edit_product_image",
+      "service": "photoroom",
+      "name": "edit_product_image",
+      "description": "Apply a controlled combination of Photoroom product-image edits to an imageUrl and upload the binary result to local transit storage. This action is for composed ecommerce edits rather than simple background removal; outputs that use relighting, text removal, or beautification should be reviewed by a human before publishing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publicly reachable source product image URL that Photoroom should edit.",
+            "format": "uri"
+          },
+          "background": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "keep",
+                    "type": "string",
+                    "description": "The background strategy."
+                  },
+                  "blurMode": {
+                    "type": "string",
+                    "enum": [
+                      "gaussian",
+                      "bokeh"
+                    ],
+                    "description": "The blur style applied to the retained background."
+                  },
+                  "blurRadius": {
+                    "type": "number",
+                    "maximum": 0.05,
+                    "exclusiveMinimum": 0,
+                    "description": "The background blur radius above 0 and up to 0.05."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "description": "Keep the source background, optionally blurring it.",
+                "allOf": [
+                  {
+                    "if": {
+                      "required": [
+                        "blurRadius"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "blurMode"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "color",
+                    "type": "string",
+                    "description": "The background strategy."
+                  },
+                  "color": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A hexadecimal color without a leading hash, such as FFFFFF or FF0000EE, or a supported color name."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "color"
+                ],
+                "description": "Replace the source background with a solid color."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "image",
+                    "type": "string",
+                    "description": "The background strategy."
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The publicly reachable URL of the replacement background image.",
+                    "format": "uri"
+                  },
+                  "scaling": {
+                    "type": "string",
+                    "enum": [
+                      "fit",
+                      "fill"
+                    ],
+                    "description": "How the replacement background should fit the output canvas."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "imageUrl"
+                ],
+                "description": "Replace the source background with an image that Photoroom can fetch."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "ai",
+                    "type": "string",
+                    "description": "The background strategy."
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A description of the product scene to generate around the existing subject."
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "A fixed generation seed for producing similar backgrounds from the same prompt."
+                  },
+                  "expandPromptMode": {
+                    "type": "string",
+                    "enum": [
+                      "ai.auto",
+                      "ai.never"
+                    ],
+                    "description": "Whether Photoroom should automatically expand a short background prompt."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "prompt"
+                ],
+                "description": "Generate a product-scene background from a controlled prompt."
+              }
+            ],
+            "description": "The background treatment applied to the product image."
+          },
+          "shadowStyle": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "soft",
+              "hard"
+            ],
+            "description": "The current Photoroom AI shadow style generated around the detected product subject."
+          },
+          "lightingMode": {
+            "type": "string",
+            "enum": [
+              "ai.auto",
+              "ai.preserve-hue-and-saturation"
+            ],
+            "description": "The relighting mode. Preserve hue and saturation when product color accuracy matters."
+          },
+          "textRemovalMode": {
+            "type": "string",
+            "enum": [
+              "ai.artificial",
+              "ai.natural",
+              "ai.all"
+            ],
+            "description": "The class of text to remove. This can change product details and requires human review."
+          },
+          "beautifyMode": {
+            "type": "string",
+            "enum": [
+              "ai.auto",
+              "ai.food",
+              "ai.car"
+            ],
+            "description": "The product-specific AI beautification mode. This can alter the subject and requires human review."
+          },
+          "beautifySeed": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A fixed seed for producing similar beautification results. Requires beautifyMode."
+          },
+          "outline": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A hexadecimal color without a leading hash or a supported color name."
+              },
+              "width": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.1,
+                "description": "The outline width as a ratio of the result image size."
+              },
+              "blurRadius": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0.025,
+                "description": "The outline blur radius as a ratio of the result image size."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "color"
+            ],
+            "description": "A colored outline drawn around the detected product subject."
+          },
+          "canvas": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output canvas width in pixels. Provide height with this field."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output canvas height in pixels. Provide width with this field."
+              },
+              "padding": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The fractional padding on every side of the subject, from 0 up to but excluding 0.5.",
+                "exclusiveMaximum": 0.5
+              },
+              "scaling": {
+                "type": "string",
+                "enum": [
+                  "fit",
+                  "fill"
+                ],
+                "description": "Whether the subject should fit or fill the available canvas."
+              },
+              "horizontalAlignment": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ],
+                "description": "The horizontal subject alignment."
+              },
+              "verticalAlignment": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "center",
+                  "bottom"
+                ],
+                "description": "The vertical subject alignment."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Output canvas sizing and subject positioning controls.",
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "width"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "height"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "required": [
+                    "height"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "width"
+                  ]
+                }
+              }
+            ]
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "The encoded format of the edited result image."
+          },
+          "outputDpi": {
+            "type": "integer",
+            "minimum": 72,
+            "maximum": 1200,
+            "description": "The output pixel density in dots per inch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageUrl",
+          "background"
+        ],
+        "description": "A URL-based Photoroom product image edit with controlled composable options.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "background": {
+                  "properties": {
+                    "type": {
+                      "const": "ai"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+              },
+              "required": [
+                "background"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "shadowStyle"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "background": {
+                  "properties": {
+                    "type": {
+                      "const": "keep"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+              },
+              "required": [
+                "background"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "beautifyMode"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "beautifySeed"
+              ]
+            },
+            "then": {
+              "required": [
+                "beautifyMode"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL used to download the edited image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The edited image size in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated filename stored in transit."
+              },
+              "mimeType": {
+                "type": "string",
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/webp"
+                ],
+                "description": "The MIME type detected from the edited image bytes."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "sizeBytes",
+              "name",
+              "mimeType"
+            ],
+            "description": "The edited image stored in local transit storage."
+          },
+          "humanReviewRecommended": {
+            "type": "boolean",
+            "description": "Whether selected AI edits can alter product appearance or text and should be reviewed before publishing."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "humanReviewRecommended"
+        ],
+        "description": "The edited product image stored in local transit storage."
+      }
+    }
+  ]
+}

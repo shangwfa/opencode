@@ -1,0 +1,476 @@
+{
+  "service": "iqair_airvisual",
+  "displayName": "IQAir AirVisual",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "IQAIR_AIRVISUAL_API_KEY",
+      "description": "IQAir AirVisual API key sent with the key query parameter. Create or copy a key from the IQAir API dashboard: https://www.iqair.com/dashboard/api."
+    }
+  ],
+  "homepageUrl": "https://www.iqair.com",
+  "actions": [
+    {
+      "id": "iqair_airvisual.get_city_data",
+      "service": "iqair_airvisual",
+      "name": "get_city_data",
+      "description": "Get current air quality and weather data for a specified supported city.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported country English name used by IQAir AirVisual."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported state English name used by IQAir AirVisual."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported city English name used by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for reading current data for one supported city."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported city English name used by IQAir AirVisual."
+              },
+              "state": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported state English name used by IQAir AirVisual."
+              },
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported country English name used by IQAir AirVisual."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The station name returned by IQAir AirVisual when available."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The GeoJSON location type returned by IQAir AirVisual."
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "description": "One coordinate value returned by IQAir AirVisual."
+                    },
+                    "description": "Longitude and latitude coordinates returned by IQAir AirVisual.",
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "coordinates"
+                ],
+                "description": "The GeoJSON point returned by IQAir AirVisual."
+              },
+              "current": {
+                "type": "object",
+                "properties": {
+                  "weather": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A plan-dependent object returned by IQAir AirVisual."
+                  },
+                  "pollution": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A plan-dependent object returned by IQAir AirVisual."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Current weather and pollution readings returned by IQAir AirVisual."
+              },
+              "units": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One IQAir AirVisual unit value."
+                },
+                "description": "Measurement units keyed by pollutant or weather field returned by IQAir AirVisual."
+              },
+              "forecasts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plan-dependent object returned by IQAir AirVisual."
+                },
+                "description": "Hourly forecast records returned by IQAir AirVisual."
+              },
+              "forecasts_daily": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plan-dependent object returned by IQAir AirVisual."
+                },
+                "description": "Daily forecast records returned by IQAir AirVisual."
+              },
+              "history": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Historical weather and pollution records returned by IQAir AirVisual."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "city",
+              "state",
+              "country"
+            ],
+            "description": "Current air quality and weather data for one city returned by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "City data returned by IQAir AirVisual."
+      }
+    },
+    {
+      "id": "iqair_airvisual.get_nearest_city",
+      "service": "iqair_airvisual",
+      "name": "get_nearest_city",
+      "description": "Get current air quality and weather data for the nearest supported city by IP or coordinates.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false,
+            "description": "No input fields are required."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Latitude in decimal degrees."
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Longitude in decimal degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Coordinate lookup input for the nearest supported IQAir AirVisual city."
+          }
+        ],
+        "description": "Input for reading the nearest supported city. Omit both coordinates to use IP geolocation, or provide both latitude and longitude."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported city English name used by IQAir AirVisual."
+              },
+              "state": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported state English name used by IQAir AirVisual."
+              },
+              "country": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The supported country English name used by IQAir AirVisual."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The station name returned by IQAir AirVisual when available."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The GeoJSON location type returned by IQAir AirVisual."
+                  },
+                  "coordinates": {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "description": "One coordinate value returned by IQAir AirVisual."
+                    },
+                    "description": "Longitude and latitude coordinates returned by IQAir AirVisual.",
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "coordinates"
+                ],
+                "description": "The GeoJSON point returned by IQAir AirVisual."
+              },
+              "current": {
+                "type": "object",
+                "properties": {
+                  "weather": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A plan-dependent object returned by IQAir AirVisual."
+                  },
+                  "pollution": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A plan-dependent object returned by IQAir AirVisual."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Current weather and pollution readings returned by IQAir AirVisual."
+              },
+              "units": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One IQAir AirVisual unit value."
+                },
+                "description": "Measurement units keyed by pollutant or weather field returned by IQAir AirVisual."
+              },
+              "forecasts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plan-dependent object returned by IQAir AirVisual."
+                },
+                "description": "Hourly forecast records returned by IQAir AirVisual."
+              },
+              "forecasts_daily": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A plan-dependent object returned by IQAir AirVisual."
+                },
+                "description": "Daily forecast records returned by IQAir AirVisual."
+              },
+              "history": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Historical weather and pollution records returned by IQAir AirVisual."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "city",
+              "state",
+              "country"
+            ],
+            "description": "Current air quality and weather data for one city returned by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "City data returned by IQAir AirVisual."
+      }
+    },
+    {
+      "id": "iqair_airvisual.list_supported_cities",
+      "service": "iqair_airvisual",
+      "name": "list_supported_cities",
+      "description": "List supported cities for a country and state with active IQAir AirVisual stations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported country English name used by IQAir AirVisual."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported state English name used by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing supported cities in one state."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The supported city English name used by IQAir AirVisual."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One city returned by IQAir AirVisual."
+            },
+            "description": "Supported city objects returned by IQAir AirVisual."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of cities returned by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supported cities returned by IQAir AirVisual."
+      }
+    },
+    {
+      "id": "iqair_airvisual.list_supported_countries",
+      "service": "iqair_airvisual",
+      "name": "list_supported_countries",
+      "description": "List countries that currently have active IQAir AirVisual stations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input fields are required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The supported country English name used by IQAir AirVisual."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One country returned by IQAir AirVisual."
+            },
+            "description": "Supported country objects returned by IQAir AirVisual."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of countries returned by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supported countries returned by IQAir AirVisual."
+      }
+    },
+    {
+      "id": "iqair_airvisual.list_supported_states",
+      "service": "iqair_airvisual",
+      "name": "list_supported_states",
+      "description": "List supported states for a country that has active IQAir AirVisual stations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The supported country English name used by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing supported states in one country."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The supported state English name used by IQAir AirVisual."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One state returned by IQAir AirVisual."
+            },
+            "description": "Supported state objects returned by IQAir AirVisual."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of states returned by IQAir AirVisual."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Supported states returned by IQAir AirVisual."
+      }
+    }
+  ]
+}

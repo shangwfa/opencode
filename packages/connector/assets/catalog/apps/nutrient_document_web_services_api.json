@@ -1,0 +1,377 @@
+{
+  "service": "nutrient_document_web_services_api",
+  "displayName": "Nutrient DWS",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "NUTRIENT_DWS_API_KEY",
+      "description": "Nutrient DWS Processor API key sent as a Bearer token. Create or view keys from the Nutrient dashboard: https://dashboard.nutrient.io/."
+    }
+  ],
+  "homepageUrl": "https://www.nutrient.io/api/",
+  "actions": [
+    {
+      "id": "nutrient_document_web_services_api.analyze_build",
+      "service": "nutrient_document_web_services_api",
+      "name": "analyze_build",
+      "description": "Estimate Nutrient DWS Processor Build API credit usage and required features without executing the workflow.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instructions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The BuildInstructions JSON object accepted by Nutrient DWS /analyze_build."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "instructions"
+        ],
+        "description": "Input for analyzing Nutrient DWS Build instructions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The total estimated credit cost if the request is executed."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total estimated credit cost if the request is executed."
+          },
+          "requiredFeatures": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "unitCost": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The credit cost per feature unit."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The credit cost per feature unit."
+                  },
+                  "unitType": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The billing unit type reported by Nutrient DWS."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The billing unit type reported by Nutrient DWS."
+                  },
+                  "units": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The number of units used by the feature."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of units used by the feature."
+                  },
+                  "cost": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The estimated feature cost in credits."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The estimated feature cost in credits."
+                  },
+                  "usage": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A JSON path in the Build instructions."
+                    },
+                    "description": "The JSON paths in the instructions that triggered the feature."
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Nutrient DWS API object."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "unitCost",
+                  "unitType",
+                  "units",
+                  "cost",
+                  "usage",
+                  "raw"
+                ],
+                "description": "A Nutrient DWS feature cost item required by the analyzed Build instructions."
+              },
+              "description": "The cost items for a required feature."
+            },
+            "description": "The required features grouped by Nutrient DWS feature key."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Nutrient DWS API object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cost",
+          "requiredFeatures",
+          "raw"
+        ],
+        "description": "The Nutrient DWS Build analysis response."
+      }
+    },
+    {
+      "id": "nutrient_document_web_services_api.create_auth_token",
+      "service": "nutrient_document_web_services_api",
+      "name": "create_auth_token",
+      "description": "Create a Nutrient DWS JWT with optional operation, origin, and expiration restrictions.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "allowedOperations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "annotations_api",
+                "compression_api",
+                "data_extraction_api",
+                "digital_signatures_api",
+                "document_editor_api",
+                "html_conversion_api",
+                "image_conversion_api",
+                "image_rendering_api",
+                "email_conversion_api",
+                "linearization_api",
+                "ocr_api",
+                "office_conversion_api",
+                "pdfa_api",
+                "pdf_to_office_conversion_api",
+                "redaction_api"
+              ],
+              "description": "A Nutrient DWS Processor operation allowed for a JWT."
+            },
+            "description": "The Nutrient DWS operations the token may access. Omit to allow all operations.",
+            "minItems": 1
+          },
+          "allowedOrigins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An allowed origin value accepted by Nutrient DWS."
+            },
+            "description": "The origins the token may be used from. Omit to allow all origins.",
+            "minItems": 1
+          },
+          "expirationTime": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The token lifetime in seconds. Nutrient DWS defaults to one hour when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for creating a Nutrient DWS JWT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Nutrient DWS token ID."
+          },
+          "accessToken": {
+            "type": "string",
+            "description": "The generated Nutrient DWS JWT."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "accessToken"
+        ],
+        "description": "The Nutrient DWS token creation response."
+      }
+    },
+    {
+      "id": "nutrient_document_web_services_api.delete_auth_token",
+      "service": "nutrient_document_web_services_api",
+      "name": "delete_auth_token",
+      "description": "Revoke a Nutrient DWS JWT by token ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tokenId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Nutrient DWS token ID to revoke."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tokenId"
+        ],
+        "description": "Input for deleting a Nutrient DWS JWT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the token deletion request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The Nutrient DWS token deletion result."
+      }
+    },
+    {
+      "id": "nutrient_document_web_services_api.get_account_info",
+      "service": "nutrient_document_web_services_api",
+      "name": "get_account_info",
+      "description": "Retrieve sanitized account information for the connected Nutrient DWS API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving Nutrient DWS account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "signedIn": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the API key maps to a signed-in account."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the API key maps to a signed-in account."
+              },
+              "subscriptionType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "free",
+                      "paid",
+                      "enterprise"
+                    ],
+                    "description": "The subscription type reported by Nutrient DWS."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The subscription type reported by Nutrient DWS."
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "totalCredits": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total credits available to the account."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total credits available to the account."
+                  },
+                  "usedCredits": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The credits already used by the account."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The credits already used by the account."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "totalCredits",
+                  "usedCredits"
+                ],
+                "description": "Nutrient DWS credit usage values returned for the connected account."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "signedIn",
+              "subscriptionType",
+              "usage"
+            ],
+            "description": "Nutrient DWS account information."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "A sanitized Nutrient DWS account information response."
+      }
+    }
+  ]
+}

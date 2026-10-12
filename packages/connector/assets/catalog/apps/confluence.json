@@ -1,0 +1,727 @@
+{
+  "service": "confluence",
+  "displayName": "Confluence",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://auth.atlassian.com/authorize",
+      "tokenUrl": "https://auth.atlassian.com/oauth/token",
+      "scopes": [
+        "search:confluence",
+        "read:space:confluence",
+        "read:page:confluence",
+        "write:page:confluence",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "tokenRequestFormat": "json",
+      "authorizationParams": {
+        "audience": "api.atlassian.com",
+        "prompt": "consent"
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "ATLASSIAN_API_TOKEN",
+      "description": "Atlassian API token used as the Basic Auth password for Confluence Cloud. Create tokens at https://id.atlassian.com/manage-profile/security/api-tokens.",
+      "extraFields": [
+        {
+          "key": "email",
+          "label": "Atlassian Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "name@example.com",
+          "description": "Atlassian account email used as the Basic Auth username for Confluence Cloud."
+        },
+        {
+          "key": "siteUrl",
+          "label": "Confluence Site URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://example.atlassian.net",
+          "description": "Confluence Cloud site URL used to build https://<site>.atlassian.net/wiki/api/v2 requests."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.atlassian.com/software/confluence",
+  "actions": [
+    {
+      "id": "confluence.create_page",
+      "service": "confluence",
+      "name": "create_page",
+      "description": "Create a Confluence page using a JSON-friendly body value and return the created page.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write:page:confluence"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Confluence space ID where the page will be created."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title for the new Confluence page."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The page body value for the selected representation."
+          },
+          "bodyRepresentation": {
+            "type": "string",
+            "enum": [
+              "storage",
+              "atlas_doc_format"
+            ],
+            "description": "The representation used for the page body."
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent Confluence page ID."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "draft"
+            ],
+            "description": "The Confluence page status to create."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaceId",
+          "title",
+          "body"
+        ],
+        "description": "Input parameters for creating a Confluence page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Confluence page ID."
+              },
+              "status": {
+                "type": "string",
+                "description": "The Confluence page status."
+              },
+              "title": {
+                "type": "string",
+                "description": "The Confluence page title."
+              },
+              "spaceId": {
+                "type": "string",
+                "description": "The Confluence space ID containing the page."
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The parent page ID, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The parent page ID, or null when unavailable."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The Confluence page creation timestamp."
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "description": "The Confluence page version number."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The Confluence page version message."
+                      },
+                      "minorEdit": {
+                        "type": "boolean",
+                        "description": "Whether this version is marked as a minor edit."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Confluence page version."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Confluence page version."
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Provider-specific Confluence payload fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Provider-specific Confluence payload fields."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific Confluence payload fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Confluence page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Confluence create page response."
+      }
+    },
+    {
+      "id": "confluence.get_page",
+      "service": "confluence",
+      "name": "get_page",
+      "description": "Get a Confluence page by ID and optionally include its body representation.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read:page:confluence"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Confluence page ID."
+          },
+          "bodyFormat": {
+            "type": "string",
+            "enum": [
+              "storage",
+              "atlas_doc_format",
+              "view",
+              "export_view",
+              "styled_view"
+            ],
+            "description": "The body representation to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId"
+        ],
+        "description": "Input parameters for retrieving a Confluence page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Confluence page ID."
+              },
+              "status": {
+                "type": "string",
+                "description": "The Confluence page status."
+              },
+              "title": {
+                "type": "string",
+                "description": "The Confluence page title."
+              },
+              "spaceId": {
+                "type": "string",
+                "description": "The Confluence space ID containing the page."
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The parent page ID, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The parent page ID, or null when unavailable."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The Confluence page creation timestamp."
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "description": "The Confluence page version number."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The Confluence page version message."
+                      },
+                      "minorEdit": {
+                        "type": "boolean",
+                        "description": "Whether this version is marked as a minor edit."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Confluence page version."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Confluence page version."
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Provider-specific Confluence payload fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Provider-specific Confluence payload fields."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific Confluence payload fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Confluence page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Confluence page response."
+      }
+    },
+    {
+      "id": "confluence.list_spaces",
+      "service": "confluence",
+      "name": "list_spaces",
+      "description": "List Confluence spaces and return normalized space metadata plus pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read:space:confluence"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by Confluence."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "global",
+              "personal"
+            ],
+            "description": "Filter spaces by Confluence space type."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "archived"
+            ],
+            "description": "Filter spaces by Confluence space status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Confluence spaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Confluence space ID."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The Confluence space key."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Confluence space name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Confluence space type."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The Confluence space status."
+                },
+                "homepageId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ID of the space homepage, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ID of the space homepage, or null when unavailable."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-specific Confluence payload fields."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Confluence space."
+            },
+            "description": "The Confluence spaces returned by the request."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Confluence page, or null when no next page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Confluence page, or null when no next page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Confluence pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Confluence spaces response."
+      }
+    },
+    {
+      "id": "confluence.search_content",
+      "service": "confluence",
+      "name": "search_content",
+      "description": "Search Confluence content with CQL and return normalized result metadata plus pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "search:confluence"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cql": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Confluence Query Language string to execute."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by Confluence."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cql"
+        ],
+        "description": "Input parameters for searching Confluence content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Confluence content ID when returned."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Confluence content type when returned."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The Confluence content title when returned."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Confluence web URL when returned."
+                },
+                "excerpt": {
+                  "type": "string",
+                  "description": "The Confluence search excerpt when returned."
+                },
+                "containerTitle": {
+                  "type": "string",
+                  "description": "The Confluence container title when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Provider-specific Confluence payload fields."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Confluence search result."
+            },
+            "description": "The matching Confluence search results."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next Confluence page, or null when no next page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next Confluence page, or null when no next page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Confluence pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Confluence search response."
+      }
+    },
+    {
+      "id": "confluence.update_page",
+      "service": "confluence",
+      "name": "update_page",
+      "description": "Update a Confluence page title, body, or status using an explicit next version number.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write:page:confluence"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Confluence page ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated Confluence page title."
+          },
+          "versionNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The next Confluence page version number."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated page body value for the selected representation."
+          },
+          "bodyRepresentation": {
+            "type": "string",
+            "enum": [
+              "storage",
+              "atlas_doc_format"
+            ],
+            "description": "The representation used for the page body."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "draft"
+            ],
+            "description": "The updated Confluence page status."
+          },
+          "versionMessage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A message stored with the new Confluence page version."
+          },
+          "minorEdit": {
+            "type": "boolean",
+            "description": "Whether the update should be marked as a minor edit."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pageId",
+          "title",
+          "versionNumber"
+        ],
+        "description": "Input parameters for updating a Confluence page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Confluence page ID."
+              },
+              "status": {
+                "type": "string",
+                "description": "The Confluence page status."
+              },
+              "title": {
+                "type": "string",
+                "description": "The Confluence page title."
+              },
+              "spaceId": {
+                "type": "string",
+                "description": "The Confluence space ID containing the page."
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The parent page ID, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The parent page ID, or null when unavailable."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The Confluence page creation timestamp."
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "description": "The Confluence page version number."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "The Confluence page version message."
+                      },
+                      "minorEdit": {
+                        "type": "boolean",
+                        "description": "Whether this version is marked as a minor edit."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Confluence page version."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A Confluence page version."
+              },
+              "body": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Provider-specific Confluence payload fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Provider-specific Confluence payload fields."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific Confluence payload fields."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Confluence page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Confluence update page response."
+      }
+    }
+  ]
+}

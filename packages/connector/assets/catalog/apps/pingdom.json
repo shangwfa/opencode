@@ -1,0 +1,324 @@
+{
+  "service": "pingdom",
+  "displayName": "Pingdom",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "pingdom_api_token",
+      "description": "Pingdom API token used with the Authorization Bearer header. Generate it in My Pingdom under Integrations > The Pingdom API: https://my.solarwinds.cloud/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.pingdom.com",
+  "actions": [
+    {
+      "id": "pingdom.get_check",
+      "service": "pingdom",
+      "name": "get_check",
+      "description": "Retrieve a detailed Pingdom uptime check by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "check_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A numeric identifier returned by the Pingdom API."
+          },
+          "include_teams": {
+            "type": "boolean",
+            "description": "Whether to include team connections for the Pingdom check."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check_id"
+        ],
+        "description": "The input payload for retrieving one Pingdom check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A detailed Pingdom check returned by the check detail endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Pingdom check detail response."
+      }
+    },
+    {
+      "id": "pingdom.get_credits",
+      "service": "pingdom",
+      "name": "get_credits",
+      "description": "Retrieve Pingdom account check and SMS credit information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This Pingdom action does not require input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Credit and quota information returned by Pingdom."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Pingdom credits response."
+      }
+    },
+    {
+      "id": "pingdom.list_checks",
+      "service": "pingdom",
+      "name": "list_checks",
+      "description": "List Pingdom uptime checks with optional pagination and tag filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25000,
+            "description": "The maximum number of Pingdom checks to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based pagination offset. Pingdom requires limit when offset is used."
+          },
+          "showencryption": {
+            "type": "boolean",
+            "description": "Whether to include each check's encryption setting."
+          },
+          "include_tags": {
+            "type": "boolean",
+            "description": "Whether to include tags for each Pingdom check."
+          },
+          "include_severity": {
+            "type": "boolean",
+            "description": "Whether to include severity for each Pingdom check."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated tag list used to filter Pingdom checks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Pingdom checks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A numeric identifier returned by the Pingdom API."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The human-readable name of the Pingdom check."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Pingdom check type, such as http, tcp, or dns."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down",
+                    "unconfirmed_down",
+                    "unknown",
+                    "paused"
+                  ],
+                  "description": "The current status of the Pingdom check."
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "The target host monitored by the Pingdom check."
+                },
+                "resolution": {
+                  "type": "integer",
+                  "description": "How often Pingdom tests the check, in minutes."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The tag name returned by Pingdom."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The tag type returned by Pingdom."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "The number of resources using this tag."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A Pingdom tag attached to a check."
+                  },
+                  "description": "Tags attached to the Pingdom check."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Pingdom check returned by the checks API."
+            },
+            "description": "The Pingdom checks returned for this page."
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "description": "The total number of Pingdom checks."
+                  },
+                  "limited": {
+                    "type": "integer",
+                    "description": "The number of Pingdom checks after tag filtering was applied."
+                  },
+                  "filtered": {
+                    "type": "integer",
+                    "description": "The number of Pingdom checks after pagination was applied."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Count metadata returned by the Pingdom checks list endpoint."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Count metadata returned by the Pingdom checks list endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Pingdom checks list response."
+      }
+    },
+    {
+      "id": "pingdom.list_probes",
+      "service": "pingdom",
+      "name": "list_probes",
+      "description": "List Pingdom probe servers and their location details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of Pingdom probes to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based pagination offset. Pingdom requires limit when offset is used."
+          },
+          "onlyactive": {
+            "type": "boolean",
+            "description": "Whether to return only currently active Pingdom probes."
+          },
+          "includedeleted": {
+            "type": "boolean",
+            "description": "Whether to include old Pingdom probes that are no longer in use."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Pingdom probe servers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "probes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A numeric identifier returned by the Pingdom API."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country where the Pingdom probe is located."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city where the Pingdom probe is located."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The display name of the Pingdom probe location."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the Pingdom probe is currently active."
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "The DNS name of the Pingdom probe server."
+                },
+                "ip": {
+                  "type": "string",
+                  "description": "The IPv4 address of the Pingdom probe server."
+                },
+                "ipv6": {
+                  "type": "string",
+                  "description": "The IPv6 address of the Pingdom probe server."
+                },
+                "countryiso": {
+                  "type": "string",
+                  "description": "The ISO country code for the Pingdom probe."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Pingdom probe server."
+            },
+            "description": "The Pingdom probes returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Pingdom probes response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,297 @@
+{
+  "service": "mqtt",
+  "displayName": "MQTT",
+  "description": "Publish messages or briefly wait for new messages on any MQTT broker that exposes a WebSocket listener.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "websocketUrl",
+          "label": "WebSocket URL",
+          "inputType": "text",
+          "required": true,
+          "secret": true,
+          "placeholder": "wss://broker.example.com/mqtt",
+          "description": "The complete ws:// or wss:// URL of the broker's MQTT-over-WebSocket listener, including its path. Private targets require a self-hosted runtime with OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK enabled."
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "mqtt-user",
+          "description": "Optional MQTT CONNECT username configured by the broker operator."
+        },
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "GID_example@@@device-1",
+          "description": "Optional fixed MQTT Client ID. When omitted, each action uses a random Client ID. Alibaba Cloud device credentials require GroupID@@@DeviceID."
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "mqtt-password",
+          "description": "Optional MQTT CONNECT password configured by the broker operator. A username is required when set."
+        },
+        {
+          "key": "protocolVersion",
+          "label": "Protocol Version",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "3.1.1",
+          "description": "MQTT protocol version. Use 3.1.1 by default, or enter 5.0 when the broker supports MQTT 5."
+        },
+        {
+          "key": "aliyunInstanceId",
+          "label": "Alibaba Cloud Instance ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "mqtt-xxxxxxxx",
+          "description": "Alibaba Cloud ApsaraMQ instance ID for unique-certificate-per-device authentication. Configure it with a Client ID, then either save both device access key fields or pass them to each action."
+        },
+        {
+          "key": "aliyunDeviceAccessKeyId",
+          "label": "Alibaba Cloud Device AccessKey ID",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "device-access-key-id",
+          "description": "Optional Alibaba Cloud device AccessKey ID. Leave both device key fields empty to provide them at action runtime."
+        },
+        {
+          "key": "aliyunDeviceAccessKeySecret",
+          "label": "Alibaba Cloud Device AccessKey Secret",
+          "inputType": "password",
+          "required": false,
+          "secret": true,
+          "placeholder": "device-access-key-secret",
+          "description": "Optional Alibaba Cloud device AccessKey secret used to sign the Client ID."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://mqtt.org",
+  "actions": [
+    {
+      "id": "mqtt.publish_message",
+      "service": "mqtt",
+      "name": "publish_message",
+      "description": "Publish one UTF-8 or base64-encoded message through a short-lived MQTT-over-WebSocket connection.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exact MQTT topic to publish to. Topic wildcards are not allowed."
+          },
+          "payload": {
+            "type": "string",
+            "description": "Message payload encoded according to payloadEncoding."
+          },
+          "payloadEncoding": {
+            "type": "string",
+            "enum": [
+              "utf8",
+              "base64"
+            ],
+            "description": "How to decode payload before publishing it."
+          },
+          "qos": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "MQTT quality of service level."
+          },
+          "retain": {
+            "type": "boolean",
+            "description": "Whether the broker should retain this message for future subscribers."
+          },
+          "aliyunDeviceAccessKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alibaba Cloud device AccessKey ID. Provide it together with aliyunDeviceAccessKeySecret when the connection is configured for runtime device credentials."
+          },
+          "aliyunDeviceAccessKeySecret": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alibaba Cloud device AccessKey secret used to sign the Client ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "topic",
+          "payload"
+        ],
+        "description": "The message to publish to the connected MQTT broker."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "description": "Topic the message was published to."
+          },
+          "qos": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "MQTT quality of service level."
+          },
+          "retain": {
+            "type": "boolean",
+            "description": "Whether the MQTT PUBLISH retain flag was requested."
+          },
+          "protocolVersion": {
+            "type": "string",
+            "enum": [
+              "3.1.1",
+              "5.0"
+            ],
+            "description": "MQTT protocol version used for the connection."
+          },
+          "deliveryAcknowledged": {
+            "type": "boolean",
+            "description": "Whether the MQTT publish acknowledgement flow completed. This does not mean a consumer processed the message."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The completed MQTT publish operation."
+      }
+    },
+    {
+      "id": "mqtt.receive_messages",
+      "service": "mqtt",
+      "name": "receive_messages",
+      "description": "Wait briefly for new messages on an MQTT topic filter. This is not a persistent subscription and can miss messages between action calls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "topicFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "MQTT topic filter to subscribe to, including + or # wildcards when needed."
+          },
+          "qos": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "MQTT quality of service level."
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "Maximum time to wait for messages before returning."
+          },
+          "maxMessages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of messages to collect before returning."
+          },
+          "payloadEncoding": {
+            "type": "string",
+            "enum": [
+              "utf8",
+              "base64"
+            ],
+            "description": "How received message payloads should be returned."
+          },
+          "aliyunDeviceAccessKeyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alibaba Cloud device AccessKey ID. Provide it together with aliyunDeviceAccessKeySecret when the connection is configured for runtime device credentials."
+          },
+          "aliyunDeviceAccessKeySecret": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alibaba Cloud device AccessKey secret used to sign the Client ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "topicFilter"
+        ],
+        "description": "The bounded MQTT subscription to open for this action call."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "topic": {
+                  "type": "string",
+                  "description": "Exact MQTT topic the message was published to."
+                },
+                "payload": {
+                  "type": "string",
+                  "description": "Message payload encoded according to payloadEncoding."
+                },
+                "qos": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 2,
+                  "description": "MQTT quality of service level."
+                },
+                "retain": {
+                  "type": "boolean",
+                  "description": "Whether the broker marked this as a retained message."
+                },
+                "duplicate": {
+                  "type": "boolean",
+                  "description": "Whether the MQTT DUP flag was set."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One MQTT message received from the broker."
+            },
+            "description": "Messages received after the subscription became active.",
+            "maxItems": 100
+          },
+          "timedOut": {
+            "type": "boolean",
+            "description": "Whether the collection window ended because timeoutSeconds elapsed."
+          },
+          "protocolVersion": {
+            "type": "string",
+            "enum": [
+              "3.1.1",
+              "5.0"
+            ],
+            "description": "MQTT protocol version used for the connection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Messages observed during the bounded subscription window."
+      }
+    }
+  ]
+}

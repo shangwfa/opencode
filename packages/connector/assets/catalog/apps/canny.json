@@ -1,0 +1,1708 @@
+{
+  "service": "canny",
+  "displayName": "Canny",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret API Key",
+      "placeholder": "canny_secret_api_key",
+      "description": "Canny secret API key sent as the apiKey POST parameter. Find it in your Canny company settings.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://canny.io",
+  "actions": [
+    {
+      "id": "canny.create_comment",
+      "service": "canny",
+      "name": "create_comment",
+      "description": "Create a new Canny comment on a post or as a reply to a comment.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the post."
+          },
+          "authorID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the author."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text content of the comment."
+          },
+          "parentID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Parent comment ID when creating a reply."
+          },
+          "internal": {
+            "type": "boolean",
+            "description": "Whether the comment is internal only."
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Original creation time in ISO 8601 format."
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Image URLs attached to the comment."
+          },
+          "shouldNotifyVoters": {
+            "type": "boolean",
+            "description": "Whether voters of the post should receive notifications."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postID",
+          "authorID"
+        ],
+        "description": "The input payload for this action. Either value or imageURLs is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the created comment."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Identifier of the created comment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.create_or_update_user",
+      "service": "canny",
+      "name": "create_or_update_user",
+      "description": "Create a new Canny user or update an existing one by id, userID, or email.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Display name of the user."
+          },
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Alias for the user."
+          },
+          "created": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 timestamp from the source system."
+          },
+          "avatarURL": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Avatar URL for the user."
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the company."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the company."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the company was created."
+                },
+                "customFields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom fields associated with the record."
+                },
+                "monthlySpend": {
+                  "type": "number",
+                  "description": "Monthly spend for the company."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Canny company."
+            },
+            "description": "Companies associated with the user."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom fields associated with the record."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Canny user ID."
+          },
+          "userID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External user ID from the source system."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email address of the user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for this action. At least one of id, userID, or email is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the created or updated user."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Identifier of the created or updated user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.create_post",
+      "service": "canny",
+      "name": "create_post",
+      "description": "Create a new Canny post on a board for a specific author.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the board."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Title of the post."
+          },
+          "details": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Detailed body of the post."
+          },
+          "authorID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the author."
+          },
+          "byID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Admin authoring the post on behalf of the user."
+          },
+          "ownerID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Owner assigned to the post."
+          },
+          "categoryID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Category assigned to the post."
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Original creation time in ISO 8601 format."
+          },
+          "eta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Estimated timeframe for delivery in MM/YYYY."
+          },
+          "etaPublic": {
+            "type": "boolean",
+            "description": "Whether the ETA should be visible to end users."
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Image URLs attached to the post."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom fields associated with the record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardID",
+          "title",
+          "details",
+          "authorID"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the created post."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL to the created post."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "Identifier of the created post."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.list_boards",
+      "service": "canny",
+      "name": "list_boards",
+      "description": "List all Canny boards available to the authenticated workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the board."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the board was created."
+                },
+                "isPrivate": {
+                  "type": "boolean",
+                  "description": "Whether the board is private."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the board."
+                },
+                "postCount": {
+                  "type": "integer",
+                  "description": "Number of posts on the board."
+                },
+                "privateComments": {
+                  "type": "boolean",
+                  "description": "Whether comments are private by default."
+                },
+                "token": {
+                  "type": "string",
+                  "description": "Public token associated with the board."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "URL to the board."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Canny board."
+            },
+            "description": "Boards returned by the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.list_comments",
+      "service": "canny",
+      "name": "list_comments",
+      "description": "List Canny comments with optional filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the post."
+          },
+          "boardID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the board."
+          },
+          "authorID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the author."
+          },
+          "companyID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the company."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the comment."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the comment was created."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Text content of the comment."
+                },
+                "internal": {
+                  "type": "boolean",
+                  "description": "Whether the comment is internal."
+                },
+                "private": {
+                  "type": "boolean",
+                  "description": "Whether the comment is private."
+                },
+                "likeCount": {
+                  "type": "integer",
+                  "description": "Number of likes on the comment."
+                },
+                "parentID": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Parent comment ID when this is a reply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent comment ID when this is a reply."
+                },
+                "imageURLs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Image URLs attached to the comment."
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the user."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the user was created."
+                    },
+                    "isAdmin": {
+                      "type": "boolean",
+                      "description": "Whether the user is a Canny admin."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the user."
+                    },
+                    "alias": {
+                      "type": "string",
+                      "description": "Alias of the user."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "Email address of the user."
+                    },
+                    "userID": {
+                      "type": "string",
+                      "description": "External user ID from the source system."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "URL to the user in Canny admin."
+                    },
+                    "avatarURL": {
+                      "type": "string",
+                      "description": "URL to the user's avatar."
+                    },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the company."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the company."
+                          },
+                          "created": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp when the company was created."
+                          },
+                          "customFields": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Custom fields associated with the record."
+                          },
+                          "monthlySpend": {
+                            "type": "number",
+                            "description": "Monthly spend for the company."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Canny company."
+                      },
+                      "description": "Companies associated with the user."
+                    },
+                    "customFields": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Custom fields associated with the record."
+                    },
+                    "lastActivity": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp of the user's last activity."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny user."
+                },
+                "board": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the board."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the board was created."
+                    },
+                    "isPrivate": {
+                      "type": "boolean",
+                      "description": "Whether the board is private."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the board."
+                    },
+                    "postCount": {
+                      "type": "integer",
+                      "description": "Number of posts on the board."
+                    },
+                    "privateComments": {
+                      "type": "boolean",
+                      "description": "Whether comments are private by default."
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "Public token associated with the board."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "URL to the board."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny board."
+                },
+                "post": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the post."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Title of the post."
+                    },
+                    "details": {
+                      "type": "string",
+                      "description": "Detailed body of the post."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the post was created."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Current status of the post."
+                    },
+                    "score": {
+                      "type": "number",
+                      "description": "Vote score of the post."
+                    },
+                    "commentCount": {
+                      "type": "integer",
+                      "description": "Number of comments on the post."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "URL to the post."
+                    },
+                    "eta": {
+                      "type": "string",
+                      "description": "Estimated timeframe for delivery."
+                    },
+                    "imageURLs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Image URLs attached to the post."
+                    },
+                    "board": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Unique identifier of the board."
+                        },
+                        "created": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp when the board was created."
+                        },
+                        "isPrivate": {
+                          "type": "boolean",
+                          "description": "Whether the board is private."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Display name of the board."
+                        },
+                        "postCount": {
+                          "type": "integer",
+                          "description": "Number of posts on the board."
+                        },
+                        "privateComments": {
+                          "type": "boolean",
+                          "description": "Whether comments are private by default."
+                        },
+                        "token": {
+                          "type": "string",
+                          "description": "Public token associated with the board."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "URL to the board."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Canny board."
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Unique identifier of the user."
+                        },
+                        "created": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp when the user was created."
+                        },
+                        "isAdmin": {
+                          "type": "boolean",
+                          "description": "Whether the user is a Canny admin."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Display name of the user."
+                        },
+                        "alias": {
+                          "type": "string",
+                          "description": "Alias of the user."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "Email address of the user."
+                        },
+                        "userID": {
+                          "type": "string",
+                          "description": "External user ID from the source system."
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "URL to the user in Canny admin."
+                        },
+                        "avatarURL": {
+                          "type": "string",
+                          "description": "URL to the user's avatar."
+                        },
+                        "companies": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Unique identifier of the company."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Display name of the company."
+                              },
+                              "created": {
+                                "type": "string",
+                                "description": "ISO 8601 timestamp when the company was created."
+                              },
+                              "customFields": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "Custom fields associated with the record."
+                              },
+                              "monthlySpend": {
+                                "type": "number",
+                                "description": "Monthly spend for the company."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "Canny company."
+                          },
+                          "description": "Companies associated with the user."
+                        },
+                        "customFields": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Custom fields associated with the record."
+                        },
+                        "lastActivity": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp of the user's last activity."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Canny user."
+                    },
+                    "category": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A Canny object returned by the API."
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A Canny object returned by the API."
+                      },
+                      "description": "Tags associated with the post."
+                    },
+                    "customFields": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Custom fields associated with the record."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny post."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Canny comment."
+            },
+            "description": "Comments returned by the request."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.list_posts",
+      "service": "canny",
+      "name": "list_posts",
+      "description": "List Canny posts with optional filtering, search, sorting, and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the board."
+          },
+          "authorID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the author."
+          },
+          "companyID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the company."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search query applied to post titles and bodies."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "oldest",
+              "relevance",
+              "score",
+              "statusChanged",
+              "trending"
+            ],
+            "description": "Sort order used when fetching posts."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated list of statuses to filter by."
+          },
+          "tagIDs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Tag IDs used to filter posts."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of items to skip before returning results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the post."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Title of the post."
+                },
+                "details": {
+                  "type": "string",
+                  "description": "Detailed body of the post."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the post was created."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Current status of the post."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "Vote score of the post."
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "description": "Number of comments on the post."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "URL to the post."
+                },
+                "eta": {
+                  "type": "string",
+                  "description": "Estimated timeframe for delivery."
+                },
+                "imageURLs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Image URLs attached to the post."
+                },
+                "board": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the board."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the board was created."
+                    },
+                    "isPrivate": {
+                      "type": "boolean",
+                      "description": "Whether the board is private."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the board."
+                    },
+                    "postCount": {
+                      "type": "integer",
+                      "description": "Number of posts on the board."
+                    },
+                    "privateComments": {
+                      "type": "boolean",
+                      "description": "Whether comments are private by default."
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "Public token associated with the board."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "URL to the board."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny board."
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the user."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the user was created."
+                    },
+                    "isAdmin": {
+                      "type": "boolean",
+                      "description": "Whether the user is a Canny admin."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the user."
+                    },
+                    "alias": {
+                      "type": "string",
+                      "description": "Alias of the user."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "Email address of the user."
+                    },
+                    "userID": {
+                      "type": "string",
+                      "description": "External user ID from the source system."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "URL to the user in Canny admin."
+                    },
+                    "avatarURL": {
+                      "type": "string",
+                      "description": "URL to the user's avatar."
+                    },
+                    "companies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier of the company."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name of the company."
+                          },
+                          "created": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp when the company was created."
+                          },
+                          "customFields": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Custom fields associated with the record."
+                          },
+                          "monthlySpend": {
+                            "type": "number",
+                            "description": "Monthly spend for the company."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Canny company."
+                      },
+                      "description": "Companies associated with the user."
+                    },
+                    "customFields": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Custom fields associated with the record."
+                    },
+                    "lastActivity": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp of the user's last activity."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny user."
+                },
+                "category": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Canny object returned by the API."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Canny object returned by the API."
+                  },
+                  "description": "Tags associated with the post."
+                },
+                "customFields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom fields associated with the record."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Canny post."
+            },
+            "description": "Posts returned by the request."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.list_users",
+      "service": "canny",
+      "name": "list_users",
+      "description": "List Canny users with cursor-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by a previous request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the user."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the user was created."
+                },
+                "isAdmin": {
+                  "type": "boolean",
+                  "description": "Whether the user is a Canny admin."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Display name of the user."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "Alias of the user."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the user."
+                },
+                "userID": {
+                  "type": "string",
+                  "description": "External user ID from the source system."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "URL to the user in Canny admin."
+                },
+                "avatarURL": {
+                  "type": "string",
+                  "description": "URL to the user's avatar."
+                },
+                "companies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Unique identifier of the company."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Display name of the company."
+                      },
+                      "created": {
+                        "type": "string",
+                        "description": "ISO 8601 timestamp when the company was created."
+                      },
+                      "customFields": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "Custom fields associated with the record."
+                      },
+                      "monthlySpend": {
+                        "type": "number",
+                        "description": "Monthly spend for the company."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Canny company."
+                  },
+                  "description": "Companies associated with the user."
+                },
+                "customFields": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom fields associated with the record."
+                },
+                "lastActivity": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp of the user's last activity."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Canny user."
+            },
+            "description": "Users returned by the request."
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether another page is available."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Cursor for the next page when another page is available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.retrieve_board",
+      "service": "canny",
+      "name": "retrieve_board",
+      "description": "Retrieve a single Canny board by board ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the board."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the board."
+              },
+              "created": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the board was created."
+              },
+              "isPrivate": {
+                "type": "boolean",
+                "description": "Whether the board is private."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the board."
+              },
+              "postCount": {
+                "type": "integer",
+                "description": "Number of posts on the board."
+              },
+              "privateComments": {
+                "type": "boolean",
+                "description": "Whether comments are private by default."
+              },
+              "token": {
+                "type": "string",
+                "description": "Public token associated with the board."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL to the board."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Canny board."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.retrieve_post",
+      "service": "canny",
+      "name": "retrieve_post",
+      "description": "Retrieve a single Canny post by post ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the post."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "post": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the post."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the post."
+              },
+              "details": {
+                "type": "string",
+                "description": "Detailed body of the post."
+              },
+              "created": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the post was created."
+              },
+              "status": {
+                "type": "string",
+                "description": "Current status of the post."
+              },
+              "score": {
+                "type": "number",
+                "description": "Vote score of the post."
+              },
+              "commentCount": {
+                "type": "integer",
+                "description": "Number of comments on the post."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL to the post."
+              },
+              "eta": {
+                "type": "string",
+                "description": "Estimated timeframe for delivery."
+              },
+              "imageURLs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Image URLs attached to the post."
+              },
+              "board": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique identifier of the board."
+                  },
+                  "created": {
+                    "type": "string",
+                    "description": "ISO 8601 timestamp when the board was created."
+                  },
+                  "isPrivate": {
+                    "type": "boolean",
+                    "description": "Whether the board is private."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name of the board."
+                  },
+                  "postCount": {
+                    "type": "integer",
+                    "description": "Number of posts on the board."
+                  },
+                  "privateComments": {
+                    "type": "boolean",
+                    "description": "Whether comments are private by default."
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "Public token associated with the board."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "URL to the board."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Canny board."
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Unique identifier of the user."
+                  },
+                  "created": {
+                    "type": "string",
+                    "description": "ISO 8601 timestamp when the user was created."
+                  },
+                  "isAdmin": {
+                    "type": "boolean",
+                    "description": "Whether the user is a Canny admin."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name of the user."
+                  },
+                  "alias": {
+                    "type": "string",
+                    "description": "Alias of the user."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "Email address of the user."
+                  },
+                  "userID": {
+                    "type": "string",
+                    "description": "External user ID from the source system."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "URL to the user in Canny admin."
+                  },
+                  "avatarURL": {
+                    "type": "string",
+                    "description": "URL to the user's avatar."
+                  },
+                  "companies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Unique identifier of the company."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Display name of the company."
+                        },
+                        "created": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp when the company was created."
+                        },
+                        "customFields": {
+                          "type": "object",
+                          "additionalProperties": true,
+                          "description": "Custom fields associated with the record."
+                        },
+                        "monthlySpend": {
+                          "type": "number",
+                          "description": "Monthly spend for the company."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "Canny company."
+                    },
+                    "description": "Companies associated with the user."
+                  },
+                  "customFields": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Custom fields associated with the record."
+                  },
+                  "lastActivity": {
+                    "type": "string",
+                    "description": "ISO 8601 timestamp of the user's last activity."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Canny user."
+              },
+              "category": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A Canny object returned by the API."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Canny object returned by the API."
+                },
+                "description": "Tags associated with the post."
+              },
+              "customFields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Custom fields associated with the record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Canny post."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.retrieve_user",
+      "service": "canny",
+      "name": "retrieve_user",
+      "description": "Retrieve a single Canny user by id, userID, or email.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Canny user ID."
+          },
+          "userID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External user ID from the source system."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email address of the user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action. Exactly one of id, userID, or email is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the user."
+              },
+              "created": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the user was created."
+              },
+              "isAdmin": {
+                "type": "boolean",
+                "description": "Whether the user is a Canny admin."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the user."
+              },
+              "alias": {
+                "type": "string",
+                "description": "Alias of the user."
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address of the user."
+              },
+              "userID": {
+                "type": "string",
+                "description": "External user ID from the source system."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL to the user in Canny admin."
+              },
+              "avatarURL": {
+                "type": "string",
+                "description": "URL to the user's avatar."
+              },
+              "companies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier of the company."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the company."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the company was created."
+                    },
+                    "customFields": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Custom fields associated with the record."
+                    },
+                    "monthlySpend": {
+                      "type": "number",
+                      "description": "Monthly spend for the company."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Canny company."
+                },
+                "description": "Companies associated with the user."
+              },
+              "customFields": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Custom fields associated with the record."
+              },
+              "lastActivity": {
+                "type": "string",
+                "description": "ISO 8601 timestamp of the user's last activity."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Canny user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "canny.update_post",
+      "service": "canny",
+      "name": "update_post",
+      "description": "Update mutable fields on an existing Canny post.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "postID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the post."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated title of the post."
+          },
+          "details": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated body of the post."
+          },
+          "eta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated ETA in MM/YYYY format."
+          },
+          "etaPublic": {
+            "type": "boolean",
+            "description": "Whether the ETA should be visible to end users."
+          },
+          "imageURLs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Updated image URLs for the post."
+          },
+          "customFields": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom fields associated with the record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "postID"
+        ],
+        "description": "The input payload for this action. At least one mutable field is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the post update succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

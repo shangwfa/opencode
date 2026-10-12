@@ -1,0 +1,573 @@
+{
+  "service": "yoplanning",
+  "displayName": "YoPlanning",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "YOUR_YOPLANNING_API_TOKEN",
+      "description": "YoPlanning API token sent in the Authorization header. Request it from Settings > Advanced after signing in; see the official authentication guide: https://yoplanning.pro/api/v3.1/docs/#auth.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.yoplanning.com/",
+  "actions": [
+    {
+      "id": "yoplanning.get_availability_details",
+      "service": "yoplanning",
+      "name": "get_availability_details",
+      "description": "Get the currently bookable options and resources for a YoPlanning availability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "description": "The YoPlanning team ID.",
+            "format": "uuid"
+          },
+          "availabilityId": {
+            "type": "string",
+            "description": "The session group ID returned by a product availability.",
+            "format": "uuid"
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 639-1 language code used for translated product content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "availabilityId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The YoPlanning session group ID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "The bookable options and resources returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "availability"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "yoplanning.get_online_product",
+      "service": "yoplanning",
+      "name": "get_online_product",
+      "description": "Get one online product offered by a YoPlanning team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "description": "The YoPlanning team ID.",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "description": "The YoPlanning online product ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "productId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The YoPlanning online product ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The internal YoPlanning product name."
+              },
+              "team": {
+                "type": "string",
+                "description": "The YoPlanning team ID that owns the product.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "team"
+            ],
+            "description": "The online product returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "product"
+        ],
+        "description": "Action output."
+      },
+      "followUpActions": [
+        "yoplanning.list_product_availabilities"
+      ]
+    },
+    {
+      "id": "yoplanning.get_team",
+      "service": "yoplanning",
+      "name": "get_team",
+      "description": "Get one YoPlanning team by its ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "description": "The YoPlanning team ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "team": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The YoPlanning team ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The YoPlanning team name."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "The YoPlanning team returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team"
+        ],
+        "description": "Action output."
+      },
+      "followUpActions": [
+        "yoplanning.list_online_products"
+      ]
+    },
+    {
+      "id": "yoplanning.list_online_products",
+      "service": "yoplanning",
+      "name": "list_online_products",
+      "description": "List products that a YoPlanning team currently offers for online sale.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "description": "The YoPlanning team ID.",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return, from 1 to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "language": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "The ISO 639-1 language code used for translated product content."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "Return products with availability on or after this ISO 8601 date.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Return products with availability on or before this ISO 8601 date.",
+            "format": "date"
+          },
+          "subCategoryId": {
+            "type": "integer",
+            "description": "The YoPlanning subcategory ID used to filter products."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Input payload for listing a team's online products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next pagination page, or null when no page is available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous pagination page, or null when no page is available."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The YoPlanning online product ID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The internal YoPlanning product name."
+                },
+                "team": {
+                  "type": "string",
+                  "description": "The YoPlanning team ID that owns the product.",
+                  "format": "uuid"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "team"
+              ],
+              "description": "A YoPlanning online product returned by the API."
+            },
+            "description": "The online products returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated list of online products."
+      },
+      "followUpActions": [
+        "yoplanning.get_online_product",
+        "yoplanning.list_product_availabilities"
+      ]
+    },
+    {
+      "id": "yoplanning.list_product_availabilities",
+      "service": "yoplanning",
+      "name": "list_product_availabilities",
+      "description": "List bookable availability slots for one YoPlanning online product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "description": "The YoPlanning team ID.",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "description": "The YoPlanning online product ID.",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return, from 1 to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          },
+          "startDateAfter": {
+            "type": "string",
+            "description": "Return slots starting after this ISO 8601 date-time.",
+            "format": "date-time"
+          },
+          "startDateBefore": {
+            "type": "string",
+            "description": "Return slots starting before this ISO 8601 date-time.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "all"
+            ],
+            "description": "Whether to return only active slots or include deleted slots."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "productId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next pagination page, or null when no page is available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous pagination page, or null when no page is available."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start_date": {
+                  "type": "string",
+                  "description": "The availability start date-time.",
+                  "format": "date-time"
+                },
+                "end_date": {
+                  "type": "string",
+                  "description": "The availability end date-time.",
+                  "format": "date-time"
+                },
+                "session_group": {
+                  "type": "string",
+                  "description": "The session group ID used to read availability details.",
+                  "format": "uuid"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "start_date",
+                "end_date"
+              ],
+              "description": "A YoPlanning product availability returned by the API."
+            },
+            "description": "The availability slots returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated list of product availability slots."
+      },
+      "followUpActions": [
+        "yoplanning.get_availability_details"
+      ]
+    },
+    {
+      "id": "yoplanning.list_teams",
+      "service": "yoplanning",
+      "name": "list_teams",
+      "description": "List the YoPlanning teams accessible to the authenticated API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of results to return, from 1 to 100."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing accessible YoPlanning teams."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "The total number of matching resources."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next pagination page, or null when no page is available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous pagination page, or null when no page is available.",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous pagination page, or null when no page is available."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The YoPlanning team ID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The YoPlanning team name."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A YoPlanning team returned by the API."
+            },
+            "description": "The YoPlanning teams returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "next",
+          "previous",
+          "results"
+        ],
+        "description": "A paginated list of accessible YoPlanning teams."
+      },
+      "followUpActions": [
+        "yoplanning.get_team"
+      ]
+    }
+  ]
+}

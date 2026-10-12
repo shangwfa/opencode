@@ -1,0 +1,354 @@
+{
+  "service": "remove_bg",
+  "displayName": "remove.bg",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "removebg_api_key",
+      "description": "remove.bg API key sent with the X-Api-Key header. Create it from your remove.bg account as described at https://www.remove.bg/r/api-how-to-get-api-key.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.remove.bg",
+  "actions": [
+    {
+      "id": "remove_bg.get_account",
+      "service": "remove_bg",
+      "name": "get_account",
+      "description": "Fetch the current remove.bg credit balance and free API call allowance for the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number",
+                "description": "The total credits available to the account."
+              },
+              "subscription": {
+                "type": "number",
+                "description": "The subscription credits available to the account."
+              },
+              "payg": {
+                "type": "number",
+                "description": "The pay-as-you-go credits available to the account."
+              },
+              "enterprise": {
+                "type": "number",
+                "description": "The enterprise credits available to the account."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The remove.bg credit balance summary."
+          },
+          "api": {
+            "type": "object",
+            "properties": {
+              "freeCalls": {
+                "type": "integer",
+                "description": "The number of free API calls still available."
+              },
+              "sizes": {
+                "type": "string",
+                "description": "The available output size tier reported by remove.bg."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The remove.bg API usage summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for fetching remove.bg account information."
+      }
+    },
+    {
+      "id": "remove_bg.remove_background",
+      "service": "remove_bg",
+      "name": "remove_background",
+      "description": "Remove the background from an image with remove.bg and upload the generated image or ZIP result to local transit storage. Provide exactly one of imageUrl or contentBase64; use shadowType and shadowOpacity for shadows.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "description": "A publicly reachable source image URL. Provide exactly one of imageUrl or contentBase64.",
+            "format": "uri"
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw Base64-encoded source image bytes. Provide exactly one of imageUrl or contentBase64."
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "full",
+              "50MP",
+              "auto",
+              "medium",
+              "hd",
+              "4k",
+              "small",
+              "regular"
+            ],
+            "description": "The maximum output resolution. Use preview for cheaper low-resolution output, auto for the best available size, full for up to 25MP, or 50MP for the highest supported size."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "car",
+              "product",
+              "person",
+              "animal",
+              "graphic",
+              "transportation"
+            ],
+            "description": "The foreground type to detect or enforce. Use auto unless the subject category is already known."
+          },
+          "typeLevel": {
+            "type": "string",
+            "enum": [
+              "none",
+              "1",
+              "2",
+              "latest"
+            ],
+            "description": "How specific remove.bg should be when classifying the detected foreground type. Use latest for the most current classes, or none when classification metadata is not needed."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "png",
+              "jpg",
+              "zip",
+              "webp"
+            ],
+            "description": "The output format. Use auto for the default, png or webp for transparency, jpg when no transparency is needed, or zip for high-resolution transparent workflows."
+          },
+          "roi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Region of interest as 'x1 y1 x2 y2' using px or % coordinates. Only content inside this rectangle can be detected as foreground."
+          },
+          "crop": {
+            "type": "boolean",
+            "description": "Whether to crop away empty transparent regions around the result."
+          },
+          "cropMargin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Extra margin to keep around the cropped subject, such as '30px', '10%', or four CSS-like side values. Only applies when crop is true."
+          },
+          "scale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Subject scale relative to the output canvas, such as '75%' or 'original'. Scaling implies centered positioning unless position is also set."
+          },
+          "position": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Subject position in the output canvas, such as 'original', 'center', '50% 50%', or another remove.bg-supported position value."
+          },
+          "channels": {
+            "type": "string",
+            "enum": [
+              "rgba",
+              "alpha"
+            ],
+            "description": "Whether to return the finalized RGBA image or only the alpha mask. Use rgba for normal background removal results."
+          },
+          "shadowType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A single shadow style for the result. Use auto, car, 3D, drop, or none. Prefer this over the deprecated add_shadow API parameter."
+          },
+          "shadowOpacity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A single shadow opacity for the result. Use auto or a value from 0 to 100 when shadowType is set."
+          },
+          "semitransparency": {
+            "type": "boolean",
+            "description": "Whether to keep supported semi-transparent regions in the result, currently most useful for car windows."
+          },
+          "backgroundColor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A solid background color to apply, such as a hex color or color name. Do not combine with backgroundImageUrl or backgroundContentBase64."
+          },
+          "backgroundImageUrl": {
+            "type": "string",
+            "description": "A publicly reachable background image URL to apply. Do not combine with backgroundColor or backgroundContentBase64.",
+            "format": "uri"
+          },
+          "backgroundContentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw Base64-encoded background image bytes to upload as the background image. Do not combine with backgroundColor or backgroundImageUrl."
+          },
+          "backgroundFileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional filename for backgroundContentBase64 uploads. Only set this when backgroundContentBase64 is provided."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for removing an image background with remove.bg. Provide exactly one of imageUrl or contentBase64, and at most one background replacement."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the generated file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The size of the generated file in bytes."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated filename."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the generated file."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A generated file uploaded to local transit storage."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The MIME type of the generated result file."
+          },
+          "contentLength": {
+            "type": "integer",
+            "description": "The size of the generated result file in bytes."
+          },
+          "width": {
+            "type": "integer",
+            "description": "The width of the generated result image."
+          },
+          "height": {
+            "type": "integer",
+            "description": "The height of the generated result image."
+          },
+          "foregroundType": {
+            "type": "string",
+            "description": "The detected foreground type returned by remove.bg."
+          },
+          "creditsCharged": {
+            "type": "number",
+            "description": "The credits charged for this request."
+          },
+          "foregroundTop": {
+            "type": "integer",
+            "description": "The top position of the detected foreground."
+          },
+          "foregroundLeft": {
+            "type": "integer",
+            "description": "The left position of the detected foreground."
+          },
+          "foregroundWidth": {
+            "type": "integer",
+            "description": "The width of the detected foreground."
+          },
+          "foregroundHeight": {
+            "type": "integer",
+            "description": "The height of the detected foreground."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "contentType",
+          "contentLength"
+        ],
+        "description": "The output payload for removing an image background."
+      }
+    },
+    {
+      "id": "remove_bg.submit_improvement",
+      "service": "remove_bg",
+      "name": "submit_improvement",
+      "description": "Submit a source image to the remove.bg improvement program for future model quality improvements.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "description": "A publicly reachable source image URL. Provide exactly one of imageUrl or contentBase64.",
+            "format": "uri"
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw Base64-encoded source image bytes. Provide exactly one of imageUrl or contentBase64."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source image filename sent to remove.bg for the improvement submission."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional grouping tag for related improvement submissions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for submitting an image to the remove.bg improvement program. Provide exactly one of imageUrl or contentBase64."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The remove.bg submission identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for submitting an image improvement sample."
+      }
+    }
+  ]
+}

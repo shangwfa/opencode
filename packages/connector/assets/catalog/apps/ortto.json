@@ -1,0 +1,510 @@
+{
+  "service": "ortto",
+  "displayName": "Ortto",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Custom API Key",
+      "placeholder": "ORTTO_API_KEY",
+      "description": "Ortto custom API key sent with the X-Api-Key header. Create a custom API data source in Ortto to get the key: https://help.ortto.com/user/latest/data-sources/configuring-a-new-data-source/other-integrations/custom-api.html.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "default",
+          "description": "Optional Ortto instance region. Use default for api.ap3api.com, au for api.au.ap3api.com, or eu for api.eu.ap3api.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://ortto.com",
+  "actions": [
+    {
+      "id": "ortto.get_people_by_ids",
+      "service": "ortto",
+      "name": "get_people_by_ids",
+      "description": "Retrieve Ortto contacts by their contact IDs and return the requested fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An Ortto contact ID."
+            },
+            "description": "Ortto contact IDs to retrieve.",
+            "minItems": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An Ortto person field ID."
+            },
+            "description": "Ortto person field IDs to return for each contact.",
+            "maxItems": 150
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_ids"
+        ],
+        "description": "Input parameters for retrieving Ortto people by contact IDs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Ortto contact object as returned by the API, including id, fields, and any associated account data."
+            },
+            "description": "Contacts returned by Ortto."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Ortto metadata for the request, including totals when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ortto metadata for the request, including totals when returned."
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset used by Ortto for this response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset used by Ortto for this response."
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset for the next page when returned by Ortto."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset for the next page when returned by Ortto."
+          },
+          "cursor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor ID for fetching the next page when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor ID for fetching the next page when returned."
+          },
+          "has_more": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Ortto reported another page of contacts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Ortto reported another page of contacts."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Ortto API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "meta",
+          "offset",
+          "next_offset",
+          "cursor_id",
+          "has_more",
+          "raw"
+        ],
+        "description": "The normalized Ortto people retrieval result."
+      }
+    },
+    {
+      "id": "ortto.list_people",
+      "service": "ortto",
+      "name": "list_people",
+      "description": "Retrieve people from Ortto's customer data platform with optional fields, filters, pagination, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of people to return. Ortto allows 1 to 500."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The offset for offset-based pagination."
+          },
+          "cursor_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor ID returned by the previous Ortto response."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An Ortto person field ID."
+            },
+            "description": "Ortto person field IDs to return for each contact.",
+            "maxItems": 150
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A text search query for matching people."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "",
+              "archived"
+            ],
+            "description": "The Ortto person collection to query."
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for the selected sort_by_field_id."
+          },
+          "sort_by_field_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Ortto person field ID to sort by."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "An Ortto filter object copied from the Ortto app or built according to the Ortto person/get filter documentation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving people from Ortto."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Ortto contact object as returned by the API, including id, fields, and any associated account data."
+            },
+            "description": "Contacts returned by Ortto."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Ortto metadata for the request, including totals when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ortto metadata for the request, including totals when returned."
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset used by Ortto for this response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset used by Ortto for this response."
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The offset for the next page when returned by Ortto."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The offset for the next page when returned by Ortto."
+          },
+          "cursor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor ID for fetching the next page when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor ID for fetching the next page when returned."
+          },
+          "has_more": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Ortto reported another page of contacts."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Ortto reported another page of contacts."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Ortto API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "meta",
+          "offset",
+          "next_offset",
+          "cursor_id",
+          "has_more",
+          "raw"
+        ],
+        "description": "The normalized Ortto people retrieval result."
+      }
+    },
+    {
+      "id": "ortto.merge_people",
+      "service": "ortto",
+      "name": "merge_people",
+      "description": "Create or update one or more Ortto people using Ortto's person/merge endpoint and merge strategy options.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A value for an Ortto field ID. Ortto field values may be strings, numbers, booleans, nulls, arrays, or nested objects depending on the field type."
+                  },
+                  "description": "Ortto field ID/value pairs, such as str::email or str:cm:custom-field."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Ortto location data for a person, such as source_ip or address/custom location fields."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A tag name."
+                  },
+                  "description": "Tags to apply to this person."
+                },
+                "unset_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A tag name."
+                  },
+                  "description": "Tags to remove from this person."
+                },
+                "clear_fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean",
+                    "description": "Whether to clear this field."
+                  },
+                  "description": "Person fields whose existing values should be cleared when supported by the selected merge strategy."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "fields"
+              ],
+              "description": "A person record to create or update in Ortto."
+            },
+            "description": "People to create or update. Ortto allows 1 to 100 people per request.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "async": {
+            "type": "boolean",
+            "description": "Whether Ortto should queue the merge asynchronously."
+          },
+          "merge_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An Ortto person field ID."
+            },
+            "description": "Ortto person field IDs used to identify existing people.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "merge_strategy": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "number",
+                "description": "Append only."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "Overwrite existing."
+              },
+              {
+                "const": 3,
+                "type": "number",
+                "description": "Ignore existing."
+              }
+            ],
+            "description": "Ortto merge strategy: 1 append only, 2 overwrite existing, or 3 ignore existing."
+          },
+          "find_strategy": {
+            "anyOf": [
+              {
+                "const": 0,
+                "type": "number",
+                "description": "Any merge key match."
+              },
+              {
+                "const": 1,
+                "type": "number",
+                "description": "Next key only if the previous key is empty."
+              },
+              {
+                "const": 2,
+                "type": "number",
+                "description": "All merge keys must match."
+              }
+            ],
+            "description": "Ortto find strategy: 0 any, 1 next only if previous empty, or 2 all."
+          },
+          "skip_non_existing": {
+            "type": "boolean",
+            "description": "Whether to update only existing contacts and skip creating new contacts."
+          },
+          "merge_by_alt_fields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional alternate field mapping for Ortto merge_by identifiers."
+          },
+          "suppression_list_field_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ortto field ID used to compare new contacts against the email suppression list."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "people"
+        ],
+        "description": "Input parameters for creating or updating people in Ortto."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Ortto accepted the merge request."
+          },
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An Ortto contact object as returned by the API, including id, fields, and any associated account data."
+            },
+            "description": "Contacts returned by Ortto when the response includes contact records."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Ortto API response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "contacts",
+          "raw"
+        ],
+        "description": "The normalized Ortto merge people result."
+      }
+    }
+  ]
+}

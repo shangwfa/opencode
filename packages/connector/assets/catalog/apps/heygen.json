@@ -1,0 +1,1382 @@
+{
+  "service": "heygen",
+  "displayName": "HeyGen",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://app.heygen.com/oauth/authorize",
+      "tokenUrl": "https://api2.heygen.com/v1/oauth/token",
+      "refreshTokenUrl": "https://api2.heygen.com/v1/oauth/refresh_token",
+      "scopes": [],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationRequestFields": {
+        "scope": false
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HEYGEN_API_KEY",
+      "description": "HeyGen API key sent with the X-Api-Key header. Create or view API keys in HeyGen API settings."
+    }
+  ],
+  "homepageUrl": "https://www.heygen.com",
+  "actions": [
+    {
+      "id": "heygen.delete_asset",
+      "service": "heygen",
+      "name": "delete_asset",
+      "description": "Delete a HeyGen asset that is no longer needed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen asset ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "assetId"
+        ],
+        "description": "Input parameters for deleting a HeyGen asset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deleted HeyGen asset ID."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether HeyGen accepted the asset deletion request."
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the HeyGen API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw object returned by the HeyGen API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "deleted",
+          "asset",
+          "raw"
+        ],
+        "description": "The normalized output for deleting a HeyGen asset."
+      }
+    },
+    {
+      "id": "heygen.delete_video",
+      "service": "heygen",
+      "name": "delete_video",
+      "description": "Delete a generated or translated HeyGen video that is no longer needed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen video ID to delete."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "heygen_video",
+              "video_translate"
+            ],
+            "description": "The video category, either heygen_video or video_translate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId"
+        ],
+        "description": "Input parameters for deleting a HeyGen video."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen video ID requested for deletion."
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether HeyGen reported the video as deleted."
+          },
+          "deletedVideoIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The video IDs HeyGen reported as successfully deleted."
+          },
+          "failedVideoIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The video IDs HeyGen reported as failed."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId",
+          "deleted",
+          "deletedVideoIds",
+          "failedVideoIds",
+          "raw"
+        ],
+        "description": "The normalized output for deleting a HeyGen video."
+      }
+    },
+    {
+      "id": "heygen.generate_template_video",
+      "service": "heygen",
+      "name": "generate_template_video",
+      "description": "Start an asynchronous HeyGen template video generation job with explicit template variables.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen template ID to generate from."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "Template variables keyed by the exact variable names returned by the template detail endpoint."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional title for the generated video."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether HeyGen should run the request in test mode."
+          },
+          "caption": {
+            "type": "boolean",
+            "description": "Whether HeyGen should add captions to the video."
+          },
+          "dimension": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output video width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output video height in pixels."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The optional video dimension configuration."
+          },
+          "includeGif": {
+            "type": "boolean",
+            "description": "Whether to include a GIF preview URL in the webhook response."
+          },
+          "enableSharing": {
+            "type": "boolean",
+            "description": "Whether to make the video publicly shareable immediately after creation."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen folder ID where the video should be stored."
+          },
+          "brandVoiceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Brand Glossary ID used for translation and pronunciation rules."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL HeyGen should notify when video rendering is complete."
+          },
+          "keepTextVerticallyCentered": {
+            "type": "boolean",
+            "description": "Whether replaced text elements should be vertically centered."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "variables"
+        ],
+        "description": "Input parameters for generating a HeyGen video from a template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The generated HeyGen video ID."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId",
+          "raw"
+        ],
+        "description": "The normalized output for a HeyGen video generation request."
+      },
+      "followUpActions": [
+        "heygen.get_video_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "heygen.generate_template_video",
+        "statusActionId": "heygen.get_video_status"
+      }
+    },
+    {
+      "id": "heygen.generate_video",
+      "service": "heygen",
+      "name": "generate_video",
+      "description": "Start an asynchronous HeyGen avatar video generation job and return the generated video ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "videoInputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "character": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "avatar",
+                        "talking_photo"
+                      ],
+                      "description": "The character type, either avatar or talking_photo."
+                    },
+                    "avatarId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The HeyGen avatar ID to use for this scene."
+                    },
+                    "avatarStyle": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The avatar rendering style, such as normal."
+                    },
+                    "talkingPhotoId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The HeyGen talking photo ID to use for this scene."
+                    },
+                    "scale": {
+                      "type": "number",
+                      "description": "The optional character scale for this scene."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The character configuration for a HeyGen video scene."
+                },
+                "voice": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "audio"
+                      ],
+                      "description": "The voice input type, either text or audio."
+                    },
+                    "voiceId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The HeyGen voice ID to use for narration."
+                    },
+                    "inputText": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The text that HeyGen should synthesize."
+                    },
+                    "audioUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The audio URL to use when the voice type is audio."
+                    },
+                    "audioAssetId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The uploaded audio asset ID to use when the voice type is audio."
+                    },
+                    "speed": {
+                      "type": "number",
+                      "description": "The optional speech speed multiplier."
+                    },
+                    "pitch": {
+                      "type": "number",
+                      "description": "The optional voice pitch adjustment."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The voice or audio configuration for a HeyGen video scene."
+                },
+                "background": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "color",
+                        "image",
+                        "video"
+                      ],
+                      "description": "The background type: color, image, or video."
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The hex color value when the background type is color."
+                    },
+                    "url": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The background image or video URL."
+                    },
+                    "imageAssetId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The uploaded image asset ID for image backgrounds."
+                    },
+                    "videoAssetId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The uploaded video asset ID for video backgrounds."
+                    },
+                    "fit": {
+                      "type": "string",
+                      "enum": [
+                        "crop",
+                        "cover",
+                        "contain",
+                        "none"
+                      ],
+                      "description": "How the background media should fit the scene."
+                    },
+                    "playStyle": {
+                      "type": "string",
+                      "enum": [
+                        "freeze",
+                        "loop",
+                        "fit_to_scene",
+                        "full_video"
+                      ],
+                      "description": "The video background playback style."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "The optional background configuration for a HeyGen video scene."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "character",
+                "voice"
+              ],
+              "description": "One scene input for HeyGen video generation."
+            },
+            "description": "The scenes to generate into a video.",
+            "minItems": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional title for the generated video."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether HeyGen should run the request in test mode."
+          },
+          "caption": {
+            "type": "boolean",
+            "description": "Whether HeyGen should add captions to the video."
+          },
+          "callbackId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional callback identifier returned in webhooks."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL HeyGen should notify when video rendering is complete."
+          },
+          "aspectRatio": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target aspect ratio, such as 16:9 or 9:16."
+          },
+          "dimension": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output video width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output video height in pixels."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The optional video dimension configuration."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen folder ID where the video should be stored."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoInputs"
+        ],
+        "description": "Input parameters for generating a HeyGen video."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The generated HeyGen video ID."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId",
+          "raw"
+        ],
+        "description": "The normalized output for a HeyGen video generation request."
+      },
+      "followUpActions": [
+        "heygen.get_video_status"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "heygen.generate_video",
+        "statusActionId": "heygen.get_video_status"
+      }
+    },
+    {
+      "id": "heygen.get_avatar",
+      "service": "heygen",
+      "name": "get_avatar",
+      "description": "Retrieve details for a single HeyGen avatar by avatar ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "avatarId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HeyGen avatar ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "avatarId"
+        ],
+        "description": "Input parameters for retrieving a HeyGen avatar."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "avatar": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The HeyGen avatar detail object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "avatar",
+          "raw"
+        ],
+        "description": "The normalized output for this HeyGen avatar action."
+      }
+    },
+    {
+      "id": "heygen.get_current_user",
+      "service": "heygen",
+      "name": "get_current_user",
+      "description": "Retrieve profile information for the HeyGen account associated with the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The current HeyGen user object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user",
+          "raw"
+        ],
+        "description": "The normalized output for this HeyGen user action."
+      }
+    },
+    {
+      "id": "heygen.get_remaining_quota",
+      "service": "heygen",
+      "name": "get_remaining_quota",
+      "description": "Retrieve the remaining generation quota for the authenticated HeyGen account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "quota": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The HeyGen quota object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "quota",
+          "raw"
+        ],
+        "description": "The normalized output for this HeyGen quota action."
+      }
+    },
+    {
+      "id": "heygen.get_shareable_video_url",
+      "service": "heygen",
+      "name": "get_shareable_video_url",
+      "description": "Retrieve a public share URL for a rendered HeyGen video by video ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen video ID returned by a generation request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId"
+        ],
+        "description": "Input parameters for retrieving a HeyGen video resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shareableUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The public HeyGen share URL when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The public HeyGen share URL when available."
+          },
+          "raw": {
+            "description": "The raw HeyGen response data value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shareableUrl",
+          "raw"
+        ],
+        "description": "The normalized output for retrieving a HeyGen shareable video URL."
+      }
+    },
+    {
+      "id": "heygen.get_template",
+      "service": "heygen",
+      "name": "get_template",
+      "description": "Retrieve variable definitions and metadata for a single HeyGen template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HeyGen template ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "Input parameters for retrieving a HeyGen template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The HeyGen template detail object."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template",
+          "raw"
+        ],
+        "description": "The normalized output for this HeyGen template action."
+      }
+    },
+    {
+      "id": "heygen.get_video_status",
+      "service": "heygen",
+      "name": "get_video_status",
+      "description": "Retrieve processing status and download URLs for a HeyGen video by video ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen video ID returned by a generation request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId"
+        ],
+        "description": "Input parameters for retrieving a HeyGen video resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videoId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The HeyGen video ID when returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The HeyGen video ID when returned by the API."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current processing status of the video."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current processing status of the video."
+          },
+          "videoUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The rendered video URL when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rendered video URL when available."
+          },
+          "thumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The rendered video thumbnail URL when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rendered video thumbnail URL when available."
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The rendered video duration when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rendered video duration when available."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videoId",
+          "status",
+          "videoUrl",
+          "thumbnailUrl",
+          "duration",
+          "raw"
+        ],
+        "description": "The normalized output for retrieving HeyGen video status."
+      }
+    },
+    {
+      "id": "heygen.list_assets",
+      "service": "heygen",
+      "name": "list_assets",
+      "description": "List uploaded HeyGen image, video, and audio assets so they can be reused in video generation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of assets to return, from 0 to 100. Use 0 to request no assets, or omit this field to use HeyGen's server default."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination token returned by a previous request."
+          },
+          "fileType": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "audio"
+            ],
+            "description": "The asset type to list: image, video, or audio."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen folder ID to list assets from."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing HeyGen assets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total asset count when HeyGen includes it, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total asset count when HeyGen includes it, otherwise null."
+          },
+          "nextToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination token for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination token for the next page, or null when there is no next page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "assets",
+          "totalCount",
+          "nextToken",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen assets."
+      }
+    },
+    {
+      "id": "heygen.list_avatars",
+      "service": "heygen",
+      "name": "list_avatars",
+      "description": "List HeyGen avatars and talking photos available for video generation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "avatars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "talkingPhotos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "avatars",
+          "talkingPhotos",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen avatars."
+      }
+    },
+    {
+      "id": "heygen.list_folders",
+      "service": "heygen",
+      "name": "list_folders",
+      "description": "List HeyGen folders and folder IDs that can be used with HeyGen video generation inputs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of folders to return, from 0 to 100."
+          },
+          "parentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parent folder ID to filter by."
+          },
+          "nameFilter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The full or partial folder name to search for."
+          },
+          "isTrash": {
+            "type": "boolean",
+            "description": "Whether to list folders in the trash."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination token returned by a previous request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing HeyGen folders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total folder count when HeyGen includes it, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total folder count when HeyGen includes it, otherwise null."
+          },
+          "nextToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination token for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination token for the next page, or null when there is no next page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "folders",
+          "totalCount",
+          "nextToken",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen folders."
+      }
+    },
+    {
+      "id": "heygen.list_templates",
+      "service": "heygen",
+      "name": "list_templates",
+      "description": "List HeyGen templates created under the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen templates."
+      }
+    },
+    {
+      "id": "heygen.list_videos",
+      "service": "heygen",
+      "name": "list_videos",
+      "description": "List generated HeyGen videos for historical result management.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The maximum number of videos to return, from 0 to 100."
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination token returned by a previous request."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The HeyGen folder ID to list videos from."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The video title to search for."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing HeyGen videos."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total video count when HeyGen includes it, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total video count when HeyGen includes it, otherwise null."
+          },
+          "nextToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The pagination token for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pagination token for the next page, or null when there is no next page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "videos",
+          "totalCount",
+          "nextToken",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen videos."
+      }
+    },
+    {
+      "id": "heygen.list_voices",
+      "service": "heygen",
+      "name": "list_voices",
+      "description": "List HeyGen voices available for video narration.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "voices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw object returned by the HeyGen API."
+            },
+            "description": "The list of raw objects returned by the HeyGen API."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total voice count when HeyGen includes it, otherwise null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total voice count when HeyGen includes it, otherwise null."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voices",
+          "totalCount",
+          "raw"
+        ],
+        "description": "The normalized output for listing HeyGen voices."
+      }
+    },
+    {
+      "id": "heygen.upload_asset",
+      "service": "heygen",
+      "name": "upload_asset",
+      "description": "Upload an image, video, or audio file to HeyGen and return an asset ID usable in video generation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The media file content encoded as a Base64 string."
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "video/mp4",
+              "video/webm",
+              "audio/mpeg"
+            ],
+            "description": "The MIME type of the media file to upload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentBase64",
+          "mimeType"
+        ],
+        "description": "Input parameters for uploading a HeyGen media asset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The uploaded HeyGen asset ID."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The value returned by HeyGen, or null when unavailable."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The value returned by HeyGen, or null when unavailable."
+          },
+          "asset": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the HeyGen API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "assetId",
+          "url",
+          "asset",
+          "raw"
+        ],
+        "description": "The normalized output for uploading a HeyGen asset."
+      }
+    }
+  ]
+}

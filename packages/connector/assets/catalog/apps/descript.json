@@ -1,0 +1,758 @@
+{
+  "service": "descript",
+  "displayName": "Descript",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "DESCRIPT_API_TOKEN",
+      "description": "Personal API token sent as a Bearer credential. Create a Drive-scoped token in Descript Settings under API tokens: https://docs.descriptapi.com/#section/Getting-started/Create-an-API-token"
+    }
+  ],
+  "homepageUrl": "https://www.descript.com/",
+  "actions": [
+    {
+      "id": "descript.cancel_job",
+      "service": "descript",
+      "name": "cancel_job",
+      "description": "Cancel a running Descript job.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The running job UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "The job to cancel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean",
+            "description": "Whether the cancellation request succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "cancelled"
+        ],
+        "description": "Confirmation that Descript accepted the cancellation."
+      }
+    },
+    {
+      "id": "descript.get_job",
+      "service": "descript",
+      "name": "get_job",
+      "description": "Get the current state and type-specific result of a Descript job.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobId"
+        ],
+        "description": "The job to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "description": "The normalized job status."
+          },
+          "job": {
+            "type": "object",
+            "properties": {
+              "job_id": {
+                "type": "string",
+                "description": "The job identifier.",
+                "format": "uuid"
+              },
+              "job_type": {
+                "type": "string",
+                "description": "The Descript job type."
+              },
+              "job_state": {
+                "type": "string",
+                "description": "The upstream job state."
+              },
+              "result": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The type-specific job result."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Descript asynchronous job."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "job"
+        ],
+        "description": "The normalized state and raw Descript job."
+      }
+    },
+    {
+      "id": "descript.get_project",
+      "service": "descript",
+      "name": "get_project",
+      "description": "Get a Descript project with its media, compositions, and published links.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The project UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "The project to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The project and its contents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "A Descript project response."
+      }
+    },
+    {
+      "id": "descript.import_media",
+      "service": "descript",
+      "name": "import_media",
+      "description": "Import URL-hosted media into a new or existing Descript project asynchronously.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The existing project UUID to receive the media.",
+            "format": "uuid"
+          },
+          "projectName": {
+            "type": "string",
+            "description": "The name of a new project to create."
+          },
+          "teamAccess": {
+            "type": "string",
+            "enum": [
+              "edit",
+              "comment",
+              "view",
+              "none"
+            ],
+            "description": "The Drive member access for a newly created project."
+          },
+          "folderName": {
+            "type": "string",
+            "description": "The nested folder path for a newly created project."
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The display name or folder path used inside the project."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "A public or pre-signed URL that supports HTTP Range requests.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "url"
+              ],
+              "description": "One media file exposed to Descript by URL."
+            },
+            "description": "The URL-hosted media files to import.",
+            "minItems": 1
+          },
+          "compositions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Descript composition definition."
+            },
+            "description": "Optional Descript composition definitions referencing media names."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "description": "A webhook URL that Descript should call when the job stops.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "media"
+        ],
+        "description": "A URL-based Descript media import request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job identifier used to monitor completion.",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project created or modified by the job.",
+            "format": "uuid"
+          },
+          "projectUrl": {
+            "type": "string",
+            "description": "The URL for opening the project in Descript.",
+            "format": "uri"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A newly submitted Descript job."
+      },
+      "followUpActions": [
+        "descript.get_job"
+      ]
+    },
+    {
+      "id": "descript.list_agent_models",
+      "service": "descript",
+      "name": "list_agent_models",
+      "description": "List the current Descript Underlord models and stable aliases.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "availableModels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An available model and cost tier."
+            },
+            "description": "The currently available models."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A model alias."
+            },
+            "description": "Stable aliases and their current targets."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "availableModels",
+          "aliases",
+          "raw"
+        ],
+        "description": "The live Descript agent model catalog."
+      }
+    },
+    {
+      "id": "descript.list_jobs",
+      "service": "descript",
+      "name": "list_jobs",
+      "description": "List recent Descript jobs with optional project, type, time, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Only include jobs for this project UUID.",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "import/project_media",
+              "agent"
+            ],
+            "description": "Only include this job type."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "A pagination cursor from a previous response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of jobs to return."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Only include jobs created after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Only include jobs created before this ISO 8601 timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Descript jobs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "job_id": {
+                  "type": "string",
+                  "description": "The job identifier.",
+                  "format": "uuid"
+                },
+                "job_type": {
+                  "type": "string",
+                  "description": "The Descript job type."
+                },
+                "job_state": {
+                  "type": "string",
+                  "description": "The upstream job state."
+                },
+                "result": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The type-specific job result."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Descript asynchronous job."
+            },
+            "description": "The jobs in this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page, or null at the end."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page, or null at the end."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Descript."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "jobs",
+          "pagination",
+          "raw"
+        ],
+        "description": "A page of Descript jobs."
+      }
+    },
+    {
+      "id": "descript.list_projects",
+      "service": "descript",
+      "name": "list_projects",
+      "description": "List projects accessible to the Drive associated with the Descript API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A case-insensitive substring to match against project names."
+          },
+          "folderPath": {
+            "type": "string",
+            "description": "The exact folder path whose direct projects should be returned."
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "A creator UUID or me for the authenticated user."
+          },
+          "createdAfter": {
+            "type": "string",
+            "description": "Only include projects created after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "createdBefore": {
+            "type": "string",
+            "description": "Only include projects created before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "updatedAfter": {
+            "type": "string",
+            "description": "Only include projects updated after this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "updatedBefore": {
+            "type": "string",
+            "description": "Only include projects updated before this ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "created_at",
+              "updated_at",
+              "last_viewed_at"
+            ],
+            "description": "The project field used for sorting."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "A pagination cursor from a previous response."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of projects to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Descript projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Descript project summary."
+            },
+            "description": "The projects in this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "next_cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The cursor for the next page, or null at the end."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The cursor for the next page, or null at the end."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Descript."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projects",
+          "pagination",
+          "raw"
+        ],
+        "description": "A page of Descript projects."
+      }
+    },
+    {
+      "id": "descript.prompt_agent",
+      "service": "descript",
+      "name": "prompt_agent",
+      "description": "Submit an asynchronous Underlord request to create or edit a Descript project.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The existing project UUID to edit.",
+            "format": "uuid"
+          },
+          "projectName": {
+            "type": "string",
+            "description": "The name of a new project to create."
+          },
+          "compositionId": {
+            "type": "string",
+            "description": "A composition UUID, short ID, or Descript project URL to target."
+          },
+          "model": {
+            "type": "string",
+            "description": "A model ID or stable alias returned by list_agent_models."
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete natural-language editing instruction."
+          },
+          "teamAccess": {
+            "type": "string",
+            "enum": [
+              "edit",
+              "comment",
+              "view",
+              "none"
+            ],
+            "description": "The Drive member access for a newly created project."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "description": "A webhook URL that Descript should call when the job stops.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt"
+        ],
+        "description": "An Underlord instruction targeting an existing project or a new project name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job identifier used to monitor completion.",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project created or modified by the job.",
+            "format": "uuid"
+          },
+          "projectUrl": {
+            "type": "string",
+            "description": "The URL for opening the project in Descript.",
+            "format": "uri"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A newly submitted Descript job."
+      },
+      "followUpActions": [
+        "descript.get_job"
+      ]
+    },
+    {
+      "id": "descript.publish_project",
+      "service": "descript",
+      "name": "publish_project",
+      "description": "Publish or republish a Descript composition and produce share and download URLs asynchronously.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "The project UUID to publish.",
+            "format": "uuid"
+          },
+          "compositionId": {
+            "type": "string",
+            "description": "The composition UUID, short ID, or Descript project URL to publish."
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "Video",
+              "Audio"
+            ],
+            "description": "The output media type."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "480p",
+              "720p",
+              "1080p",
+              "1440p",
+              "4K"
+            ],
+            "description": "The video resolution."
+          },
+          "accessLevel": {
+            "type": "string",
+            "enum": [
+              "public",
+              "unlisted",
+              "drive",
+              "private"
+            ],
+            "description": "The desired share-page access level."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "description": "A webhook URL that Descript should call when the job stops.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "A Descript composition publish request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "The job identifier used to monitor completion.",
+            "format": "uuid"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "The project created or modified by the job.",
+            "format": "uuid"
+          },
+          "projectUrl": {
+            "type": "string",
+            "description": "The URL for opening the project in Descript.",
+            "format": "uri"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete response payload returned by Descript."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A newly submitted Descript job."
+      },
+      "followUpActions": [
+        "descript.get_job"
+      ]
+    }
+  ]
+}

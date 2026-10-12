@@ -1,0 +1,280 @@
+{
+  "service": "check",
+  "displayName": "Check",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CHECK_API_KEY",
+      "description": "Check API key sent as an Authorization Bearer token. Use a sandbox or production key from your Check account.",
+      "extraFields": [
+        {
+          "key": "environment",
+          "label": "Environment",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "sandbox or production",
+          "description": "The Check API environment for this key. Use sandbox for https://sandbox.checkhq.com or production for https://api.checkhq.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.checkhq.com",
+  "actions": [
+    {
+      "id": "check.get_agency",
+      "service": "check",
+      "name": "get_agency",
+      "description": "Get one Check tax agency by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Check agency ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for reading a Check agency."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "agency": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique Check agency identifier."
+              },
+              "label": {
+                "type": "string",
+                "description": "The human-readable agency name."
+              },
+              "jurisdiction": {
+                "type": "string",
+                "description": "The lowercase jurisdiction code for the agency."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw agency object returned by Check."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Check agency."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "agency"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "check.list_agencies",
+      "service": "check",
+      "name": "list_agencies",
+      "description": "List Check tax agencies with optional ID, jurisdiction, label, and page size filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Check agency ID."
+            },
+            "description": "The Check agency IDs to look up. Check accepts repeated id query parameters.",
+            "minItems": 1,
+            "maxItems": 500
+          },
+          "jurisdictions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Check jurisdiction code."
+            },
+            "description": "The lowercase jurisdiction codes used to filter agencies.",
+            "minItems": 1
+          },
+          "labelContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A case-insensitive substring filter applied to the agency label."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of agencies to return per page. Check allows up to 500."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Check agencies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the next page, or null if there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the next page, or null if there is no next page."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The URL of the previous page, or null if there is no previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL of the previous page, or null if there is no previous page."
+          },
+          "agencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Check agency identifier."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The human-readable agency name."
+                },
+                "jurisdiction": {
+                  "type": "string",
+                  "description": "The lowercase jurisdiction code for the agency."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw agency object returned by Check."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Check agency."
+            },
+            "description": "The agencies returned by Check."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw paginated agency list response returned by Check."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "next",
+          "previous",
+          "agencies",
+          "raw"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "check.validate_address",
+      "service": "check",
+      "name": "validate_address",
+      "description": "Validate a US address using Check's address validation endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "line1": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A street address line to validate with Check."
+          },
+          "line2": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A second street address line to validate with Check."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The city for the address to validate."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The US state code for the address to validate."
+          },
+          "postalCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The postal code for the address to validate."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country code for the address to validate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "line1",
+          "city",
+          "state",
+          "postalCode"
+        ],
+        "description": "Input parameters for validating an address with Check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Check address validation result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

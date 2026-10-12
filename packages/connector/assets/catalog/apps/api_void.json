@@ -1,0 +1,618 @@
+{
+  "service": "api_void",
+  "displayName": "APIVoid",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "APIVOID_API_KEY",
+      "description": "APIVoid API key sent with the X-API-Key header. Create or view API keys in the APIVoid dashboard: https://dash.apivoid.com/."
+    }
+  ],
+  "homepageUrl": "https://www.apivoid.com/",
+  "actions": [
+    {
+      "id": "api_void.check_domain_reputation",
+      "service": "api_void",
+      "name": "check_domain_reputation",
+      "description": "Check the reputation, blacklist status, category flags, and risk score of a domain with APIVoid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain or host to submit, for example google.com."
+          },
+          "excludeEngines": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated APIVoid engine names to exclude from the scan."
+          },
+          "spamhausKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Spamhaus DBL DQS key to enable the Spamhaus engine."
+          },
+          "includeDomainAge": {
+            "type": "boolean",
+            "description": "Whether APIVoid should include domain age as a risk factor. This may consume an additional credit."
+          },
+          "domainAgeCacheOnly": {
+            "type": "boolean",
+            "description": "Whether to use only cached domain age data when includeDomainAge is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "host"
+        ],
+        "description": "Input parameters for checking domain reputation with APIVoid."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "The host submitted for scanning."
+              },
+              "blacklists": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Blacklist engine results returned by APIVoid."
+              },
+              "category": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Domain category and structural risk flags returned by APIVoid."
+              },
+              "risk_score": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid domain risk score."
+              },
+              "domain_age": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Domain age details returned when requested."
+              }
+            },
+            "additionalProperties": true,
+            "description": "APIVoid domain reputation payload."
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "description": "The raw X-Service-Quota header value."
+                  },
+                  "callUsage": {
+                    "type": "integer",
+                    "description": "The amount of credits consumed for the request."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "The amount of credits available after the request."
+                  },
+                  "reset": {
+                    "type": "integer",
+                    "description": "Unix timestamp when credits will next reset."
+                  },
+                  "overageAllowed": {
+                    "type": "boolean",
+                    "description": "Whether overage is allowed on the subscription plan."
+                  },
+                  "overageEnabled": {
+                    "type": "boolean",
+                    "description": "Whether overage is enabled for the account."
+                  },
+                  "overageValue": {
+                    "type": "integer",
+                    "description": "The amount of overage credits consumed."
+                  },
+                  "overageLimit": {
+                    "type": "integer",
+                    "description": "The maximum overage credits allowed in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "raw"
+                ],
+                "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+          }
+        },
+        "additionalProperties": false,
+        "description": "APIVoid domain reputation result and quota metadata."
+      }
+    },
+    {
+      "id": "api_void.check_ip_reputation",
+      "service": "api_void",
+      "name": "check_ip_reputation",
+      "description": "Check the reputation, blacklist status, and risk score of an IP address with APIVoid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public IPv4 or IPv6 address to scan with APIVoid."
+          },
+          "excludeEngines": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated APIVoid engine names to exclude from the scan."
+          },
+          "spamhausKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Spamhaus DBL DQS key to enable the Spamhaus engine."
+          },
+          "disableReverseDns": {
+            "type": "boolean",
+            "description": "Whether to disable reverse DNS lookup to reduce response time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ip"
+        ],
+        "description": "Input parameters for checking IP reputation with APIVoid."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "ip": {
+                "type": "string",
+                "description": "The IP address submitted for scanning."
+              },
+              "blacklists": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Blacklist engine results returned by APIVoid."
+              },
+              "information": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "IP geolocation and network information returned by APIVoid."
+              },
+              "anomaly": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Anomaly and proxy risk flags returned by APIVoid."
+              },
+              "risk_score": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid IP risk score."
+              }
+            },
+            "additionalProperties": true,
+            "description": "APIVoid IP reputation payload."
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "description": "The raw X-Service-Quota header value."
+                  },
+                  "callUsage": {
+                    "type": "integer",
+                    "description": "The amount of credits consumed for the request."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "The amount of credits available after the request."
+                  },
+                  "reset": {
+                    "type": "integer",
+                    "description": "Unix timestamp when credits will next reset."
+                  },
+                  "overageAllowed": {
+                    "type": "boolean",
+                    "description": "Whether overage is allowed on the subscription plan."
+                  },
+                  "overageEnabled": {
+                    "type": "boolean",
+                    "description": "Whether overage is enabled for the account."
+                  },
+                  "overageValue": {
+                    "type": "integer",
+                    "description": "The amount of overage credits consumed."
+                  },
+                  "overageLimit": {
+                    "type": "integer",
+                    "description": "The maximum overage credits allowed in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "raw"
+                ],
+                "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+          }
+        },
+        "additionalProperties": false,
+        "description": "APIVoid IP reputation result and quota metadata."
+      }
+    },
+    {
+      "id": "api_void.check_url_reputation",
+      "service": "api_void",
+      "name": "check_url_reputation",
+      "description": "Check DNS, blacklist, file, and risk signals for a URL with APIVoid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to submit for reputation scanning.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for checking URL reputation with APIVoid."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "The URL submitted for scanning."
+              },
+              "dns_records": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "DNS records returned by APIVoid."
+              },
+              "domain_blacklist": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Domain blacklist engine results returned by APIVoid."
+              },
+              "file_type": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "File type details returned by APIVoid."
+              },
+              "risk_score": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid URL risk score."
+              }
+            },
+            "additionalProperties": true,
+            "description": "APIVoid URL reputation payload."
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "description": "The raw X-Service-Quota header value."
+                  },
+                  "callUsage": {
+                    "type": "integer",
+                    "description": "The amount of credits consumed for the request."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "The amount of credits available after the request."
+                  },
+                  "reset": {
+                    "type": "integer",
+                    "description": "Unix timestamp when credits will next reset."
+                  },
+                  "overageAllowed": {
+                    "type": "boolean",
+                    "description": "Whether overage is allowed on the subscription plan."
+                  },
+                  "overageEnabled": {
+                    "type": "boolean",
+                    "description": "Whether overage is enabled for the account."
+                  },
+                  "overageValue": {
+                    "type": "integer",
+                    "description": "The amount of overage credits consumed."
+                  },
+                  "overageLimit": {
+                    "type": "integer",
+                    "description": "The maximum overage credits allowed in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "raw"
+                ],
+                "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+          }
+        },
+        "additionalProperties": false,
+        "description": "APIVoid URL reputation result and quota metadata."
+      }
+    },
+    {
+      "id": "api_void.get_account_info",
+      "service": "api_void",
+      "name": "get_account_info",
+      "description": "Get APIVoid account credit, overage, and usage information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for APIVoid account info."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid credit details."
+              },
+              "overage": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid overage settings."
+              },
+              "usage_stats": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "APIVoid usage statistics."
+              }
+            },
+            "additionalProperties": true,
+            "description": "APIVoid account, credit, overage, and usage statistics."
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "description": "The raw X-Service-Quota header value."
+                  },
+                  "callUsage": {
+                    "type": "integer",
+                    "description": "The amount of credits consumed for the request."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "The amount of credits available after the request."
+                  },
+                  "reset": {
+                    "type": "integer",
+                    "description": "Unix timestamp when credits will next reset."
+                  },
+                  "overageAllowed": {
+                    "type": "boolean",
+                    "description": "Whether overage is allowed on the subscription plan."
+                  },
+                  "overageEnabled": {
+                    "type": "boolean",
+                    "description": "Whether overage is enabled for the account."
+                  },
+                  "overageValue": {
+                    "type": "integer",
+                    "description": "The amount of overage credits consumed."
+                  },
+                  "overageLimit": {
+                    "type": "integer",
+                    "description": "The maximum overage credits allowed in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "raw"
+                ],
+                "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+          }
+        },
+        "additionalProperties": false,
+        "description": "APIVoid account details and quota metadata."
+      }
+    },
+    {
+      "id": "api_void.verify_email",
+      "service": "api_void",
+      "name": "verify_email",
+      "description": "Verify an email address or email domain with APIVoid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address to submit for APIVoid verification.",
+            "format": "email"
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The email domain to submit when verifying domain-level email signals."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for verifying an email address or email domain with APIVoid. Provide exactly one of email or domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The email address submitted for verification."
+              },
+              "canonical_email": {
+                "type": "string",
+                "description": "The normalized email address returned by APIVoid."
+              },
+              "valid_format": {
+                "type": "boolean",
+                "description": "Whether APIVoid found a valid email format."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The email domain returned by APIVoid."
+              },
+              "disposable": {
+                "type": "boolean",
+                "description": "Whether the email domain is disposable."
+              },
+              "should_block": {
+                "type": "boolean",
+                "description": "Whether APIVoid recommends blocking the email."
+              },
+              "score": {
+                "type": "integer",
+                "description": "APIVoid email score."
+              },
+              "elapsed_ms": {
+                "type": "integer",
+                "description": "APIVoid processing time in milliseconds."
+              }
+            },
+            "additionalProperties": true,
+            "description": "APIVoid email verification payload."
+          },
+          "quota": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "raw": {
+                    "type": "string",
+                    "description": "The raw X-Service-Quota header value."
+                  },
+                  "callUsage": {
+                    "type": "integer",
+                    "description": "The amount of credits consumed for the request."
+                  },
+                  "available": {
+                    "type": "integer",
+                    "description": "The amount of credits available after the request."
+                  },
+                  "reset": {
+                    "type": "integer",
+                    "description": "Unix timestamp when credits will next reset."
+                  },
+                  "overageAllowed": {
+                    "type": "boolean",
+                    "description": "Whether overage is allowed on the subscription plan."
+                  },
+                  "overageEnabled": {
+                    "type": "boolean",
+                    "description": "Whether overage is enabled for the account."
+                  },
+                  "overageValue": {
+                    "type": "integer",
+                    "description": "The amount of overage credits consumed."
+                  },
+                  "overageLimit": {
+                    "type": "integer",
+                    "description": "The maximum overage credits allowed in the billing cycle."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "raw"
+                ],
+                "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quota values parsed from the APIVoid X-Service-Quota response header."
+          }
+        },
+        "additionalProperties": false,
+        "description": "APIVoid email verification result and quota metadata."
+      }
+    }
+  ]
+}

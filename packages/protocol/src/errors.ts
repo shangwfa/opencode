@@ -46,6 +46,15 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
   { httpApiStatus: 409 },
 ) {}
 
+export class ConnectorNotFoundError extends Schema.TaggedError<ConnectorNotFoundError>()(
+  "ConnectorNotFoundError",
+  {
+    connectionID: Schema.String,
+    message: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 404 },
+) {}
+
 export class SessionBusyError extends Schema.TaggedError<SessionBusyError>()(
   "SessionBusyError",
   {

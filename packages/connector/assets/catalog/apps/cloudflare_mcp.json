@@ -1,0 +1,169 @@
+{
+  "service": "cloudflare_mcp",
+  "displayName": "Cloudflare MCP",
+  "description": "Search Cloudflare documentation and API schemas, then manage Cloudflare resources through the official unified MCP service. API tokens connect directly; OAuth uses a public client registered through https://mcp.cloudflare.com/register with this Open Connector deployment's callback URL.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "oauth2",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://mcp.cloudflare.com/authorize",
+      "tokenUrl": "https://mcp.cloudflare.com/token",
+      "refreshTokenUrl": "https://mcp.cloudflare.com/token",
+      "scopes": [
+        "user:read",
+        "account:read",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      }
+    },
+    {
+      "type": "api_key",
+      "label": "Cloudflare API Token / Bearer Token",
+      "placeholder": "Paste a Cloudflare API token",
+      "description": "A Cloudflare user or account API token sent to the official MCP server as an Authorization Bearer token. Grant only the permissions needed by your workflows. Account tokens should also include Account Resources: Read so the MCP server can auto-detect the account ID."
+    }
+  ],
+  "homepageUrl": "https://github.com/cloudflare/mcp",
+  "iconUrl": "https://workers.cloudflare.com/favicon.ico",
+  "actions": [
+    {
+      "id": "cloudflare_mcp.docs",
+      "service": "cloudflare_mcp",
+      "name": "docs",
+      "description": "Search the official Cloudflare developer documentation for relevant guidance and examples.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudflare documentation search query.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for searching Cloudflare documentation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "similarity": {
+                  "type": "number",
+                  "description": "The semantic similarity score."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The source document ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Cloudflare developer documentation URL.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The documentation page title."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The matching documentation text."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One matching documentation excerpt."
+            },
+            "description": "Matching documentation excerpts."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Semantically relevant Cloudflare documentation excerpts."
+      }
+    },
+    {
+      "id": "cloudflare_mcp.execute",
+      "service": "cloudflare_mcp",
+      "name": "execute",
+      "description": "Run sandboxed JavaScript on Cloudflare's official MCP server to call Cloudflare API endpoints discovered with `search`.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A JavaScript async arrow function. Use `search` before `execute` to discover the exact Cloudflare API path and parameters.",
+            "pattern": "\\S"
+          },
+          "account_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional Cloudflare account ID. Supply it for a user token when the operation is account-scoped; account tokens are auto-detected.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "description": "Input for executing Cloudflare API calls."
+      },
+      "outputSchema": {
+        "description": "The value returned by the supplied Cloudflare API function."
+      }
+    },
+    {
+      "id": "cloudflare_mcp.search",
+      "service": "cloudflare_mcp",
+      "name": "search",
+      "description": "Run sandboxed JavaScript against Cloudflare's OpenAPI specification to discover API endpoints and parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A JavaScript async arrow function. Use `search` before `execute` to discover the exact Cloudflare API path and parameters.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "description": "Input for searching the Cloudflare API specification."
+      },
+      "outputSchema": {
+        "description": "The value returned by the supplied search function."
+      },
+      "followUpActions": [
+        "cloudflare_mcp.execute"
+      ]
+    }
+  ]
+}

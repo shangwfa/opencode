@@ -1,0 +1,406 @@
+{
+  "service": "pulsetic",
+  "displayName": "Pulsetic",
+  "description": "Inspect Pulsetic monitors, checks, events, statistics, and downtime.",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "PULSETIC_API_KEY",
+      "description": "Pulsetic API key sent in the Authorization header. Create or manage keys at https://app.pulsetic.com/account/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://pulsetic.com",
+  "actions": [
+    {
+      "id": "pulsetic.get_monitor",
+      "service": "pulsetic",
+      "name": "get_monitor",
+      "description": "Get one Pulsetic monitor by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting one Pulsetic monitor."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The unique Pulsetic monitor ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The monitor name."
+              },
+              "url": {
+                "type": "string",
+                "description": "The monitored URL."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current monitor status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A monitor returned by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting one Pulsetic monitor."
+      }
+    },
+    {
+      "id": "pulsetic.get_monitor_downtime",
+      "service": "pulsetic",
+      "name": "get_monitor_downtime",
+      "description": "Get total Pulsetic downtime for a monitor over an optional lookback window.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          },
+          "seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "The lookback window in seconds used to calculate downtime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitorId"
+        ],
+        "description": "The input payload for getting Pulsetic monitor downtime."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "downtimeSeconds": {
+            "type": "number",
+            "description": "The total downtime in seconds reported by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting monitor downtime."
+      }
+    },
+    {
+      "id": "pulsetic.get_monitor_stats",
+      "service": "pulsetic",
+      "name": "get_monitor_stats",
+      "description": "Get Pulsetic uptime, downtime, and response-time statistics for a monitor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting Pulsetic monitor statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The 1-, 7-, 30-, and 90-day statistics returned by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting monitor statistics."
+      }
+    },
+    {
+      "id": "pulsetic.list_monitor_checks",
+      "service": "pulsetic",
+      "name": "list_monitor_checks",
+      "description": "List Pulsetic checks for a monitor and time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Pulsetic node slug."
+            },
+            "description": "The Pulsetic node slugs used to filter checks.",
+            "minItems": 1
+          },
+          "responseCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599,
+              "description": "An HTTP response code."
+            },
+            "description": "The HTTP response codes used to filter checks.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitorId",
+          "startTime",
+          "endTime"
+        ],
+        "description": "The input payload for listing Pulsetic monitor checks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A monitor history record returned by Pulsetic."
+            },
+            "description": "The monitor checks returned by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing monitor checks."
+      }
+    },
+    {
+      "id": "pulsetic.list_monitor_events",
+      "service": "pulsetic",
+      "name": "list_monitor_events",
+      "description": "List Pulsetic online and offline events for a monitor and time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "Online",
+              "Offline"
+            ],
+            "description": "The monitor event type used to filter results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitorId",
+          "startTime",
+          "endTime"
+        ],
+        "description": "The input payload for listing Pulsetic monitor events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A monitor history record returned by Pulsetic."
+            },
+            "description": "The monitor events returned by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing monitor events."
+      }
+    },
+    {
+      "id": "pulsetic.list_monitor_snapshots",
+      "service": "pulsetic",
+      "name": "list_monitor_snapshots",
+      "description": "List hourly Pulsetic snapshots for a monitor and time range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitorId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The unique Pulsetic monitor ID."
+          },
+          "startTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "endTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start or end of the query window as a date-time accepted by Pulsetic."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "monitorId",
+          "startTime",
+          "endTime"
+        ],
+        "description": "The input payload for listing Pulsetic monitor snapshots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A monitor history record returned by Pulsetic."
+            },
+            "description": "The monitor snapshots returned by Pulsetic."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing monitor snapshots."
+      }
+    },
+    {
+      "id": "pulsetic.list_monitors",
+      "service": "pulsetic",
+      "name": "list_monitors",
+      "description": "List Pulsetic monitors with optional pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Pulsetic monitors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The unique Pulsetic monitor ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The monitor name."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The monitored URL."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current monitor status."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A monitor returned by Pulsetic."
+            },
+            "description": "The Pulsetic monitors on the requested page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Pulsetic monitors."
+      }
+    }
+  ]
+}

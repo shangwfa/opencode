@@ -1,0 +1,683 @@
+{
+  "service": "moorcheh",
+  "displayName": "Moorcheh",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "MOORCHEH_API_KEY",
+      "description": "Moorcheh API key sent with the x-api-key header. Create or copy a key from the API Keys section at https://console.moorcheh.ai as described at https://docs.moorcheh.ai/guides/authentication."
+    }
+  ],
+  "homepageUrl": "https://www.moorcheh.ai",
+  "actions": [
+    {
+      "id": "moorcheh.create_text_namespace",
+      "service": "moorcheh",
+      "name": "create_text_namespace",
+      "description": "Create a text namespace in Moorcheh for storing searchable documents.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace_name"
+        ],
+        "description": "Input for creating a Moorcheh text namespace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status returned by Moorcheh."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable operation message returned by Moorcheh."
+          },
+          "namespace_name": {
+            "type": "string",
+            "description": "The created namespace name."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message",
+          "namespace_name"
+        ],
+        "description": "The text namespace creation result returned by Moorcheh."
+      }
+    },
+    {
+      "id": "moorcheh.delete_documents",
+      "service": "moorcheh",
+      "name": "delete_documents",
+      "description": "Permanently delete up to 1,000 documents from a Moorcheh text namespace.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Moorcheh document identifier."
+            },
+            "description": "Document identifiers to delete.",
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace_name",
+          "ids"
+        ],
+        "description": "Input for deleting Moorcheh text documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status returned by Moorcheh."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable operation message returned by Moorcheh."
+          },
+          "requested_deletions": {
+            "type": "integer",
+            "description": "The number of requested document deletions."
+          },
+          "actual_deletions": {
+            "type": "integer",
+            "description": "The number of documents actually deleted."
+          },
+          "remaining_items": {
+            "type": "integer",
+            "description": "The number of items remaining in the namespace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message",
+          "requested_deletions",
+          "actual_deletions",
+          "remaining_items"
+        ],
+        "description": "The batch document deletion result returned by Moorcheh."
+      }
+    },
+    {
+      "id": "moorcheh.fetch_text_data",
+      "service": "moorcheh",
+      "name": "fetch_text_data",
+      "description": "Fetch one cursor-paginated page of text chunks from a Moorcheh namespace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return, up to 100."
+          },
+          "next_token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque cursor returned by the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace_name"
+        ],
+        "description": "Input for fetching a page of Moorcheh text data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status returned by Moorcheh."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable operation message returned by Moorcheh."
+          },
+          "namespace": {
+            "type": "string",
+            "description": "The requested namespace name."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Statistics for the returned page."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The chunk identifier."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The chunk text."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata associated with a Moorcheh document."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized chunk creation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized chunk creation timestamp."
+                },
+                "is_summary": {
+                  "type": "boolean",
+                  "description": "Whether the item is a generated summary chunk."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "text",
+                "metadata",
+                "created_at",
+                "is_summary"
+              ],
+              "description": "One stored text or summary chunk."
+            },
+            "description": "The text and summary chunks in this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "The page size used by Moorcheh."
+              },
+              "has_more": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              },
+              "next_token": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The opaque cursor for the next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The opaque cursor for the next page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "limit",
+              "has_more",
+              "next_token"
+            ],
+            "description": "Cursor pagination metadata for this page."
+          },
+          "execution_time": {
+            "type": "number",
+            "description": "The request processing time in seconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message",
+          "namespace",
+          "statistics",
+          "items",
+          "pagination",
+          "execution_time"
+        ],
+        "description": "One cursor-paginated page of text data returned by Moorcheh."
+      }
+    },
+    {
+      "id": "moorcheh.get_documents",
+      "service": "moorcheh",
+      "name": "get_documents",
+      "description": "Retrieve up to 100 Moorcheh text documents by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Moorcheh document identifier."
+            },
+            "description": "Document identifiers to process.",
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace_name",
+          "ids"
+        ],
+        "description": "Input for retrieving Moorcheh documents by identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status returned by Moorcheh."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable operation message returned by Moorcheh."
+          },
+          "requested_ids": {
+            "type": "integer",
+            "description": "The number of requested document identifiers."
+          },
+          "found_items": {
+            "type": "integer",
+            "description": "The number of documents found."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The document or chunk identifier returned by Moorcheh."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The stored text returned by Moorcheh."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata associated with a Moorcheh document."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "text",
+                "metadata"
+              ],
+              "description": "A text document returned by Moorcheh."
+            },
+            "description": "The documents found in the namespace."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message",
+          "requested_ids",
+          "found_items",
+          "items"
+        ],
+        "description": "The batch document retrieval result returned by Moorcheh."
+      }
+    },
+    {
+      "id": "moorcheh.list_namespaces",
+      "service": "moorcheh",
+      "name": "list_namespaces",
+      "description": "List Moorcheh namespaces with their types, sizes, and creation times.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Moorcheh namespaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "namespaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace_name": {
+                  "type": "string",
+                  "description": "The namespace name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "vector"
+                  ],
+                  "description": "The namespace storage type."
+                },
+                "vector_dimension": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The vector dimension, or null for text namespaces."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The vector dimension, or null for text namespaces."
+                },
+                "item_count": {
+                  "type": "integer",
+                  "description": "The number of items in the namespace."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The namespace creation timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "namespace_name",
+                "type",
+                "vector_dimension",
+                "item_count",
+                "created_at"
+              ],
+              "description": "One Moorcheh namespace."
+            },
+            "description": "Namespaces owned by the authenticated account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespaces"
+        ],
+        "description": "The Moorcheh namespace list."
+      }
+    },
+    {
+      "id": "moorcheh.search_text",
+      "service": "moorcheh",
+      "name": "search_text",
+      "description": "Search one or more Moorcheh text namespaces with a semantic text query.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The semantic text query, optionally ending with Moorcheh filters."
+          },
+          "namespaces": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+            },
+            "description": "Text namespace names to search.",
+            "minItems": 1
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of relevant chunks to return."
+          },
+          "kiosk_mode": {
+            "type": "boolean",
+            "description": "Whether to filter results below a relevance threshold."
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum relevance score when kiosk_mode is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "namespaces"
+        ],
+        "description": "Input for semantic text search in Moorcheh."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The matching document identifier."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "The Information Theoretic Similarity score."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The human-readable relevance label."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The matching text content."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary metadata associated with a Moorcheh document."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "score",
+                "label",
+                "text",
+                "metadata"
+              ],
+              "description": "One Moorcheh semantic search result."
+            },
+            "description": "Search results ordered by relevance."
+          },
+          "execution_time": {
+            "type": "number",
+            "description": "The total search processing time in seconds."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results",
+          "execution_time"
+        ],
+        "description": "The semantic search result from Moorcheh."
+      }
+    },
+    {
+      "id": "moorcheh.upload_text_documents",
+      "service": "moorcheh",
+      "name": "upload_text_documents",
+      "description": "Upload text documents and flat metadata to a Moorcheh text namespace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "namespace_name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "The Moorcheh namespace name containing only letters, numbers, hyphens, or underscores."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A Moorcheh document identifier."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text content indexed by Moorcheh."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "text"
+              ],
+              "description": "A text document uploaded to Moorcheh."
+            },
+            "description": "Text documents to upload.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "namespace_name",
+          "documents"
+        ],
+        "description": "Input for uploading text documents to Moorcheh."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The operation status returned by Moorcheh."
+          },
+          "message": {
+            "type": "string",
+            "description": "The human-readable operation message returned by Moorcheh."
+          },
+          "upload_id": {
+            "type": "string",
+            "description": "The upload batch identifier."
+          },
+          "namespace_name": {
+            "type": "string",
+            "description": "The target namespace name."
+          },
+          "documents_processed": {
+            "type": "integer",
+            "description": "The number of documents accepted for processing."
+          },
+          "processing_status": {
+            "type": "string",
+            "description": "The current upload processing status."
+          },
+          "uploaded_documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The accepted document identifier."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The document processing status."
+                },
+                "character_count": {
+                  "type": "integer",
+                  "description": "The number of characters in the accepted document."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "status",
+                "character_count"
+              ],
+              "description": "One accepted document status."
+            },
+            "description": "The accepted document statuses."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message"
+        ],
+        "description": "The text document upload result returned by Moorcheh."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1200 @@
+{
+  "service": "xingpan",
+  "displayName": "Xingpan API",
+  "homepageUrl": "https://xingpan.vip/",
+  "iconUrl": "https://www.xingpan.vip/static/module/index/default/images/logo_load.png",
+  "categories": [
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "XINGPAN_ACCESS_TOKEN",
+      "description": "Xingpan access_token for chart calculations. See https://www.xingpan.vip/astrology/Apiinterface for the limited test token; contact official WeChat xingpanvip to obtain a production token and confirm access and quotas."
+    }
+  ],
+  "actions": [
+    {
+      "id": "xingpan.calculate_comparison_chart",
+      "service": "xingpan",
+      "name": "calculate_comparison_chart",
+      "description": "Calculate a comparison chart for two people, including both planetary sets and their relationship to the houses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "birthday": {
+                  "type": "string",
+                  "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "Birthplace longitude in degrees, positive east and negative west."
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "Birthplace latitude in degrees, positive north and negative south."
+                },
+                "timezone": {
+                  "type": "number",
+                  "minimum": -14,
+                  "maximum": 14,
+                  "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "birthday",
+                "longitude",
+                "latitude"
+              ],
+              "description": "Birth details in local civil time at the birthplace."
+            },
+            "description": "The two people's birth details in the requested order; their order affects comparison charts.",
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "people"
+        ],
+        "description": "Input for calculating a chart for exactly two people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_composite_chart",
+      "service": "xingpan",
+      "name": "calculate_composite_chart",
+      "description": "Calculate a composite midpoint relationship chart for two people.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "birthday": {
+                  "type": "string",
+                  "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "Birthplace longitude in degrees, positive east and negative west."
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "Birthplace latitude in degrees, positive north and negative south."
+                },
+                "timezone": {
+                  "type": "number",
+                  "minimum": -14,
+                  "maximum": 14,
+                  "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "birthday",
+                "longitude",
+                "latitude"
+              ],
+              "description": "Birth details in local civil time at the birthplace."
+            },
+            "description": "The two people's birth details in the requested order; their order affects comparison charts.",
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "people"
+        ],
+        "description": "Input for calculating a chart for exactly two people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_lunar_return_chart",
+      "service": "xingpan",
+      "name": "calculate_lunar_return_chart",
+      "description": "Calculate a lunar return chart from birth details and a reference date, time, and return location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "birth": {
+            "type": "object",
+            "properties": {
+              "birthday": {
+                "type": "string",
+                "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Birthplace longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Birthplace latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "birthday",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Birth details in local civil time at the birthplace."
+          },
+          "returnReference": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "Local reference date and time used by Xingpan to select the return calculation, in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format. The actual return instant is computed upstream.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Return location longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Return location latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Reference time and location for the return calculation; distinct from the birth details."
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "birth",
+          "returnReference"
+        ],
+        "description": "Input for calculating a solar or lunar return chart."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_natal_chart",
+      "service": "xingpan",
+      "name": "calculate_natal_chart",
+      "description": "Calculate a personal natal chart from birth time and location, with optional SVG, interpretation corpus, and aspect patterns.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "birth": {
+            "type": "object",
+            "properties": {
+              "birthday": {
+                "type": "string",
+                "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Birthplace longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Birthplace latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "birthday",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Birth details in local civil time at the birthplace."
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          },
+          "fixedStars": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan fixed star name."
+            },
+            "description": "Fixed star names from get_chart_config, such as Regulus or Spica.",
+            "uniqueItems": true
+          },
+          "includeCorpus": {
+            "type": "boolean",
+            "description": "Whether to request the upstream chart interpretation corpus.",
+            "default": false
+          },
+          "includeAspectPatterns": {
+            "type": "boolean",
+            "description": "Whether to calculate geometric aspect patterns such as Grand Trine and T-Square.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "birth"
+        ],
+        "description": "Input for calculating a personal natal chart."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_solar_return_chart",
+      "service": "xingpan",
+      "name": "calculate_solar_return_chart",
+      "description": "Calculate a solar return chart from birth details and a reference date, time, and location. In verified upstream probes, changing the reference location did not change the birth-location houses; relocated solar returns remain unverified.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "birth": {
+            "type": "object",
+            "properties": {
+              "birthday": {
+                "type": "string",
+                "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Birthplace longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Birthplace latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "birthday",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Birth details in local civil time at the birthplace."
+          },
+          "returnReference": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "description": "Local reference date and time used by Xingpan to select the return calculation, in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format. The actual return instant is computed upstream.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Return location longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Return location latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Reference time and location for the return calculation; distinct from the birth details."
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "birth",
+          "returnReference"
+        ],
+        "description": "Input for calculating a solar or lunar return chart."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_synastry_chart",
+      "service": "xingpan",
+      "name": "calculate_synastry_chart",
+      "description": "Calculate Xingpan's pairing (synastry) chart for two people.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "birthday": {
+                  "type": "string",
+                  "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180,
+                  "description": "Birthplace longitude in degrees, positive east and negative west."
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90,
+                  "description": "Birthplace latitude in degrees, positive north and negative south."
+                },
+                "timezone": {
+                  "type": "number",
+                  "minimum": -14,
+                  "maximum": 14,
+                  "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "birthday",
+                "longitude",
+                "latitude"
+              ],
+              "description": "Birth details in local civil time at the birthplace."
+            },
+            "description": "The two people's birth details in the requested order; their order affects comparison charts.",
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "people"
+        ],
+        "description": "Input for calculating a chart for exactly two people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.calculate_transit_chart",
+      "service": "xingpan",
+      "name": "calculate_transit_chart",
+      "description": "Calculate a transit chart against a natal chart for a specified local date and time at the birthplace, accounting for date-specific UTC offsets.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "birth": {
+            "type": "object",
+            "properties": {
+              "birthday": {
+                "type": "string",
+                "description": "Local birth date and time in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180,
+                "description": "Birthplace longitude in degrees, positive east and negative west."
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90,
+                "description": "Birthplace latitude in degrees, positive north and negative south."
+              },
+              "timezone": {
+                "type": "number",
+                "minimum": -14,
+                "maximum": 14,
+                "description": "UTC offset in hours at this local date and time, including historical daylight saving time. Omit to look it up from Xingpan; an explicit value, including 0, is preserved."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "birthday",
+              "longitude",
+              "latitude"
+            ],
+            "description": "Birth details in local civil time at the birthplace."
+          },
+          "transitDateTime": {
+            "type": "string",
+            "description": "Transit date and time in the birthplace's local civil time, in YYYY-MM-DD HH:mm or YYYY-MM-DD HH:mm:ss format.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}(:\\d{2})?$"
+          },
+          "transitTimezone": {
+            "type": "number",
+            "minimum": -14,
+            "maximum": 14,
+            "description": "UTC offset in hours at the transit date and time. Omit for an independent historical timezone lookup; this need not equal the birth timezone."
+          },
+          "planets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan planet ID, such as 0 for the Sun or D for Chiron."
+            },
+            "description": "Planet IDs from get_chart_config; defaults to the Sun, Moon, and eight other major planets (0 through 9).",
+            "minItems": 1,
+            "uniqueItems": true,
+            "default": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ]
+          },
+          "asteroids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan asteroid ID."
+            },
+            "description": "Additional asteroid IDs from get_chart_config, such as xs433 for Eros.",
+            "uniqueItems": true
+          },
+          "virtualPoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Xingpan virtual point ID."
+            },
+            "description": "Virtual point IDs from get_chart_config, such as 10 for the Ascendant.",
+            "uniqueItems": true
+          },
+          "houseSystem": {
+            "type": "string",
+            "minLength": 1,
+            "description": "House system code; defaults to K (Koch). Other systems include P (Placidus) and W (Whole sign).",
+            "default": "K"
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "advanced"
+            ],
+            "description": "SVG chart style. Defaults to none for data-only output; basic or advanced includes the chart SVG.",
+            "default": "none"
+          },
+          "aspectOrbs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Allowed orb in degrees for this aspect angle."
+            },
+            "description": "Aspect angle to allowed orb in degrees, for example {\"90\":2}. Omit to use upstream defaults."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "birth",
+          "transitDateTime"
+        ],
+        "description": "Input for calculating a transit chart at the birthplace."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Complete upstream chart data with access tokens removed. Native fields include planet, house, sign, attribute, optional svg, and planet_second for comparison or transit charts; return charts may include return_time or user.turn_date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chart"
+        ],
+        "description": "Calculated Xingpan chart data."
+      }
+    },
+    {
+      "id": "xingpan.get_chart_config",
+      "service": "xingpan",
+      "name": "get_chart_config",
+      "description": "Get Xingpan planet, asteroid, fixed star, virtual point, zodiac, and house configuration.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for fetching Xingpan chart configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Upstream configuration maps and lists, including planets, virtual, planet_xs, planet_xf, planetEnglish, planetChinese, and zodiac names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "Xingpan chart configuration."
+      }
+    },
+    {
+      "id": "xingpan.get_daily_horoscope",
+      "service": "xingpan",
+      "name": "get_daily_horoscope",
+      "description": "Get daily zodiac horoscopes for one sign or all twelve signs, including overall, love, career, health, scores, and lucky items.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Requested date in YYYY-MM-DD format. Omit to use the provider's current day.",
+            "format": "date"
+          },
+          "sign": {
+            "type": "string",
+            "enum": [
+              "aries",
+              "taurus",
+              "gemini",
+              "cancer",
+              "leo",
+              "virgo",
+              "libra",
+              "scorpio",
+              "sagittarius",
+              "capricorn",
+              "aquarius",
+              "pisces"
+            ],
+            "description": "Zodiac sign to query. Omit to return all twelve signs."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for fetching daily zodiac horoscopes; birth details are not needed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "horoscopes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One upstream horoscope, including sign, date, overall, love, career, health, score fields, and lucky items; new upstream fields are preserved."
+            },
+            "description": "The requested zodiac horoscopes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "horoscopes"
+        ],
+        "description": "Daily zodiac horoscopes normalized to a list for both single-sign and all-sign requests."
+      }
+    }
+  ]
+}

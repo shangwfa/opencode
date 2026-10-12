@@ -1,0 +1,515 @@
+{
+  "service": "anchor_browser",
+  "displayName": "Anchor Browser",
+  "categories": [
+    "Developer Tools",
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "anchor_api_key",
+      "description": "Anchor Browser API key sent in the anchor-api-key header. Create or manage API keys in Anchor project settings: https://app.anchorbrowser.io/",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://anchorbrowser.io",
+  "actions": [
+    {
+      "id": "anchor_browser.get_billing_info",
+      "service": "anchor_browser",
+      "name": "get_billing_info",
+      "description": "Retrieve Anchor Browser project billing balance, usage, tier, and browser limits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for retrieving Anchor Browser billing information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "billing": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "number",
+                "description": "Available credit balance for the authenticated project."
+              },
+              "credits_used": {
+                "type": "number",
+                "description": "Credits used in the current billing period."
+              },
+              "included_credits": {
+                "type": "number",
+                "description": "Credits included in the current tier before overage."
+              },
+              "billing_period": {
+                "type": "string",
+                "description": "Current billing period in YYYY-MM format."
+              },
+              "tier": {
+                "type": "string",
+                "description": "Billing tier for the project."
+              },
+              "gifts_balance": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Available gift or prepaid credit balance before applicable overage."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Available gift or prepaid credit balance before applicable overage."
+              },
+              "max_concurrent_browsers": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Maximum concurrent browser sessions allowed for the project."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Maximum concurrent browser sessions allowed for the project."
+              },
+              "cost_limit": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Optional configured credit spend limit for the project."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Optional configured credit spend limit for the project."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Anchor Browser billing information."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw object returned by Anchor Browser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Anchor Browser billing response."
+      }
+    },
+    {
+      "id": "anchor_browser.get_project_metadata",
+      "service": "anchor_browser",
+      "name": "get_project_metadata",
+      "description": "Retrieve lightweight Anchor Browser project metadata by project ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Anchor Browser project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for retrieving Anchor Browser project metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The project name."
+              },
+              "domain": {
+                "type": "string",
+                "description": "The project domain."
+              },
+              "logo_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project logo URL, if one is configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project logo URL, if one is configured."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Anchor Browser project metadata."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw object returned by Anchor Browser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Anchor Browser project metadata response."
+      }
+    },
+    {
+      "id": "anchor_browser.start_browser_session",
+      "service": "anchor_browser",
+      "name": "start_browser_session",
+      "description": "Start an Anchor Browser session and return its CDP and live-view connection URLs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "initial_url": {
+                "type": "string",
+                "description": "The URL to navigate to when the browser session starts.",
+                "format": "uri"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One session tag."
+                },
+                "description": "Custom labels to categorize and identify browser sessions."
+              },
+              "recording": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for session recording in Anchor Browser."
+              },
+              "proxy": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether Anchor Browser proxying is active for the session."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Proxy configuration forwarded to Anchor Browser."
+              },
+              "timeout": {
+                "type": "object",
+                "properties": {
+                  "max_duration": {
+                    "type": "integer",
+                    "description": "Maximum time in minutes the session can run before automatically terminating."
+                  },
+                  "idle_timeout": {
+                    "type": "integer",
+                    "description": "Time in minutes the session waits for new connections after all others are closed."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Timeout configuration for the Anchor Browser session."
+              },
+              "live_view": {
+                "type": "object",
+                "properties": {
+                  "read_only": {
+                    "type": "boolean",
+                    "description": "Whether live view opens in read-only mode."
+                  },
+                  "one_time_url": {
+                    "type": "boolean",
+                    "description": "Whether Anchor Browser should generate a single-use live view URL."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Live view configuration for the Anchor Browser session."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Session-related configuration sent to Anchor Browser."
+          },
+          "browser": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The profile name to use during the browser session."
+                  },
+                  "persist": {
+                    "type": "boolean",
+                    "description": "Whether browser session profile data should be saved when the session ends."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Options for managing and persisting browser session profiles."
+              },
+              "adblock": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for ad blocking."
+              },
+              "popup_blocker": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for popup blocking."
+              },
+              "captcha_solver": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for captcha solving."
+              },
+              "headless": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for headless mode."
+              },
+              "viewport": {
+                "type": "object",
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport width in pixels."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Viewport height in pixels."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Viewport configuration for the Anchor Browser session."
+              },
+              "fullscreen": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for fullscreen mode."
+              },
+              "pdf_viewer": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for PDF viewer mode."
+              },
+              "p2p_download": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for peer-to-peer download capture."
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One Anchor Browser extension ID."
+                },
+                "description": "Extension IDs to load in the browser session."
+              },
+              "disable_web_security": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for disabling browser web security."
+              },
+              "extra_stealth": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for extra stealth mode."
+              },
+              "force_popups_as_tabs": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for forcing popups to open as tabs."
+              },
+              "web_bot_auth": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for Cloudflare Web Bot Auth."
+              },
+              "disable_dialogs": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean",
+                    "description": "Whether this Anchor Browser feature is active."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Configuration for suppressing native browser dialogs."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Browser-specific configuration sent to Anchor Browser."
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The integration ID to load."
+                },
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The integration type, such as 1PASSWORD."
+                },
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Provider-specific integration configuration."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Anchor Browser integration to load in a browser session."
+            },
+            "description": "Integrations to load in the browser session."
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The identity ID to use for the browser session."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Previously configured identity to use for the browser session."
+            },
+            "description": "Authenticated identities to activate in the session."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Configuration for starting an Anchor Browser session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the browser session."
+              },
+              "cdp_url": {
+                "type": "string",
+                "description": "The CDP websocket connection string."
+              },
+              "live_view_url": {
+                "type": "string",
+                "description": "The browser session live view URL."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A started Anchor Browser session."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw object returned by Anchor Browser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Anchor Browser session creation response."
+      }
+    }
+  ]
+}

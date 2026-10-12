@@ -1,0 +1,1323 @@
+{
+  "service": "kingdee",
+  "displayName": "Kingdee",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "Enterprise Application URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://erp.example.com/k3cloud/",
+          "description": "HTTPS URL of your Kingdee Cloud Galaxy Enterprise application."
+        },
+        {
+          "key": "dataCenterId",
+          "label": "Data Center ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "YOUR_DATA_CENTER_ID",
+          "description": "The account-set ID, preserved as a string; this is not an organization ID. Configure a third-party application and authorize its user in Kingdee Cloud Galaxy Enterprise."
+        },
+        {
+          "key": "username",
+          "label": "Integration Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "integration-user",
+          "description": "The integration user authorized for this application. Configure a third-party application and authorize its user in Kingdee Cloud Galaxy Enterprise."
+        },
+        {
+          "key": "applicationId",
+          "label": "Application ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "YOUR_APPLICATION_ID",
+          "description": "The Kingdee third-party application ID. Configure a third-party application and authorize its user in Kingdee Cloud Galaxy Enterprise."
+        },
+        {
+          "key": "applicationSecret",
+          "label": "Application Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "YOUR_APPLICATION_SECRET",
+          "description": "The application secret used by LoginByAppSecret. Configure a third-party application and authorize its user in Kingdee Cloud Galaxy Enterprise."
+        },
+        {
+          "key": "localeId",
+          "label": "Locale ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "2052",
+          "description": "Optional Kingdee locale ID. The default is Simplified Chinese (2052)."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.kingdee.com/cn",
+  "actions": [
+    {
+      "id": "kingdee.allocate_records",
+      "service": "kingdee",
+      "name": "allocate_records",
+      "description": "Allocate master data to target organizations.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "PkIds": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated internal IDs of master data to allocate."
+              },
+              "TOrgIds": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated target organization internal IDs."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "PkIds",
+              "TOrgIds"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.audit_records",
+      "service": "kingdee",
+      "name": "audit_records",
+      "description": "Approve records through the audit operation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "CreateOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the creating organization."
+              },
+              "Numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Record numbers; required when selecting by numbers."
+              },
+              "Ids": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated record internal IDs; required when selecting by IDs."
+              },
+              "InterationFlags": {
+                "type": "string",
+                "description": "Semicolon-separated interaction flags documented for this operation."
+              },
+              "UseOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the using organization."
+              },
+              "NetworkCtrl": {
+                "type": "boolean",
+                "description": "Whether to enable network concurrency control."
+              },
+              "IsVerifyProcInst": {
+                "type": "boolean",
+                "description": "Whether to check running workflow instances associated with the record."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              },
+              "UseBatControlTimes": {
+                "type": "boolean",
+                "description": "Whether to apply the record batch-processing configuration."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.batch_save_records",
+      "service": "kingdee",
+      "name": "batch_save_records",
+      "description": "Save multiple records, including updates, and preserve partial results.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "NumberSearch": {
+                "type": "boolean",
+                "description": "Whether to look up master data by number."
+              },
+              "ValidateFlag": {
+                "type": "boolean",
+                "description": "Whether to validate business data; false disables validation."
+              },
+              "IsDeleteEntry": {
+                "type": "boolean",
+                "description": "Whether to delete existing entries; upstream defaults to true."
+              },
+              "IsEntryBatchFill": {
+                "type": "boolean",
+                "description": "Whether to fill entries in batches."
+              },
+              "NeedUpDateFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to update; Model must include record and applicable entry internal IDs."
+              },
+              "NeedReturnFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to return; use entitykey.key for entry fields."
+              },
+              "SubSystemId": {
+                "type": "string",
+                "description": "Subsystem ID containing the form."
+              },
+              "InterationFlags": {
+                "type": "string",
+                "description": "Semicolon-separated interaction flags documented for this operation."
+              },
+              "Model": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A form-specific record."
+                },
+                "description": "Form-specific business data; obtain field keys and requirements from the official object documentation.",
+                "minItems": 1
+              },
+              "BatchCount": {
+                "type": "integer",
+                "description": "Number of server-side processing threads; only effective for larger batches."
+              },
+              "IsVerifyBaseDataField": {
+                "type": "boolean",
+                "description": "Whether to validate referenced master data; the operation determines the default."
+              },
+              "IsAutoAdjustField": {
+                "type": "boolean",
+                "description": "Whether to reorder JSON fields automatically."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              },
+              "IsControlPrecision": {
+                "type": "boolean",
+                "description": "Whether to validate amount, price and quantity precision."
+              },
+              "ValidateRepeatJson": {
+                "type": "boolean",
+                "description": "Whether to reject duplicate JSON data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "Model"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.delete_records",
+      "service": "kingdee",
+      "name": "delete_records",
+      "description": "Delete records by internal IDs or numbers.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "CreateOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the creating organization."
+              },
+              "Numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Record numbers; required when selecting by numbers."
+              },
+              "Ids": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated record internal IDs; required when selecting by IDs."
+              },
+              "NetworkCtrl": {
+                "type": "boolean",
+                "description": "Whether to enable network concurrency control."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.draft_record",
+      "service": "kingdee",
+      "name": "draft_record",
+      "description": "Save a draft, including changes to an existing draft.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "NeedUpDateFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to update; Model must include record and applicable entry internal IDs."
+              },
+              "NeedReturnFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to return; use entitykey.key for entry fields."
+              },
+              "IsDeleteEntry": {
+                "type": "boolean",
+                "description": "Whether to delete existing entries; upstream defaults to true."
+              },
+              "SubSystemId": {
+                "type": "string",
+                "description": "Subsystem ID containing the form."
+              },
+              "IsVerifyBaseDataField": {
+                "type": "boolean",
+                "description": "Whether to validate referenced master data; the operation determines the default."
+              },
+              "IsEntryBatchFill": {
+                "type": "boolean",
+                "description": "Whether to fill entries in batches."
+              },
+              "ValidateFlag": {
+                "type": "boolean",
+                "description": "Whether to validate business data; false disables validation."
+              },
+              "NumberSearch": {
+                "type": "boolean",
+                "description": "Whether to look up master data by number."
+              },
+              "IsAutoAdjustField": {
+                "type": "boolean",
+                "description": "Whether to reorder JSON fields automatically."
+              },
+              "InterationFlags": {
+                "type": "string",
+                "description": "Semicolon-separated interaction flags documented for this operation."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              },
+              "IsControlPrecision": {
+                "type": "boolean",
+                "description": "Whether to validate amount, price and quantity precision."
+              },
+              "ValidateRepeatJson": {
+                "type": "boolean",
+                "description": "Whether to reject duplicate JSON data."
+              },
+              "Model": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Form-specific business data; obtain field keys and requirements from the official object documentation."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "Model"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.get_record",
+      "service": "kingdee",
+      "name": "get_record",
+      "description": "View a record by its internal ID or number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "CreateOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the creating organization."
+              },
+              "Number": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Record number; required when selecting by number."
+              },
+              "Id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Record internal ID; required when selecting by ID."
+              },
+              "IsSortBySeq": {
+                "type": "boolean",
+                "description": "Whether to sort entries by sequence."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "description": "The form-specific record."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Record details and the upstream result."
+      }
+    },
+    {
+      "id": "kingdee.push_records",
+      "service": "kingdee",
+      "name": "push_records",
+      "description": "Convert source records or entries into target records using a conversion rule.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "Ids": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated record internal IDs; required when selecting by IDs."
+              },
+              "Numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Record numbers; required when selecting by numbers."
+              },
+              "EntryIds": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated entry internal IDs; omit record IDs and numbers when pushing individual entries."
+              },
+              "RuleId": {
+                "type": "string",
+                "description": "Conversion rule ID; required unless a default conversion rule is enabled."
+              },
+              "TargetBillTypeId": {
+                "type": "string",
+                "description": "Target bill type ID."
+              },
+              "TargetOrgId": {
+                "type": "integer",
+                "description": "Target organization internal ID."
+              },
+              "TargetFormId": {
+                "type": "string",
+                "description": "Target form ID; required when using a default conversion rule."
+              },
+              "IsEnableDefaultRule": {
+                "type": "boolean",
+                "description": "Whether to use the default conversion rule."
+              },
+              "IsDraftWhenSaveFail": {
+                "type": "boolean",
+                "description": "Whether to save a draft if saving the converted record fails."
+              },
+              "CustomParams": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Custom parameters passed through to conversion plugins."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.query_records",
+      "service": "kingdee",
+      "name": "query_records",
+      "description": "Query business records by fields, filters and row offset.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "FieldKeys": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated field keys to return, in column order; use keys from the object documentation."
+              },
+              "FilterString": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A filter expression."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A documented filter condition."
+                    },
+                    "description": "Structured filter conditions."
+                  }
+                ],
+                "description": "Documented filter expression or structured filter conditions; use the object documentation."
+              },
+              "OrderString": {
+                "type": "string",
+                "description": "Sort expression using documented field keys."
+              },
+              "TopRowCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Maximum total rows requested by the query."
+              },
+              "StartRow": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based starting row offset."
+              },
+              "Limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Maximum rows to return, up to 10000."
+              },
+              "SubSystemId": {
+                "type": "string",
+                "description": "Subsystem ID containing the form."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "FieldKeys"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "A field value."
+              },
+              "description": "A row in FieldKeys order."
+            },
+            "description": "Returned rows, without inferred totals or next-page flags."
+          },
+          "fieldKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A field key."
+            },
+            "description": "Column keys in requested order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query rows in requested field order."
+      }
+    },
+    {
+      "id": "kingdee.query_report",
+      "service": "kingdee",
+      "name": "query_report",
+      "description": "Query a report using its form-specific filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "FieldKeys": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated field keys to return, in column order; use keys from the object documentation."
+              },
+              "SchemeId": {
+                "type": "string",
+                "description": "Internal ID of the report filter scheme."
+              },
+              "StartRow": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based starting row offset."
+              },
+              "Limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "Maximum rows to return, up to 10000."
+              },
+              "IsVerifyBaseDataField": {
+                "type": "boolean",
+                "description": "Whether to validate referenced master data; the operation determines the default."
+              },
+              "FilterString": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A filter expression."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A documented filter condition."
+                    },
+                    "description": "Structured filter conditions."
+                  }
+                ],
+                "description": "Documented filter expression or structured filter conditions; use the object documentation."
+              },
+              "Model": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Form-specific business data; obtain field keys and requirements from the official object documentation."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "Model",
+              "FieldKeys"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream report Result, including Rows and RowCount when supplied."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Report data and upstream pagination when supplied."
+      }
+    },
+    {
+      "id": "kingdee.save_record",
+      "service": "kingdee",
+      "name": "save_record",
+      "description": "Save a record, including updates to existing records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "NeedUpDateFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to update; Model must include record and applicable entry internal IDs."
+              },
+              "NeedReturnFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Fields to return; use entitykey.key for entry fields."
+              },
+              "IsDeleteEntry": {
+                "type": "boolean",
+                "description": "Whether to delete existing entries; upstream defaults to true."
+              },
+              "SubSystemId": {
+                "type": "string",
+                "description": "Subsystem ID containing the form."
+              },
+              "IsVerifyBaseDataField": {
+                "type": "boolean",
+                "description": "Whether to validate referenced master data; the operation determines the default."
+              },
+              "IsEntryBatchFill": {
+                "type": "boolean",
+                "description": "Whether to fill entries in batches."
+              },
+              "ValidateFlag": {
+                "type": "boolean",
+                "description": "Whether to validate business data; false disables validation."
+              },
+              "NumberSearch": {
+                "type": "boolean",
+                "description": "Whether to look up master data by number."
+              },
+              "IsAutoAdjustField": {
+                "type": "boolean",
+                "description": "Whether to reorder JSON fields automatically."
+              },
+              "InterationFlags": {
+                "type": "string",
+                "description": "Semicolon-separated interaction flags documented for this operation."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              },
+              "IsControlPrecision": {
+                "type": "boolean",
+                "description": "Whether to validate amount, price and quantity precision."
+              },
+              "ValidateRepeatJson": {
+                "type": "boolean",
+                "description": "Whether to reject duplicate JSON data."
+              },
+              "Model": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Form-specific business data; obtain field keys and requirements from the official object documentation."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "Model"
+            ],
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.submit_records",
+      "service": "kingdee",
+      "name": "submit_records",
+      "description": "Submit records for approval.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "CreateOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the creating organization."
+              },
+              "Numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Record numbers; required when selecting by numbers."
+              },
+              "Ids": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated record internal IDs; required when selecting by IDs."
+              },
+              "SelectedPostId": {
+                "type": "integer",
+                "description": "Employee position ID used to initiate workflow when the employee has multiple positions."
+              },
+              "UseOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the using organization."
+              },
+              "NetworkCtrl": {
+                "type": "boolean",
+                "description": "Whether to enable network concurrency control."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    },
+    {
+      "id": "kingdee.unaudit_records",
+      "service": "kingdee",
+      "name": "unaudit_records",
+      "description": "Reverse the audit status of records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "formId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The official business object FormId, not a catalog node ID."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "CreateOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the creating organization."
+              },
+              "Numbers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A field key or record number."
+                },
+                "description": "Record numbers; required when selecting by numbers."
+              },
+              "Ids": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Comma-separated record internal IDs; required when selecting by IDs."
+              },
+              "InterationFlags": {
+                "type": "string",
+                "description": "Semicolon-separated interaction flags documented for this operation."
+              },
+              "IgnoreInterationFlag": {
+                "type": "boolean",
+                "description": "Whether to ignore interactions."
+              },
+              "UseOrgId": {
+                "type": "integer",
+                "description": "Internal ID of the using organization."
+              },
+              "NetworkCtrl": {
+                "type": "boolean",
+                "description": "Whether to enable network concurrency control."
+              },
+              "IsVerifyProcInst": {
+                "type": "boolean",
+                "description": "Whether to check running workflow instances associated with the record."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The complete business parameters with official field casing; Connector serializes the inner JSON."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The business object and operation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether every reported operation succeeded."
+          },
+          "partialSuccess": {
+            "type": "boolean",
+            "description": "Whether both successful entities and errors were reported."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "description": "An upstream business error."
+            },
+            "description": "Reported business errors."
+          },
+          "successfulEntities": {
+            "type": "array",
+            "items": {
+              "description": "An upstream successful entity."
+            },
+            "description": "Successfully processed entities reported by Kingdee."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The upstream Result, including additional fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Business operation outcome, preserving partial success."
+      }
+    }
+  ]
+}

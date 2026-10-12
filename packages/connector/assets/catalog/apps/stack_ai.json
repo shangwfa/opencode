@@ -1,0 +1,280 @@
+{
+  "service": "stack_ai",
+  "displayName": "StackAI",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "Public API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "STACK_AI_PUBLIC_KEY",
+          "description": "StackAI public API key used with the Authorization: Bearer <apiKey> header for deployed flow inference requests."
+        },
+        {
+          "key": "organizationId",
+          "label": "Organization ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "org_...",
+          "description": "The StackAI organization identifier used in deployed flow paths."
+        },
+        {
+          "key": "flowId",
+          "label": "Flow ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "flow_...",
+          "description": "The deployed StackAI flow identifier used in inference requests."
+        }
+      ],
+      "testAction": {
+        "actionName": "get_run_metadata",
+        "input": {
+          "runId": "validation"
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.stack-ai.com",
+  "actions": [
+    {
+      "id": "stack_ai.get_run_metadata",
+      "service": "stack_ai",
+      "name": "get_run_metadata",
+      "description": "Fetch metadata for one previously started StackAI run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StackAI run identifier returned by a previous run."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "runId"
+        ],
+        "description": "Input parameters for reading one StackAI run metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "object",
+            "properties": {
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The StackAI run identifier."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The run status returned by StackAI when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The run status returned by StackAI when available."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The run creation timestamp returned by StackAI."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The run creation timestamp returned by StackAI."
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The run completion timestamp returned by StackAI."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The run completion timestamp returned by StackAI."
+              },
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The StackAI user identifier attached to the run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The StackAI user identifier attached to the run."
+              },
+              "conversationId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The StackAI conversation identifier attached to the run."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The StackAI conversation identifier attached to the run."
+              },
+              "output": {
+                "description": "The run output payload returned by StackAI."
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The text response returned by StackAI when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The text response returned by StackAI when available."
+              },
+              "usage": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The usage metadata returned by StackAI when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The usage metadata returned by StackAI when available."
+              },
+              "raw": {
+                "description": "The raw StackAI run metadata payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The StackAI run metadata payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "run"
+        ],
+        "description": "The normalized StackAI run metadata wrapper."
+      }
+    },
+    {
+      "id": "stack_ai.run_flow",
+      "service": "stack_ai",
+      "name": "run_flow",
+      "description": "Run a deployed StackAI flow with JSON variables and return its normalized result.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The StackAI user identifier used for the run."
+          },
+          "variables": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The JSON variables object passed to the deployed flow."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Input parameters for running a deployed StackAI flow with JSON variables."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The StackAI run identifier when StackAI returns one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The StackAI run identifier when StackAI returns one."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The run status returned by StackAI when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run status returned by StackAI when available."
+          },
+          "output": {
+            "description": "The primary StackAI output payload."
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The text response returned by StackAI when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The text response returned by StackAI when available."
+          },
+          "raw": {
+            "description": "The raw StackAI JSON payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized StackAI run payload returned by the deployed flow API."
+      }
+    }
+  ]
+}

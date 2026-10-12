@@ -1,0 +1,379 @@
+{
+  "service": "flotiq",
+  "displayName": "Flotiq",
+  "homepageUrl": "https://flotiq.com/",
+  "categories": [
+    "Documents & Content",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FLOTIQ_API_KEY",
+      "description": "Get an application or scoped key from the API Keys view in the Flotiq panel: https://flotiq.com/docs/API/ Use a read-write key or grant the content-type operations you need. Sent as X-AUTH-TOKEN."
+    }
+  ],
+  "actions": [
+    {
+      "id": "flotiq.create_content_object",
+      "service": "flotiq",
+      "name": "create_content_object",
+      "description": "Create a Flotiq content object using fields from its content type schema. Types with Draft & Public enabled create drafts.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "content": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Content fields matching the content type schema, including optional id and relation references. Maximum object size is 1 MB."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "content"
+        ],
+        "description": "Content object creation parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The content object's schema-defined fields and Flotiq metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "object"
+        ],
+        "description": "The returned content object."
+      }
+    },
+    {
+      "id": "flotiq.delete_content_object",
+      "service": "flotiq",
+      "name": "delete_content_object",
+      "description": "Delete one Flotiq content object by ID. Flotiq can reject deletion when other objects reference it.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content object ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "id"
+        ],
+        "description": "Content object deletion parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Flotiq accepted the deletion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The confirmed deletion result."
+      }
+    },
+    {
+      "id": "flotiq.get_content_object",
+      "service": "flotiq",
+      "name": "get_content_object",
+      "description": "Get a Flotiq content object by ID with optional relation hydration and draft preview.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content object ID."
+          },
+          "hydrate": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Relation hydration depth: 0, 1 or 2."
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Include draft and archived content using X-MODE: preview; defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "id"
+        ],
+        "description": "Content object lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The content object's schema-defined fields and Flotiq metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "object"
+        ],
+        "description": "The returned content object."
+      }
+    },
+    {
+      "id": "flotiq.get_content_type",
+      "service": "flotiq",
+      "name": "get_content_type",
+      "description": "Get a Flotiq content type definition to discover its fields before reading or writing objects.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "resolveRef": {
+            "type": "boolean",
+            "description": "Resolve schema references; defaults to false."
+          },
+          "strictSchema": {
+            "type": "boolean",
+            "description": "Use the OpenAPI-compatible schema property when resolveRef is true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType"
+        ],
+        "description": "Content type lookup parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The complete content type definition and schema."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType"
+        ],
+        "description": "The content type definition."
+      }
+    },
+    {
+      "id": "flotiq.list_content_objects",
+      "service": "flotiq",
+      "name": "list_content_objects",
+      "description": "List one page of Flotiq content objects with filtering, sorting, relation hydration and optional draft preview.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number; defaults to 1."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Objects per page; defaults to 20, maximum 1000."
+          },
+          "order_by": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The schema field to sort by, such as internal.createdAt."
+          },
+          "order_direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction; defaults to asc."
+          },
+          "empty_first": {
+            "type": "boolean",
+            "description": "Place empty values first; defaults to false."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Flotiq filter conditions keyed by field, such as {title: {type: 'equals', filter: 'Hello'}}. Encoded as JSON by the connector."
+          },
+          "hydrate": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Relation hydration depth: 0, 1 or 2."
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Include draft and archived content using X-MODE: preview; defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType"
+        ],
+        "description": "Content object listing parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A content object with user-defined fields."
+            },
+            "description": "The content objects on this page."
+          },
+          "total_count": {
+            "type": "integer",
+            "description": "Total matching objects."
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total available pages."
+          },
+          "current_page": {
+            "type": "integer",
+            "description": "The returned 1-based page number."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of objects on this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "One page of content objects and upstream pagination metadata."
+      }
+    },
+    {
+      "id": "flotiq.update_content_object",
+      "service": "flotiq",
+      "name": "update_content_object",
+      "description": "Update a Flotiq content object. PATCH changes supplied fields; PUT replaces object data and requires all schema-required fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content type API name, such as blogposts."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The content object ID."
+          },
+          "content": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Content fields matching the content type schema, including optional id and relation references. Maximum object size is 1 MB."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PATCH",
+              "PUT"
+            ],
+            "description": "Update method; defaults to PATCH. PUT requires the complete object data."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType",
+          "id",
+          "content"
+        ],
+        "description": "Content object update parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The content object's schema-defined fields and Flotiq metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "object"
+        ],
+        "description": "The returned content object."
+      }
+    }
+  ]
+}

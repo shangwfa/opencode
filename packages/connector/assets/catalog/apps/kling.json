@@ -1,0 +1,736 @@
+{
+  "service": "kling",
+  "displayName": "Kling AI",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "your-kling-api-key",
+      "description": "Kling AI API key used as a Bearer token for the official V3 API. Create one at https://klingai.com/dev/api-key."
+    }
+  ],
+  "homepageUrl": "https://klingai.com",
+  "actions": [
+    {
+      "id": "kling.get_video_generation",
+      "service": "kling",
+      "name": "get_video_generation",
+      "description": "Retrieve a Kling AI task state and its generated video when available.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The opaque Kling AI task handle returned by the selected connection.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A Kling AI task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "The opaque Kling AI task handle returned by the selected connection.",
+                "pattern": "\\S"
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in milliseconds."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is submitted or processing."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A submitted or processing Kling AI task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "The opaque Kling AI task handle returned by the selected connection.",
+                "pattern": "\\S"
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in milliseconds."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "videoUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The temporary generated video URL."
+              },
+              "watermarkVideoUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The temporary watermarked video URL when requested."
+              },
+              "duration": {
+                "type": "number",
+                "description": "The generated video duration in seconds."
+              },
+              "resolution": {
+                "type": "string",
+                "description": "The generated video resolution when reported."
+              },
+              "framesPerSecond": {
+                "type": "integer",
+                "description": "The generated video frame rate when reported."
+              },
+              "audioMode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "native",
+                  "original"
+                ],
+                "description": "How the generated video uses audio."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "videoUrl"
+            ],
+            "description": "A succeeded Kling AI video generation task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "The opaque Kling AI task handle returned by the selected connection.",
+                "pattern": "\\S"
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in milliseconds."
+              },
+              "state": {
+                "const": "failed",
+                "type": "string",
+                "description": "The task is failed."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream terminal error code when available."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream terminal error message when available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported for a Kling AI task."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Kling AI task in the failed terminal state."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "The opaque Kling AI task handle returned by the selected connection.",
+                "pattern": "\\S"
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in milliseconds."
+              },
+              "state": {
+                "const": "cancelled",
+                "type": "string",
+                "description": "The task is cancelled."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream terminal error code when available."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream terminal error message when available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported for a Kling AI task."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Kling AI task in the cancelled terminal state."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "description": "The opaque Kling AI task handle returned by the selected connection.",
+                "pattern": "\\S"
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in milliseconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in milliseconds."
+              },
+              "state": {
+                "const": "expired",
+                "type": "string",
+                "description": "The task is expired."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream terminal error code when available."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream terminal error message when available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported for a Kling AI task."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Kling AI task in the expired terminal state."
+          }
+        ],
+        "description": "The normalized Kling AI task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "kling.submit_video_generation",
+        "statusActionId": "kling.get_video_generation"
+      }
+    },
+    {
+      "id": "kling.submit_video_generation",
+      "service": "kling",
+      "name": "submit_video_generation",
+      "description": "Submit an asynchronous Kling AI V3 video generation task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "kling-3.0-turbo",
+              "kling-3.0",
+              "kling-3.0-omni"
+            ],
+            "description": "The Kling AI V3 video model.",
+            "default": "kling-3.0"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2500,
+            "description": "The video prompt, including any @referenceId media references.",
+            "pattern": "\\S"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "first_frame",
+                    "last_frame",
+                    "reference_image",
+                    "reference_video",
+                    "source_video"
+                  ],
+                  "description": "How Kling AI uses this media input."
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "description": "A public HTTP or HTTPS media URL passed to Kling AI.",
+                  "format": "uri",
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/"
+                },
+                "referenceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "description": "A request-unique identifier that can be referenced as @referenceId in prompts.",
+                  "pattern": "\\S"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "url"
+              ],
+              "description": "A URL-based image or video input for Kling AI."
+            },
+            "description": "URL-based media inputs for Kling AI.",
+            "maxItems": 9
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "720p",
+              "1080p",
+              "4k"
+            ],
+            "description": "The generated video resolution.",
+            "default": "720p"
+          },
+          "aspectRatio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "9:16",
+              "1:1"
+            ],
+            "description": "The generated aspect ratio when it is not inherited from input media.",
+            "default": "16:9"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 15,
+            "description": "The requested video duration in seconds.",
+            "default": 5
+          },
+          "audioMode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "native",
+              "original"
+            ],
+            "description": "How the generated video uses audio."
+          },
+          "multiShot": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "intelligent",
+                  "custom"
+                ],
+                "description": "Whether Kling AI plans shots or uses the supplied custom shots."
+              },
+              "shots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "description": "The prompt for this shot.",
+                      "pattern": "\\S"
+                    },
+                    "duration": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 15,
+                      "description": "The shot duration in seconds."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "prompt",
+                    "duration"
+                  ],
+                  "description": "One custom multi-shot segment."
+                },
+                "description": "The ordered shots used by custom mode.",
+                "minItems": 1,
+                "maxItems": 6
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "mode"
+            ],
+            "description": "A Kling AI multi-shot generation mode."
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether Kling AI should also generate a watermarked video.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "A unified Kling AI V3 video generation request.",
+        "anyOf": [
+          {
+            "required": [
+              "prompt"
+            ]
+          },
+          {
+            "required": [
+              "multiShot"
+            ]
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "model": {
+                  "const": "kling-3.0-turbo"
+                }
+              },
+              "required": [
+                "model"
+              ]
+            },
+            "then": {
+              "properties": {
+                "resolution": {
+                  "type": "string",
+                  "enum": [
+                    "720p",
+                    "1080p"
+                  ]
+                },
+                "audioMode": {
+                  "type": "string",
+                  "enum": [
+                    "native"
+                  ]
+                },
+                "media": {
+                  "type": "array",
+                  "maxItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "const": "first_frame"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "model": {
+                      "const": "kling-3.0"
+                    }
+                  },
+                  "required": [
+                    "model"
+                  ]
+                },
+                {
+                  "not": {
+                    "required": [
+                      "model"
+                    ]
+                  }
+                }
+              ]
+            },
+            "then": {
+              "properties": {
+                "audioMode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "native"
+                  ]
+                },
+                "media": {
+                  "type": "array",
+                  "maxItems": 2,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "enum": [
+                          "first_frame",
+                          "last_frame"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "multiShot": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "custom"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ]
+                }
+              },
+              "required": [
+                "multiShot"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "prompt"
+                ]
+              },
+              "properties": {
+                "multiShot": {
+                  "required": [
+                    "mode",
+                    "shots"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "multiShot": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "intelligent"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ]
+                }
+              },
+              "required": [
+                "multiShot"
+              ]
+            },
+            "then": {
+              "required": [
+                "prompt"
+              ],
+              "properties": {
+                "multiShot": {
+                  "not": {
+                    "required": [
+                      "shots"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "audioMode": {
+                  "const": "original"
+                }
+              },
+              "required": [
+                "audioMode"
+              ]
+            },
+            "then": {
+              "required": [
+                "model",
+                "media"
+              ],
+              "properties": {
+                "model": {
+                  "const": "kling-3.0-omni"
+                },
+                "media": {
+                  "type": "array",
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "enum": [
+                          "reference_video",
+                          "source_video"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "media"
+              ],
+              "properties": {
+                "media": {
+                  "type": "array",
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "const": "last_frame"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ]
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "media": {
+                  "type": "array",
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "const": "first_frame"
+                      }
+                    },
+                    "required": [
+                      "role"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "The opaque Kling AI task handle returned by the selected connection.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted Kling AI task handle."
+      },
+      "followUpActions": [
+        "kling.get_video_generation"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "kling.submit_video_generation",
+        "statusActionId": "kling.get_video_generation"
+      }
+    }
+  ]
+}

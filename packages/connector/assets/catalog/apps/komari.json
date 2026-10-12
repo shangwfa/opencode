@@ -1,0 +1,2912 @@
+{
+  "service": "komari",
+  "displayName": "Komari",
+  "description": "Read server inventory and monitoring metrics from a self-hosted Komari instance.",
+  "categories": [
+    "Developer Tools",
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Enter your Komari API key",
+      "description": "The API key configured in the Komari dashboard. Komari accepts it as a Bearer token and currently grants administrator-level API access, so use a dedicated secret and restrict exposed actions in OpenConnector.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://komari.example.com",
+          "description": "The HTTP or HTTPS root URL of your Komari 1.3.2 or newer instance. Public addresses work by default; private-network targets require a self-hosted OpenConnector runtime with OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK enabled. Loopback, link-local, reserved, and cloud-metadata targets remain blocked."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://github.com/komari-monitor/komari",
+  "actions": [
+    {
+      "id": "komari.add_client",
+      "service": "komari",
+      "name": "add_client",
+      "description": "Create a Komari client. The response contains its enrollment token.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:addClient"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Optional client name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "New client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Created client identity and token."
+      }
+    },
+    {
+      "id": "komari.add_load_notification",
+      "service": "komari",
+      "name": "add_load_notification",
+      "description": "Create a load notification rule.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:addLoadNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs.",
+            "minItems": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Rule name."
+          },
+          "metric": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "threshold": {
+            "type": "number",
+            "description": "Trigger threshold."
+          },
+          "ratio": {
+            "type": "number",
+            "maximum": 1,
+            "exclusiveMinimum": 0,
+            "description": "Required time ratio from zero to one."
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 240,
+            "description": "Evaluation interval in minutes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients",
+          "metric",
+          "threshold",
+          "ratio",
+          "interval"
+        ],
+        "description": "Load notification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Created load notification ID."
+      }
+    },
+    {
+      "id": "komari.add_ping_task",
+      "service": "komari",
+      "name": "add_ping_task",
+      "description": "Create a ping task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:addPingTask"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs."
+          },
+          "default_on": {
+            "type": "boolean",
+            "description": "Apply to new clients by default."
+          },
+          "name": {
+            "type": "string",
+            "description": "Task name."
+          },
+          "target": {
+            "type": "string",
+            "description": "Ping target."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "icmp",
+              "tcp",
+              "http"
+            ],
+            "description": "Ping protocol."
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Interval in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "target",
+          "type",
+          "interval"
+        ],
+        "description": "New ping task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Created ping task ID."
+      }
+    },
+    {
+      "id": "komari.batch_delete_clipboard",
+      "service": "komari",
+      "name": "batch_delete_clipboard",
+      "description": "Delete multiple clipboard entries.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:batchDeleteClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Clipboard ID."
+            },
+            "description": "Clipboard IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ids"
+        ],
+        "description": "Clipboard selectors."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.cancel_metric_migration",
+      "service": "komari",
+      "name": "cancel_metric_migration",
+      "description": "Cancel the active metric-store migration.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:cancelMetricMigration"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Migration cancel status."
+      }
+    },
+    {
+      "id": "komari.clear_all_records",
+      "service": "komari",
+      "name": "clear_all_records",
+      "description": "Permanently delete all load and ping records.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:clearAllRecords"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.clear_records",
+      "service": "komari",
+      "name": "clear_records",
+      "description": "Permanently delete all load records.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:clearRecords"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.create_clipboard",
+      "service": "komari",
+      "name": "create_clipboard",
+      "description": "Create a clipboard entry.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:createClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Clipboard fields such as name, text, weight, and remark."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Created clipboard entry."
+      }
+    },
+    {
+      "id": "komari.delete_all_sessions",
+      "service": "komari",
+      "name": "delete_all_sessions",
+      "description": "Revoke all login sessions.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:deleteAllSessions"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.delete_clipboard",
+      "service": "komari",
+      "name": "delete_clipboard",
+      "description": "Delete a clipboard entry.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:deleteClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Clipboard ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Clipboard selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.delete_load_notification",
+      "service": "komari",
+      "name": "delete_load_notification",
+      "description": "Delete load notification rules.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:deleteLoadNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A resource ID."
+            },
+            "description": "Resource IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Select resources by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.delete_ping_tasks",
+      "service": "komari",
+      "name": "delete_ping_tasks",
+      "description": "Delete ping tasks and their records.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:deletePingTask"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "A resource ID."
+            },
+            "description": "Resource IDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Select resources by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.delete_session",
+      "service": "komari",
+      "name": "delete_session",
+      "description": "Revoke one login session using the stable identifier returned by list_sessions.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:deleteSession"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "Stable session identifier returned by list_sessions.",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session_id"
+        ],
+        "description": "Session selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.disable_offline_notifications",
+      "service": "komari",
+      "name": "disable_offline_notifications",
+      "description": "Disable offline notifications for clients.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:disableOfflineNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients"
+        ],
+        "description": "Select Komari clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.disable_traffic_report_notifications",
+      "service": "komari",
+      "name": "disable_traffic_report_notifications",
+      "description": "Disable traffic reports for clients.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:disableTrafficReportNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients"
+        ],
+        "description": "Select Komari clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_client",
+      "service": "komari",
+      "name": "edit_client",
+      "description": "Update client fields. This changes Komari configuration.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:editClient"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uuid"
+        ],
+        "description": "Partial client fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_load_notification",
+      "service": "komari",
+      "name": "edit_load_notification",
+      "description": "Replace load notification rule fields.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:editLoadNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Rules to update.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notifications"
+        ],
+        "description": "Load notification updates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_offline_notifications",
+      "service": "komari",
+      "name": "edit_offline_notifications",
+      "description": "Replace offline notification rule fields.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:editOfflineNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Rules to update.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notifications"
+        ],
+        "description": "Offline notification updates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_ping_tasks",
+      "service": "komari",
+      "name": "edit_ping_tasks",
+      "description": "Replace ping task fields.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:editPingTask"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ping task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ping protocol."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "The ping target."
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The interval in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A configured ping task."
+            },
+            "description": "Tasks to update.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tasks"
+        ],
+        "description": "Ping task updates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_settings",
+      "service": "komari",
+      "name": "edit_settings",
+      "description": "Update arbitrary Komari settings; invalid database settings can disrupt service.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:editSettings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Setting keys and replacement values."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.edit_traffic_report_notifications",
+      "service": "komari",
+      "name": "edit_traffic_report_notifications",
+      "description": "Replace traffic-report rule fields.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:editTrafficReportNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Rules to update.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "notifications"
+        ],
+        "description": "Traffic report updates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.enable_offline_notifications",
+      "service": "komari",
+      "name": "enable_offline_notifications",
+      "description": "Enable offline notifications for clients.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:enableOfflineNotification"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients"
+        ],
+        "description": "Select Komari clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.enable_traffic_report_notifications",
+      "service": "komari",
+      "name": "enable_traffic_report_notifications",
+      "description": "Enable traffic reports for clients.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:enableTrafficReportNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A client UUID.",
+              "format": "uuid"
+            },
+            "description": "Client UUIDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients"
+        ],
+        "description": "Select Komari clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.execute_command",
+      "service": "komari",
+      "name": "execute_command",
+      "description": "DANGEROUS: execute a shell command on selected clients. Komari API keys bypass interactive 2FA for this sensitive RPC.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:exec"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command to execute."
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Client UUID.",
+              "format": "uuid"
+            },
+            "description": "Target client UUIDs.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "clients"
+        ],
+        "description": "Remote command."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Execution task and connected clients."
+      }
+    },
+    {
+      "id": "komari.get_client",
+      "service": "komari",
+      "name": "get_client",
+      "description": "Get one client without returning its enrollment token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getClient"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Select a Komari client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The node UUID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The node display name."
+              },
+              "os": {
+                "type": "string",
+                "description": "The node operating system."
+              },
+              "arch": {
+                "type": "string",
+                "description": "The node architecture."
+              },
+              "region": {
+                "type": "string",
+                "description": "The configured region."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Komari node. Client tokens are omitted unless get_client_token is used."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Client details."
+      }
+    },
+    {
+      "id": "komari.get_client_task_result",
+      "service": "komari",
+      "name": "get_client_task_result",
+      "description": "Get one client's result for an execution task.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getSpecificTaskResult"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Execution task ID."
+          },
+          "uuid": {
+            "type": "string",
+            "description": "Client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "uuid"
+        ],
+        "description": "Task result selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Execution result."
+      }
+    },
+    {
+      "id": "komari.get_client_token",
+      "service": "komari",
+      "name": "get_client_token",
+      "description": "Get a client enrollment token. Treat the response as a secret.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getClientToken"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Select a Komari client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Client enrollment token."
+      }
+    },
+    {
+      "id": "komari.get_clipboard",
+      "service": "komari",
+      "name": "get_clipboard",
+      "description": "Get one clipboard entry.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Clipboard ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Clipboard selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Clipboard entry."
+      }
+    },
+    {
+      "id": "komari.get_current_user",
+      "service": "komari",
+      "name": "get_current_user",
+      "description": "Get the current Komari user or guest identity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getMe"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Current user identity."
+      }
+    },
+    {
+      "id": "komari.get_database_size",
+      "service": "komari",
+      "name": "get_database_size",
+      "description": "Inspect main and monitoring database storage.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getDatabaseSize"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Database storage status."
+      }
+    },
+    {
+      "id": "komari.get_execution_task",
+      "service": "komari",
+      "name": "get_execution_task",
+      "description": "Get one remote execution task and its results.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getTaskById"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The execution task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Select an execution task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Execution task."
+      }
+    },
+    {
+      "id": "komari.get_load_history",
+      "service": "komari",
+      "name": "get_load_history",
+      "description": "Get persisted resource metrics for a node.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getRecordsByUUID"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "Client UUID.",
+            "format": "uuid"
+          },
+          "load_type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "cpu",
+              "ram",
+              "swap",
+              "load",
+              "temp",
+              "disk",
+              "network",
+              "process",
+              "connections"
+            ],
+            "description": "Metric projection."
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "Recent hours to query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Historical metric query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Record count."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari monitoring metric record."
+            },
+            "description": "Metric records."
+          },
+          "load_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Applied projection."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Applied projection."
+          },
+          "has_gpu_data": {
+            "type": "boolean",
+            "description": "Whether GPU history is present."
+          },
+          "gpu_devices": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "GPU histories keyed by device index."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count",
+          "records"
+        ],
+        "description": "Historical metrics."
+      }
+    },
+    {
+      "id": "komari.get_message_sender_provider",
+      "service": "komari",
+      "name": "get_message_sender_provider",
+      "description": "Get one message-sender configuration or list available templates. The result may contain secrets.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getMessageSenderProvider"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Optional provider name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Provider selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Message-sender configuration or templates."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Message-sender configuration or templates."
+      }
+    },
+    {
+      "id": "komari.get_metric_migration_status",
+      "service": "komari",
+      "name": "get_metric_migration_status",
+      "description": "Get metric-store migration progress.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getMetricMigrationStatus"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Migration status."
+      }
+    },
+    {
+      "id": "komari.get_oidc_provider",
+      "service": "komari",
+      "name": "get_oidc_provider",
+      "description": "Get one OIDC configuration or list templates. The result may contain client secrets.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getOidcProvider"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "Optional provider name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Provider selector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "OIDC configuration or templates."
+          }
+        },
+        "additionalProperties": false,
+        "description": "OIDC configuration or templates."
+      }
+    },
+    {
+      "id": "komari.get_ping_history",
+      "service": "komari",
+      "name": "get_ping_history",
+      "description": "Get ping records by node, task, or both.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getPingRecords"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "description": "Select ping history by client UUID, task ID, or both, with an optional recent-hours window.",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "Client UUID.",
+            "format": "uuid"
+          },
+          "task_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Ping task ID."
+          },
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "Recent hours to query."
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "uuid"
+            ]
+          },
+          {
+            "required": [
+              "task_id"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Record count."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task_id": {
+                  "type": "integer",
+                  "description": "The ping task ID."
+                },
+                "time": {
+                  "type": "string",
+                  "description": "Measurement time.",
+                  "format": "date-time"
+                },
+                "value": {
+                  "type": "integer",
+                  "description": "Latency in milliseconds, or a negative value for packet loss."
+                },
+                "client": {
+                  "type": "string",
+                  "description": "The reporting client UUID.",
+                  "format": "uuid"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A ping measurement."
+            },
+            "description": "Ping measurements."
+          },
+          "basic_info": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Per-client summaries."
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ping task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ping protocol."
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The interval in seconds."
+                },
+                "default_on": {
+                  "type": "boolean",
+                  "description": "Whether the task applies to new clients by default."
+                },
+                "clients": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A client UUID.",
+                    "format": "uuid"
+                  },
+                  "description": "Assigned client UUIDs when returned."
+                },
+                "total": {
+                  "type": "integer",
+                  "description": "Number of measurements."
+                },
+                "loss": {
+                  "type": "number",
+                  "description": "Packet-loss percentage."
+                },
+                "min": {
+                  "type": "integer",
+                  "description": "Minimum successful latency."
+                },
+                "max": {
+                  "type": "integer",
+                  "description": "Maximum successful latency."
+                },
+                "avg": {
+                  "type": "integer",
+                  "description": "Average successful latency."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A task-level ping summary."
+            },
+            "description": "Per-task summaries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ping records and summaries."
+      }
+    },
+    {
+      "id": "komari.get_ping_metric_stats",
+      "service": "komari",
+      "name": "get_ping_metric_stats",
+      "description": "Get aggregate latency, loss, percentile, and standard-deviation statistics.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getPingMetricStats"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Ping statistics query with optional entity, task, time, and point filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Ping metric statistics."
+      }
+    },
+    {
+      "id": "komari.get_public_settings",
+      "service": "komari",
+      "name": "get_public_settings",
+      "description": "Get settings that Komari exposes to its public frontend.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getPublicSettings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Public Komari settings."
+      }
+    },
+    {
+      "id": "komari.get_recent_metrics",
+      "service": "komari",
+      "name": "get_recent_metrics",
+      "description": "Get the short in-memory window of recent reports for a node.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getClientRecentRecords"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Select a Komari client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari monitoring metric record."
+            },
+            "description": "Recent node reports."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Recent node reports."
+      }
+    },
+    {
+      "id": "komari.get_settings",
+      "service": "komari",
+      "name": "get_settings",
+      "description": "Get all Komari settings. The result can contain secrets and database DSNs.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getSettings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Komari settings."
+      }
+    },
+    {
+      "id": "komari.get_terminal_settings",
+      "service": "komari",
+      "name": "get_terminal_settings",
+      "description": "Get xterm.js terminal appearance settings.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getXtermjsSettings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Terminal settings."
+      }
+    },
+    {
+      "id": "komari.get_version",
+      "service": "komari",
+      "name": "get_version",
+      "description": "Get the Komari server version and build hash.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getVersion"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Release version."
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Build hash when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Build hash when available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Komari version."
+      }
+    },
+    {
+      "id": "komari.list_audit_logs",
+      "service": "komari",
+      "name": "list_audit_logs",
+      "description": "List paged audit logs.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getLogs"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Page size."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based page number."
+          },
+          "msg_type": {
+            "type": "string",
+            "description": "Optional exact message type."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Audit log page."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Audit log page."
+      }
+    },
+    {
+      "id": "komari.list_client_execution_tasks",
+      "service": "komari",
+      "name": "list_client_execution_tasks",
+      "description": "List execution tasks assigned to a client.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getTasksByClientId"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Select a Komari client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Client execution tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Client execution tasks."
+      }
+    },
+    {
+      "id": "komari.list_clients",
+      "service": "komari",
+      "name": "list_clients",
+      "description": "List all clients without returning enrollment tokens.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:listClients"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The node UUID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The node display name."
+                },
+                "os": {
+                  "type": "string",
+                  "description": "The node operating system."
+                },
+                "arch": {
+                  "type": "string",
+                  "description": "The node architecture."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "The configured region."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Komari node. Client tokens are omitted unless get_client_token is used."
+            },
+            "description": "Komari clients."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Komari clients."
+      }
+    },
+    {
+      "id": "komari.list_clipboard",
+      "service": "komari",
+      "name": "list_clipboard",
+      "description": "List clipboard entries.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:listClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Clipboard entries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Clipboard entries."
+      }
+    },
+    {
+      "id": "komari.list_execution_tasks",
+      "service": "komari",
+      "name": "list_execution_tasks",
+      "description": "List remote execution tasks and their results, which may contain command output.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getTasks"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Execution tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Execution tasks."
+      }
+    },
+    {
+      "id": "komari.list_load_notifications",
+      "service": "komari",
+      "name": "list_load_notifications",
+      "description": "List load notification rules.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getAllLoadNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Load notification rules."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Load notification rules."
+      }
+    },
+    {
+      "id": "komari.list_metric_definitions",
+      "service": "komari",
+      "name": "list_metric_definitions",
+      "description": "List all metric definitions and retention policies.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:listMetricDefinitions"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The metric name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The metric type."
+                },
+                "unit": {
+                  "type": "string",
+                  "description": "The metric unit."
+                },
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Retention period in days; zero disables storage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A metric definition and retention policy."
+            },
+            "description": "Metric definitions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Metric definitions."
+      }
+    },
+    {
+      "id": "komari.list_nodes",
+      "service": "komari",
+      "name": "list_nodes",
+      "description": "List visible Komari nodes without client tokens or private address fields.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getNodesInformation"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The node UUID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The node display name."
+                },
+                "os": {
+                  "type": "string",
+                  "description": "The node operating system."
+                },
+                "arch": {
+                  "type": "string",
+                  "description": "The node architecture."
+                },
+                "region": {
+                  "type": "string",
+                  "description": "The configured region."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Komari node. Client tokens are omitted unless get_client_token is used."
+            },
+            "description": "Visible Komari nodes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Visible Komari nodes."
+      }
+    },
+    {
+      "id": "komari.list_offline_notifications",
+      "service": "komari",
+      "name": "list_offline_notifications",
+      "description": "List offline notification rules.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:listOfflineNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Offline notification rules."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Offline notification rules."
+      }
+    },
+    {
+      "id": "komari.list_ping_tasks",
+      "service": "komari",
+      "name": "list_ping_tasks",
+      "description": "List all ping tasks including targets.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getAllPingTasks"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ping task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ping protocol."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "The ping target."
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The interval in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A configured ping task."
+            },
+            "description": "Ping tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Ping tasks."
+      }
+    },
+    {
+      "id": "komari.list_public_metric_definitions",
+      "service": "komari",
+      "name": "list_public_metric_definitions",
+      "description": "List public metric definitions and retention policies.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:listMetricDefinitions"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The metric name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The metric type."
+                },
+                "unit": {
+                  "type": "string",
+                  "description": "The metric unit."
+                },
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Retention period in days; zero disables storage."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A metric definition and retention policy."
+            },
+            "description": "Public metric definitions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Public metric definitions."
+      }
+    },
+    {
+      "id": "komari.list_public_ping_tasks",
+      "service": "komari",
+      "name": "list_public_ping_tasks",
+      "description": "List ping tasks using the public response shape.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:getPublicPingTasks"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The ping task ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The task name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ping protocol."
+                },
+                "target": {
+                  "type": "string",
+                  "description": "The ping target."
+                },
+                "interval": {
+                  "type": "integer",
+                  "description": "The interval in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A configured ping task."
+            },
+            "description": "Public ping tasks."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Public ping tasks."
+      }
+    },
+    {
+      "id": "komari.list_sessions",
+      "service": "komari",
+      "name": "list_sessions",
+      "description": "List login sessions using stable identifiers while redacting session tokens and IP addresses.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getSessions"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "current_session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Stable identifier for the current session, when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable identifier for the current session, when available."
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string",
+                  "description": "Stable SHA-256 identifier derived from the session token."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The user UUID.",
+                  "format": "uuid"
+                },
+                "login_method": {
+                  "type": "string",
+                  "description": "The login method."
+                },
+                "latest_online": {
+                  "type": "string",
+                  "description": "Most recent activity time.",
+                  "format": "date-time"
+                },
+                "expires": {
+                  "type": "string",
+                  "description": "Session expiration time.",
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Session creation time.",
+                  "format": "date-time"
+                },
+                "current": {
+                  "type": "boolean",
+                  "description": "Whether this is the current session."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "session_id",
+                "current"
+              ],
+              "description": "A login session with its secret token and IP addresses redacted."
+            },
+            "description": "Redacted login sessions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Redacted login sessions."
+      }
+    },
+    {
+      "id": "komari.list_task_results",
+      "service": "komari",
+      "name": "list_task_results",
+      "description": "List all client results for an execution task.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:getTaskResultsByTaskId"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The execution task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Select an execution task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Execution results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Execution results."
+      }
+    },
+    {
+      "id": "komari.list_traffic_report_notifications",
+      "service": "komari",
+      "name": "list_traffic_report_notifications",
+      "description": "List traffic-report rules.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:listTrafficReportNotifications"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Komari resource object."
+            },
+            "description": "Traffic report rules."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Traffic report rules."
+      }
+    },
+    {
+      "id": "komari.order_clients",
+      "service": "komari",
+      "name": "order_clients",
+      "description": "Set client display weights using a UUID-to-weight map.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:orderClients"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer",
+          "description": "Display weight."
+        },
+        "description": "Client UUIDs mapped to integer weights."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.order_ping_tasks",
+      "service": "komari",
+      "name": "order_ping_tasks",
+      "description": "Set ping-task weights using an ID-to-weight map.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:orderPingTask"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer",
+          "description": "Display weight."
+        },
+        "description": "Ping task IDs mapped to weights."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.query_metrics",
+      "service": "komari",
+      "name": "query_metrics",
+      "description": "Query metric time-series points with filters, aggregation, and downsampling.",
+      "operationType": "read",
+      "requiredScopes": [
+        "public:queryMetrics"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metric_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A metric key."
+            },
+            "description": "Metric keys to query.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "metric_keys"
+        ],
+        "description": "Komari metric query. Use metric_keys plus optional entity_ids, time bounds, tags, aggregation, and point limits."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Metric query response."
+      }
+    },
+    {
+      "id": "komari.record_visitor_event",
+      "service": "komari",
+      "name": "record_visitor_event",
+      "description": "Record a bounded visitor audit event in Komari.",
+      "operationType": "write",
+      "requiredScopes": [
+        "public:recordVisitorEvent"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Short event name."
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Frontend path."
+          },
+          "route": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Frontend route."
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Optional target identifier."
+          },
+          "detail": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Bounded event metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event"
+        ],
+        "description": "Visitor event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Visitor audit status."
+      }
+    },
+    {
+      "id": "komari.remove_client",
+      "service": "komari",
+      "name": "remove_client",
+      "description": "Permanently delete a client and its runtime state.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "admin:removeClient"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "description": "The client UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "Select a Komari client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.set_message_sender_provider",
+      "service": "komari",
+      "name": "set_message_sender_provider",
+      "description": "Save and possibly reload a message-sender provider configuration.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:setMessageSenderProvider"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Provider name."
+          },
+          "addition": {
+            "type": "string",
+            "description": "Provider-specific JSON configuration; may contain secrets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Message-sender provider."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Configuration status."
+      }
+    },
+    {
+      "id": "komari.set_oidc_provider",
+      "service": "komari",
+      "name": "set_oidc_provider",
+      "description": "Save and possibly reload an OIDC provider configuration.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:setOidcProvider"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Provider name."
+          },
+          "addition": {
+            "type": "string",
+            "description": "Provider-specific JSON configuration; may contain secrets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "OIDC provider."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Configuration status."
+      }
+    },
+    {
+      "id": "komari.set_terminal_settings",
+      "service": "komari",
+      "name": "set_terminal_settings",
+      "description": "Update xterm.js terminal appearance settings, including optional custom CSS.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:setXtermjsSettings"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "xterm.js terminalOptions, terminalPadding, transparentBackground, and customCss."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Normalized terminal settings."
+      }
+    },
+    {
+      "id": "komari.start_metric_migration",
+      "service": "komari",
+      "name": "start_metric_migration",
+      "description": "Start migrating metrics from a source store into the current store.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:startMetricMigration"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source_driver": {
+            "type": "string",
+            "description": "Optional source driver."
+          },
+          "source_dsn": {
+            "type": "string",
+            "description": "Optional source DSN; treat as sensitive."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Migration source."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Migration start status."
+      }
+    },
+    {
+      "id": "komari.test_geoip",
+      "service": "komari",
+      "name": "test_geoip",
+      "description": "Test Komari GeoIP lookup.",
+      "operationType": "read",
+      "requiredScopes": [
+        "admin:testGeoip"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "description": "IP address; defaults to the caller address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "GeoIP query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "GeoIP lookup result."
+      }
+    },
+    {
+      "id": "komari.test_message_sender",
+      "service": "komari",
+      "name": "test_message_sender",
+      "description": "Send a test notification through the active message sender.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:testSendMessage"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.update_clipboard",
+      "service": "komari",
+      "name": "update_clipboard",
+      "description": "Update a clipboard entry.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:updateClipboard"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Clipboard ID."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id"
+        ],
+        "description": "Clipboard ID and fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Komari completed the operation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Operation result."
+      }
+    },
+    {
+      "id": "komari.update_metric_definition",
+      "service": "komari",
+      "name": "update_metric_definition",
+      "description": "Change a metric retention policy; zero deletes stored data for that metric.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:updateMetricDefinition"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name."
+          },
+          "retention_days": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Retention in days; zero disables storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "retention_days"
+        ],
+        "description": "Metric retention update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Updated metric definition."
+      }
+    },
+    {
+      "id": "komari.vacuum_database",
+      "service": "komari",
+      "name": "vacuum_database",
+      "description": "Run database maintenance and reclaim storage space.",
+      "operationType": "write",
+      "requiredScopes": [
+        "admin:vacuumDatabase"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This operation takes no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Database maintenance result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,366 @@
+{
+  "service": "kraken_io",
+  "displayName": "Kraken.io",
+  "categories": [
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "kraken_api_key",
+      "description": "Kraken.io API key used inside the auth.api_key request body. Find it in your Kraken.io account API Credentials page: https://kraken.io/account/api-credentials",
+      "extraFields": [
+        {
+          "key": "apiSecret",
+          "label": "API Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "kraken_api_secret",
+          "description": "Kraken.io API secret paired with the API key in the auth.api_secret request body. Find it in your Kraken.io account API Credentials page: https://kraken.io/account/api-credentials"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://kraken.io",
+  "actions": [
+    {
+      "id": "kraken_io.get_user_status",
+      "service": "kraken_io",
+      "name": "get_user_status",
+      "description": "Fetch the current Kraken.io plan status and monthly optimization quota.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Kraken.io account status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Whether the Kraken.io account is currently active."
+          },
+          "planName": {
+            "type": "string",
+            "description": "The subscribed Kraken.io plan name."
+          },
+          "quotaTotal": {
+            "type": "integer",
+            "description": "The total monthly quota in bytes."
+          },
+          "quotaUsed": {
+            "type": "integer",
+            "description": "The used monthly quota in bytes."
+          },
+          "quotaRemaining": {
+            "type": "integer",
+            "description": "The remaining monthly quota in bytes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Kraken.io account status payload."
+      }
+    },
+    {
+      "id": "kraken_io.optimize_image",
+      "service": "kraken_io",
+      "name": "optimize_image",
+      "description": "Optimize one image with Kraken.io from either a public URL or direct upload, then store the result in local transit storage.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceUrl": {
+            "type": "string",
+            "description": "The public URL of the source image to optimize.",
+            "format": "uri"
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Base64-encoded source image bytes to upload."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The filename used for direct upload requests."
+          },
+          "lossy": {
+            "type": "boolean",
+            "description": "Whether Kraken.io should use lossy optimization instead of lossless optimization."
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The custom image quality level for JPG, PNG, and GIF output."
+          },
+          "dev": {
+            "type": "boolean",
+            "description": "Whether to enable Kraken.io sandbox mode for development testing."
+          },
+          "autoOrient": {
+            "type": "boolean",
+            "description": "Whether Kraken.io should automatically orient the image from EXIF data."
+          },
+          "preserveMeta": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "profile",
+                "date",
+                "copyright",
+                "geotag",
+                "orientation"
+              ],
+              "description": "One metadata section to preserve in the optimized image."
+            },
+            "description": "The metadata sections to preserve in the optimized file.",
+            "minItems": 1
+          },
+          "chromaSubsampling": {
+            "type": "string",
+            "enum": [
+              "4:2:0",
+              "4:2:2",
+              "4:4:4"
+            ],
+            "description": "The JPEG chroma subsampling mode requested for optimization."
+          },
+          "resize": {
+            "type": "object",
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": [
+                  "exact",
+                  "portrait",
+                  "landscape",
+                  "auto",
+                  "fit",
+                  "crop",
+                  "square",
+                  "fill"
+                ],
+                "description": "The Kraken.io resize strategy to apply before optimization."
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The target width in pixels."
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The target height in pixels."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The output square size in pixels for the square strategy."
+              },
+              "x": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The crop origin x coordinate in pixels."
+              },
+              "y": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The crop origin y coordinate in pixels."
+              },
+              "scale": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The percentage used to scale the cropped area after applying the crop strategy."
+              },
+              "cropMode": {
+                "type": "string",
+                "enum": [
+                  "n",
+                  "t",
+                  "nw",
+                  "tl",
+                  "ne",
+                  "tr",
+                  "w",
+                  "l",
+                  "c",
+                  "e",
+                  "r",
+                  "se",
+                  "br",
+                  "sw",
+                  "bl",
+                  "s",
+                  "b"
+                ],
+                "description": "The gravity or direction used when cropping or fitting an image."
+              },
+              "background": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The fill background color in HEX, RGB, or RGBA notation."
+              },
+              "enhance": {
+                "type": "boolean",
+                "description": "Whether Kraken.io should enhance small resized images after resizing."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "strategy"
+            ],
+            "description": "Kraken.io resize settings for a single optimized output."
+          },
+          "convert": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "jpeg",
+                  "png",
+                  "gif",
+                  "webp",
+                  "avif"
+                ],
+                "description": "The output file format requested from Kraken.io."
+              },
+              "background": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The background color used when converting to a format that needs flattened transparency."
+              },
+              "keepExtension": {
+                "type": "boolean",
+                "description": "Whether Kraken.io should keep the original file extension after conversion."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "format"
+            ],
+            "description": "Kraken.io image conversion settings."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for optimizing one image with Kraken.io.",
+        "oneOf": [
+          {
+            "required": [
+              "sourceUrl"
+            ]
+          },
+          {
+            "required": [
+              "contentBase64"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "description": "The optimized filename returned by Kraken.io."
+          },
+          "originalSize": {
+            "type": "integer",
+            "description": "The original file size in bytes."
+          },
+          "optimizedSize": {
+            "type": "integer",
+            "description": "The optimized file size in bytes."
+          },
+          "savedBytes": {
+            "type": "integer",
+            "description": "The number of bytes saved by Kraken.io."
+          },
+          "originalWidth": {
+            "type": "integer",
+            "description": "The original image width in pixels."
+          },
+          "originalHeight": {
+            "type": "integer",
+            "description": "The original image height in pixels."
+          },
+          "krakedUrl": {
+            "type": "string",
+            "description": "The temporary Kraken.io download URL returned by the optimization request."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The MIME type of the downloaded optimized file."
+          },
+          "contentLength": {
+            "type": "integer",
+            "description": "The downloaded optimized file size in bytes."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The filename of the optimized file."
+              },
+              "mimetype": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the optimized file."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit download URL for the optimized file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The optimized file size in bytes."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the optimized file."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A downloadable optimized file stored in local transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName",
+          "originalSize",
+          "optimizedSize",
+          "savedBytes",
+          "krakedUrl",
+          "contentType",
+          "contentLength",
+          "file"
+        ],
+        "description": "The output payload for optimizing one image with Kraken.io."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1128 @@
+{
+  "service": "wakatime",
+  "displayName": "WakaTime",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "waka_...",
+      "description": "WakaTime API key used with the Authorization Basic header. Retrieve it from your account settings at https://wakatime.com/api-key."
+    }
+  ],
+  "homepageUrl": "https://wakatime.com",
+  "actions": [
+    {
+      "id": "wakatime.get_all_time_since_today",
+      "service": "wakatime",
+      "name": "get_all_time_since_today",
+      "description": "Get the total WakaTime coding time logged since the account was created.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The WakaTime project name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The human-readable total coding time."
+              },
+              "range": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "description": "The calendar date returned by WakaTime.",
+                    "format": "date"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The human-readable date range text."
+                  },
+                  "start": {
+                    "type": "string",
+                    "description": "The start timestamp of the range.",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "The end timestamp of the range.",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "description": "The timezone used for the range."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A WakaTime date range object."
+              },
+              "decimal": {
+                "type": "string",
+                "description": "The decimal representation of the total coding time."
+              },
+              "digital": {
+                "type": "string",
+                "description": "The digital clock representation of the total coding time."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The keystroke timeout used for this result."
+              },
+              "daily_average": {
+                "type": "number",
+                "description": "The average daily coding time in seconds."
+              },
+              "is_up_to_date": {
+                "type": "boolean",
+                "description": "Whether today's coding time has been fully calculated."
+              },
+              "total_seconds": {
+                "type": "number",
+                "description": "The total coding time in seconds."
+              },
+              "percent_calculated": {
+                "type": "integer",
+                "description": "The percentage of today's coding time currently included."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The WakaTime all-time coding total object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "total"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "wakatime.get_current_user",
+      "service": "wakatime",
+      "name": "get_current_user",
+      "description": "Get the currently authenticated WakaTime user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The WakaTime user ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address, when returned."
+              },
+              "plan": {
+                "type": "string",
+                "description": "The WakaTime plan name."
+              },
+              "photo": {
+                "type": "string",
+                "description": "The user's profile photo URL."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "The user's configured timezone."
+              },
+              "username": {
+                "type": "string",
+                "description": "The user's public username."
+              },
+              "display_name": {
+                "type": "string",
+                "description": "The display name returned by WakaTime."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A WakaTime user object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Action output."
+      },
+      "followUpActions": [
+        "wakatime.get_all_time_since_today",
+        "wakatime.list_projects",
+        "wakatime.get_stats"
+      ]
+    },
+    {
+      "id": "wakatime.get_stats",
+      "service": "wakatime",
+      "name": "get_stats",
+      "description": "Get WakaTime coding stats for the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The WakaTime stats range, such as last_7_days, last_30_days, all_time, YYYY, or YYYY-MM."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The keystroke timeout override in minutes."
+          },
+          "writes_only": {
+            "type": "boolean",
+            "description": "Whether to count only file write activity instead of all coding activity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "range": {
+                "type": "string",
+                "description": "The stats range returned by WakaTime."
+              },
+              "status": {
+                "type": "string",
+                "description": "The stats calculation status."
+              },
+              "total_seconds": {
+                "type": "number",
+                "description": "The total coding time in seconds."
+              },
+              "daily_average": {
+                "type": "number",
+                "description": "The average daily coding time in seconds."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The categories breakdown returned by WakaTime."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The languages breakdown returned by WakaTime."
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The projects breakdown returned by WakaTime."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The WakaTime stats returned for the requested range."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stats"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "wakatime.get_status_bar_today",
+      "service": "wakatime",
+      "name": "get_status_bar_today",
+      "description": "Get today's cached WakaTime status bar summary for the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The WakaTime project name."
+          },
+          "branches": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of branch names used to filter activity."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The keystroke timeout override in minutes."
+          },
+          "writes_only": {
+            "type": "boolean",
+            "description": "Whether to count only file write activity instead of all coding activity."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Olson timezone string such as America/Los_Angeles."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status_bar": {
+            "type": "object",
+            "properties": {
+              "range": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "description": "The calendar date returned by WakaTime.",
+                    "format": "date"
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The human-readable date range text."
+                  },
+                  "start": {
+                    "type": "string",
+                    "description": "The start timestamp of the range.",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "description": "The end timestamp of the range.",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "description": "The timezone used for the range."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A WakaTime date range object."
+              },
+              "grand_total": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The human-readable duration returned by WakaTime."
+                  },
+                  "decimal": {
+                    "type": "string",
+                    "description": "The decimal duration string returned by WakaTime, when present."
+                  },
+                  "digital": {
+                    "type": "string",
+                    "description": "The digital duration string returned by WakaTime."
+                  },
+                  "hours": {
+                    "type": "integer",
+                    "description": "The hours component of the duration."
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "description": "The minutes component of the duration."
+                  },
+                  "seconds": {
+                    "type": "integer",
+                    "description": "The seconds component of the duration."
+                  },
+                  "total_seconds": {
+                    "type": "number",
+                    "description": "The total number of seconds represented by the duration."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A WakaTime duration summary object."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The categories breakdown returned by WakaTime."
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The dependencies breakdown returned by WakaTime."
+              },
+              "editors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The editors breakdown returned by WakaTime."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The languages breakdown returned by WakaTime."
+              },
+              "machines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The machines breakdown returned by WakaTime."
+              },
+              "operating_systems": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The operating systems breakdown returned by WakaTime."
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The item name returned by WakaTime."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration for this item."
+                    },
+                    "percent": {
+                      "type": "number",
+                      "description": "The percentage of total time for this item."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds tracked for this item."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime breakdown item."
+                },
+                "description": "The projects breakdown returned by WakaTime."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A WakaTime daily summary object."
+          },
+          "cached_at": {
+            "type": "string",
+            "description": "When WakaTime calculated and cached this status bar response.",
+            "format": "date-time"
+          },
+          "has_team_features": {
+            "type": "boolean",
+            "description": "Whether the user has access to WakaTime team features."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status_bar"
+        ],
+        "description": "The WakaTime status bar today result."
+      }
+    },
+    {
+      "id": "wakatime.get_summaries",
+      "service": "wakatime",
+      "name": "get_summaries",
+      "description": "Get WakaTime daily summaries for the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "Today",
+              "Yesterday",
+              "Last 7 Days",
+              "Last 7 Days from Yesterday",
+              "Last 14 Days",
+              "Last 30 Days",
+              "This Week",
+              "Last Week",
+              "This Month",
+              "Last Month"
+            ],
+            "description": "A predefined WakaTime summaries date range."
+          },
+          "start": {
+            "type": "string",
+            "description": "The summaries start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "The summaries end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The WakaTime project name."
+          },
+          "branches": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of branch names used to filter activity."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The keystroke timeout override in minutes."
+          },
+          "writes_only": {
+            "type": "boolean",
+            "description": "Whether to count only file write activity instead of all coding activity."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An Olson timezone string such as America/Los_Angeles."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input.",
+        "anyOf": [
+          {
+            "required": [
+              "range"
+            ]
+          },
+          {
+            "required": [
+              "start",
+              "end"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summaries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "range": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "description": "The calendar date returned by WakaTime.",
+                      "format": "date"
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable date range text."
+                    },
+                    "start": {
+                      "type": "string",
+                      "description": "The start timestamp of the range.",
+                      "format": "date-time"
+                    },
+                    "end": {
+                      "type": "string",
+                      "description": "The end timestamp of the range.",
+                      "format": "date-time"
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "description": "The timezone used for the range."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime date range object."
+                },
+                "grand_total": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "The human-readable duration returned by WakaTime."
+                    },
+                    "decimal": {
+                      "type": "string",
+                      "description": "The decimal duration string returned by WakaTime, when present."
+                    },
+                    "digital": {
+                      "type": "string",
+                      "description": "The digital duration string returned by WakaTime."
+                    },
+                    "hours": {
+                      "type": "integer",
+                      "description": "The hours component of the duration."
+                    },
+                    "minutes": {
+                      "type": "integer",
+                      "description": "The minutes component of the duration."
+                    },
+                    "seconds": {
+                      "type": "integer",
+                      "description": "The seconds component of the duration."
+                    },
+                    "total_seconds": {
+                      "type": "number",
+                      "description": "The total number of seconds represented by the duration."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A WakaTime duration summary object."
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The categories breakdown returned by WakaTime."
+                },
+                "dependencies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The dependencies breakdown returned by WakaTime."
+                },
+                "editors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The editors breakdown returned by WakaTime."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The languages breakdown returned by WakaTime."
+                },
+                "machines": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The machines breakdown returned by WakaTime."
+                },
+                "operating_systems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The operating systems breakdown returned by WakaTime."
+                },
+                "projects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The item name returned by WakaTime."
+                      },
+                      "text": {
+                        "type": "string",
+                        "description": "The human-readable duration for this item."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The percentage of total time for this item."
+                      },
+                      "total_seconds": {
+                        "type": "number",
+                        "description": "The total number of seconds tracked for this item."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A WakaTime breakdown item."
+                  },
+                  "description": "The projects breakdown returned by WakaTime."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A WakaTime daily summary object."
+            },
+            "description": "The daily summaries returned by WakaTime."
+          },
+          "cumulative_total": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The human-readable cumulative duration."
+              },
+              "decimal": {
+                "type": "string",
+                "description": "The decimal cumulative duration string."
+              },
+              "digital": {
+                "type": "string",
+                "description": "The digital cumulative duration string."
+              },
+              "seconds": {
+                "type": "number",
+                "description": "The cumulative duration in seconds."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The cumulative total returned for the summaries range."
+          },
+          "daily_average": {
+            "type": "object",
+            "properties": {
+              "seconds": {
+                "type": "number",
+                "description": "The daily average coding time in seconds."
+              },
+              "text": {
+                "type": "string",
+                "description": "The human-readable daily average."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The daily average returned for the summaries range."
+          },
+          "start": {
+            "type": "string",
+            "description": "The start timestamp returned for the summaries range.",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "description": "The end timestamp returned for the summaries range.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summaries"
+        ],
+        "description": "The WakaTime daily summaries result."
+      }
+    },
+    {
+      "id": "wakatime.list_projects",
+      "service": "wakatime",
+      "name": "list_projects",
+      "description": "List WakaTime projects for the authenticated user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search term used to filter project names."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The WakaTime project ID."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The relative WakaTime URL for the project."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The project name."
+                },
+                "badge": {
+                  "type": "string",
+                  "description": "The project badge URL, when enabled."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project color returned by WakaTime."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project color returned by WakaTime."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A WakaTime project object."
+            },
+            "description": "The projects returned by WakaTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projects"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "service": "helium10",
+  "displayName": "Helium 10",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://members.helium10.com/authhub/api/scenarios/mcp/oauth2/authorize",
+      "tokenUrl": "https://members.helium10.com/authhub/api/scenarios/mcp/oauth2/token",
+      "refreshTokenUrl": "https://members.helium10.com/authhub/api/scenarios/mcp/oauth2/token",
+      "scopes": [
+        "mcp:tools"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "resource": "https://mcp.helium10.com/mcp"
+      }
+    }
+  ],
+  "homepageUrl": "https://www.helium10.com",
+  "actions": [
+    {
+      "id": "helium10.call_tool",
+      "service": "helium10",
+      "name": "call_tool",
+      "description": "Call a Helium 10 MCP tool after verifying it against the official V1 read-only catalog and the connected account's live tool list.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mcp:tools"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current Helium 10 MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by the Helium 10 MCP tool."
+      },
+      "followUpActions": [
+        "helium10.list_tools"
+      ]
+    },
+    {
+      "id": "helium10.list_tools",
+      "service": "helium10",
+      "name": "list_tools",
+      "description": "Discover Helium 10 MCP tools that are both in the official V1 read-only catalog and currently available to the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "mcp:tools"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by Helium 10 MCP."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Helium 10 MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected Helium 10 MCP server."
+            },
+            "description": "Tools currently exposed to the connected Helium 10 account."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The current Helium 10 MCP tool catalog."
+      },
+      "followUpActions": [
+        "helium10.call_tool"
+      ]
+    }
+  ]
+}

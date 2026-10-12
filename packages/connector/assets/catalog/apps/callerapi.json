@@ -1,0 +1,333 @@
+{
+  "service": "callerapi",
+  "displayName": "CallerAPI",
+  "categories": [
+    "Communication",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CALLERAPI_API_KEY",
+      "description": "CallerAPI key sent with the x-auth header. Get it from the CallerAPI dashboard: https://callerapi.com/dashboard",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://callerapi.com",
+  "actions": [
+    {
+      "id": "callerapi.get_phone_number_information",
+      "service": "callerapi",
+      "name": "get_phone_number_information",
+      "description": "Look up CallerAPI spam reputation, business details, complaints, and optional HLR carrier data for a phone number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number to look up. CallerAPI accepts E.164 input."
+          },
+          "hlr": {
+            "type": "boolean",
+            "description": "Whether to include HLR carrier data in the CallerAPI lookup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "phone"
+        ],
+        "description": "The input payload for looking up CallerAPI phone number information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by CallerAPI."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "The phone number returned by CallerAPI."
+              },
+              "is_spam": {
+                "type": "boolean",
+                "description": "Whether the number is marked as spam."
+              },
+              "reputation": {
+                "type": "string",
+                "description": "The reputation label for the number."
+              },
+              "spam_score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The spam likelihood score from 0 to 100."
+              },
+              "entity_type": {
+                "type": "string",
+                "description": "The entity type returned by CallerAPI."
+              },
+              "total_complaints": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total complaint count recorded for the number."
+              },
+              "complaints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "CreatedDate": {
+                      "type": "string",
+                      "description": "The date and time when the complaint was created."
+                    },
+                    "ViolationDate": {
+                      "type": "string",
+                      "description": "The date and time when the reported violation occurred."
+                    },
+                    "ConsumerState": {
+                      "type": "string",
+                      "description": "The consumer state associated with the complaint."
+                    },
+                    "Subject": {
+                      "type": "string",
+                      "description": "The complaint subject or category."
+                    },
+                    "RecordedMessageOrRobocall": {
+                      "type": "string",
+                      "description": "Whether the complaint involved a robocall."
+                    },
+                    "Comment": {
+                      "type": "string",
+                      "description": "Additional complaint details when provided."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A complaint record returned by CallerAPI."
+                },
+                "description": "The complaints returned for the phone number."
+              },
+              "business_info": {
+                "type": "object",
+                "properties": {
+                  "business_name": {
+                    "type": "string",
+                    "description": "The associated business name."
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "The high-level business category."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The business city."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The business state or province."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "The business country code."
+                  },
+                  "industry": {
+                    "type": "string",
+                    "description": "The business industry."
+                  },
+                  "verified": {
+                    "type": "boolean",
+                    "description": "Whether CallerAPI marks the business as verified."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Business details associated with the phone number."
+              },
+              "carrier_info": {
+                "type": "object",
+                "properties": {
+                  "country": {
+                    "type": "object",
+                    "properties": {
+                      "iso": {
+                        "type": "string",
+                        "description": "The ISO country code."
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "The country calling code."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The full country name."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Country information returned with carrier details."
+                  },
+                  "network": {
+                    "type": "object",
+                    "properties": {
+                      "carrier": {
+                        "type": "string",
+                        "description": "The current carrier name."
+                      },
+                      "ocn": {
+                        "type": "string",
+                        "description": "The operating company number."
+                      },
+                      "spid": {
+                        "type": "string",
+                        "description": "The service provider ID."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The network type returned by CallerAPI."
+                      },
+                      "original": {
+                        "type": "object",
+                        "properties": {
+                          "carrier": {
+                            "type": "string",
+                            "description": "The original carrier name."
+                          },
+                          "ocn": {
+                            "type": "string",
+                            "description": "The original operating company number."
+                          },
+                          "spid": {
+                            "type": "string",
+                            "description": "The original service provider ID."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Original carrier information returned with carrier details."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Network information returned with carrier details."
+                  },
+                  "number": {
+                    "type": "object",
+                    "properties": {
+                      "lrn": {
+                        "type": "string",
+                        "description": "The location routing number."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The number type returned by CallerAPI."
+                      },
+                      "valid": {
+                        "type": "string",
+                        "description": "The number validity status."
+                      },
+                      "mobile": {
+                        "type": "boolean",
+                        "description": "Whether CallerAPI reports the number as mobile."
+                      },
+                      "msisdn": {
+                        "type": "string",
+                        "description": "The phone number in MSISDN format."
+                      },
+                      "ported": {
+                        "type": "boolean",
+                        "description": "Whether the number has been ported."
+                      },
+                      "ported_date": {
+                        "type": "string",
+                        "description": "The date when the number was ported."
+                      },
+                      "landline": {
+                        "type": "boolean",
+                        "description": "Whether CallerAPI reports the number as landline."
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "description": "The number time zone."
+                      },
+                      "reachable": {
+                        "type": "string",
+                        "description": "The number reachability status."
+                      },
+                      "local_format": {
+                        "type": "string",
+                        "description": "The local number format."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Number details returned with carrier information."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Carrier and HLR information returned by CallerAPI."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Detailed CallerAPI phone intelligence for a number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The phone number information response returned by CallerAPI."
+      }
+    },
+    {
+      "id": "callerapi.get_user_information",
+      "service": "callerapi",
+      "name": "get_user_information",
+      "description": "Retrieve the authenticated CallerAPI account email and credit balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving CallerAPI account details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "The request status returned by CallerAPI."
+          },
+          "email": {
+            "type": "string",
+            "description": "The authenticated account email address."
+          },
+          "credits_spent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of credits spent by the account."
+          },
+          "credits_monthly": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The monthly credit allocation for the account."
+          },
+          "credits_left": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of credits left in the account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The CallerAPI account information response."
+      }
+    }
+  ]
+}

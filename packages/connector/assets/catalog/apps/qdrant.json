@@ -1,0 +1,913 @@
+{
+  "service": "qdrant",
+  "displayName": "Qdrant Cloud",
+  "description": "Create, inspect, write, and query dense-vector collections in Qdrant Cloud.",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clusterUrl",
+          "label": "Cluster URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://your-cluster.cloud.qdrant.io",
+          "description": "The HTTPS REST URL for a Qdrant Cloud cluster. Only official cloud.qdrant.io endpoints on port 443 or 6333 are supported."
+        },
+        {
+          "key": "apiKey",
+          "label": "API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your Qdrant Cloud database API key",
+          "description": "A Qdrant Cloud database API key with access to the target collections."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://qdrant.tech/cloud/",
+  "actions": [
+    {
+      "id": "qdrant.create_collection",
+      "service": "qdrant",
+      "name": "create_collection",
+      "description": "Create a Qdrant Cloud collection with one unnamed dense vector configuration.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          },
+          "vectorSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The dense vector dimension."
+          },
+          "distance": {
+            "type": "string",
+            "enum": [
+              "Cosine",
+              "Euclid",
+              "Dot",
+              "Manhattan"
+            ],
+            "description": "The distance function used by the collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName",
+          "vectorSize",
+          "distance"
+        ],
+        "description": "Input parameters for creating a dense-vector Qdrant collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "Whether Qdrant created the collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "created"
+        ],
+        "description": "Action output."
+      },
+      "followUpActions": [
+        "qdrant.get_collection",
+        "qdrant.upsert_points"
+      ]
+    },
+    {
+      "id": "qdrant.get_collection",
+      "service": "qdrant",
+      "name": "get_collection",
+      "description": "Retrieve configuration and status information for one Qdrant collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName"
+        ],
+        "description": "Input parameters for retrieving a Qdrant collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "description": "The collection status."
+              },
+              "optimizer_status": {
+                "description": "The collection optimizer status."
+              },
+              "indexed_vectors_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The approximate indexed vector count."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The approximate indexed vector count."
+              },
+              "points_count": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The approximate point count."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The approximate point count."
+              },
+              "segments_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of collection segments."
+              },
+              "config": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The collection configuration."
+              },
+              "payload_schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The collection payload index schema."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A collection warning."
+                },
+                "description": "Collection warnings."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "status",
+              "optimizer_status",
+              "segments_count",
+              "config",
+              "payload_schema"
+            ],
+            "description": "A Qdrant collection description."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collection"
+        ],
+        "description": "The Qdrant collection description response."
+      },
+      "followUpActions": [
+        "qdrant.query_points",
+        "qdrant.scroll_points",
+        "qdrant.upsert_points"
+      ]
+    },
+    {
+      "id": "qdrant.get_point",
+      "service": "qdrant",
+      "name": "get_point",
+      "description": "Retrieve one point by numeric ID or UUID from a Qdrant collection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "A numeric point ID within the JavaScript safe-integer range."
+              },
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+              }
+            ],
+            "description": "A Qdrant numeric or UUID point ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName",
+          "id"
+        ],
+        "description": "Input parameters for retrieving a Qdrant point."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "A numeric point ID within the JavaScript safe-integer range."
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                    "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+                  }
+                ],
+                "description": "A Qdrant numeric or UUID point ID."
+              },
+              "payload": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A JSON object stored with the point."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A JSON object stored with the point."
+              },
+              "vector": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "description": "One vector component."
+                    },
+                    "description": "A dense unnamed vector.",
+                    "minItems": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A dense unnamed vector."
+              },
+              "shard_key": {
+                "description": "The Qdrant shard key when present."
+              },
+              "order_value": {
+                "description": "The Qdrant order value when present."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id"
+            ],
+            "description": "A Qdrant point record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "point"
+        ],
+        "description": "The Qdrant point record response."
+      }
+    },
+    {
+      "id": "qdrant.list_collections",
+      "service": "qdrant",
+      "name": "list_collections",
+      "description": "List the Qdrant collections visible to the authenticated API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Qdrant collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The collection name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name"
+              ],
+              "description": "A Qdrant collection name."
+            },
+            "description": "The visible Qdrant collections."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collections"
+        ],
+        "description": "The Qdrant collection list response."
+      },
+      "followUpActions": [
+        "qdrant.get_collection",
+        "qdrant.create_collection"
+      ]
+    },
+    {
+      "id": "qdrant.query_points",
+      "service": "qdrant",
+      "name": "query_points",
+      "description": "Search a dense-vector Qdrant collection with an optional payload filter.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          },
+          "vector": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "description": "One vector component."
+            },
+            "description": "A dense unnamed vector.",
+            "minItems": 1
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "must": {
+                "description": "Conditions that must match."
+              },
+              "must_not": {
+                "description": "Conditions that must not match."
+              },
+              "should": {
+                "description": "Conditions where at least one should match."
+              },
+              "min_should": {
+                "type": "object",
+                "properties": {
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "description": "One Qdrant filter condition."
+                    },
+                    "description": "The Qdrant filter conditions to evaluate."
+                  },
+                  "min_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The minimum number of conditions that must match."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "conditions",
+                  "min_count"
+                ],
+                "description": "Conditions where at least `min_count` entries must match."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Qdrant filter. Nested conditions are validated by Qdrant."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of points to return."
+          },
+          "withPayload": {
+            "type": "boolean",
+            "description": "Whether to include point payloads."
+          },
+          "withVector": {
+            "type": "boolean",
+            "description": "Whether to include point vectors."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of matching points to skip."
+          },
+          "scoreThreshold": {
+            "type": "number",
+            "description": "The minimum score a result must have."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName",
+          "vector"
+        ],
+        "description": "Input parameters for querying Qdrant points."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "A numeric point ID within the JavaScript safe-integer range."
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                      "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+                    }
+                  ],
+                  "description": "A Qdrant numeric or UUID point ID."
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The point version."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "The similarity score."
+                },
+                "payload": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A JSON object stored with the point."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A JSON object stored with the point."
+                },
+                "vector": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "One vector component."
+                      },
+                      "description": "A dense unnamed vector.",
+                      "minItems": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A dense unnamed vector."
+                },
+                "shard_key": {
+                  "description": "The Qdrant shard key when present."
+                },
+                "order_value": {
+                  "description": "The Qdrant order value when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "version",
+                "score"
+              ],
+              "description": "A Qdrant scored point."
+            },
+            "description": "The scored points returned by Qdrant."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "points"
+        ],
+        "description": "The Qdrant query response."
+      },
+      "followUpActions": [
+        "qdrant.get_point",
+        "qdrant.scroll_points"
+      ]
+    },
+    {
+      "id": "qdrant.scroll_points",
+      "service": "qdrant",
+      "name": "scroll_points",
+      "description": "Read one page of points from a Qdrant collection with an optional payload filter.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "A numeric point ID within the JavaScript safe-integer range."
+              },
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+              }
+            ],
+            "description": "A Qdrant numeric or UUID point ID."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "must": {
+                "description": "Conditions that must match."
+              },
+              "must_not": {
+                "description": "Conditions that must not match."
+              },
+              "should": {
+                "description": "Conditions where at least one should match."
+              },
+              "min_should": {
+                "type": "object",
+                "properties": {
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "description": "One Qdrant filter condition."
+                    },
+                    "description": "The Qdrant filter conditions to evaluate."
+                  },
+                  "min_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The minimum number of conditions that must match."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "conditions",
+                  "min_count"
+                ],
+                "description": "Conditions where at least `min_count` entries must match."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Qdrant filter. Nested conditions are validated by Qdrant."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of points to return."
+          },
+          "withPayload": {
+            "type": "boolean",
+            "description": "Whether to include point payloads."
+          },
+          "withVector": {
+            "type": "boolean",
+            "description": "Whether to include point vectors."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName"
+        ],
+        "description": "Input parameters for scrolling through Qdrant points."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "A numeric point ID within the JavaScript safe-integer range."
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                      "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+                    }
+                  ],
+                  "description": "A Qdrant numeric or UUID point ID."
+                },
+                "payload": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "A JSON object stored with the point."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A JSON object stored with the point."
+                },
+                "vector": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "One vector component."
+                      },
+                      "description": "A dense unnamed vector.",
+                      "minItems": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A dense unnamed vector."
+                },
+                "shard_key": {
+                  "description": "The Qdrant shard key when present."
+                },
+                "order_value": {
+                  "description": "The Qdrant order value when present."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id"
+              ],
+              "description": "A Qdrant point record."
+            },
+            "description": "The point records returned by Qdrant."
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "A numeric point ID within the JavaScript safe-integer range."
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                    "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+                  }
+                ],
+                "description": "A Qdrant numeric or UUID point ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Qdrant numeric or UUID point ID."
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Whether there is no next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "points",
+          "nextOffset",
+          "complete"
+        ],
+        "description": "One page of Qdrant scroll results."
+      },
+      "followUpActions": [
+        "qdrant.scroll_points",
+        "qdrant.get_point"
+      ]
+    },
+    {
+      "id": "qdrant.upsert_points",
+      "service": "qdrant",
+      "name": "upsert_points",
+      "description": "Insert or replace dense-vector points in a Qdrant collection and wait for the write to commit.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Qdrant collection name. The names `.` and `..` are not supported.",
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "A numeric point ID within the JavaScript safe-integer range."
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^(?:[0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}|[uU][rR][nN]:[uU][uU][iI][dD]:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+                      "description": "A Qdrant UUID point ID in simple, hyphenated, or URN form."
+                    }
+                  ],
+                  "description": "A Qdrant numeric or UUID point ID."
+                },
+                "vector": {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "description": "One vector component."
+                  },
+                  "description": "A dense unnamed vector.",
+                  "minItems": 1
+                },
+                "payload": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object stored with the point."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "vector"
+              ],
+              "description": "A Qdrant point to insert or update."
+            },
+            "description": "The points to upsert.",
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionName",
+          "points"
+        ],
+        "description": "Input parameters for upserting Qdrant points."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "The Qdrant operation ID when returned, within the JavaScript safe-integer range."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Qdrant operation ID when returned, within the JavaScript safe-integer range."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "acknowledged",
+              "completed",
+              "wait_timeout"
+            ],
+            "description": "The Qdrant write status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "status"
+        ],
+        "description": "The Qdrant upsert operation result."
+      },
+      "followUpActions": [
+        "qdrant.get_point",
+        "qdrant.query_points",
+        "qdrant.scroll_points"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1390 @@
+{
+  "service": "speedtest_tracker",
+  "displayName": "Speedtest Tracker",
+  "description": "Run speed tests and inspect results, statistics, and Ookla servers on a self-hosted Speedtest Tracker instance.",
+  "categories": [
+    "Developer Tools",
+    "Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "Enter your Speedtest Tracker API token",
+      "description": "A bearer token created from /admin/api-tokens on your Speedtest Tracker instance. See https://docs.speedtest-tracker.dev/api/authorization.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://speedtest.example.com",
+          "description": "The HTTPS root URL of your Speedtest Tracker instance, including any reverse-proxy subpath. Private-network instances require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK in a self-hosted Node deployment."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://speedtest-tracker.dev",
+  "actions": [
+    {
+      "id": "speedtest_tracker.check_health",
+      "service": "speedtest_tracker",
+      "name": "check_health",
+      "description": "Check that the Speedtest Tracker instance is reachable and running through its unauthenticated health check endpoint.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The health check needs no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The upstream health message, normally `Speedtest Tracker is running!`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The health check response."
+      }
+    },
+    {
+      "id": "speedtest_tracker.get_latest_result",
+      "service": "speedtest_tracker",
+      "name": "get_latest_result",
+      "description": "Retrieve the most recent speedtest result, optionally narrowed by the same filters as list_results, for example status `completed` for the last successful test. Requires a token with the Read Results ability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "results:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ping": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by ping in milliseconds. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "download": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by download bandwidth in bytes per second. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by upload bandwidth in bytes per second. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "healthy": {
+            "type": "boolean",
+            "description": "Only include results whose benchmark evaluation matched this healthy flag."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "started",
+              "checking",
+              "benchmarking",
+              "running",
+              "completed",
+              "failed",
+              "skipped"
+            ],
+            "description": "Only include results with this status."
+          },
+          "scheduled": {
+            "type": "boolean",
+            "description": "Only include scheduled results (true) or manual dashboard results (false). Tests started through the API are stored as scheduled."
+          },
+          "startAt": {
+            "type": "string",
+            "description": "Only include results created on or after this ISO 8601 date or date-time, for example `2026-09-01` or `2026-09-01T00:00:00Z`."
+          },
+          "endAt": {
+            "type": "string",
+            "description": "Only include results created on or before this ISO 8601 date or date-time. A date without a time covers the whole day."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional filters applied before picking the newest result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "description": "The result ID."
+                  },
+                  "service": {
+                    "type": "string",
+                    "description": "The speedtest service that produced the result, currently `ookla`."
+                  },
+                  "ping": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "Ping latency in milliseconds, null until the test completes."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Ping latency in milliseconds, null until the test completes."
+                  },
+                  "download": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Download bandwidth in bytes per second, null until the test completes."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Download bandwidth in bytes per second, null until the test completes."
+                  },
+                  "upload": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Upload bandwidth in bytes per second, null until the test completes."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Upload bandwidth in bytes per second, null until the test completes."
+                  },
+                  "download_bits": {
+                    "type": "number",
+                    "description": "Download bandwidth in bits per second, omitted when download is empty."
+                  },
+                  "upload_bits": {
+                    "type": "number",
+                    "description": "Upload bandwidth in bits per second, omitted when upload is empty."
+                  },
+                  "download_bits_human": {
+                    "type": "string",
+                    "description": "Human readable download bandwidth such as `934.51 Mbps`, omitted when download is empty."
+                  },
+                  "upload_bits_human": {
+                    "type": "string",
+                    "description": "Human readable upload bandwidth such as `41.20 Mbps`, omitted when upload is empty."
+                  },
+                  "download_bytes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Total bytes transferred during the download phase."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Total bytes transferred during the download phase."
+                  },
+                  "upload_bytes": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Total bytes transferred during the upload phase."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Total bytes transferred during the upload phase."
+                  },
+                  "download_bytes_human": {
+                    "type": "string",
+                    "description": "Human readable download transfer size, omitted when download_bytes is empty."
+                  },
+                  "upload_bytes_human": {
+                    "type": "string",
+                    "description": "Human readable upload transfer size, omitted when upload_bytes is empty."
+                  },
+                  "benchmarks": {
+                    "description": "The benchmark evaluation payload, null when no benchmarks were configured."
+                  },
+                  "healthy": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "waiting",
+                      "started",
+                      "checking",
+                      "benchmarking",
+                      "running",
+                      "completed",
+                      "failed",
+                      "skipped"
+                    ],
+                    "description": "The result status. waiting, started, checking, benchmarking, and running mean the test is still in progress."
+                  },
+                  "scheduled": {
+                    "type": "boolean",
+                    "description": "Whether the test ran from the schedule or the API (true) instead of a manual dashboard run (false)."
+                  },
+                  "dispatched_by": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                  },
+                  "comments": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Free-form comments attached to the result."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Free-form comments attached to the result."
+                  },
+                  "data": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                  },
+                  "created_at": {
+                    "type": "string",
+                    "description": "When the result was created, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "When the result was last updated, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "id",
+                  "status"
+                ],
+                "description": "A Speedtest Tracker result with upstream field names. Bandwidth fields use bytes per second unless the name says bits."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Speedtest Tracker result with upstream field names. Bandwidth fields use bytes per second unless the name says bits."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newest matching result."
+      },
+      "followUpActions": [
+        "speedtest_tracker.list_results",
+        "speedtest_tracker.run_speedtest"
+      ]
+    },
+    {
+      "id": "speedtest_tracker.get_result",
+      "service": "speedtest_tracker",
+      "name": "get_result",
+      "description": "Retrieve one speedtest result by ID. Use it to poll a test queued by run_speedtest until its status leaves the in-progress states. Requires a token with the Read Results ability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "results:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The result ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The result ID."
+              },
+              "service": {
+                "type": "string",
+                "description": "The speedtest service that produced the result, currently `ookla`."
+              },
+              "ping": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Ping latency in milliseconds, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Ping latency in milliseconds, null until the test completes."
+              },
+              "download": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Download bandwidth in bytes per second, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Download bandwidth in bytes per second, null until the test completes."
+              },
+              "upload": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Upload bandwidth in bytes per second, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Upload bandwidth in bytes per second, null until the test completes."
+              },
+              "download_bits": {
+                "type": "number",
+                "description": "Download bandwidth in bits per second, omitted when download is empty."
+              },
+              "upload_bits": {
+                "type": "number",
+                "description": "Upload bandwidth in bits per second, omitted when upload is empty."
+              },
+              "download_bits_human": {
+                "type": "string",
+                "description": "Human readable download bandwidth such as `934.51 Mbps`, omitted when download is empty."
+              },
+              "upload_bits_human": {
+                "type": "string",
+                "description": "Human readable upload bandwidth such as `41.20 Mbps`, omitted when upload is empty."
+              },
+              "download_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total bytes transferred during the download phase."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total bytes transferred during the download phase."
+              },
+              "upload_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total bytes transferred during the upload phase."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total bytes transferred during the upload phase."
+              },
+              "download_bytes_human": {
+                "type": "string",
+                "description": "Human readable download transfer size, omitted when download_bytes is empty."
+              },
+              "upload_bytes_human": {
+                "type": "string",
+                "description": "Human readable upload transfer size, omitted when upload_bytes is empty."
+              },
+              "benchmarks": {
+                "description": "The benchmark evaluation payload, null when no benchmarks were configured."
+              },
+              "healthy": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "waiting",
+                  "started",
+                  "checking",
+                  "benchmarking",
+                  "running",
+                  "completed",
+                  "failed",
+                  "skipped"
+                ],
+                "description": "The result status. waiting, started, checking, benchmarking, and running mean the test is still in progress."
+              },
+              "scheduled": {
+                "type": "boolean",
+                "description": "Whether the test ran from the schedule or the API (true) instead of a manual dashboard run (false)."
+              },
+              "dispatched_by": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+              },
+              "comments": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Free-form comments attached to the result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Free-form comments attached to the result."
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the result was created, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "When the result was last updated, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "A Speedtest Tracker result with upstream field names. Bandwidth fields use bytes per second unless the name says bits."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved result."
+      },
+      "asyncLifecycle": {
+        "startActionId": "speedtest_tracker.run_speedtest",
+        "statusActionId": "speedtest_tracker.get_result"
+      }
+    },
+    {
+      "id": "speedtest_tracker.get_stats",
+      "service": "speedtest_tracker",
+      "name": "get_stats",
+      "description": "Retrieve aggregated ping, download, and upload statistics, optionally limited to a date range. Requires a token with the Read Results ability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "results:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "description": "Only include results created on or after this ISO 8601 date or date-time, for example `2026-09-01` or `2026-09-01T00:00:00Z`."
+          },
+          "endAt": {
+            "type": "string",
+            "description": "Only include results created on or before this ISO 8601 date or date-time. A date without a time covers the whole day."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional date range for the statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stats": {
+            "type": "object",
+            "properties": {
+              "total_results": {
+                "type": "integer",
+                "description": "The number of results in the selected range."
+              },
+              "ping": {
+                "type": "object",
+                "properties": {
+                  "avg": {
+                    "type": "number",
+                    "description": "Average ping, rounded to two decimals."
+                  },
+                  "min": {
+                    "type": "number",
+                    "description": "Minimum ping, rounded to two decimals."
+                  },
+                  "max": {
+                    "type": "number",
+                    "description": "Maximum ping, rounded to two decimals."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "avg",
+                  "min",
+                  "max"
+                ],
+                "description": "Aggregated ping statistics in milliseconds."
+              },
+              "download": {
+                "type": "object",
+                "properties": {
+                  "avg": {
+                    "type": "number",
+                    "description": "Average download bandwidth in bytes per second, rounded."
+                  },
+                  "avg_bits": {
+                    "type": "number",
+                    "description": "Average download bandwidth in bits per second, omitted when avg is 0."
+                  },
+                  "avg_bits_human": {
+                    "type": "string",
+                    "description": "Human readable average download bandwidth, omitted when avg is 0."
+                  },
+                  "min": {
+                    "type": "number",
+                    "description": "Minimum download bandwidth in bytes per second, rounded."
+                  },
+                  "min_bits": {
+                    "type": "number",
+                    "description": "Minimum download bandwidth in bits per second, omitted when min is 0."
+                  },
+                  "min_bits_human": {
+                    "type": "string",
+                    "description": "Human readable minimum download bandwidth, omitted when min is 0."
+                  },
+                  "max": {
+                    "type": "number",
+                    "description": "Maximum download bandwidth in bytes per second, rounded."
+                  },
+                  "max_bits": {
+                    "type": "number",
+                    "description": "Maximum download bandwidth in bits per second, omitted when max is 0."
+                  },
+                  "max_bits_human": {
+                    "type": "string",
+                    "description": "Human readable maximum download bandwidth, omitted when max is 0."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "avg",
+                  "min",
+                  "max"
+                ],
+                "description": "Aggregated download bandwidth statistics in bytes per second, with bits variants when the value is non-zero."
+              },
+              "upload": {
+                "type": "object",
+                "properties": {
+                  "avg": {
+                    "type": "number",
+                    "description": "Average upload bandwidth in bytes per second, rounded."
+                  },
+                  "avg_bits": {
+                    "type": "number",
+                    "description": "Average upload bandwidth in bits per second, omitted when avg is 0."
+                  },
+                  "avg_bits_human": {
+                    "type": "string",
+                    "description": "Human readable average upload bandwidth, omitted when avg is 0."
+                  },
+                  "min": {
+                    "type": "number",
+                    "description": "Minimum upload bandwidth in bytes per second, rounded."
+                  },
+                  "min_bits": {
+                    "type": "number",
+                    "description": "Minimum upload bandwidth in bits per second, omitted when min is 0."
+                  },
+                  "min_bits_human": {
+                    "type": "string",
+                    "description": "Human readable minimum upload bandwidth, omitted when min is 0."
+                  },
+                  "max": {
+                    "type": "number",
+                    "description": "Maximum upload bandwidth in bytes per second, rounded."
+                  },
+                  "max_bits": {
+                    "type": "number",
+                    "description": "Maximum upload bandwidth in bits per second, omitted when max is 0."
+                  },
+                  "max_bits_human": {
+                    "type": "string",
+                    "description": "Human readable maximum upload bandwidth, omitted when max is 0."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "avg",
+                  "min",
+                  "max"
+                ],
+                "description": "Aggregated upload bandwidth statistics in bytes per second, with bits variants when the value is non-zero."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "total_results",
+              "ping",
+              "download",
+              "upload"
+            ],
+            "description": "Aggregated statistics with upstream field names. All averages are 0 when no result matches."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The aggregated statistics."
+      },
+      "followUpActions": [
+        "speedtest_tracker.list_results"
+      ]
+    },
+    {
+      "id": "speedtest_tracker.list_results",
+      "service": "speedtest_tracker",
+      "name": "list_results",
+      "description": "List speedtest results with optional filters, sorting, and pagination. Requires a token with the Read Results ability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "results:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ping": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by ping in milliseconds. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "download": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by download bandwidth in bytes per second. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Filter by upload bandwidth in bytes per second. Prefix the value with a comparison operator (<, <=, >, >=, or <>) for range queries, for example `>=20`; a bare number means equals."
+          },
+          "healthy": {
+            "type": "boolean",
+            "description": "Only include results whose benchmark evaluation matched this healthy flag."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "started",
+              "checking",
+              "benchmarking",
+              "running",
+              "completed",
+              "failed",
+              "skipped"
+            ],
+            "description": "Only include results with this status."
+          },
+          "scheduled": {
+            "type": "boolean",
+            "description": "Only include scheduled results (true) or manual dashboard results (false). Tests started through the API are stored as scheduled."
+          },
+          "startAt": {
+            "type": "string",
+            "description": "Only include results created on or after this ISO 8601 date or date-time, for example `2026-09-01` or `2026-09-01T00:00:00Z`."
+          },
+          "endAt": {
+            "type": "string",
+            "description": "Only include results created on or before this ISO 8601 date or date-time. A date without a time covers the whole day."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "ping",
+              "-ping",
+              "download",
+              "-download",
+              "upload",
+              "-upload",
+              "created_at",
+              "-created_at",
+              "updated_at",
+              "-updated_at"
+            ],
+            "description": "The sort field; prefix with `-` for descending. Defaults to the instance insertion order, so use `-created_at` for newest first."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Results per page, from 1 to 500. Defaults to 25. The instance can lower the maximum through API_MAX_RESULTS."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters, sorting, and pagination for listing results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The result ID."
+                },
+                "service": {
+                  "type": "string",
+                  "description": "The speedtest service that produced the result, currently `ookla`."
+                },
+                "ping": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "Ping latency in milliseconds, null until the test completes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Ping latency in milliseconds, null until the test completes."
+                },
+                "download": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Download bandwidth in bytes per second, null until the test completes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Download bandwidth in bytes per second, null until the test completes."
+                },
+                "upload": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Upload bandwidth in bytes per second, null until the test completes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Upload bandwidth in bytes per second, null until the test completes."
+                },
+                "download_bits": {
+                  "type": "number",
+                  "description": "Download bandwidth in bits per second, omitted when download is empty."
+                },
+                "upload_bits": {
+                  "type": "number",
+                  "description": "Upload bandwidth in bits per second, omitted when upload is empty."
+                },
+                "download_bits_human": {
+                  "type": "string",
+                  "description": "Human readable download bandwidth such as `934.51 Mbps`, omitted when download is empty."
+                },
+                "upload_bits_human": {
+                  "type": "string",
+                  "description": "Human readable upload bandwidth such as `41.20 Mbps`, omitted when upload is empty."
+                },
+                "download_bytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Total bytes transferred during the download phase."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Total bytes transferred during the download phase."
+                },
+                "upload_bytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Total bytes transferred during the upload phase."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Total bytes transferred during the upload phase."
+                },
+                "download_bytes_human": {
+                  "type": "string",
+                  "description": "Human readable download transfer size, omitted when download_bytes is empty."
+                },
+                "upload_bytes_human": {
+                  "type": "string",
+                  "description": "Human readable upload transfer size, omitted when upload_bytes is empty."
+                },
+                "benchmarks": {
+                  "description": "The benchmark evaluation payload, null when no benchmarks were configured."
+                },
+                "healthy": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "waiting",
+                    "started",
+                    "checking",
+                    "benchmarking",
+                    "running",
+                    "completed",
+                    "failed",
+                    "skipped"
+                  ],
+                  "description": "The result status. waiting, started, checking, benchmarking, and running mean the test is still in progress."
+                },
+                "scheduled": {
+                  "type": "boolean",
+                  "description": "Whether the test ran from the schedule or the API (true) instead of a manual dashboard run (false)."
+                },
+                "dispatched_by": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                },
+                "comments": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Free-form comments attached to the result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Free-form comments attached to the result."
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "When the result was created, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "When the result was last updated, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "status"
+              ],
+              "description": "A Speedtest Tracker result with upstream field names. Bandwidth fields use bytes per second unless the name says bits."
+            },
+            "description": "The matching results in the requested order."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "type": "integer",
+                "description": "The current 1-based page number."
+              },
+              "lastPage": {
+                "type": "integer",
+                "description": "The last available page number."
+              },
+              "perPage": {
+                "type": "integer",
+                "description": "The page size applied by the instance."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of matching results."
+              },
+              "from": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The 1-based position of the first result on this page, null when the page is empty."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The 1-based position of the first result on this page, null when the page is empty."
+              },
+              "to": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The 1-based position of the last result on this page, null when the page is empty."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The 1-based position of the last result on this page, null when the page is empty."
+              },
+              "nextPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The next page number, null on the last page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page number, null on the last page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination details normalized from the upstream meta block."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated result list."
+      },
+      "followUpActions": [
+        "speedtest_tracker.get_result",
+        "speedtest_tracker.get_stats"
+      ]
+    },
+    {
+      "id": "speedtest_tracker.list_servers",
+      "service": "speedtest_tracker",
+      "name": "list_servers",
+      "description": "List nearby Ookla speedtest servers as seen by the instance, for choosing a serverId for run_speedtest. Requires a token with the List Servers ability.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "ookla:list-servers"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Listing servers needs no input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "servers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "The Ookla server ID. Numeric IDs are returned as integers so they can be passed to run_speedtest."
+                },
+                "host": {
+                  "type": "string",
+                  "description": "The server host and port, for example `speedtest.example.net:8080`."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The server sponsor name."
+                },
+                "location": {
+                  "type": "string",
+                  "description": "The server city or location label."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The server country."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "host",
+                "name",
+                "location",
+                "country"
+              ],
+              "description": "An Ookla speedtest server."
+            },
+            "description": "The servers returned by the instance, empty when it cannot reach Ookla."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The available Ookla servers."
+      },
+      "followUpActions": [
+        "speedtest_tracker.run_speedtest"
+      ]
+    },
+    {
+      "id": "speedtest_tracker.run_speedtest",
+      "service": "speedtest_tracker",
+      "name": "run_speedtest",
+      "description": "Queue a new Ookla speedtest on the instance and return the queued result immediately. Poll get_result with the returned ID until the status is completed, failed, or skipped. Requires a token with the Run Speedtest ability.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "speedtests:run"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Ookla server ID to test against, from list_servers. Omit to let the instance choose a server."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The speedtest to queue."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The result ID."
+              },
+              "service": {
+                "type": "string",
+                "description": "The speedtest service that produced the result, currently `ookla`."
+              },
+              "ping": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "Ping latency in milliseconds, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Ping latency in milliseconds, null until the test completes."
+              },
+              "download": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Download bandwidth in bytes per second, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Download bandwidth in bytes per second, null until the test completes."
+              },
+              "upload": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Upload bandwidth in bytes per second, null until the test completes."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Upload bandwidth in bytes per second, null until the test completes."
+              },
+              "download_bits": {
+                "type": "number",
+                "description": "Download bandwidth in bits per second, omitted when download is empty."
+              },
+              "upload_bits": {
+                "type": "number",
+                "description": "Upload bandwidth in bits per second, omitted when upload is empty."
+              },
+              "download_bits_human": {
+                "type": "string",
+                "description": "Human readable download bandwidth such as `934.51 Mbps`, omitted when download is empty."
+              },
+              "upload_bits_human": {
+                "type": "string",
+                "description": "Human readable upload bandwidth such as `41.20 Mbps`, omitted when upload is empty."
+              },
+              "download_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total bytes transferred during the download phase."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total bytes transferred during the download phase."
+              },
+              "upload_bytes": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Total bytes transferred during the upload phase."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total bytes transferred during the upload phase."
+              },
+              "download_bytes_human": {
+                "type": "string",
+                "description": "Human readable download transfer size, omitted when download_bytes is empty."
+              },
+              "upload_bytes_human": {
+                "type": "string",
+                "description": "Human readable upload transfer size, omitted when upload_bytes is empty."
+              },
+              "benchmarks": {
+                "description": "The benchmark evaluation payload, null when no benchmarks were configured."
+              },
+              "healthy": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the result passed the configured benchmarks, null when not evaluated."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "waiting",
+                  "started",
+                  "checking",
+                  "benchmarking",
+                  "running",
+                  "completed",
+                  "failed",
+                  "skipped"
+                ],
+                "description": "The result status. waiting, started, checking, benchmarking, and running mean the test is still in progress."
+              },
+              "scheduled": {
+                "type": "boolean",
+                "description": "Whether the test ran from the schedule or the API (true) instead of a manual dashboard run (false)."
+              },
+              "dispatched_by": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ID of the user whose token or dashboard session dispatched the test, null for scheduled runs."
+              },
+              "comments": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Free-form comments attached to the result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Free-form comments attached to the result."
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The raw Ookla Speedtest CLI payload, including isp, server, ping, download, upload, interface, packetLoss, and result URL fields."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "When the result was created, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "When the result was last updated, formatted as `YYYY-MM-DD HH:mm:ss` in the instance timezone."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "A Speedtest Tracker result with upstream field names. Bandwidth fields use bytes per second unless the name says bits."
+          },
+          "message": {
+            "type": "string",
+            "description": "The upstream confirmation message, normally `Speedtest added to the queue.`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The queued speedtest."
+      },
+      "followUpActions": [
+        "speedtest_tracker.get_result"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "speedtest_tracker.run_speedtest",
+        "statusActionId": "speedtest_tracker.get_result"
+      }
+    }
+  ]
+}

@@ -1,0 +1,1093 @@
+{
+  "service": "seedance",
+  "displayName": "Seedance",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Ark API Key",
+      "placeholder": "Your Seedance API key",
+      "description": "Seedance API key sent as a Bearer token. Create an API key in the Ark console: https://console.volcengine.com/ark/region:ark+cn-beijing/apikey."
+    }
+  ],
+  "homepageUrl": "https://www.volcengine.com/product/ark",
+  "actions": [
+    {
+      "id": "seedance.delete_video_generation",
+      "service": "seedance",
+      "name": "delete_video_generation",
+      "description": "Cancel a queued Seedance task or delete a task according to Seedance task-state semantics.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Seedance task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A Seedance task cancellation or deletion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Seedance task identifier returned by the selected connection."
+          },
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Seedance accepted the cancellation or deletion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "accepted"
+        ],
+        "description": "The Seedance cancellation or deletion result."
+      }
+    },
+    {
+      "id": "seedance.get_video_generation",
+      "service": "seedance",
+      "name": "get_video_generation",
+      "description": "Retrieve a Seedance task state and its generated video when available.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Seedance task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "A Seedance task lookup."
+      },
+      "outputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Seedance task identifier returned by the selected connection."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model name reported for this task."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in seconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in seconds."
+              },
+              "state": {
+                "const": "processing",
+                "type": "string",
+                "description": "The task is queued or running."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The task progress when available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A queued or running Seedance task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Seedance task identifier returned by the selected connection."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model name reported for this task."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in seconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in seconds."
+              },
+              "state": {
+                "const": "succeeded",
+                "type": "string",
+                "description": "The task succeeded."
+              },
+              "videoUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated video URL."
+              },
+              "lastFrameUrl": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated final-frame image URL when requested."
+              },
+              "seed": {
+                "type": "integer",
+                "description": "The seed used by the task."
+              },
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "480p",
+                  "720p",
+                  "1080p"
+                ],
+                "description": "The generated video resolution."
+              },
+              "ratio": {
+                "type": "string",
+                "enum": [
+                  "16:9",
+                  "4:3",
+                  "1:1",
+                  "3:4",
+                  "9:16",
+                  "21:9",
+                  "adaptive"
+                ],
+                "description": "The generated video aspect ratio."
+              },
+              "duration": {
+                "type": "number",
+                "description": "The generated video duration in seconds."
+              },
+              "frames": {
+                "type": "integer",
+                "description": "The generated frame count."
+              },
+              "framesPerSecond": {
+                "type": "integer",
+                "description": "The generated video frame rate."
+              },
+              "generateAudio": {
+                "type": "boolean",
+                "description": "Whether the generated video contains synchronized audio."
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "web_search",
+                      "type": "string",
+                      "description": "Use web search while generating the video."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "description": "A tool available to the Seedance model."
+                },
+                "description": "The tools used by Seedance."
+              },
+              "safetyIdentifier": {
+                "type": "string",
+                "description": "The end-user safety identifier supplied at submission."
+              },
+              "serviceTier": {
+                "type": "string",
+                "description": "The service tier that processed the task."
+              },
+              "executionExpiresAfter": {
+                "type": "integer",
+                "description": "The task expiration threshold in seconds."
+              },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "completionTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The completion token count."
+                  },
+                  "totalTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total token count."
+                  },
+                  "toolUsage": {
+                    "type": "object",
+                    "properties": {
+                      "webSearch": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The web search invocation count."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Tool usage reported by Seedance."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Token and tool usage reported for a succeeded Seedance task."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state",
+              "videoUrl"
+            ],
+            "description": "A succeeded Seedance video generation task."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Seedance task identifier returned by the selected connection."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model name reported for this task."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in seconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in seconds."
+              },
+              "state": {
+                "const": "failed",
+                "type": "string",
+                "description": "The task is failed."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream error code when provided."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream error message when provided."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported by Seedance when the task did not succeed."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Seedance task in the failed terminal state."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Seedance task identifier returned by the selected connection."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model name reported for this task."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in seconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in seconds."
+              },
+              "state": {
+                "const": "cancelled",
+                "type": "string",
+                "description": "The task is cancelled."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream error code when provided."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream error message when provided."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported by Seedance when the task did not succeed."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Seedance task in the cancelled terminal state."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The opaque Seedance task identifier returned by the selected connection."
+              },
+              "model": {
+                "type": "string",
+                "description": "The model name reported for this task."
+              },
+              "createdAt": {
+                "type": "integer",
+                "description": "The task creation Unix timestamp in seconds."
+              },
+              "updatedAt": {
+                "type": "integer",
+                "description": "The task update Unix timestamp in seconds."
+              },
+              "state": {
+                "const": "expired",
+                "type": "string",
+                "description": "The task is expired."
+              },
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The upstream error code when provided."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The upstream error message when provided."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The terminal error reported by Seedance when the task did not succeed."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "taskId",
+              "state"
+            ],
+            "description": "A Seedance task in the expired terminal state."
+          }
+        ],
+        "description": "The normalized Seedance task state."
+      },
+      "asyncLifecycle": {
+        "startActionId": "seedance.submit_video_generation",
+        "statusActionId": "seedance.get_video_generation"
+      }
+    },
+    {
+      "id": "seedance.list_video_generations",
+      "service": "seedance",
+      "name": "list_video_generations",
+      "description": "List Seedance video generation tasks visible to the configured Seedance API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The result page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The number of tasks per page."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "cancelled",
+              "succeeded",
+              "failed"
+            ],
+            "description": "Filter tasks by upstream status."
+          },
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The opaque Seedance task identifier returned by the selected connection."
+            },
+            "description": "Filter by exact Seedance task identifiers."
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by an exact Seedance Endpoint ID."
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "default",
+              "flex"
+            ],
+            "description": "Filter by the processing service tier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing Seedance video generation tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The opaque Seedance task identifier returned by the selected connection."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "The model name reported for this task."
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "The task creation Unix timestamp in seconds."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "The task update Unix timestamp in seconds."
+                    },
+                    "state": {
+                      "const": "processing",
+                      "type": "string",
+                      "description": "The task is queued or running."
+                    },
+                    "progress": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "The task progress when available."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "state"
+                  ],
+                  "description": "A queued or running Seedance task."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The opaque Seedance task identifier returned by the selected connection."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "The model name reported for this task."
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "The task creation Unix timestamp in seconds."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "The task update Unix timestamp in seconds."
+                    },
+                    "state": {
+                      "const": "succeeded",
+                      "type": "string",
+                      "description": "The task succeeded."
+                    },
+                    "videoUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The generated video URL."
+                    },
+                    "lastFrameUrl": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The generated final-frame image URL when requested."
+                    },
+                    "seed": {
+                      "type": "integer",
+                      "description": "The seed used by the task."
+                    },
+                    "resolution": {
+                      "type": "string",
+                      "enum": [
+                        "480p",
+                        "720p",
+                        "1080p"
+                      ],
+                      "description": "The generated video resolution."
+                    },
+                    "ratio": {
+                      "type": "string",
+                      "enum": [
+                        "16:9",
+                        "4:3",
+                        "1:1",
+                        "3:4",
+                        "9:16",
+                        "21:9",
+                        "adaptive"
+                      ],
+                      "description": "The generated video aspect ratio."
+                    },
+                    "duration": {
+                      "type": "number",
+                      "description": "The generated video duration in seconds."
+                    },
+                    "frames": {
+                      "type": "integer",
+                      "description": "The generated frame count."
+                    },
+                    "framesPerSecond": {
+                      "type": "integer",
+                      "description": "The generated video frame rate."
+                    },
+                    "generateAudio": {
+                      "type": "boolean",
+                      "description": "Whether the generated video contains synchronized audio."
+                    },
+                    "tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "web_search",
+                            "type": "string",
+                            "description": "Use web search while generating the video."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "type"
+                        ],
+                        "description": "A tool available to the Seedance model."
+                      },
+                      "description": "The tools used by Seedance."
+                    },
+                    "safetyIdentifier": {
+                      "type": "string",
+                      "description": "The end-user safety identifier supplied at submission."
+                    },
+                    "serviceTier": {
+                      "type": "string",
+                      "description": "The service tier that processed the task."
+                    },
+                    "executionExpiresAfter": {
+                      "type": "integer",
+                      "description": "The task expiration threshold in seconds."
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "completionTokens": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The completion token count."
+                        },
+                        "totalTokens": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The total token count."
+                        },
+                        "toolUsage": {
+                          "type": "object",
+                          "properties": {
+                            "webSearch": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "The web search invocation count."
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Tool usage reported by Seedance."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Token and tool usage reported for a succeeded Seedance task."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "state",
+                    "videoUrl"
+                  ],
+                  "description": "A succeeded Seedance video generation task."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The opaque Seedance task identifier returned by the selected connection."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "The model name reported for this task."
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "The task creation Unix timestamp in seconds."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "The task update Unix timestamp in seconds."
+                    },
+                    "state": {
+                      "const": "failed",
+                      "type": "string",
+                      "description": "The task is failed."
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "The upstream error code when provided."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The upstream error message when provided."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The terminal error reported by Seedance when the task did not succeed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "state"
+                  ],
+                  "description": "A Seedance task in the failed terminal state."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The opaque Seedance task identifier returned by the selected connection."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "The model name reported for this task."
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "The task creation Unix timestamp in seconds."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "The task update Unix timestamp in seconds."
+                    },
+                    "state": {
+                      "const": "cancelled",
+                      "type": "string",
+                      "description": "The task is cancelled."
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "The upstream error code when provided."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The upstream error message when provided."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The terminal error reported by Seedance when the task did not succeed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "state"
+                  ],
+                  "description": "A Seedance task in the cancelled terminal state."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The opaque Seedance task identifier returned by the selected connection."
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "The model name reported for this task."
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "The task creation Unix timestamp in seconds."
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "description": "The task update Unix timestamp in seconds."
+                    },
+                    "state": {
+                      "const": "expired",
+                      "type": "string",
+                      "description": "The task is expired."
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "The upstream error code when provided."
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "The upstream error message when provided."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The terminal error reported by Seedance when the task did not succeed."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "taskId",
+                    "state"
+                  ],
+                  "description": "A Seedance task in the expired terminal state."
+                }
+              ],
+              "description": "The normalized Seedance task state."
+            },
+            "description": "The matching Seedance tasks."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching tasks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "total"
+        ],
+        "description": "A page of Seedance video generation tasks."
+      }
+    },
+    {
+      "id": "seedance.submit_video_generation",
+      "service": "seedance",
+      "name": "submit_video_generation",
+      "description": "Submit an asynchronous Seedance video generation task through Seedance.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seedance Model ID or Endpoint ID used for Seedance video generation.",
+            "default": "doubao-seedance-2-0-260128",
+            "examples": [
+              "doubao-seedance-2-0-260128"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "The video generation prompt."
+          },
+          "omniReferenceTaskType": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "reference",
+              "edit",
+              "extend"
+            ],
+            "description": "Guide Seedance 2.5 when classifying an all-modal reference task."
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "mp4",
+              "mov"
+            ],
+            "description": "The generated video file format."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A public image URL, data URL, or Volcengine asset identifier."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "first_frame",
+                    "last_frame",
+                    "reference_image"
+                  ],
+                  "description": "How Seedance uses this image."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "An image input for Seedance."
+            },
+            "description": "Image inputs for Seedance."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A public video URL or Volcengine asset identifier."
+                },
+                "role": {
+                  "const": "reference_video",
+                  "type": "string",
+                  "description": "Use the video as a Seedance reference video."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "A reference video input for Seedance."
+            },
+            "description": "Reference video inputs for Seedance."
+          },
+          "audios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A public audio URL, data URL, or Volcengine asset identifier."
+                },
+                "role": {
+                  "const": "reference_audio",
+                  "type": "string",
+                  "description": "Use the audio as a Seedance reference audio."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "A reference audio input for Seedance."
+            },
+            "description": "Reference audio inputs for Seedance."
+          },
+          "returnLastFrame": {
+            "type": "boolean",
+            "description": "Whether to return the generated video's final frame.",
+            "default": false
+          },
+          "executionExpiresAfter": {
+            "type": "integer",
+            "minimum": 3600,
+            "maximum": 259200,
+            "description": "The task expiration threshold in seconds."
+          },
+          "generateAudio": {
+            "type": "boolean",
+            "description": "Whether Seedance should generate synchronized audio for the video.",
+            "default": true
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "web_search",
+                  "type": "string",
+                  "description": "Use web search while generating the video."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "description": "A tool available to the Seedance model."
+            },
+            "description": "Tools available to Seedance."
+          },
+          "safetyIdentifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "A stable privacy-safe identifier for the end user."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "480p",
+              "720p",
+              "1080p"
+            ],
+            "description": "The generated video resolution.",
+            "default": "720p"
+          },
+          "ratio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "4:3",
+              "1:1",
+              "3:4",
+              "9:16",
+              "21:9",
+              "adaptive"
+            ],
+            "description": "The generated video aspect ratio.",
+            "default": "adaptive"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "The video duration in seconds. Supported values depend on the selected model; -1 lets the model choose.",
+            "default": 5
+          },
+          "seed": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 4294967295,
+            "description": "The random seed, or -1 for a random seed."
+          },
+          "watermark": {
+            "type": "boolean",
+            "description": "Whether the generated video should contain a watermark.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "A structured Seedance video generation request. Provide a prompt or at least one media input.",
+        "anyOf": [
+          {
+            "required": [
+              "prompt"
+            ]
+          },
+          {
+            "required": [
+              "images"
+            ]
+          },
+          {
+            "required": [
+              "videos"
+            ]
+          },
+          {
+            "required": [
+              "audios"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The opaque Seedance task identifier returned by the selected connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The submitted Seedance task handle."
+      },
+      "followUpActions": [
+        "seedance.get_video_generation"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "seedance.submit_video_generation",
+        "statusActionId": "seedance.get_video_generation"
+      }
+    }
+  ]
+}

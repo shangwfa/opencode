@@ -1,0 +1,392 @@
+{
+  "service": "linkhut",
+  "displayName": "Linkhut",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://ln.ht/_/oauth/authorize",
+      "tokenUrl": "https://api.ln.ht/v1/oauth/token",
+      "scopes": [
+        "posts:read",
+        "posts:write",
+        "tags:read"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://ln.ht",
+  "actions": [
+    {
+      "id": "linkhut.add_bookmark",
+      "service": "linkhut",
+      "name": "add_bookmark",
+      "description": "Create a new bookmark in Linkhut without replacing an existing bookmark.",
+      "operationType": "write",
+      "requiredScopes": [
+        "posts:write"
+      ],
+      "providerPermissions": [
+        "posts:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bookmark URL."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bookmark title or description."
+          },
+          "tags": {
+            "type": "string",
+            "description": "The tags string to store for the bookmark."
+          },
+          "shared": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A boolean Linkhut flag value."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "description": "An explicit Linkhut yes or no flag string."
+              }
+            ],
+            "description": "Whether the bookmark should be public."
+          },
+          "toread": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A boolean Linkhut flag value."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "description": "An explicit Linkhut yes or no flag string."
+              }
+            ],
+            "description": "Whether the bookmark should be marked as unread."
+          },
+          "extended": {
+            "type": "string",
+            "description": "The optional extended note for the bookmark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "description"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result_code": {
+            "type": "string",
+            "description": "The result code returned by Linkhut."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "linkhut.delete_bookmark",
+      "service": "linkhut",
+      "name": "delete_bookmark",
+      "description": "Delete a Linkhut bookmark by URL.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "posts:write"
+      ],
+      "providerPermissions": [
+        "posts:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bookmark URL to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result_code": {
+            "type": "string",
+            "description": "The result code returned by Linkhut."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "linkhut.get_all_tags",
+      "service": "linkhut",
+      "name": "get_all_tags",
+      "description": "List all Linkhut tags with their bookmark counts.",
+      "operationType": "read",
+      "requiredScopes": [
+        "tags:read"
+      ],
+      "providerPermissions": [
+        "tags:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of bookmarks using this tag."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A tag summary returned by Linkhut."
+            },
+            "description": "The tags returned by Linkhut."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "linkhut.get_bookmarks",
+      "service": "linkhut",
+      "name": "get_bookmarks",
+      "description": "List Linkhut bookmarks using the official bookmark filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "posts:read"
+      ],
+      "providerPermissions": [
+        "posts:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dt": {
+            "type": "string",
+            "description": "The ISO 8601 UTC timestamp used to filter bookmarks by date."
+          },
+          "tag": {
+            "type": "string",
+            "description": "The tag filter string. Multiple tags can be separated by spaces."
+          },
+          "url": {
+            "type": "string",
+            "description": "The exact bookmarked URL to fetch."
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A boolean Linkhut flag value."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "description": "An explicit Linkhut yes or no flag string."
+              }
+            ],
+            "description": "Whether Linkhut should include metadata in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bookmarks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The bookmarked URL."
+                },
+                "hash": {
+                  "type": "string",
+                  "description": "The stable Linkhut hash for the bookmark."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The bookmark title or description."
+                },
+                "extended": {
+                  "type": "string",
+                  "description": "The extended note stored for the bookmark."
+                },
+                "tags": {
+                  "type": "string",
+                  "description": "The raw space-separated tags string."
+                },
+                "time": {
+                  "type": "string",
+                  "description": "The timestamp when the bookmark was saved."
+                },
+                "shared": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is public."
+                },
+                "toread": {
+                  "type": "boolean",
+                  "description": "Whether the bookmark is marked as unread."
+                },
+                "meta": {
+                  "description": "The optional metadata payload returned by Linkhut."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url",
+                "hash",
+                "description",
+                "time",
+                "shared",
+                "toread"
+              ],
+              "description": "A bookmark returned by Linkhut."
+            },
+            "description": "The bookmarks returned by Linkhut."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    },
+    {
+      "id": "linkhut.update_bookmark",
+      "service": "linkhut",
+      "name": "update_bookmark",
+      "description": "Update an existing Linkhut bookmark by URL.",
+      "operationType": "write",
+      "requiredScopes": [
+        "posts:write"
+      ],
+      "providerPermissions": [
+        "posts:write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bookmark URL."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The bookmark title or description."
+          },
+          "tags": {
+            "type": "string",
+            "description": "The tags string to store for the bookmark."
+          },
+          "shared": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A boolean Linkhut flag value."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "description": "An explicit Linkhut yes or no flag string."
+              }
+            ],
+            "description": "Whether the bookmark should be public."
+          },
+          "toread": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A boolean Linkhut flag value."
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "description": "An explicit Linkhut yes or no flag string."
+              }
+            ],
+            "description": "Whether the bookmark should be marked as unread."
+          },
+          "extended": {
+            "type": "string",
+            "description": "The optional extended note for the bookmark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "description"
+        ],
+        "description": "The input payload for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result_code": {
+            "type": "string",
+            "description": "The result code returned by Linkhut."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for this action."
+      }
+    }
+  ]
+}

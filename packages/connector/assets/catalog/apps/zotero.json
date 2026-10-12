@@ -1,0 +1,1667 @@
+{
+  "service": "zotero",
+  "displayName": "Zotero",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "ZOTERO_API_KEY",
+      "description": "Zotero API key. Create a dedicated key and copy your user ID from https://www.zotero.org/settings/keys."
+    }
+  ],
+  "homepageUrl": "https://www.zotero.org",
+  "actions": [
+    {
+      "id": "zotero.create_collection",
+      "service": "zotero",
+      "name": "create_collection",
+      "description": "Create one collection in a Zotero user or group library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the new Zotero collection.",
+            "pattern": "\\S"
+          },
+          "parentCollection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The key of the parent Zotero collection.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              {
+                "const": false,
+                "type": "boolean",
+                "description": "A false value indicating a root Zotero collection."
+              }
+            ],
+            "description": "The parent collection key, or false for a root collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input for creating one Zotero collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The Zotero collection key.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current Zotero collection version."
+              },
+              "library": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group"
+                    ],
+                    "description": "The type of Zotero library."
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric Zotero library ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name of the Zotero library."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ],
+                "description": "The Zotero library metadata attached to an item or collection."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The links returned for the Zotero collection."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The computed metadata returned for the collection."
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 8,
+                    "description": "The Zotero collection key.",
+                    "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The current Zotero collection version."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The collection name."
+                  },
+                  "parentCollection": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 8,
+                        "description": "The key of the parent Zotero collection.",
+                        "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                      },
+                      {
+                        "const": false,
+                        "type": "boolean",
+                        "description": "A false value indicating a root Zotero collection."
+                      }
+                    ],
+                    "description": "The parent collection key, or false for a root collection."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "key",
+                  "version",
+                  "name",
+                  "parentCollection"
+                ],
+                "description": "The editable Zotero collection data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "version",
+              "data"
+            ],
+            "description": "A Zotero collection resource with stable identity fields and provider-defined metadata."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version assigned by the write, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version assigned by the write, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Zotero collection."
+      }
+    },
+    {
+      "id": "zotero.create_item",
+      "service": "zotero",
+      "name": "create_item",
+      "description": "Create one bibliographic item in a Zotero user or group library.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "item": {
+            "type": "object",
+            "properties": {
+              "itemType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Zotero item type to create.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "itemType"
+            ],
+            "description": "The editable Zotero JSON for a new item. Fields beyond itemType depend on the item type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "item"
+        ],
+        "description": "The input for creating one Zotero item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The Zotero item key.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current Zotero item version."
+              },
+              "library": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group"
+                    ],
+                    "description": "The type of Zotero library."
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric Zotero library ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name of the Zotero library."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ],
+                "description": "The Zotero library metadata attached to an item or collection."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The links returned for the Zotero item."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The computed metadata returned for the Zotero item."
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 8,
+                    "description": "The Zotero item key.",
+                    "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The current Zotero item version."
+                  },
+                  "itemType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Zotero item type."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "key",
+                  "version",
+                  "itemType"
+                ],
+                "description": "The editable Zotero item data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "version",
+              "data"
+            ],
+            "description": "A Zotero item resource with stable identity fields and provider-defined metadata."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version assigned by the write, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version assigned by the write, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newly created Zotero item."
+      }
+    },
+    {
+      "id": "zotero.delete_collection",
+      "service": "zotero",
+      "name": "delete_collection",
+      "description": "Delete one Zotero collection at a known version.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "collectionKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero collection to delete.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current collection version used for concurrency control."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionKey",
+          "version"
+        ],
+        "description": "The input for deleting one Zotero collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collectionKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the deleted Zotero collection.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Zotero accepted the collection deletion."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version assigned by the deletion, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version assigned by the deletion, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The acknowledgement for a deleted collection."
+      }
+    },
+    {
+      "id": "zotero.delete_item",
+      "service": "zotero",
+      "name": "delete_item",
+      "description": "Delete one Zotero item at a known version.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "itemKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero item to delete.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current item version used for concurrency control."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemKey",
+          "version"
+        ],
+        "description": "The input for deleting one Zotero item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "itemKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the deleted Zotero item.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Zotero accepted the item deletion."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version assigned by the deletion, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version assigned by the deletion, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The acknowledgement for a deleted Zotero item."
+      }
+    },
+    {
+      "id": "zotero.get_collection",
+      "service": "zotero",
+      "name": "get_collection",
+      "description": "Retrieve one collection from a Zotero user or group library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "collectionKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero collection to retrieve.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionKey"
+        ],
+        "description": "The input for retrieving one Zotero collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The Zotero collection key.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current Zotero collection version."
+              },
+              "library": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group"
+                    ],
+                    "description": "The type of Zotero library."
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric Zotero library ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name of the Zotero library."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ],
+                "description": "The Zotero library metadata attached to an item or collection."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The links returned for the Zotero collection."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The computed metadata returned for the collection."
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 8,
+                    "description": "The Zotero collection key.",
+                    "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The current Zotero collection version."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The collection name."
+                  },
+                  "parentCollection": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 8,
+                        "description": "The key of the parent Zotero collection.",
+                        "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                      },
+                      {
+                        "const": false,
+                        "type": "boolean",
+                        "description": "A false value indicating a root Zotero collection."
+                      }
+                    ],
+                    "description": "The parent collection key, or false for a root collection."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "key",
+                  "version",
+                  "name",
+                  "parentCollection"
+                ],
+                "description": "The editable Zotero collection data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "version",
+              "data"
+            ],
+            "description": "A Zotero collection resource with stable identity fields and provider-defined metadata."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current Zotero collection version."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Zotero collection."
+      }
+    },
+    {
+      "id": "zotero.get_item",
+      "service": "zotero",
+      "name": "get_item",
+      "description": "Retrieve one item from a Zotero user or group library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "itemKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero item to retrieve.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemKey"
+        ],
+        "description": "The input for retrieving one Zotero item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The Zotero item key.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current Zotero item version."
+              },
+              "library": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group"
+                    ],
+                    "description": "The type of Zotero library."
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric Zotero library ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name of the Zotero library."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ],
+                "description": "The Zotero library metadata attached to an item or collection."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The links returned for the Zotero item."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The computed metadata returned for the Zotero item."
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 8,
+                    "description": "The Zotero item key.",
+                    "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The current Zotero item version."
+                  },
+                  "itemType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The Zotero item type."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "key",
+                  "version",
+                  "itemType"
+                ],
+                "description": "The editable Zotero item data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "version",
+              "data"
+            ],
+            "description": "A Zotero item resource with stable identity fields and provider-defined metadata."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current Zotero item version."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Zotero item."
+      }
+    },
+    {
+      "id": "zotero.list_collections",
+      "service": "zotero",
+      "name": "list_collections",
+      "description": "List collections in a Zotero user or group library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of objects to return, from 1 through 100."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based index of the first object to return."
+          },
+          "topLevelOnly": {
+            "type": "boolean",
+            "description": "Whether to return only collections that do not have a parent collection."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing Zotero collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 8,
+                  "maxLength": 8,
+                  "description": "The Zotero collection key.",
+                  "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The current Zotero collection version."
+                },
+                "library": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "group"
+                      ],
+                      "description": "The type of Zotero library."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The numeric Zotero library ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the Zotero library."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type",
+                    "id",
+                    "name"
+                  ],
+                  "description": "The Zotero library metadata attached to an item or collection."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The links returned for the Zotero collection."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The computed metadata returned for the collection."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 8,
+                      "maxLength": 8,
+                      "description": "The Zotero collection key.",
+                      "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The current Zotero collection version."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The collection name."
+                    },
+                    "parentCollection": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 8,
+                          "maxLength": 8,
+                          "description": "The key of the parent Zotero collection.",
+                          "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                        },
+                        {
+                          "const": false,
+                          "type": "boolean",
+                          "description": "A false value indicating a root Zotero collection."
+                        }
+                      ],
+                      "description": "The parent collection key, or false for a root collection."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "key",
+                    "version",
+                    "name",
+                    "parentCollection"
+                  ],
+                  "description": "The editable Zotero collection data."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "key",
+                "version",
+                "data"
+              ],
+              "description": "A Zotero collection resource with stable identity fields and provider-defined metadata."
+            },
+            "description": "The matching Zotero collections."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching Zotero collections."
+          },
+          "nextStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The start index for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The start index for the next page, or null at the end."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version returned for this page, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version returned for this page, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated Zotero collection list."
+      }
+    },
+    {
+      "id": "zotero.list_groups",
+      "service": "zotero",
+      "name": "list_groups",
+      "description": "List Zotero groups accessible to the user connected by the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of objects to return, from 1 through 100."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based index of the first object to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing the connected user's Zotero groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric Zotero group ID."
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The current Zotero group metadata version."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The links returned for the Zotero group."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The computed metadata returned for the Zotero group."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The numeric Zotero group ID."
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The current Zotero group metadata version."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The Zotero group name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "id",
+                    "version",
+                    "name"
+                  ],
+                  "description": "The Zotero group data."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "version",
+                "data"
+              ],
+              "description": "A Zotero group resource accessible to the connected user."
+            },
+            "description": "The Zotero groups accessible to the connected user."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching Zotero groups."
+          },
+          "nextStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The start index for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The start index for the next page, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated Zotero group list."
+      }
+    },
+    {
+      "id": "zotero.list_items",
+      "service": "zotero",
+      "name": "list_items",
+      "description": "List or search items in a Zotero user or group library.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of objects to return, from 1 through 100."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based index of the first object to return."
+          },
+          "collectionKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The collection whose items should be returned.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "topLevelOnly": {
+            "type": "boolean",
+            "description": "Whether to return only top-level items and omit child notes or attachments."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zotero quick-search phrase.",
+            "pattern": "\\S"
+          },
+          "qmode": {
+            "type": "string",
+            "enum": [
+              "titleCreatorYear",
+              "everything"
+            ],
+            "description": "The Zotero quick-search mode."
+          },
+          "itemType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zotero item-type search expression.",
+            "pattern": "\\S"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Zotero tag search expression.",
+            "pattern": "\\S"
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Return only items modified after this Zotero library version."
+          },
+          "includeTrashed": {
+            "type": "boolean",
+            "description": "Whether to include matching items in the trash."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "dateAdded",
+              "dateModified",
+              "title",
+              "creator",
+              "itemType",
+              "date",
+              "publisher",
+              "publicationTitle",
+              "journalAbbreviation",
+              "language",
+              "accessDate",
+              "libraryCatalog",
+              "callNumber",
+              "rights",
+              "addedBy"
+            ],
+            "description": "The Zotero item field used to sort the result list."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The Zotero item sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing and searching Zotero items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 8,
+                  "maxLength": 8,
+                  "description": "The Zotero item key.",
+                  "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The current Zotero item version."
+                },
+                "library": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "group"
+                      ],
+                      "description": "The type of Zotero library."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "The numeric Zotero library ID."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The display name of the Zotero library."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "type",
+                    "id",
+                    "name"
+                  ],
+                  "description": "The Zotero library metadata attached to an item or collection."
+                },
+                "links": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The links returned for the Zotero item."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The computed metadata returned for the Zotero item."
+                },
+                "data": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "minLength": 8,
+                      "maxLength": 8,
+                      "description": "The Zotero item key.",
+                      "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "The current Zotero item version."
+                    },
+                    "itemType": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The Zotero item type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "key",
+                    "version",
+                    "itemType"
+                  ],
+                  "description": "The editable Zotero item data."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "key",
+                "version",
+                "data"
+              ],
+              "description": "A Zotero item resource with stable identity fields and provider-defined metadata."
+            },
+            "description": "The matching Zotero items."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching Zotero items."
+          },
+          "nextStart": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The start index for the next page, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The start index for the next page, or null at the end."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero library version returned for this page, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero library version returned for this page, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated Zotero item list."
+      }
+    },
+    {
+      "id": "zotero.update_collection",
+      "service": "zotero",
+      "name": "update_collection",
+      "description": "Replace the editable fields of one Zotero collection at a known version.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "collectionKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero collection to update.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current collection version used for concurrency control."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The complete collection name to save.",
+            "pattern": "\\S"
+          },
+          "parentCollection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The key of the parent Zotero collection.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              {
+                "const": false,
+                "type": "boolean",
+                "description": "A false value indicating a root Zotero collection."
+              }
+            ],
+            "description": "The parent collection key, or false for a root collection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "collectionKey",
+          "version",
+          "name",
+          "parentCollection"
+        ],
+        "description": "The input for replacing one Zotero collection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 8,
+                "description": "The Zotero collection key.",
+                "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current Zotero collection version."
+              },
+              "library": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "group"
+                    ],
+                    "description": "The type of Zotero library."
+                  },
+                  "id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The numeric Zotero library ID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The display name of the Zotero library."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "type",
+                  "id",
+                  "name"
+                ],
+                "description": "The Zotero library metadata attached to an item or collection."
+              },
+              "links": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The links returned for the Zotero collection."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The computed metadata returned for the collection."
+              },
+              "data": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 8,
+                    "description": "The Zotero collection key.",
+                    "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The current Zotero collection version."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The collection name."
+                  },
+                  "parentCollection": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 8,
+                        "description": "The key of the parent Zotero collection.",
+                        "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+                      },
+                      {
+                        "const": false,
+                        "type": "boolean",
+                        "description": "A false value indicating a root Zotero collection."
+                      }
+                    ],
+                    "description": "The parent collection key, or false for a root collection."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "key",
+                  "version",
+                  "name",
+                  "parentCollection"
+                ],
+                "description": "The editable Zotero collection data."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "version",
+              "data"
+            ],
+            "description": "A Zotero collection resource with stable identity fields and provider-defined metadata."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero collection version assigned by the write, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero collection version assigned by the write, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Zotero collection."
+      }
+    },
+    {
+      "id": "zotero.update_item",
+      "service": "zotero",
+      "name": "update_item",
+      "description": "Partially update one Zotero item at a known version.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "libraryType": {
+            "type": "string",
+            "enum": [
+              "user",
+              "group"
+            ],
+            "description": "The Zotero library type. Omit it to use the connected user's library."
+          },
+          "libraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric Zotero user or group library ID. User libraries default to the connected user's ID."
+          },
+          "itemKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the Zotero item to update.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current item version used for concurrency control."
+          },
+          "changes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The editable Zotero fields to patch. Omitted properties remain unchanged; arrays replace the complete upstream list.",
+            "minProperties": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemKey",
+          "version",
+          "changes"
+        ],
+        "description": "The input for partially updating one Zotero item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "itemKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 8,
+            "description": "The key of the updated Zotero item.",
+            "pattern": "^[23456789ABCDEFGHIJKLMNPQRSTUVWXYZ]{8}$"
+          },
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Zotero accepted the item update."
+          },
+          "libraryVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The Zotero item version assigned by the update, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Zotero item version assigned by the update, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The acknowledgement for an updated Zotero item."
+      }
+    }
+  ]
+}

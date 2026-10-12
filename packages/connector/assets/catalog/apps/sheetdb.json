@@ -1,0 +1,658 @@
+{
+  "service": "sheetdb",
+  "displayName": "SheetDB",
+  "categories": [
+    "Data",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Bearer Token",
+      "placeholder": "SHEETDB_ACCESS_TOKEN",
+      "description": "SheetDB bearer token for one spreadsheet API. Find it in that API's Settings tab: https://sheetdb.io/app/apis",
+      "extraFields": [
+        {
+          "key": "apiId",
+          "label": "API ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "58f61be4dda40",
+          "description": "SheetDB API ID from the API URL or the APIs dashboard: https://sheetdb.io/app/apis"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://sheetdb.io",
+  "actions": [
+    {
+      "id": "sheetdb.count_rows",
+      "service": "sheetdb",
+      "name": "count_rows",
+      "description": "Count data rows in the connected spreadsheet, excluding the header row.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for counting spreadsheet rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of data rows in the spreadsheet."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count"
+        ],
+        "description": "The spreadsheet row count returned by SheetDB."
+      }
+    },
+    {
+      "id": "sheetdb.create_rows",
+      "service": "sheetdb",
+      "name": "create_rows",
+      "description": "Append one or more JSON rows to the connected spreadsheet.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string cell value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric cell value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean cell value."
+                  },
+                  {
+                    "const": null,
+                    "type": "null",
+                    "description": "An empty cell value."
+                  }
+                ],
+                "description": "A scalar spreadsheet cell value."
+              },
+              "description": "A spreadsheet row keyed by column name."
+            },
+            "description": "Rows to append to the spreadsheet.",
+            "minItems": 1
+          },
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          },
+          "returnValues": {
+            "type": "boolean",
+            "description": "Whether SheetDB should return the freshly created rows."
+          },
+          "valueInputOption": {
+            "type": "string",
+            "enum": [
+              "RAW",
+              "USER_ENTERED"
+            ],
+            "description": "The Google Sheets value rendering or input mode."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows"
+        ],
+        "description": "Input parameters for creating SheetDB rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows created."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string cell value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric cell value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean cell value."
+                  },
+                  {
+                    "const": null,
+                    "type": "null",
+                    "description": "An empty cell value."
+                  }
+                ],
+                "description": "A scalar spreadsheet cell value."
+              },
+              "description": "A spreadsheet row keyed by column name."
+            },
+            "description": "Spreadsheet rows returned by SheetDB."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "created"
+        ],
+        "description": "The SheetDB row creation result."
+      }
+    },
+    {
+      "id": "sheetdb.delete_rows",
+      "service": "sheetdb",
+      "name": "delete_rows",
+      "description": "Delete all rows matching one spreadsheet column and value.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchColumn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The column name used to select rows for deletion."
+          },
+          "searchValue": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The value used to select rows for deletion."
+          },
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "searchColumn",
+          "searchValue"
+        ],
+        "description": "Input parameters for deleting SheetDB rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The SheetDB row deletion result."
+      }
+    },
+    {
+      "id": "sheetdb.get_document_name",
+      "service": "sheetdb",
+      "name": "get_document_name",
+      "description": "Get the Google Sheets document name for the connected SheetDB API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for getting the document name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentName": {
+            "type": "string",
+            "description": "The Google Sheets document name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentName"
+        ],
+        "description": "The document name returned by SheetDB."
+      }
+    },
+    {
+      "id": "sheetdb.get_keys",
+      "service": "sheetdb",
+      "name": "get_keys",
+      "description": "Get the column names from the first row of the connected spreadsheet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting spreadsheet column names."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A spreadsheet column name."
+            },
+            "description": "The spreadsheet column names."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keys"
+        ],
+        "description": "Column names returned by SheetDB."
+      }
+    },
+    {
+      "id": "sheetdb.list_rows",
+      "service": "sheetdb",
+      "name": "list_rows",
+      "description": "List rows from the connected SheetDB spreadsheet with optional paging and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows to skip before returning results."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The column name used to sort rows."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc",
+              "random"
+            ],
+            "description": "The row sort order."
+          },
+          "sortMethod": {
+            "const": "date",
+            "type": "string",
+            "description": "Use date-aware sorting."
+          },
+          "sortDateFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The date format used for date-aware sorting, such as Y-m-d."
+          },
+          "castNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A column name to convert to numbers."
+            },
+            "description": "Column names whose values should be converted to numbers.",
+            "minItems": 1
+          },
+          "valueRenderOption": {
+            "type": "string",
+            "enum": [
+              "FORMATTED_VALUE",
+              "UNFORMATTED_VALUE",
+              "FORMULA"
+            ],
+            "description": "How Google Sheets values should be rendered."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing SheetDB rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string cell value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric cell value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean cell value."
+                  },
+                  {
+                    "const": null,
+                    "type": "null",
+                    "description": "An empty cell value."
+                  }
+                ],
+                "description": "A scalar spreadsheet cell value."
+              },
+              "description": "A spreadsheet row keyed by column name."
+            },
+            "description": "Spreadsheet rows returned by SheetDB."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows"
+        ],
+        "description": "Rows returned by SheetDB."
+      }
+    },
+    {
+      "id": "sheetdb.search_rows",
+      "service": "sheetdb",
+      "name": "search_rows",
+      "description": "Search spreadsheet rows using dynamic column conditions and AND or OR matching.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string search condition."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric search condition."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean search condition."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One search condition."
+                  },
+                  "description": "Multiple search conditions for the same column.",
+                  "minItems": 1
+                }
+              ],
+              "description": "A search value or multiple conditions for the same column."
+            },
+            "description": "Search conditions keyed by spreadsheet column name."
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ],
+            "description": "Whether all or any search conditions must match."
+          },
+          "caseSensitive": {
+            "type": "boolean",
+            "description": "Whether string matching is case-sensitive."
+          },
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of rows to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows to skip before returning results."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The column name used to sort rows."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc",
+              "random"
+            ],
+            "description": "The row sort order."
+          },
+          "sortMethod": {
+            "const": "date",
+            "type": "string",
+            "description": "Use date-aware sorting."
+          },
+          "sortDateFormat": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The date format used for date-aware sorting, such as Y-m-d."
+          },
+          "castNumbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A column name to convert to numbers."
+            },
+            "description": "Column names whose values should be converted to numbers.",
+            "minItems": 1
+          },
+          "valueRenderOption": {
+            "type": "string",
+            "enum": [
+              "FORMATTED_VALUE",
+              "UNFORMATTED_VALUE",
+              "FORMULA"
+            ],
+            "description": "How Google Sheets values should be rendered."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for searching SheetDB rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A string cell value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric cell value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean cell value."
+                  },
+                  {
+                    "const": null,
+                    "type": "null",
+                    "description": "An empty cell value."
+                  }
+                ],
+                "description": "A scalar spreadsheet cell value."
+              },
+              "description": "A spreadsheet row keyed by column name."
+            },
+            "description": "Spreadsheet rows returned by SheetDB."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rows"
+        ],
+        "description": "Rows matching the SheetDB search conditions."
+      }
+    },
+    {
+      "id": "sheetdb.update_rows",
+      "service": "sheetdb",
+      "name": "update_rows",
+      "description": "Update all rows matching one spreadsheet column and value.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchColumn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The column name used to select rows for updating."
+          },
+          "searchValue": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The value used to select rows for updating."
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string cell value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric cell value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean cell value."
+                },
+                {
+                  "const": null,
+                  "type": "null",
+                  "description": "An empty cell value."
+                }
+              ],
+              "description": "A scalar spreadsheet cell value."
+            },
+            "description": "A spreadsheet row keyed by column name."
+          },
+          "sheet": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional spreadsheet tab name."
+          },
+          "valueInputOption": {
+            "type": "string",
+            "enum": [
+              "RAW",
+              "USER_ENTERED"
+            ],
+            "description": "The Google Sheets value rendering or input mode."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "searchColumn",
+          "searchValue",
+          "data"
+        ],
+        "description": "Input parameters for updating SheetDB rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of rows updated."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated"
+        ],
+        "description": "The SheetDB row update result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,973 @@
+{
+  "service": "docparser",
+  "displayName": "Docparser",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Docparser API key",
+      "description": "Docparser API key sent with the api_key header. Open your parser, go to More > Integrations, and copy the parser API key from the official integration settings."
+    }
+  ],
+  "homepageUrl": "https://docparser.com",
+  "actions": [
+    {
+      "id": "docparser.fetch_document_from_url",
+      "service": "docparser",
+      "name": "fetch_document_from_url",
+      "description": "Queue a publicly accessible document URL for import into a Docparser parser and return the scheduled document metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier to import the document into."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The publicly accessible document URL to fetch."
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional passthrough ID that is stored with the fetched document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parserId",
+          "url"
+        ],
+        "description": "Input parameters for fetching a document into Docparser from a public URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The unique identifier of the fetched document."
+          },
+          "parserId": {
+            "type": "string",
+            "description": "The parser identifier the document was queued against."
+          },
+          "remoteId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The passthrough remote ID returned by Docparser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The passthrough remote ID returned by Docparser."
+          },
+          "message": {
+            "type": "string",
+            "description": "The upstream status message, which usually contains a status URL."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized metadata returned after queuing a URL import in Docparser."
+      }
+    },
+    {
+      "id": "docparser.get_document_result",
+      "service": "docparser",
+      "name": "get_document_result",
+      "description": "Retrieve the parsed data of one Docparser document. When child documents exist and are included, multiple result rows may be returned.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier that owns the document."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique document identifier returned during import."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "object",
+              "flat"
+            ],
+            "description": "The output format for parsed data. `object` returns nested JSON and `flat` returns flattened key/value pairs."
+          },
+          "includeChildren": {
+            "type": "boolean",
+            "description": "Whether parsed data of child documents should also be returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parserId",
+          "documentId"
+        ],
+        "description": "Input parameters for retrieving parsed data of one Docparser document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the parsed result."
+                },
+                "documentId": {
+                  "type": "string",
+                  "description": "The unique identifier of the source document."
+                },
+                "remoteId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The passthrough remote ID associated with the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The passthrough remote ID associated with the document."
+                },
+                "fileName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original file name of the source document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original file name of the source document."
+                },
+                "mediaLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The standard Docparser media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The standard Docparser media link for the document."
+                },
+                "mediaLinkOriginal": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original-file media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original-file media link for the document."
+                },
+                "mediaLinkData": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parsed-data media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parsed-data media link for the document."
+                },
+                "pageCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The page count of the parsed document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page count of the parsed document."
+                },
+                "uploadedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the document was uploaded."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the document was uploaded."
+                },
+                "processedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the document finished processing."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the document finished processing."
+                },
+                "parsedData": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized parsed-document result returned by Docparser."
+            },
+            "description": "The parsed result rows returned by Docparser for the requested document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the get_document_result action."
+      }
+    },
+    {
+      "id": "docparser.get_document_status",
+      "service": "docparser",
+      "name": "get_document_status",
+      "description": "Retrieve the import, preprocessing, parsing, and webhook-dispatch status of one Docparser document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier that owns the document."
+          },
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique document identifier returned during import."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Docparser document status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "description": "The document token returned by Docparser."
+              },
+              "remoteId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The passthrough remote ID linked to the document."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The passthrough remote ID linked to the document."
+              },
+              "fileSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The import source reported by Docparser, such as `api`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The import source reported by Docparser, such as `api`."
+              },
+              "filename": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The original file name reported by Docparser."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The original file name reported by Docparser."
+              },
+              "mimeType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The detected MIME type of the document."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The detected MIME type of the document."
+              },
+              "pages": {
+                "type": "integer",
+                "description": "The page count reported by Docparser."
+              },
+              "supported": {
+                "type": "boolean",
+                "description": "Whether the file type is supported by Docparser."
+              },
+              "importingInProgress": {
+                "type": "boolean",
+                "description": "Whether the document import is still running."
+              },
+              "processingInProgress": {
+                "type": "boolean",
+                "description": "Whether the parser is still processing the document."
+              },
+              "webhookDispatchingInProgress": {
+                "type": "boolean",
+                "description": "Whether webhook dispatch is still running."
+              },
+              "uploadedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when the document was uploaded."
+              },
+              "importedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when the document import finished."
+              },
+              "ocrStartedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when OCR started."
+              },
+              "preprocessedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when preprocessing finished."
+              },
+              "preprocessingInProgressAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when preprocessing started."
+              },
+              "processedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when parsing completed."
+              },
+              "firstProcessedAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when parsing first completed."
+              },
+              "dispatchedWebhook": {
+                "type": "boolean",
+                "description": "Whether a webhook was dispatched successfully."
+              },
+              "dispatchedWebhookAt": {
+                "type": "integer",
+                "description": "The Unix timestamp in seconds when the webhook was dispatched."
+              },
+              "dispatchedWebhookProblem": {
+                "type": "boolean",
+                "description": "Whether webhook dispatch encountered a problem."
+              },
+              "webhooksCreated": {
+                "type": "integer",
+                "description": "The number of queued webhooks created."
+              },
+              "webhooksSent": {
+                "type": "integer",
+                "description": "The number of webhooks successfully sent."
+              },
+              "failedJobs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The background jobs that failed for this document."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized status information for a Docparser document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the get_document_status action."
+      }
+    },
+    {
+      "id": "docparser.get_multiple_document_results",
+      "service": "docparser",
+      "name": "get_multiple_document_results",
+      "description": "Retrieve parsed data for multiple documents of a specific parser with optional filtering, pagination, queue inclusion, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier to read results from."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "object",
+              "flat"
+            ],
+            "description": "The output format for parsed data. `object` returns nested JSON and `flat` returns flattened key/value pairs."
+          },
+          "list": {
+            "type": "string",
+            "enum": [
+              "last_uploaded",
+              "uploaded_after",
+              "processed_after"
+            ],
+            "description": "The upstream result list mode used to filter which documents are returned."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The maximum number of result rows to return."
+          },
+          "date": {
+            "type": "string",
+            "description": "The ISO 8601 or Unix timestamp filter used with `uploaded_after` or `processed_after` list modes."
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restrict results to documents with this remote ID."
+          },
+          "includeProcessingQueue": {
+            "type": "boolean",
+            "description": "Whether in-progress documents should also be included in the result set."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "parsed_at",
+              "processed_at",
+              "uploaded_at",
+              "first_processed_at",
+              "imported_at",
+              "integrated_at",
+              "dispatched_webhook_at",
+              "preprocessed_at"
+            ],
+            "description": "The timestamp field used to sort multiple-document results."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction used for multiple-document results."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parserId"
+        ],
+        "description": "Input parameters for retrieving parsed data of multiple Docparser documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the parsed result."
+                },
+                "documentId": {
+                  "type": "string",
+                  "description": "The unique identifier of the source document."
+                },
+                "remoteId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The passthrough remote ID associated with the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The passthrough remote ID associated with the document."
+                },
+                "fileName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original file name of the source document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original file name of the source document."
+                },
+                "mediaLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The standard Docparser media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The standard Docparser media link for the document."
+                },
+                "mediaLinkOriginal": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original-file media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original-file media link for the document."
+                },
+                "mediaLinkData": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parsed-data media link for the document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parsed-data media link for the document."
+                },
+                "pageCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The page count of the parsed document."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The page count of the parsed document."
+                },
+                "uploadedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the document was uploaded."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the document was uploaded."
+                },
+                "processedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the document finished processing."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the document finished processing."
+                },
+                "parsedData": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A loose JSON object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized parsed-document result returned by Docparser."
+            },
+            "description": "The parsed result rows returned by Docparser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the get_multiple_document_results action."
+      }
+    },
+    {
+      "id": "docparser.get_parser_models",
+      "service": "docparser",
+      "name": "get_parser_models",
+      "description": "List all model layouts for a specific Docparser parser.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier to list model layouts for."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving parser model layouts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the parser model layout."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The human-readable label of the parser model layout."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A model layout attached to a specific Docparser parser."
+            },
+            "description": "The parser model layouts returned by Docparser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized parser model list returned by Docparser."
+      }
+    },
+    {
+      "id": "docparser.list_parsers",
+      "service": "docparser",
+      "name": "list_parsers",
+      "description": "List all Document Parsers linked to the current Docparser account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "parsers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique identifier of the parser."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "The human-readable parser label."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Document Parser linked to the current Docparser account."
+            },
+            "description": "The parsers returned by Docparser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized parser list returned by Docparser."
+      }
+    },
+    {
+      "id": "docparser.ping",
+      "service": "docparser",
+      "name": "ping",
+      "description": "Ping the Docparser API to verify that the provided API key is valid.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "msg": {
+            "type": "string",
+            "description": "The upstream confirmation message. Docparser returns `pong`."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized ping response returned by Docparser."
+      }
+    },
+    {
+      "id": "docparser.reintegrate_documents",
+      "service": "docparser",
+      "name": "reintegrate_documents",
+      "description": "Schedule one or more Docparser documents for the integration queue using their document IDs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier that owns the documents."
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The document identifiers to schedule for reintegration.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for scheduling documents for reintegration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalReintegrate": {
+            "type": "integer",
+            "description": "The number of documents Docparser scheduled for reintegration."
+          },
+          "msg": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream message returned by Docparser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream message returned by Docparser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the reintegrate_documents action."
+      }
+    },
+    {
+      "id": "docparser.reparse_documents",
+      "service": "docparser",
+      "name": "reparse_documents",
+      "description": "Schedule one or more Docparser documents for re-parsing using their document IDs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier that owns the documents."
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The document identifiers to schedule for re-parsing.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for scheduling documents for re-parsing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalReparsed": {
+            "type": "integer",
+            "description": "The number of documents Docparser scheduled for re-parsing."
+          },
+          "msg": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The upstream message returned by Docparser."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The upstream message returned by Docparser."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output payload for the reparse_documents action."
+      }
+    },
+    {
+      "id": "docparser.upload_document_by_content",
+      "service": "docparser",
+      "name": "upload_document_by_content",
+      "description": "Upload a document to a Docparser parser by sending base64-encoded file content and an optional file name.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parserId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The parser identifier to upload the document to."
+          },
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded document content to upload."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name to attribute to the uploaded document."
+          },
+          "remoteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional passthrough ID that is stored with the document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parserId",
+          "contentBase64"
+        ],
+        "description": "Input parameters for uploading a document by base64 content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The unique identifier of the imported document."
+          },
+          "fileSize": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The imported file size in bytes when Docparser returns it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The imported file size in bytes when Docparser returns it."
+          },
+          "quotaUsed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The amount of account quota consumed by the import."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The amount of account quota consumed by the import."
+          },
+          "quotaLeft": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The remaining account quota after the import."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The remaining account quota after the import."
+          },
+          "quotaRefill": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The ISO 8601 timestamp when the account quota refills."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ISO 8601 timestamp when the account quota refills."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized import metadata returned after uploading a document to Docparser."
+      }
+    }
+  ]
+}

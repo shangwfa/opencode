@@ -1,0 +1,1314 @@
+{
+  "service": "enigma",
+  "displayName": "Enigma",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "enigma_api_key",
+      "description": "Enigma API key sent with the x-api-key header. Create it from the Enigma API getting-started flow: https://developers.enigma.com/docs/getting-started.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.enigma.com",
+  "actions": [
+    {
+      "id": "enigma.create_list",
+      "service": "enigma",
+      "name": "create_list",
+      "description": "Create a user-managed Enigma list from a search definition or input file, with optional aliases, column ordering, and column mapping.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The list name to create."
+          },
+          "listType": {
+            "type": "string",
+            "enum": [
+              "LIST_GENERATION",
+              "ENRICHMENT"
+            ],
+            "description": "The Enigma list type used when creating or returning a list."
+          },
+          "description": {
+            "type": "string",
+            "description": "The optional list description."
+          },
+          "searchInput": {
+            "type": "object",
+            "properties": {
+              "entityType": {
+                "type": "string",
+                "enum": [
+                  "BRAND",
+                  "OPERATING_LOCATION",
+                  "LEGAL_ENTITY"
+                ],
+                "description": "The Enigma entity type to search or retrieve: brand, operating location, or legal entity."
+              },
+              "conditions": {
+                "type": "object",
+                "properties": {
+                  "filter": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A loose JSON object."
+                  },
+                  "orderBy": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "The order-by expressions Enigma should apply."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The maximum number of matches to return."
+                  },
+                  "pageToken": {
+                    "type": "string",
+                    "description": "The opaque Enigma page token used to continue pagination."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The official Enigma GraphQL conditions object."
+              },
+              "prompt": {
+                "type": "string",
+                "description": "A natural-language prompt used to create the list."
+              },
+              "matchThreshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "The minimum match confidence Enigma should keep."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma list search input object."
+          },
+          "fileFormat": {
+            "type": "string",
+            "description": "The output file format Enigma should use for exports."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fullyQualifiedName": {
+                  "type": "string",
+                  "description": "The fully qualified Enigma field path."
+                },
+                "aliasName": {
+                  "type": "string",
+                  "description": "The alias name to show for the field."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A field alias definition."
+            },
+            "description": "Field aliases to configure on the list."
+          },
+          "columnOrdering": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The output column ordering for the list."
+          },
+          "columnMapping": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "columnName": {
+                  "type": "string",
+                  "description": "The input column name to map."
+                },
+                "searchField": {
+                  "type": "string",
+                  "enum": [
+                    "NAME",
+                    "PERSON_FIRST_NAME",
+                    "PERSON_LAST_NAME",
+                    "WEBSITE",
+                    "ADDRESS_STREET1",
+                    "ADDRESS_STREET2",
+                    "ADDRESS_CITY",
+                    "ADDRESS_STATE",
+                    "ADDRESS_POSTAL_CODE"
+                  ],
+                  "description": "An Enigma list search field identifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A column mapping definition."
+            },
+            "description": "The column mappings Enigma should use when reading an input file."
+          },
+          "inputFileUri": {
+            "type": "string",
+            "description": "The input file URI Enigma should use to build the list."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for creating a user-managed Enigma list. Provide either searchInput or inputFileUri."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma create_list action."
+      }
+    },
+    {
+      "id": "enigma.create_suggestion",
+      "service": "enigma",
+      "name": "create_suggestion",
+      "description": "Submit a suggestion to Enigma for data correction or enrichment feedback using the official GraphQL suggestion mutation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "suggestedByEmail": {
+            "type": "string",
+            "description": "The email address of the person submitting the suggestion.",
+            "format": "email"
+          },
+          "payload": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A loose JSON object."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REJECTED",
+              "PENDING_REVIEW"
+            ],
+            "description": "The suggestion status to set when supported."
+          },
+          "suggestedValue": {
+            "description": "The JSON value being proposed for the target field."
+          },
+          "ancestorIdentifier": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An ancestor entity identifier."
+            },
+            "description": "Ancestor entities related to the suggestion."
+          },
+          "suggestedEntityIdentifier": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The entity identifier the suggestion is attached to."
+          },
+          "field": {
+            "type": "string",
+            "description": "The target field being suggested for update."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for submitting an Enigma suggestion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma create_suggestion action."
+      }
+    },
+    {
+      "id": "enigma.delete_list",
+      "service": "enigma",
+      "name": "delete_list",
+      "description": "Delete a user-managed Enigma list by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Enigma list ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a user-managed Enigma list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Enigma list ID that was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output of the Enigma delete_list action."
+      }
+    },
+    {
+      "id": "enigma.get_account",
+      "service": "enigma",
+      "name": "get_account",
+      "description": "Retrieve the current Enigma account metadata available to the connected API key, including customer, billing, and auto-recharge details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized Enigma account payload."
+      }
+    },
+    {
+      "id": "enigma.get_aggregate_counts",
+      "service": "enigma",
+      "name": "get_aggregate_counts",
+      "description": "Run the official Enigma GraphQL aggregate query to count matching entities or related entities for a search request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "A natural-language prompt used by Enigma semantic search."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Enigma GraphQL entity ID to look up directly."
+          },
+          "name": {
+            "type": "string",
+            "description": "The business or entity name to search for."
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Enigma address identifier to search for directly."
+              },
+              "street1": {
+                "type": "string",
+                "description": "The first street-address line used to narrow the search."
+              },
+              "street2": {
+                "type": "string",
+                "description": "The second street-address line, such as suite or unit number."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city used to narrow the search."
+              },
+              "state": {
+                "type": "string",
+                "description": "The state or region used to narrow the search."
+              },
+              "postalCode": {
+                "type": "string",
+                "description": "The postal code used to narrow the search."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL address input object."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Enigma address identifier to search for directly."
+                },
+                "street1": {
+                  "type": "string",
+                  "description": "The first street-address line used to narrow the search."
+                },
+                "street2": {
+                  "type": "string",
+                  "description": "The second street-address line, such as suite or unit number."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city used to narrow the search."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state or region used to narrow the search."
+                },
+                "postalCode": {
+                  "type": "string",
+                  "description": "The postal code used to narrow the search."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An official Enigma GraphQL address input object."
+            },
+            "description": "Multiple address candidates used to narrow the search."
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "description": "The person's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The person's last name."
+              },
+              "dateOfBirth": {
+                "type": "string",
+                "description": "The person's date of birth.",
+                "format": "date"
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Enigma address identifier to search for directly."
+                  },
+                  "street1": {
+                    "type": "string",
+                    "description": "The first street-address line used to narrow the search."
+                  },
+                  "street2": {
+                    "type": "string",
+                    "description": "The second street-address line, such as suite or unit number."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city used to narrow the search."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state or region used to narrow the search."
+                  },
+                  "postalCode": {
+                    "type": "string",
+                    "description": "The postal code used to narrow the search."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An official Enigma GraphQL address input object."
+              },
+              "tin": {
+                "type": "object",
+                "properties": {
+                  "tin": {
+                    "type": "string",
+                    "description": "The taxpayer identification number to search with."
+                  },
+                  "tinType": {
+                    "type": "string",
+                    "enum": [
+                      "EIN",
+                      "SSN",
+                      "ITIN",
+                      "TIN"
+                    ],
+                    "description": "The TIN type Enigma should use for the search."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An official Enigma GraphQL TIN input object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL person input object."
+          },
+          "phoneNumber": {
+            "type": "string",
+            "description": "A complete phone number used to narrow the search."
+          },
+          "website": {
+            "type": "string",
+            "description": "A website URL or domain used to narrow the search."
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              },
+              "orderBy": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The order-by expressions Enigma should apply."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of matches to return."
+              },
+              "pageToken": {
+                "type": "string",
+                "description": "The opaque Enigma page token used to continue pagination."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL conditions object."
+          },
+          "tin": {
+            "type": "object",
+            "properties": {
+              "tin": {
+                "type": "string",
+                "description": "The taxpayer identification number to search with."
+              },
+              "tinType": {
+                "type": "string",
+                "enum": [
+                  "EIN",
+                  "SSN",
+                  "ITIN",
+                  "TIN"
+                ],
+                "description": "The TIN type Enigma should use for the search."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL TIN input object."
+          },
+          "matchThreshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum Enigma match confidence to keep."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "BRAND",
+              "OPERATING_LOCATION",
+              "LEGAL_ENTITY"
+            ],
+            "description": "The Enigma entity type to search or retrieve: brand, operating location, or legal entity."
+          },
+          "engine": {
+            "type": "string",
+            "description": "The Enigma search engine override to use for the query."
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "filename": {
+                "type": "string",
+                "description": "The output file name Enigma should generate."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "PARQUET",
+                  "CSV"
+                ],
+                "description": "The export file format Enigma should generate."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL output specification."
+          },
+          "enrichmentIdsS3Path": {
+            "type": "string",
+            "description": "The Enigma-supported S3 parquet path containing internal_id values."
+          },
+          "countField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Enigma field path or supported alias to count."
+          },
+          "countConditions": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              },
+              "orderBy": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The order-by expressions Enigma should apply."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of matches to return."
+              },
+              "pageToken": {
+                "type": "string",
+                "description": "The opaque Enigma page token used to continue pagination."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL conditions object."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for the Enigma GraphQL aggregate count query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "countField": {
+            "type": "string",
+            "description": "The resolved Enigma field path that was counted."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The aggregate count returned by Enigma."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The aggregate count returned by Enigma."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized output of the Enigma get_aggregate_counts action."
+      }
+    },
+    {
+      "id": "enigma.get_background_task",
+      "service": "enigma",
+      "name": "get_background_task",
+      "description": "Retrieve the latest status for an Enigma background task created by an asynchronous GraphQL search or export workflow.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Enigma background task UUID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving an Enigma background task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma get_background_task action."
+      }
+    },
+    {
+      "id": "enigma.get_business",
+      "service": "enigma",
+      "name": "get_business",
+      "description": "Retrieve a single Enigma entity by GraphQL entity ID and entity type, returning the provider entity payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Enigma GraphQL entity ID to retrieve."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "BRAND",
+              "OPERATING_LOCATION",
+              "LEGAL_ENTITY"
+            ],
+            "description": "The Enigma entity type to search or retrieve: brand, operating location, or legal entity."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a single Enigma entity by ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "business": {
+            "description": "The Enigma entity, or null when nothing matched."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma get_business action."
+      }
+    },
+    {
+      "id": "enigma.get_graphql_schema_extended",
+      "service": "enigma",
+      "name": "get_graphql_schema_extended",
+      "description": "Retrieve Enigma's extended GraphQL schema metadata, including types, projections, and data-asset descriptors.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma get_graphql_schema_extended action."
+      }
+    },
+    {
+      "id": "enigma.get_list_materialization",
+      "service": "enigma",
+      "name": "get_list_materialization",
+      "description": "Retrieve an Enigma list materialization by ID, including progress, generated resource URI, metrics, and billing details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Enigma list materialization ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a list materialization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma get_list_materialization action."
+      }
+    },
+    {
+      "id": "enigma.search_graphql",
+      "service": "enigma",
+      "name": "search_graphql",
+      "description": "Search Enigma entities through the official GraphQL search query, supporting direct lookups, structured filters, natural-language prompts, and asynchronous output generation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "A natural-language prompt used by Enigma semantic search."
+          },
+          "id": {
+            "type": "string",
+            "description": "The Enigma GraphQL entity ID to look up directly."
+          },
+          "name": {
+            "type": "string",
+            "description": "The business or entity name to search for."
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Enigma address identifier to search for directly."
+              },
+              "street1": {
+                "type": "string",
+                "description": "The first street-address line used to narrow the search."
+              },
+              "street2": {
+                "type": "string",
+                "description": "The second street-address line, such as suite or unit number."
+              },
+              "city": {
+                "type": "string",
+                "description": "The city used to narrow the search."
+              },
+              "state": {
+                "type": "string",
+                "description": "The state or region used to narrow the search."
+              },
+              "postalCode": {
+                "type": "string",
+                "description": "The postal code used to narrow the search."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL address input object."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Enigma address identifier to search for directly."
+                },
+                "street1": {
+                  "type": "string",
+                  "description": "The first street-address line used to narrow the search."
+                },
+                "street2": {
+                  "type": "string",
+                  "description": "The second street-address line, such as suite or unit number."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The city used to narrow the search."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The state or region used to narrow the search."
+                },
+                "postalCode": {
+                  "type": "string",
+                  "description": "The postal code used to narrow the search."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An official Enigma GraphQL address input object."
+            },
+            "description": "Multiple address candidates used to narrow the search."
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "description": "The person's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The person's last name."
+              },
+              "dateOfBirth": {
+                "type": "string",
+                "description": "The person's date of birth.",
+                "format": "date"
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Enigma address identifier to search for directly."
+                  },
+                  "street1": {
+                    "type": "string",
+                    "description": "The first street-address line used to narrow the search."
+                  },
+                  "street2": {
+                    "type": "string",
+                    "description": "The second street-address line, such as suite or unit number."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city used to narrow the search."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state or region used to narrow the search."
+                  },
+                  "postalCode": {
+                    "type": "string",
+                    "description": "The postal code used to narrow the search."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An official Enigma GraphQL address input object."
+              },
+              "tin": {
+                "type": "object",
+                "properties": {
+                  "tin": {
+                    "type": "string",
+                    "description": "The taxpayer identification number to search with."
+                  },
+                  "tinType": {
+                    "type": "string",
+                    "enum": [
+                      "EIN",
+                      "SSN",
+                      "ITIN",
+                      "TIN"
+                    ],
+                    "description": "The TIN type Enigma should use for the search."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An official Enigma GraphQL TIN input object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL person input object."
+          },
+          "phoneNumber": {
+            "type": "string",
+            "description": "A complete phone number used to narrow the search."
+          },
+          "website": {
+            "type": "string",
+            "description": "A website URL or domain used to narrow the search."
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              },
+              "orderBy": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The order-by expressions Enigma should apply."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of matches to return."
+              },
+              "pageToken": {
+                "type": "string",
+                "description": "The opaque Enigma page token used to continue pagination."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL conditions object."
+          },
+          "tin": {
+            "type": "object",
+            "properties": {
+              "tin": {
+                "type": "string",
+                "description": "The taxpayer identification number to search with."
+              },
+              "tinType": {
+                "type": "string",
+                "enum": [
+                  "EIN",
+                  "SSN",
+                  "ITIN",
+                  "TIN"
+                ],
+                "description": "The TIN type Enigma should use for the search."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An official Enigma GraphQL TIN input object."
+          },
+          "matchThreshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum Enigma match confidence to keep."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "BRAND",
+              "OPERATING_LOCATION",
+              "LEGAL_ENTITY"
+            ],
+            "description": "The Enigma entity type to search or retrieve: brand, operating location, or legal entity."
+          },
+          "engine": {
+            "type": "string",
+            "description": "The Enigma search engine override to use for the query."
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "filename": {
+                "type": "string",
+                "description": "The output file name Enigma should generate."
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "PARQUET",
+                  "CSV"
+                ],
+                "description": "The export file format Enigma should generate."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL output specification."
+          },
+          "enrichmentIdsS3Path": {
+            "type": "string",
+            "description": "The Enigma-supported S3 parquet path containing internal_id values."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for the Enigma GraphQL search query. Provide at least one of prompt, id, name, website, or phoneNumber; entityType is required with id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Enigma accepted the request as an asynchronous background task."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The Enigma response payload."
+            },
+            "description": "The search results returned by Enigma."
+          },
+          "backgroundTasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The Enigma response payload."
+            },
+            "description": "Background tasks returned for asynchronous search jobs."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma GraphQL search action."
+      }
+    },
+    {
+      "id": "enigma.search_lists",
+      "service": "enigma",
+      "name": "search_lists",
+      "description": "Query user-created Enigma lists with optional name or ID filters and Relay-style pagination controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Enigma list ID to filter by."
+          },
+          "name": {
+            "type": "string",
+            "description": "The list name to filter by."
+          },
+          "conditions": {
+            "type": "object",
+            "properties": {
+              "filter": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A loose JSON object."
+              },
+              "orderBy": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "The order-by expressions Enigma should apply."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of matches to return."
+              },
+              "pageToken": {
+                "type": "string",
+                "description": "The opaque Enigma page token used to continue pagination."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The official Enigma GraphQL conditions object."
+          },
+          "first": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items to return when paginating forward."
+          },
+          "after": {
+            "type": "string",
+            "description": "The forward-pagination cursor."
+          },
+          "last": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of items to return when paginating backward."
+          },
+          "before": {
+            "type": "string",
+            "description": "The backward-pagination cursor."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for querying Enigma user-created lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma search_lists action."
+      }
+    },
+    {
+      "id": "enigma.verify_business_v2",
+      "service": "enigma",
+      "name": "verify_business_v2",
+      "description": "Verify a business with Enigma's KYB v2 API, returning a normalized risk summary and the raw verification payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "package": {
+            "type": "string",
+            "enum": [
+              "identify",
+              "verify"
+            ],
+            "description": "The Enigma KYB package to run."
+          },
+          "attrs": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A comma-separated list of KYB attributes."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "KYB attributes to request."
+              }
+            ],
+            "description": "Additional KYB attributes to request."
+          },
+          "name": {
+            "type": "string",
+            "description": "A business name to verify."
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Up to two business-name candidates to verify.",
+            "maxItems": 2
+          },
+          "tin": {
+            "type": "string",
+            "description": "A business TIN or EIN to verify."
+          },
+          "tins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Up to one business TIN or EIN candidate to verify.",
+            "maxItems": 1
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "streetAddress1": {
+                "type": "string",
+                "description": "The primary business street address."
+              },
+              "streetAddress2": {
+                "type": "string",
+                "description": "The secondary business street address."
+              },
+              "city": {
+                "type": "string",
+                "description": "The business city."
+              },
+              "state": {
+                "type": "string",
+                "description": "The business state or region."
+              },
+              "postalCode": {
+                "type": "string",
+                "description": "The business postal code."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A KYB address object accepted by the Enigma v2 API."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "streetAddress1": {
+                  "type": "string",
+                  "description": "The primary business street address."
+                },
+                "streetAddress2": {
+                  "type": "string",
+                  "description": "The secondary business street address."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "The business city."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The business state or region."
+                },
+                "postalCode": {
+                  "type": "string",
+                  "description": "The business postal code."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A KYB address object accepted by the Enigma v2 API."
+            },
+            "description": "Up to two business-address candidates to verify.",
+            "maxItems": 2
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string",
+                "description": "The person's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The person's last name."
+              },
+              "ssn": {
+                "type": "string",
+                "description": "The person's Social Security Number."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A person object accepted by the Enigma v2 API."
+          },
+          "personsToScreen": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string",
+                  "description": "The person's first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The person's last name."
+                },
+                "ssn": {
+                  "type": "string",
+                  "description": "The person's Social Security Number."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A person object accepted by the Enigma v2 API."
+            },
+            "description": "Up to four people to screen against watchlists.",
+            "maxItems": 4
+          },
+          "website": {
+            "type": "string",
+            "description": "A business website URL."
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Up to one website candidate to verify.",
+            "maxItems": 1
+          },
+          "topN": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of top matches Enigma should return."
+          },
+          "matchConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The minimum match confidence Enigma should keep."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for Enigma's KYB v2 business verification API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "The normalized output of the Enigma verify_business_v2 action."
+      }
+    }
+  ]
+}

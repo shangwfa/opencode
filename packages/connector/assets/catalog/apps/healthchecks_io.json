@@ -1,0 +1,1347 @@
+{
+  "service": "healthchecks_io",
+  "displayName": "Healthchecks.io",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "healthchecks_api_key",
+      "description": "Healthchecks.io Management API key sent with the X-Api-Key header. Create or view it from Project Settings > API Access in your Healthchecks.io dashboard: https://healthchecks.io/docs/api/.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://healthchecks.io",
+  "actions": [
+    {
+      "id": "healthchecks_io.create_check",
+      "service": "healthchecks_io",
+      "name": "create_check",
+      "description": "Create a Healthchecks.io simple or cron check.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable check name."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom check slug."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A space-delimited list of tags assigned to the check."
+          },
+          "desc": {
+            "type": "string",
+            "description": "The check description."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The simple check timeout in seconds."
+          },
+          "grace": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The grace period in seconds."
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A cron or systemd OnCalendar expression defining the check schedule."
+          },
+          "tz": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timezone used with the schedule field, such as Europe/Riga."
+          },
+          "manual_resume": {
+            "type": "boolean",
+            "description": "Whether the check should stay down until manually resumed."
+          },
+          "methods": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The allowed HTTP methods for ping requests, such as POST."
+          },
+          "channels": {
+            "type": "string",
+            "description": "A comma-separated list of channel UUIDs or names, * for all channels, or an empty string to unassign all channels."
+          },
+          "start_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as starts."
+          },
+          "success_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as successes."
+          },
+          "failure_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as failures."
+          },
+          "filter_subject": {
+            "type": "boolean",
+            "description": "Whether inbound email subject lines should be keyword-filtered."
+          },
+          "filter_body": {
+            "type": "boolean",
+            "description": "Whether inbound email bodies should be keyword-filtered."
+          },
+          "filter_http_body": {
+            "type": "boolean",
+            "description": "Whether HTTP ping bodies should be keyword-filtered."
+          },
+          "filter_default_fail": {
+            "type": "boolean",
+            "description": "Whether unmatched pings should be treated as failures when keyword filtering is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Healthchecks.io check.",
+        "anyOf": [
+          {
+            "required": [
+              "timeout"
+            ]
+          },
+          {
+            "required": [
+              "schedule"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The check UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The check name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The custom check slug."
+              },
+              "tags": {
+                "type": "string",
+                "description": "The space-delimited tag list."
+              },
+              "desc": {
+                "type": "string",
+                "description": "The check description."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current check status."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The simple check timeout in seconds."
+              },
+              "grace": {
+                "type": "integer",
+                "description": "The grace period in seconds."
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The cron or systemd OnCalendar expression when present."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The timezone used with the schedule field."
+              },
+              "manual_resume": {
+                "type": "boolean",
+                "description": "Whether the check requires manual resume after failure."
+              },
+              "methods": {
+                "type": "string",
+                "description": "The allowed HTTP methods for ping requests."
+              },
+              "ping_url": {
+                "type": "string",
+                "description": "The ping URL for this check.",
+                "format": "uri"
+              },
+              "update_url": {
+                "type": "string",
+                "description": "The Management API update URL for this check.",
+                "format": "uri"
+              },
+              "pause_url": {
+                "type": "string",
+                "description": "The Management API pause URL for this check.",
+                "format": "uri"
+              },
+              "resume_url": {
+                "type": "string",
+                "description": "The Management API resume URL for this check.",
+                "format": "uri"
+              },
+              "channels": {
+                "type": "string",
+                "description": "The channel assignment string returned by Healthchecks.io."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check"
+        ],
+        "description": "The response returned when creating a check."
+      }
+    },
+    {
+      "id": "healthchecks_io.delete_check",
+      "service": "healthchecks_io",
+      "name": "delete_check",
+      "description": "Delete a Healthchecks.io check by UUID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID used in the API path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "The input payload for deleting a Healthchecks.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the check deletion request succeeded."
+          },
+          "check": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "uuid": {
+                    "type": "string",
+                    "description": "The check UUID."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The check name."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The custom check slug."
+                  },
+                  "tags": {
+                    "type": "string",
+                    "description": "The space-delimited tag list."
+                  },
+                  "desc": {
+                    "type": "string",
+                    "description": "The check description."
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "The current check status."
+                  },
+                  "timeout": {
+                    "type": "integer",
+                    "description": "The simple check timeout in seconds."
+                  },
+                  "grace": {
+                    "type": "integer",
+                    "description": "The grace period in seconds."
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "description": "The cron or systemd OnCalendar expression when present."
+                  },
+                  "tz": {
+                    "type": "string",
+                    "description": "The timezone used with the schedule field."
+                  },
+                  "manual_resume": {
+                    "type": "boolean",
+                    "description": "Whether the check requires manual resume after failure."
+                  },
+                  "methods": {
+                    "type": "string",
+                    "description": "The allowed HTTP methods for ping requests."
+                  },
+                  "ping_url": {
+                    "type": "string",
+                    "description": "The ping URL for this check.",
+                    "format": "uri"
+                  },
+                  "update_url": {
+                    "type": "string",
+                    "description": "The Management API update URL for this check.",
+                    "format": "uri"
+                  },
+                  "pause_url": {
+                    "type": "string",
+                    "description": "The Management API pause URL for this check.",
+                    "format": "uri"
+                  },
+                  "resume_url": {
+                    "type": "string",
+                    "description": "The Management API resume URL for this check.",
+                    "format": "uri"
+                  },
+                  "channels": {
+                    "type": "string",
+                    "description": "The channel assignment string returned by Healthchecks.io."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A check resource returned by Healthchecks.io."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "check"
+        ],
+        "description": "The response returned when deleting a check."
+      }
+    },
+    {
+      "id": "healthchecks_io.get_check",
+      "service": "healthchecks_io",
+      "name": "get_check",
+      "description": "Get a Healthchecks.io check by UUID or unique key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID or unique key used in the Management API path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check_id"
+        ],
+        "description": "The input payload for getting a Healthchecks.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The check UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The check name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The custom check slug."
+              },
+              "tags": {
+                "type": "string",
+                "description": "The space-delimited tag list."
+              },
+              "desc": {
+                "type": "string",
+                "description": "The check description."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current check status."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The simple check timeout in seconds."
+              },
+              "grace": {
+                "type": "integer",
+                "description": "The grace period in seconds."
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The cron or systemd OnCalendar expression when present."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The timezone used with the schedule field."
+              },
+              "manual_resume": {
+                "type": "boolean",
+                "description": "Whether the check requires manual resume after failure."
+              },
+              "methods": {
+                "type": "string",
+                "description": "The allowed HTTP methods for ping requests."
+              },
+              "ping_url": {
+                "type": "string",
+                "description": "The ping URL for this check.",
+                "format": "uri"
+              },
+              "update_url": {
+                "type": "string",
+                "description": "The Management API update URL for this check.",
+                "format": "uri"
+              },
+              "pause_url": {
+                "type": "string",
+                "description": "The Management API pause URL for this check.",
+                "format": "uri"
+              },
+              "resume_url": {
+                "type": "string",
+                "description": "The Management API resume URL for this check.",
+                "format": "uri"
+              },
+              "channels": {
+                "type": "string",
+                "description": "The channel assignment string returned by Healthchecks.io."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check"
+        ],
+        "description": "The response returned when getting a check."
+      }
+    },
+    {
+      "id": "healthchecks_io.list_badges",
+      "service": "healthchecks_io",
+      "name": "list_badges",
+      "description": "List badge metadata in the current Healthchecks.io project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Healthchecks.io badges."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "badges": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "svg": {
+                  "type": "string",
+                  "description": "The two-state SVG badge URL.",
+                  "format": "uri"
+                },
+                "svg3": {
+                  "type": "string",
+                  "description": "The three-state SVG badge URL.",
+                  "format": "uri"
+                },
+                "json": {
+                  "type": "string",
+                  "description": "The two-state JSON badge URL.",
+                  "format": "uri"
+                },
+                "json3": {
+                  "type": "string",
+                  "description": "The three-state JSON badge URL.",
+                  "format": "uri"
+                },
+                "shields": {
+                  "type": "string",
+                  "description": "The two-state shields.io badge URL.",
+                  "format": "uri"
+                },
+                "shields3": {
+                  "type": "string",
+                  "description": "The three-state shields.io badge URL.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": true,
+              "description": "Badge URLs for a Healthchecks.io tag."
+            },
+            "description": "The badge URL map returned by Healthchecks.io, keyed by tag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badges"
+        ],
+        "description": "The response returned when listing badges."
+      }
+    },
+    {
+      "id": "healthchecks_io.list_channels",
+      "service": "healthchecks_io",
+      "name": "list_channels",
+      "description": "List notification integrations in the current Healthchecks.io project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Healthchecks.io channels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The channel UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The channel name."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "The channel kind."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether the channel is enabled."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A notification channel returned by Healthchecks.io."
+            },
+            "description": "The channels returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels"
+        ],
+        "description": "The response returned when listing channels."
+      }
+    },
+    {
+      "id": "healthchecks_io.list_checks",
+      "service": "healthchecks_io",
+      "name": "list_checks",
+      "description": "List Healthchecks.io checks in the current project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return checks with this slug."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Healthchecks.io checks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "description": "The check UUID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The check name."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The custom check slug."
+                },
+                "tags": {
+                  "type": "string",
+                  "description": "The space-delimited tag list."
+                },
+                "desc": {
+                  "type": "string",
+                  "description": "The check description."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current check status."
+                },
+                "timeout": {
+                  "type": "integer",
+                  "description": "The simple check timeout in seconds."
+                },
+                "grace": {
+                  "type": "integer",
+                  "description": "The grace period in seconds."
+                },
+                "schedule": {
+                  "type": "string",
+                  "description": "The cron or systemd OnCalendar expression when present."
+                },
+                "tz": {
+                  "type": "string",
+                  "description": "The timezone used with the schedule field."
+                },
+                "manual_resume": {
+                  "type": "boolean",
+                  "description": "Whether the check requires manual resume after failure."
+                },
+                "methods": {
+                  "type": "string",
+                  "description": "The allowed HTTP methods for ping requests."
+                },
+                "ping_url": {
+                  "type": "string",
+                  "description": "The ping URL for this check.",
+                  "format": "uri"
+                },
+                "update_url": {
+                  "type": "string",
+                  "description": "The Management API update URL for this check.",
+                  "format": "uri"
+                },
+                "pause_url": {
+                  "type": "string",
+                  "description": "The Management API pause URL for this check.",
+                  "format": "uri"
+                },
+                "resume_url": {
+                  "type": "string",
+                  "description": "The Management API resume URL for this check.",
+                  "format": "uri"
+                },
+                "channels": {
+                  "type": "string",
+                  "description": "The channel assignment string returned by Healthchecks.io."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A check resource returned by Healthchecks.io."
+            },
+            "description": "The checks returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "checks"
+        ],
+        "description": "The response returned when listing Healthchecks.io checks."
+      }
+    },
+    {
+      "id": "healthchecks_io.list_flips",
+      "service": "healthchecks_io",
+      "name": "list_flips",
+      "description": "List Healthchecks.io status flips for a check by UUID or unique key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID or unique key used in the Management API path."
+          },
+          "seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Only return flips in the latest number of seconds."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A UNIX timestamp in seconds."
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A UNIX timestamp in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check_id"
+        ],
+        "description": "The input payload for listing Healthchecks.io status flips."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "flips": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The UNIX timestamp when the flip happened."
+                },
+                "up": {
+                  "type": "boolean",
+                  "description": "Whether the check transitioned to up at this timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A status flip record returned by Healthchecks.io."
+            },
+            "description": "The status flip records returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "flips"
+        ],
+        "description": "The response returned when listing status flips."
+      }
+    },
+    {
+      "id": "healthchecks_io.list_pings",
+      "service": "healthchecks_io",
+      "name": "list_pings",
+      "description": "List recent Healthchecks.io pings for a check by UUID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID used in the API path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "The input payload for listing Healthchecks.io pings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "n": {
+                  "type": "integer",
+                  "description": "The ping sequence number."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The ping type such as start, success, or failure."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "The timestamp string for the ping."
+                },
+                "scheme": {
+                  "type": "string",
+                  "description": "The request scheme used by the ping."
+                },
+                "remote_addr": {
+                  "type": "string",
+                  "description": "The remote address that sent the ping."
+                },
+                "method": {
+                  "type": "string",
+                  "description": "The HTTP method used by the ping."
+                },
+                "ua": {
+                  "type": "string",
+                  "description": "The user agent reported by the ping."
+                },
+                "body": {
+                  "type": "string",
+                  "description": "The stored request body preview when returned in the list response."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A ping record returned by Healthchecks.io."
+            },
+            "description": "The ping records returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pings"
+        ],
+        "description": "The response returned when listing pings."
+      }
+    },
+    {
+      "id": "healthchecks_io.pause_check",
+      "service": "healthchecks_io",
+      "name": "pause_check",
+      "description": "Pause monitoring for a Healthchecks.io check by UUID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID used in the API path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "The input payload for pausing a Healthchecks.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The check UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The check name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The custom check slug."
+              },
+              "tags": {
+                "type": "string",
+                "description": "The space-delimited tag list."
+              },
+              "desc": {
+                "type": "string",
+                "description": "The check description."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current check status."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The simple check timeout in seconds."
+              },
+              "grace": {
+                "type": "integer",
+                "description": "The grace period in seconds."
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The cron or systemd OnCalendar expression when present."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The timezone used with the schedule field."
+              },
+              "manual_resume": {
+                "type": "boolean",
+                "description": "Whether the check requires manual resume after failure."
+              },
+              "methods": {
+                "type": "string",
+                "description": "The allowed HTTP methods for ping requests."
+              },
+              "ping_url": {
+                "type": "string",
+                "description": "The ping URL for this check.",
+                "format": "uri"
+              },
+              "update_url": {
+                "type": "string",
+                "description": "The Management API update URL for this check.",
+                "format": "uri"
+              },
+              "pause_url": {
+                "type": "string",
+                "description": "The Management API pause URL for this check.",
+                "format": "uri"
+              },
+              "resume_url": {
+                "type": "string",
+                "description": "The Management API resume URL for this check.",
+                "format": "uri"
+              },
+              "channels": {
+                "type": "string",
+                "description": "The channel assignment string returned by Healthchecks.io."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check"
+        ],
+        "description": "The response returned when pausing a check."
+      }
+    },
+    {
+      "id": "healthchecks_io.resume_check",
+      "service": "healthchecks_io",
+      "name": "resume_check",
+      "description": "Resume monitoring for a Healthchecks.io check by UUID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID used in the API path."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "The input payload for resuming a Healthchecks.io check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The check UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The check name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The custom check slug."
+              },
+              "tags": {
+                "type": "string",
+                "description": "The space-delimited tag list."
+              },
+              "desc": {
+                "type": "string",
+                "description": "The check description."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current check status."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The simple check timeout in seconds."
+              },
+              "grace": {
+                "type": "integer",
+                "description": "The grace period in seconds."
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The cron or systemd OnCalendar expression when present."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The timezone used with the schedule field."
+              },
+              "manual_resume": {
+                "type": "boolean",
+                "description": "Whether the check requires manual resume after failure."
+              },
+              "methods": {
+                "type": "string",
+                "description": "The allowed HTTP methods for ping requests."
+              },
+              "ping_url": {
+                "type": "string",
+                "description": "The ping URL for this check.",
+                "format": "uri"
+              },
+              "update_url": {
+                "type": "string",
+                "description": "The Management API update URL for this check.",
+                "format": "uri"
+              },
+              "pause_url": {
+                "type": "string",
+                "description": "The Management API pause URL for this check.",
+                "format": "uri"
+              },
+              "resume_url": {
+                "type": "string",
+                "description": "The Management API resume URL for this check.",
+                "format": "uri"
+              },
+              "channels": {
+                "type": "string",
+                "description": "The channel assignment string returned by Healthchecks.io."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check"
+        ],
+        "description": "The response returned when resuming a check."
+      }
+    },
+    {
+      "id": "healthchecks_io.update_check",
+      "service": "healthchecks_io",
+      "name": "update_check",
+      "description": "Update a Healthchecks.io check by UUID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Healthchecks.io check UUID used in the API path."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable check name."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom check slug."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A space-delimited list of tags assigned to the check."
+          },
+          "desc": {
+            "type": "string",
+            "description": "The check description."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The simple check timeout in seconds."
+          },
+          "grace": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The grace period in seconds."
+          },
+          "schedule": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A cron or systemd OnCalendar expression defining the check schedule."
+          },
+          "tz": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The timezone used with the schedule field, such as Europe/Riga."
+          },
+          "manual_resume": {
+            "type": "boolean",
+            "description": "Whether the check should stay down until manually resumed."
+          },
+          "methods": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The allowed HTTP methods for ping requests, such as POST."
+          },
+          "channels": {
+            "type": "string",
+            "description": "A comma-separated list of channel UUIDs or names, * for all channels, or an empty string to unassign all channels."
+          },
+          "start_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as starts."
+          },
+          "success_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as successes."
+          },
+          "failure_kw": {
+            "type": "string",
+            "description": "Comma-separated keywords that mark inbound email or HTTP pings as failures."
+          },
+          "filter_subject": {
+            "type": "boolean",
+            "description": "Whether inbound email subject lines should be keyword-filtered."
+          },
+          "filter_body": {
+            "type": "boolean",
+            "description": "Whether inbound email bodies should be keyword-filtered."
+          },
+          "filter_http_body": {
+            "type": "boolean",
+            "description": "Whether HTTP ping bodies should be keyword-filtered."
+          },
+          "filter_default_fail": {
+            "type": "boolean",
+            "description": "Whether unmatched pings should be treated as failures when keyword filtering is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uuid"
+        ],
+        "description": "The input payload for updating a Healthchecks.io check.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "slug"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "desc"
+            ]
+          },
+          {
+            "required": [
+              "timeout"
+            ]
+          },
+          {
+            "required": [
+              "grace"
+            ]
+          },
+          {
+            "required": [
+              "schedule"
+            ]
+          },
+          {
+            "required": [
+              "tz"
+            ]
+          },
+          {
+            "required": [
+              "manual_resume"
+            ]
+          },
+          {
+            "required": [
+              "methods"
+            ]
+          },
+          {
+            "required": [
+              "channels"
+            ]
+          },
+          {
+            "required": [
+              "start_kw"
+            ]
+          },
+          {
+            "required": [
+              "success_kw"
+            ]
+          },
+          {
+            "required": [
+              "failure_kw"
+            ]
+          },
+          {
+            "required": [
+              "filter_subject"
+            ]
+          },
+          {
+            "required": [
+              "filter_body"
+            ]
+          },
+          {
+            "required": [
+              "filter_http_body"
+            ]
+          },
+          {
+            "required": [
+              "filter_default_fail"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "check": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "The check UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The check name."
+              },
+              "slug": {
+                "type": "string",
+                "description": "The custom check slug."
+              },
+              "tags": {
+                "type": "string",
+                "description": "The space-delimited tag list."
+              },
+              "desc": {
+                "type": "string",
+                "description": "The check description."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current check status."
+              },
+              "timeout": {
+                "type": "integer",
+                "description": "The simple check timeout in seconds."
+              },
+              "grace": {
+                "type": "integer",
+                "description": "The grace period in seconds."
+              },
+              "schedule": {
+                "type": "string",
+                "description": "The cron or systemd OnCalendar expression when present."
+              },
+              "tz": {
+                "type": "string",
+                "description": "The timezone used with the schedule field."
+              },
+              "manual_resume": {
+                "type": "boolean",
+                "description": "Whether the check requires manual resume after failure."
+              },
+              "methods": {
+                "type": "string",
+                "description": "The allowed HTTP methods for ping requests."
+              },
+              "ping_url": {
+                "type": "string",
+                "description": "The ping URL for this check.",
+                "format": "uri"
+              },
+              "update_url": {
+                "type": "string",
+                "description": "The Management API update URL for this check.",
+                "format": "uri"
+              },
+              "pause_url": {
+                "type": "string",
+                "description": "The Management API pause URL for this check.",
+                "format": "uri"
+              },
+              "resume_url": {
+                "type": "string",
+                "description": "The Management API resume URL for this check.",
+                "format": "uri"
+              },
+              "channels": {
+                "type": "string",
+                "description": "The channel assignment string returned by Healthchecks.io."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A check resource returned by Healthchecks.io."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "check"
+        ],
+        "description": "The response returned when updating a check."
+      }
+    }
+  ]
+}

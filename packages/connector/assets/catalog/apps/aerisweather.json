@@ -1,0 +1,338 @@
+{
+  "service": "aerisweather",
+  "displayName": "Xweather",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Client Secret",
+      "placeholder": "XWEATHER_CLIENT_SECRET",
+      "description": "Xweather API client secret passed as the client_secret query parameter. Register an application in the Xweather Apps section to get the access ID and secret key: https://www.xweather.com/docs/weather-api/getting-started",
+      "extraFields": [
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "XWEATHER_CLIENT_ID",
+          "description": "Xweather API access ID passed as the client_id query parameter. Register an application in the Xweather Apps section to get the access ID and secret key: https://www.xweather.com/docs/weather-api/getting-started"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.xweather.com/",
+  "actions": [
+    {
+      "id": "aerisweather.get_forecast",
+      "service": "aerisweather",
+      "name": "get_forecast",
+      "description": "Retrieve Xweather forecast periods for a location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xweather location identifier, such as a city name, postal code, station ID, or latitude and longitude pair."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xweather forecast filter, such as day, daynight, 1hr, or 3hr."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of records to return."
+          },
+          "periodLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of forecast periods to return."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Xweather field path such as place.name or ob.tempC."
+            },
+            "description": "The Xweather dot-notation fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location"
+        ],
+        "description": "The input payload for retrieving an Xweather forecast."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "forecasts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "loc": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A raw nested object returned by Xweather."
+                },
+                "interval": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The forecast interval returned by Xweather."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The forecast interval returned by Xweather."
+                },
+                "place": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A raw nested object returned by Xweather."
+                },
+                "periods": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A raw nested object returned by Xweather."
+                  },
+                  "description": "The forecast periods returned by Xweather."
+                },
+                "raw": {
+                  "description": "The raw Xweather response payload."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "loc",
+                "interval",
+                "place",
+                "periods",
+                "raw"
+              ],
+              "description": "A normalized Xweather forecast result."
+            },
+            "description": "The forecast records returned by Xweather."
+          },
+          "raw": {
+            "description": "The raw Xweather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "forecasts",
+          "raw"
+        ],
+        "description": "The response returned when retrieving an Xweather forecast."
+      }
+    },
+    {
+      "id": "aerisweather.get_observation",
+      "service": "aerisweather",
+      "name": "get_observation",
+      "description": "Retrieve the latest Xweather observation for a location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xweather location identifier, such as a city name, postal code, station ID, or latitude and longitude pair."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Xweather field path such as place.name or ob.tempC."
+            },
+            "description": "The Xweather dot-notation fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location"
+        ],
+        "description": "The input payload for retrieving an Xweather observation."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "observation": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The reporting station ID returned by Xweather."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The reporting station ID returned by Xweather."
+              },
+              "dataSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The observation data source returned by Xweather."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The observation data source returned by Xweather."
+              },
+              "loc": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "place": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "profile": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "observation": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "raw": {
+                "description": "The raw Xweather response payload."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "dataSource",
+              "loc",
+              "place",
+              "profile",
+              "observation",
+              "raw"
+            ],
+            "description": "A normalized Xweather observation result."
+          },
+          "raw": {
+            "description": "The raw Xweather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "observation",
+          "raw"
+        ],
+        "description": "The response returned when retrieving an Xweather observation."
+      }
+    },
+    {
+      "id": "aerisweather.get_place",
+      "service": "aerisweather",
+      "name": "get_place",
+      "description": "Resolve an Xweather place by location identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xweather location identifier, such as a city name, postal code, station ID, or latitude and longitude pair."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Xweather field path such as place.name or ob.tempC."
+            },
+            "description": "The Xweather dot-notation fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "location"
+        ],
+        "description": "The input payload for resolving an Xweather place."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "object",
+            "properties": {
+              "loc": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "place": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "profile": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A raw nested object returned by Xweather."
+              },
+              "raw": {
+                "description": "The raw Xweather response payload."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "loc",
+              "place",
+              "profile",
+              "raw"
+            ],
+            "description": "A normalized Xweather place result."
+          },
+          "raw": {
+            "description": "The raw Xweather response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "place",
+          "raw"
+        ],
+        "description": "The response returned when resolving an Xweather place."
+      }
+    }
+  ]
+}

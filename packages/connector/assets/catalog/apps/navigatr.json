@@ -1,0 +1,803 @@
+{
+  "service": "navigatr",
+  "displayName": "Navigatr",
+  "homepageUrl": "https://www.navigatr.org",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Personal Access Token",
+      "placeholder": "NAVIGATR_PERSONAL_ACCESS_TOKEN",
+      "description": "Create a Navigatr personal access token in User Settings → Personal Access Tokens: https://navigatr.app/settings/personal-access-tokens/. It is sent in the X-Access-Token header."
+    }
+  ],
+  "actions": [
+    {
+      "id": "navigatr.get_badge",
+      "service": "navigatr",
+      "name": "get_badge",
+      "description": "Retrieve a badge and its issuing providers, criteria, and other available details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_id": {
+            "type": "integer",
+            "description": "Navigatr badge ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_id"
+        ],
+        "description": "Badge lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Navigatr badge ID."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Badge name."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Badge name."
+          },
+          "status": {
+            "type": "string",
+            "description": "Badge publication status."
+          },
+          "url": {
+            "type": "string",
+            "description": "Public badge URL."
+          },
+          "providers": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Issuing provider details."
+                },
+                "description": "Providers that can issue this badge."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Providers that can issue this badge."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge details, including additional upstream fields."
+      }
+    },
+    {
+      "id": "navigatr.get_badge_assertion",
+      "service": "navigatr",
+      "name": "get_badge_assertion",
+      "description": "Retrieve a badge assertion. Navigatr redacts recipient information when the connected account lacks permission to view it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_assertion_id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_assertion_id"
+        ],
+        "description": "Assertion lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "Assertion status."
+          },
+          "badge_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Navigatr badge ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Navigatr badge ID."
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Recipient user ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recipient user ID."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Public assertion URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public assertion URL."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge assertion details; recipient fields depend on caller permissions."
+      }
+    },
+    {
+      "id": "navigatr.issue_badge",
+      "service": "navigatr",
+      "name": "issue_badge",
+      "description": "Issue a configured badge to a user or organisation. Identify the recipient by user ID, QR code, Spydus barcode, or email with first and last name; include recipient_organisation for organisation badges.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_id": {
+            "type": "integer",
+            "description": "Navigatr badge ID."
+          },
+          "provider_id": {
+            "type": "integer",
+            "description": "Issuing provider ID; must be one of the badge's providers."
+          },
+          "recipient_id": {
+            "type": "integer",
+            "description": "Existing Navigatr recipient user ID."
+          },
+          "qr_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient QR code ID."
+          },
+          "spydus_barcode_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient Spydus library card barcode ID."
+          },
+          "recipient_email": {
+            "type": "string",
+            "description": "Recipient email address.",
+            "format": "email"
+          },
+          "recipient_firstname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient first name; required when identifying by email."
+          },
+          "recipient_lastname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient last name; required when identifying by email."
+          },
+          "recipient_organisation": {
+            "type": "string",
+            "description": "Organisation name shown on organisation assertions."
+          },
+          "issue_date": {
+            "type": "string",
+            "description": "Date and time when the assertion becomes valid.",
+            "format": "date-time"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Date and time when the assertion expires.",
+            "format": "date-time"
+          },
+          "evidence_text": {
+            "type": "string",
+            "description": "Plain text evidence of the recipient's achievement."
+          },
+          "evidence_url": {
+            "type": "string",
+            "description": "Evidence URL passed to Navigatr.",
+            "format": "uri"
+          },
+          "score": {
+            "type": "integer",
+            "description": "Recipient score; omit to issue regardless of score."
+          },
+          "min_score": {
+            "type": "integer",
+            "description": "Minimum score required for issuance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_id",
+          "provider_id"
+        ],
+        "description": "Badge issuance details.",
+        "anyOf": [
+          {
+            "required": [
+              "recipient_id"
+            ]
+          },
+          {
+            "required": [
+              "qr_id"
+            ]
+          },
+          {
+            "required": [
+              "spydus_barcode_id"
+            ]
+          },
+          {
+            "required": [
+              "recipient_email",
+              "recipient_firstname",
+              "recipient_lastname"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "Assertion status."
+          },
+          "badge_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Navigatr badge ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Navigatr badge ID."
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Recipient user ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recipient user ID."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Public assertion URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public assertion URL."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge assertion details; recipient fields depend on caller permissions."
+      }
+    },
+    {
+      "id": "navigatr.list_badge_assertions",
+      "service": "navigatr",
+      "name": "list_badge_assertions",
+      "description": "List issuance records for a badge with optional provider, status, keyword, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_id": {
+            "type": "integer",
+            "description": "Navigatr badge ID."
+          },
+          "provider_id": {
+            "type": "integer",
+            "description": "Issuing provider ID; must be one of the badge's providers."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "Time_Created_Asc",
+              "Time_Created_Desc",
+              "Name_Asc",
+              "Name_Desc"
+            ],
+            "description": "Sort order."
+          },
+          "keyword": {
+            "type": "string",
+            "description": "Search assertion records."
+          },
+          "status": {
+            "type": "string",
+            "description": "Assertion status filter."
+          },
+          "paginated": {
+            "type": "boolean",
+            "description": "Return a paginated response; defaults to true upstream."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Results per page, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_id"
+        ],
+        "description": "Badge assertion filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Navigatr badge assertion ID."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Assertion status."
+                },
+                "badge_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Navigatr badge ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Navigatr badge ID."
+                },
+                "recipient_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Recipient user ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recipient user ID."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Public assertion URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Public assertion URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Badge assertion details; recipient fields depend on caller permissions."
+            },
+            "description": "Results in this response."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total matching results."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Requested page size."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total pages."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Results with pagination metadata when requested."
+      }
+    },
+    {
+      "id": "navigatr.list_badges",
+      "service": "navigatr",
+      "name": "list_badges",
+      "description": "List badges for a provider, community, QA community, or issuer. Public API access is limited to the connected user's own provider or community.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "provider_id": {
+            "type": "integer",
+            "description": "Issuing provider ID; must be one of the badge's providers."
+          },
+          "community_id": {
+            "type": "integer",
+            "description": "Community ID."
+          },
+          "qa_community_id": {
+            "type": "integer",
+            "description": "Quality assurance community ID."
+          },
+          "issuer_id": {
+            "type": "integer",
+            "description": "Badge issuer ID."
+          },
+          "featured": {
+            "type": "boolean",
+            "description": "Filter by featured status."
+          },
+          "qa_required": {
+            "type": "boolean",
+            "description": "Filter by whether quality assurance is required."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Experience",
+              "Learning",
+              "Validation",
+              "Certification",
+              "Attendance",
+              "Work_Experience",
+              "Volunteering",
+              "Job",
+              "Apprenticeship",
+              "Course",
+              "Internship",
+              "Workshop",
+              "Campaigning",
+              "Activism",
+              "Other",
+              "Informal_Learning",
+              "Training",
+              "Certified",
+              "Qualification",
+              "Membership"
+            ],
+            "description": "Badge type."
+          },
+          "recipient_type": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Organisation"
+            ],
+            "description": "Recipient type."
+          },
+          "source": {
+            "type": "string",
+            "description": "Badge source, such as Internal or Credly."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "Time_Created_Asc",
+              "Time_Created_Desc",
+              "Time_Updated_Asc",
+              "Time_Updated_Desc",
+              "Name_Asc",
+              "Name_Desc"
+            ],
+            "description": "Sort order."
+          },
+          "keyword": {
+            "type": "string",
+            "description": "Search badge names."
+          },
+          "status": {
+            "type": "string",
+            "description": "Comma-separated badge statuses."
+          },
+          "paginated": {
+            "type": "boolean",
+            "description": "Return a paginated response; defaults to true upstream."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number, starting at 1."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Results per page, from 1 to 100."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Badge filters; supply at least one provider, community, QA community, or issuer ID.",
+        "anyOf": [
+          {
+            "required": [
+              "provider_id"
+            ]
+          },
+          {
+            "required": [
+              "community_id"
+            ]
+          },
+          {
+            "required": [
+              "qa_community_id"
+            ]
+          },
+          {
+            "required": [
+              "issuer_id"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Navigatr badge ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Badge name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Badge name."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Badge publication status."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Public badge URL."
+                },
+                "providers": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Issuing provider details."
+                      },
+                      "description": "Providers that can issue this badge."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Providers that can issue this badge."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Badge details, including additional upstream fields."
+            },
+            "description": "Results in this response."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total matching results."
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Requested page size."
+          },
+          "pages": {
+            "type": "integer",
+            "description": "Total pages."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Results with pagination metadata when requested."
+      }
+    },
+    {
+      "id": "navigatr.revoke_badge_assertion",
+      "service": "navigatr",
+      "name": "revoke_badge_assertion",
+      "description": "Revoke a badge assertion, optionally recording a reason.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_assertion_id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          },
+          "revocation_reason": {
+            "type": "string",
+            "description": "Reason for revoking the assertion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_assertion_id"
+        ],
+        "description": "Assertion revocation request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "Assertion status."
+          },
+          "badge_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Navigatr badge ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Navigatr badge ID."
+          },
+          "recipient_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Recipient user ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recipient user ID."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Public assertion URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Public assertion URL."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Badge assertion details; recipient fields depend on caller permissions."
+      }
+    },
+    {
+      "id": "navigatr.verify_badge_assertion",
+      "service": "navigatr",
+      "name": "verify_badge_assertion",
+      "description": "Verify a badge assertion and retrieve the result and reasons. This updates or clears the persisted time_verified field and the public verification indicator.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "badge_assertion_id": {
+            "type": "integer",
+            "description": "Navigatr badge assertion ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "badge_assertion_id"
+        ],
+        "description": "Assertion verification request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "description": "Whether the assertion is verified."
+          },
+          "reasons": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Verification reason."
+            },
+            "description": "Verification reasons keyed by check."
+          },
+          "status": {
+            "type": "string",
+            "description": "Assertion status."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Assertion verification result with additional upstream details."
+      }
+    }
+  ]
+}

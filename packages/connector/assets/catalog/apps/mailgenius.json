@@ -1,0 +1,210 @@
+{
+  "service": "mailgenius",
+  "displayName": "MailGenius",
+  "description": "Create inbound email deliverability audits and retrieve MailGenius test results.",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "MAILGENIUS_API_TOKEN",
+      "description": "MailGenius API token sent with the Authorization Bearer header. Create and manage API tokens in the MailGenius application: https://app.mailgenius.com/."
+    }
+  ],
+  "homepageUrl": "https://www.mailgenius.com/",
+  "actions": [
+    {
+      "id": "mailgenius.create_email_audit",
+      "service": "mailgenius",
+      "name": "create_email_audit",
+      "description": "Generate a MailGenius test email address for an inbound deliverability audit.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for generating a MailGenius test email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "audit": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by MailGenius."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audit"
+        ],
+        "description": "The wrapped generated test email response."
+      },
+      "followUpActions": [
+        "mailgenius.get_email_result"
+      ]
+    },
+    {
+      "id": "mailgenius.get_daily_limit",
+      "service": "mailgenius",
+      "name": "get_daily_limit",
+      "description": "Get the MailGenius API token daily test limit, used count, and remaining count.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for fetching the MailGenius daily limit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dailyLimit": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by MailGenius."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dailyLimit"
+        ],
+        "description": "The wrapped MailGenius daily limit response."
+      }
+    },
+    {
+      "id": "mailgenius.get_email_result",
+      "service": "mailgenius",
+      "name": "get_email_result",
+      "description": "Get the MailGenius result for a generated test email slug, including NOT_READY responses before analysis is complete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MailGenius test email slug returned by create_email_audit or list_email_audits."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "slug"
+        ],
+        "description": "Input parameters for fetching a MailGenius email test result."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by MailGenius."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The wrapped MailGenius email test result response."
+      }
+    },
+    {
+      "id": "mailgenius.list_email_audits",
+      "service": "mailgenius",
+      "name": "list_email_audits",
+      "description": "List MailGenius generated test emails and their slugs, optionally filtered by time range and used state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromTimestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The start timestamp in seconds."
+          },
+          "toTimestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The end timestamp in seconds."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to fetch."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of audit items to return."
+          },
+          "used": {
+            "type": "boolean",
+            "description": "Whether to return used or unused test email audit items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing MailGenius test email audit items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "testEmails": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The MailGenius slug used to fetch this test email result."
+                },
+                "test_email": {
+                  "type": "string",
+                  "description": "The generated MailGenius test email address.",
+                  "format": "email"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "slug",
+                "test_email"
+              ],
+              "description": "A MailGenius test email audit item."
+            },
+            "description": "The test email audit items returned by MailGenius."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object returned by MailGenius."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "testEmails",
+          "raw"
+        ],
+        "description": "The wrapped MailGenius test email list response."
+      }
+    }
+  ]
+}

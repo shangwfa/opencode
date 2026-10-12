@@ -1,0 +1,2332 @@
+{
+  "service": "ixspy",
+  "displayName": "IXSPY",
+  "description": "Research AliExpress products, categories, rankings, trends, and markets with IXSPY.",
+  "categories": [
+    "Data",
+    "Marketing",
+    "E-commerce"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_IXSPY_API_KEY",
+      "description": "IXSPY Open API key sent as a Bearer token. Copy it from My Keys at https://open.ixspy.com/#/account/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://ixspy.com/",
+  "actions": [
+    {
+      "id": "ixspy.get_category_resource",
+      "service": "ixspy",
+      "name": "get_category_resource",
+      "description": "Get the current IXSPY CDN URL for the complete AliExpress category tree resource.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to get the category tree resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The CDN URL for downloading the complete category tree JSON resource.",
+            "format": "uri"
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current AliExpress category tree resource returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_keyword_rank",
+      "service": "ixspy",
+      "name": "get_keyword_rank",
+      "description": "Get an IXSPY AliExpress keyword ranking with search popularity, click, conversion, competition, supply, and growth metrics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rankDate": {
+            "type": "string",
+            "description": "The available IXSPY keyword ranking date.",
+            "format": "date"
+          },
+          "dateType": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month"
+            ],
+            "description": "The ranking period."
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The category ID represented by the keyword ranking."
+          },
+          "regionCode": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "US",
+              "RU"
+            ],
+            "description": "The supported IXSPY keyword region."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A fuzzy keyword filter.",
+            "pattern": "\\S"
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "searchPopularity",
+              "searchGrowth",
+              "clickRate",
+              "conversionRate"
+            ],
+            "description": "The keyword metric used for sorting."
+          },
+          "orderKind": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rankDate",
+          "dateType",
+          "categoryId",
+          "regionCode"
+        ],
+        "description": "The keyword ranking, period, date, category, region, optional filter, and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ranked keyword with demand, conversion, supply, competition, and growth metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress keyword ranking returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_market_insights",
+      "service": "ixspy",
+      "name": "get_market_insights",
+      "description": "Compare immediate child categories in IXSPY using product, sales, revenue, review, market-share, and Choice-product metrics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentCategoryId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The parent category ID. Use 0 for top-level categories."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parentCategoryId"
+        ],
+        "description": "The parent category and pagination for market insights."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One child category with market size, revenue, share, and Choice-product metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress market insight results returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_details",
+      "service": "ixspy",
+      "name": "get_product_details",
+      "description": "Get IXSPY details for up to 10 AliExpress product IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One AliExpress product ID."
+            },
+            "description": "The product IDs to retrieve.",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress products to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One AliExpress product detail record."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested AliExpress product details returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_rank",
+      "service": "ixspy",
+      "name": "get_product_rank",
+      "description": "Get an IXSPY AliExpress total, hot, growth, new-product, or holiday product ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rankType": {
+            "type": "string",
+            "enum": [
+              "total",
+              "normalHot",
+              "normalGrowth",
+              "newHot",
+              "newGrowth",
+              "holidayNormal",
+              "holidayNew"
+            ],
+            "description": "The product ranking type."
+          },
+          "dateType": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "holiday"
+            ],
+            "description": "The ranking period."
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The category ID represented by the ranking."
+          },
+          "rankDate": {
+            "type": "string",
+            "description": "The available IXSPY ranking date.",
+            "format": "date"
+          },
+          "searchWords": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words that must occur in the product title.",
+            "pattern": "\\S"
+          },
+          "choiceType": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The AliExpress fulfillment type: 0 for POP, 1 for semi-managed, or 2 for fully managed."
+          },
+          "priceMin": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The minimum product price in USD."
+          },
+          "priceMax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum product price in USD."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rankType",
+          "dateType",
+          "categoryId",
+          "rankDate"
+        ],
+        "description": "The product ranking, date, category, optional filters, and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ranked AliExpress product and its current and previous rank metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress product ranking returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_region_sales",
+      "service": "ixspy",
+      "name": "get_product_region_sales",
+      "description": "Get estimated AliExpress product order counts grouped by buyer country or region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress product ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress product to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The product identifier returned by IXSPY."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One buyer region and its estimated order count."
+            },
+            "description": "The product statistic rows returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The product statistics returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_shipping_stats",
+      "service": "ixspy",
+      "name": "get_product_shipping_stats",
+      "description": "Get estimated AliExpress order counts grouped by shipping method for a product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress product ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress product to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The product identifier returned by IXSPY."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One shipping method and its estimated order count."
+            },
+            "description": "The product statistic rows returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The product statistics returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_sku_sales",
+      "service": "ixspy",
+      "name": "get_product_sku_sales",
+      "description": "Get the estimated order distribution across SKU variants for an AliExpress product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress product ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress product to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The product identifier returned by IXSPY."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One SKU combination and its estimated order count."
+            },
+            "description": "The product statistic rows returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The product statistics returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_product_trends",
+      "service": "ixspy",
+      "name": "get_product_trends",
+      "description": "Get up to 90 days of IXSPY price, sales, and review trend data for a product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress product ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first trend date. IXSPY defaults to 30 days before today.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last trend date, no more than 90 days after the start date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "productId"
+        ],
+        "description": "The AliExpress product and optional date range to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The product identifier returned by IXSPY."
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The first date represented in the trend series.",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first date represented in the trend series."
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last date represented in the trend series.",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last date represented in the trend series."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One product trend point with provider-defined metrics."
+            },
+            "description": "The daily product trend points returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The product trend series returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_region_product_rank",
+      "service": "ixspy",
+      "name": "get_region_product_rank",
+      "description": "Get an IXSPY weekly or monthly AliExpress product ranking for one buyer region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dateType": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month"
+            ],
+            "description": "The ranking period."
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The category ID represented by the ranking."
+          },
+          "rankDate": {
+            "type": "string",
+            "description": "The available IXSPY ranking date.",
+            "format": "date"
+          },
+          "regionCode": {
+            "type": "string",
+            "enum": [
+              "RU",
+              "ES",
+              "FR",
+              "US",
+              "CL",
+              "UA",
+              "NL",
+              "PL",
+              "BR",
+              "IT",
+              "DE",
+              "KR",
+              "SA",
+              "IL",
+              "RO",
+              "KH",
+              "PE",
+              "JP",
+              "TR",
+              "UK",
+              "CA",
+              "BY",
+              "MX",
+              "AE",
+              "FI",
+              "LT",
+              "NO",
+              "SE",
+              "PT",
+              "BG",
+              "HU",
+              "ZA",
+              "AU"
+            ],
+            "description": "The documented IXSPY buyer-region code."
+          },
+          "searchWords": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words that must occur in the product title.",
+            "pattern": "\\S"
+          },
+          "choiceType": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The AliExpress fulfillment type: 0 for POP, 1 for semi-managed, or 2 for fully managed."
+          },
+          "priceMin": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The minimum product price in USD."
+          },
+          "priceMax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum product price in USD."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dateType",
+          "categoryId",
+          "rankDate",
+          "regionCode"
+        ],
+        "description": "The regional product ranking, date, category, optional filters, and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ranked AliExpress product and its regional sales metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The regional AliExpress product ranking returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_store_category_distribution",
+      "service": "ixspy",
+      "name": "get_store_category_distribution",
+      "description": "Get IXSPY product and sales distribution by category for an AliExpress store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeMerchantId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress merchant ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress store to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The store identifier returned by IXSPY."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One category path with product and sales distribution metrics."
+            },
+            "description": "The store statistic rows returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The store statistics returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_store_details",
+      "service": "ixspy",
+      "name": "get_store_details",
+      "description": "Get IXSPY details for up to 10 AliExpress stores by merchant IDs or link IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "merchantIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One AliExpress merchant ID."
+            },
+            "description": "The merchant IDs to retrieve.",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          },
+          "linkIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One AliExpress store link ID."
+            },
+            "description": "The store link IDs to retrieve.",
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Exactly one type of AliExpress store identifier to retrieve, with up to 10 IDs.",
+        "oneOf": [
+          {
+            "required": [
+              "merchantIds"
+            ]
+          },
+          {
+            "required": [
+              "linkIds"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One AliExpress store detail record."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested AliExpress store details returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_store_rank",
+      "service": "ixspy",
+      "name": "get_store_rank",
+      "description": "Get an IXSPY AliExpress total, hot, growth, new-store, or rising-store ranking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rankType": {
+            "type": "string",
+            "enum": [
+              "total",
+              "normalHot",
+              "normalGrowth",
+              "newHot",
+              "newGrowth"
+            ],
+            "description": "The store ranking type."
+          },
+          "dateType": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "description": "The ranking period."
+          },
+          "rankDate": {
+            "type": "string",
+            "description": "The available IXSPY ranking date.",
+            "format": "date"
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The top-level category ID represented by the ranking."
+          },
+          "searchWords": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Words that must occur in the store name.",
+            "pattern": "\\S"
+          },
+          "choiceType": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "The AliExpress fulfillment type: 0 for POP, 1 for semi-managed, or 2 for fully managed."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rankType",
+          "dateType",
+          "rankDate",
+          "categoryId"
+        ],
+        "description": "The store ranking, date, top-level category, optional filters, and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ranked AliExpress store and its current and previous rank metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress store ranking returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_store_region_sales",
+      "service": "ixspy",
+      "name": "get_store_region_sales",
+      "description": "Get estimated AliExpress store order counts grouped by buyer country or region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeMerchantId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress merchant ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress store to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The store identifier returned by IXSPY."
+          },
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One buyer region and its estimated order count."
+            },
+            "description": "The store statistic rows returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The store statistics returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.get_store_trends",
+      "service": "ixspy",
+      "name": "get_store_trends",
+      "description": "Get up to 90 days of IXSPY follower, sales, and review trend data for a store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storeMerchantId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The AliExpress merchant ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The first trend date.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The last trend date, no more than 90 days after the start date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress store and date range to analyze."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer IXSPY identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string IXSPY identifier."
+              }
+            ],
+            "description": "The store identifier returned by IXSPY."
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The first date represented in the trend series.",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first date represented in the trend series."
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last date represented in the trend series.",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last date represented in the trend series."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One store trend point with provider-defined metrics."
+            },
+            "description": "The daily store trend points returned by IXSPY."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The store trend series returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.list_category_children",
+      "service": "ixspy",
+      "name": "list_category_children",
+      "description": "List the immediate AliExpress child categories under an IXSPY category, including root categories.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The parent category ID. Use 0 for root categories."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The parent category whose immediate children should be listed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "An integer category identifier."
+              },
+              {
+                "type": "string",
+                "description": "A string category identifier."
+              }
+            ],
+            "description": "The parent category identifier returned by IXSPY."
+          },
+          "count": {
+            "type": "integer",
+            "description": "The number of immediate child categories returned."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One AliExpress category with names, hierarchy, and leaf metadata."
+            },
+            "description": "The immediate child categories."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress child categories returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.list_rank_dates",
+      "service": "ixspy",
+      "name": "list_rank_dates",
+      "description": "List the IXSPY dates currently available for normal, holiday, or keyword AliExpress rankings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rankType": {
+            "type": "string",
+            "enum": [
+              "normalRank",
+              "holidayRank",
+              "keywordRank"
+            ],
+            "description": "The ranking date family."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ranking family whose available dates should be listed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rankType": {
+            "type": "string",
+            "description": "The ranking family returned by IXSPY."
+          },
+          "dateTypes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ranking period with dates and optional holiday metadata."
+            },
+            "description": "The available date groups."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The available IXSPY ranking dates."
+      }
+    },
+    {
+      "id": "ixspy.research_categories",
+      "service": "ixspy",
+      "name": "research_categories",
+      "description": "Compare immediate child categories in IXSPY using products, stores, sales, reviews, supply-demand, regional, and top-100 opportunity metrics.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "parentCategoryId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The parent category ID. Use 0 for top-level categories."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "parentCategoryId"
+        ],
+        "description": "The parent category and pagination for category research."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One child category with market-size, demand, competition, regional, and opportunity metrics."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress category research results returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.search_categories",
+      "service": "ixspy",
+      "name": "search_categories",
+      "description": "Search AliExpress categories in IXSPY by Chinese or English name, path, or fuzzy keyword.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Chinese or English category keyword or path to search.",
+            "pattern": "\\S"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The exact category depth to return when supplied."
+          },
+          "isLeaf": {
+            "type": "boolean",
+            "description": "Whether to return only leaf categories."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of matching categories to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "Filters for searching AliExpress categories."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One matching AliExpress category with names and hierarchy metadata."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The matching AliExpress categories returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.search_products",
+      "service": "ixspy",
+      "name": "search_products",
+      "description": "Search IXSPY AliExpress products with keyword, category, price, sales, review, rating, fulfillment, discovery, and update filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The category ID whose descendants should also be searched."
+          },
+          "nameKeyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An English product-title keyword.",
+            "pattern": "\\S"
+          },
+          "choiceTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2,
+              "description": "The AliExpress fulfillment type: 0 for POP, 1 for semi-managed, or 2 for fully managed."
+            },
+            "description": "The AliExpress fulfillment types to include.",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "shipsFrom": {
+            "type": "string",
+            "enum": [
+              "US",
+              "FR",
+              "RU",
+              "ES",
+              "AU",
+              "PL",
+              "IT",
+              "CZ",
+              "GB",
+              "BE",
+              "DE",
+              "IL",
+              "TR",
+              "UA",
+              "BR",
+              "KR",
+              "HU",
+              "SA",
+              "ID",
+              "AE",
+              "CL",
+              "ZA",
+              "MX",
+              "China"
+            ],
+            "description": "The documented IXSPY product origin code."
+          },
+          "discoveredAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The earliest IXSPY discovery time as a Unix timestamp in seconds."
+          },
+          "discoveredBefore": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The latest IXSPY discovery time as a Unix timestamp in seconds."
+          },
+          "priceMin": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The minimum product price in USD."
+          },
+          "priceMax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum product price in USD."
+          },
+          "totalSalesMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum one-year total sales count."
+          },
+          "totalSalesMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum one-year total sales count."
+          },
+          "sales7dMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum seven-day sales count."
+          },
+          "sales7dMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum seven-day sales count."
+          },
+          "totalReviewsMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum one-year review count."
+          },
+          "totalReviewsMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum one-year review count."
+          },
+          "salesReviewRatioMin": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The minimum sales-to-review ratio."
+          },
+          "salesReviewRatioMax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum sales-to-review ratio."
+          },
+          "ratingMin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The minimum product rating."
+          },
+          "ratingMax": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The maximum product rating."
+          },
+          "hasVideo": {
+            "type": "boolean",
+            "description": "Whether products must contain a video."
+          },
+          "storeMerchantId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The merchant ID used to restrict results to one store."
+          },
+          "updatedAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The earliest data update time as a Unix timestamp in seconds."
+          },
+          "updatedBefore": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The latest data update time as a Unix timestamp in seconds."
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "totalSales",
+              "totalReviews",
+              "sales7d",
+              "discoveredTime"
+            ],
+            "description": "The product field used for sorting."
+          },
+          "orderKind": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for searching AliExpress products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One AliExpress product with pricing, sales, reviews, store, media, and category metadata."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress product search results returned by IXSPY."
+      }
+    },
+    {
+      "id": "ixspy.search_stores",
+      "service": "ixspy",
+      "name": "search_stores",
+      "description": "Search IXSPY AliExpress stores with name, category, sales, followers, reviews, rating, price, product count, origin, age, tags, and fulfillment filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nameKeyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A store-name keyword for fuzzy matching.",
+            "pattern": "\\S"
+          },
+          "categoryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "A top-level category ID."
+          },
+          "totalSalesMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum total store sales count."
+          },
+          "totalSalesMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum total store sales count."
+          },
+          "totalFollowersMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum store follower count."
+          },
+          "totalFollowersMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum store follower count."
+          },
+          "totalReviewsMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum store review count."
+          },
+          "totalReviewsMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum store review count."
+          },
+          "ratingMin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The minimum store rating."
+          },
+          "ratingMax": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "The maximum store rating."
+          },
+          "averagePriceMin": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The minimum average product price in USD."
+          },
+          "averagePriceMax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The maximum average product price in USD."
+          },
+          "totalProductsMin": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum store product count."
+          },
+          "totalProductsMax": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum store product count."
+          },
+          "createdAfter": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The earliest store creation time as a Unix timestamp in seconds."
+          },
+          "createdBefore": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The latest store creation time as a Unix timestamp in seconds."
+          },
+          "topBrandTag": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "The store tier: 0 for none, 1 for Brand, 2 for Silver, 3 for Gold, or 4 for Plus."
+          },
+          "shipsFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The origin country name used by IXSPY.",
+            "pattern": "\\S"
+          },
+          "styleZone": {
+            "type": "boolean",
+            "description": "Whether the store must be in the AliExpress Style Zone."
+          },
+          "choiceTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2,
+              "description": "The AliExpress fulfillment type: 0 for POP, 1 for semi-managed, or 2 for fully managed."
+            },
+            "description": "The AliExpress fulfillment types to include.",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "orderBy": {
+            "type": "string",
+            "enum": [
+              "totalSales",
+              "totalReviews",
+              "totalFollowers",
+              "createdTime"
+            ],
+            "description": "The store field used for sorting."
+          },
+          "orderKind": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page number.",
+            "default": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of results per page, up to 50.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for searching AliExpress stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One AliExpress store with sales, followers, reviews, rating, category, and fulfillment metadata."
+            },
+            "description": "The records returned by IXSPY."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current one-based page number when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current one-based page number when IXSPY supplies pagination."
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of pages when IXSPY supplies pagination."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of pages when IXSPY supplies pagination."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total matching record count when IXSPY supplies it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total matching record count when IXSPY supplies it."
+          },
+          "credits": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The IXSPY credit delta reported for the request. A negative value means credits were deducted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The AliExpress store search results returned by IXSPY."
+      }
+    }
+  ]
+}

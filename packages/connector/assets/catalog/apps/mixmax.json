@@ -1,0 +1,566 @@
+{
+  "service": "mixmax",
+  "displayName": "Mixmax",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "MIXMAX_API_TOKEN",
+      "description": "Mixmax developer token sent with the X-API-Token header. Create it in My Settings > Integrations > API: https://success.mixmax.com/en/articles/11643056-mixmax-rest-api"
+    }
+  ],
+  "homepageUrl": "https://www.mixmax.com/",
+  "actions": [
+    {
+      "id": "mixmax.add_sequence_recipients",
+      "service": "mixmax",
+      "name": "add_sequence_recipients",
+      "description": "Add recipients to a Mixmax sequence and optionally schedule them or keep them in draft.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequenceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mixmax sequence identifier."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "description": "The recipient email address.",
+                  "format": "email"
+                },
+                "variables": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The recipient email stored in the lowercase email variable.",
+                      "format": "email"
+                    },
+                    "Email": {
+                      "type": "string",
+                      "description": "The recipient email stored in the uppercase Email variable.",
+                      "format": "email"
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Sequence variables for one recipient; either email or Email must equal the recipient email."
+                },
+                "scheduledAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "A Unix timestamp in milliseconds for sequence activation."
+                    },
+                    {
+                      "const": false,
+                      "description": "Keep the sequence recipient in draft."
+                    }
+                  ],
+                  "description": "A Unix timestamp in milliseconds for activation, or false to keep the recipient in draft."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "email"
+              ],
+              "description": "One recipient to add to a Mixmax sequence."
+            },
+            "description": "The recipients to add to the sequence.",
+            "minItems": 1
+          },
+          "scheduledAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "description": "A Unix timestamp in milliseconds for sequence activation."
+              },
+              {
+                "const": false,
+                "description": "Keep the sequence recipient in draft."
+              }
+            ],
+            "description": "A Unix timestamp in milliseconds for activation, or false to keep the recipient in draft."
+          },
+          "enrich": {
+            "type": "boolean",
+            "description": "Whether Mixmax should enrich recipients from stored contact data."
+          },
+          "allowMissingVariables": {
+            "type": "boolean",
+            "description": "Whether Mixmax should accept recipients missing variables used by the sequence."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sequenceId",
+          "recipients"
+        ],
+        "description": "The input payload for adding recipients to a Mixmax sequence."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The processed recipient value reported by Mixmax, including invalid values returned with an error status."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "success",
+                "error",
+                "duplicated",
+                "unsubscribed"
+              ],
+              "description": "The result of processing the recipient."
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "One recipient processing error."
+              },
+              "description": "The errors reported when the recipient could not be added."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "email",
+            "status"
+          ],
+          "description": "The result of adding one recipient to a Mixmax sequence."
+        },
+        "description": "The per-recipient processing results returned by Mixmax."
+      }
+    },
+    {
+      "id": "mixmax.list_sequence_recipients",
+      "service": "mixmax",
+      "name": "list_sequence_recipients",
+      "description": "List activated recipients for one Mixmax sequence with offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sequenceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mixmax sequence identifier."
+          },
+          "analyticsFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Analytics source: myself, a Mixmax team ID, or omit for everyone."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of sequence recipients to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "Number of sequence recipients to skip."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "email",
+              "lastStage",
+              "lastMessageCreated",
+              "nextStageScheduledAt",
+              "opens",
+              "clicks",
+              "replied",
+              "downloads",
+              "accepted"
+            ],
+            "description": "The recipient field used for sorting."
+          },
+          "sortDesc": {
+            "type": "boolean",
+            "description": "Whether to sort sequence recipients in descending order."
+          },
+          "includeVariables": {
+            "type": "boolean",
+            "description": "Whether to include recipient variables in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sequenceId"
+        ],
+        "description": "The input payload for listing recipients activated in one Mixmax sequence."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Mixmax sequence recipient identifier."
+            },
+            "userId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Mixmax user ID that created the recipient."
+            },
+            "createdAt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "When the sequence recipient was created."
+            },
+            "updatedAt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "When the sequence recipient was last updated."
+            },
+            "sequenceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The Mixmax sequence identifier."
+            },
+            "email": {
+              "type": "string",
+              "description": "The sequence recipient email address.",
+              "format": "email"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "active",
+                "failed",
+                "completed"
+              ],
+              "description": "The current sequence recipient state."
+            },
+            "variables": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The optional variables assigned to the sequence recipient."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "_id",
+            "sequenceId",
+            "email",
+            "state"
+          ],
+          "description": "An activated Mixmax sequence recipient."
+        },
+        "description": "The activated Mixmax sequence recipients returned by the API."
+      }
+    },
+    {
+      "id": "mixmax.list_sequences",
+      "service": "mixmax",
+      "name": "list_sequences",
+      "description": "List Mixmax sequences with optional name, folder, expansion, and cursor filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return sequences whose name matches this value."
+          },
+          "expand": {
+            "type": "string",
+            "enum": [
+              "stages"
+            ],
+            "description": "The sequence field to expand."
+          },
+          "folder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by personal, shared, or a Mixmax sequence folder identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "description": "Maximum number of sequences to return."
+          },
+          "next": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An opaque Mixmax pagination cursor."
+          },
+          "previous": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An opaque Mixmax pagination cursor."
+          },
+          "fields": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated response fields to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Mixmax sequences."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Mixmax sequence identifier."
+                },
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Mixmax user ID that owns the sequence."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "When the sequence was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "When the sequence was last updated."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user-configured sequence name."
+                },
+                "stages": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A Mixmax sequence stage identifier."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "An expanded Mixmax sequence stage."
+                      }
+                    ],
+                    "description": "A sequence stage ID or an expanded stage object."
+                  },
+                  "description": "The sequence stage IDs or expanded stage objects."
+                },
+                "variables": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A sequence variable name."
+                  },
+                  "description": "The variable names used by the sequence."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "_id",
+                "name"
+              ],
+              "description": "A Mixmax sequence returned by the API."
+            },
+            "description": "The Mixmax sequences available to the current user."
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next page."
+          },
+          "hasNext": {
+            "type": "boolean",
+            "description": "Whether another sequence page is available."
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the previous page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the previous page."
+          },
+          "hasPrevious": {
+            "type": "boolean",
+            "description": "Whether a previous sequence page is available."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "results"
+        ],
+        "description": "The response returned when listing Mixmax sequences."
+      }
+    },
+    {
+      "id": "mixmax.search_sequence_recipients",
+      "service": "mixmax",
+      "name": "search_sequence_recipients",
+      "description": "Search Mixmax sequence recipients by query text or exact email addresses, optionally within one sequence.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A case-insensitive recipient email search string, such as from:mixmax.com."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One recipient email address.",
+              "format": "email"
+            },
+            "description": "Exact recipient email addresses to search for.",
+            "minItems": 1
+          },
+          "sequenceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Mixmax sequence identifier."
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Number of matching sequence recipients to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of matching sequence recipients to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for searching Mixmax sequence recipients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching sequence recipients."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Mixmax sequence recipient identifier."
+                },
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Mixmax user ID that owns the sequence recipient."
+                },
+                "sequenceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Mixmax sequence identifier."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The sequence recipient email address.",
+                  "format": "email"
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sequence recipient state."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sequence recipient name."
+                },
+                "stages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One provider-defined stage analytics object."
+                  },
+                  "description": "The provider-defined stage analytics for the sequence recipient."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "_id",
+                "sequenceId",
+                "email"
+              ],
+              "description": "A Mixmax sequence recipient search result with provider-defined analytics details."
+            },
+            "description": "The matching Mixmax sequence recipients."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "total",
+          "results"
+        ],
+        "description": "The response returned when searching Mixmax sequence recipients."
+      }
+    }
+  ]
+}

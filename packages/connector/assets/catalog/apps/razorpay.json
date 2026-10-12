@@ -1,0 +1,1480 @@
+{
+  "service": "razorpay",
+  "displayName": "Razorpay",
+  "categories": [
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Key Secret",
+      "placeholder": "rzp_test_xxxxxxxxxxxx",
+      "description": "Razorpay Key Secret used together with your Key ID for HTTP Basic Authentication. Generate API keys in Razorpay Dashboard > Account & Settings > API Keys.",
+      "extraFields": [
+        {
+          "key": "keyId",
+          "label": "Key ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "rzp_test_xxxxxxxxxxxx",
+          "description": "Razorpay Key ID paired with the Key Secret for HTTP Basic Authentication."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://razorpay.com",
+  "actions": [
+    {
+      "id": "razorpay.create_order",
+      "service": "razorpay",
+      "name": "create_order",
+      "description": "Create a Razorpay order for an amount, currency, and optional receipt metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The order amount in the smallest currency subunit."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3,
+            "description": "The three-letter ISO currency code for the order.",
+            "pattern": "\\S"
+          },
+          "receipt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Your internal receipt reference. Razorpay allows up to 40 characters.",
+            "pattern": "\\S"
+          },
+          "notes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One note value.",
+              "pattern": "\\S"
+            },
+            "description": "Key-value pairs forwarded to Razorpay notes. Razorpay accepts up to 15 pairs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "description": "The input payload for creating a Razorpay order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the Razorpay order.",
+                "pattern": "\\S"
+              },
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The entity type returned by Razorpay.",
+                "pattern": "\\S"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The order amount in the smallest currency subunit."
+              },
+              "amountPaid": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The amount paid against the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The amount paid against the order."
+              },
+              "amountDue": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The amount still due for the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The amount still due for the order."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code used for the order.",
+                "pattern": "\\S"
+              },
+              "receipt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Your internal receipt reference when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Your internal receipt reference when present."
+              },
+              "offerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Razorpay offer identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Razorpay offer identifier when present."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The order status returned by Razorpay."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The order status returned by Razorpay."
+              },
+              "attempts": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of payment attempts recorded for the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of payment attempts recorded for the order."
+              },
+              "notes": {
+                "description": "The notes payload returned by Razorpay."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp when the order was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp when the order was created."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Razorpay order payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Razorpay order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a Razorpay order."
+      }
+    },
+    {
+      "id": "razorpay.create_refund",
+      "service": "razorpay",
+      "name": "create_refund",
+      "description": "Create a Razorpay refund for a payment, with optional amount, speed, and notes.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Razorpay payment identifier to refund.",
+            "pattern": "\\S"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The refund amount in the smallest currency subunit."
+          },
+          "speed": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "optimum"
+            ],
+            "description": "The refund processing speed requested from Razorpay."
+          },
+          "receipt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Your internal refund receipt reference.",
+            "pattern": "\\S"
+          },
+          "notes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One note value.",
+              "pattern": "\\S"
+            },
+            "description": "Key-value pairs forwarded to Razorpay notes. Razorpay accepts up to 15 pairs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "paymentId"
+        ],
+        "description": "The input payload for creating a Razorpay refund."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the Razorpay refund.",
+                "pattern": "\\S"
+              },
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The entity type returned by Razorpay.",
+                "pattern": "\\S"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The refund amount in the smallest currency subunit."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code used for the refund.",
+                "pattern": "\\S"
+              },
+              "paymentId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Razorpay payment identifier linked to the refund.",
+                "pattern": "\\S"
+              },
+              "receipt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Your internal refund receipt reference when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Your internal refund receipt reference when present."
+              },
+              "notes": {
+                "description": "The notes payload returned by Razorpay."
+              },
+              "acquirerData": {
+                "description": "The dynamic acquirer data returned by Razorpay."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp when the refund was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp when the refund was created."
+              },
+              "batchId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Razorpay batch identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Razorpay batch identifier when present."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The refund status returned by Razorpay."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The refund status returned by Razorpay."
+              },
+              "speedRequested": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The refund speed requested in the original call."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The refund speed requested in the original call."
+              },
+              "speedProcessed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The refund speed actually processed by Razorpay."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The refund speed actually processed by Razorpay."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Razorpay refund payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Razorpay refund."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a Razorpay refund."
+      }
+    },
+    {
+      "id": "razorpay.get_order",
+      "service": "razorpay",
+      "name": "get_order",
+      "description": "Fetch one Razorpay order by its order identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Razorpay order identifier, such as order_9A33XWu170gUtm.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching a Razorpay order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the Razorpay order.",
+                "pattern": "\\S"
+              },
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The entity type returned by Razorpay.",
+                "pattern": "\\S"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The order amount in the smallest currency subunit."
+              },
+              "amountPaid": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The amount paid against the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The amount paid against the order."
+              },
+              "amountDue": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The amount still due for the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The amount still due for the order."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code used for the order.",
+                "pattern": "\\S"
+              },
+              "receipt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Your internal receipt reference when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Your internal receipt reference when present."
+              },
+              "offerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Razorpay offer identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Razorpay offer identifier when present."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The order status returned by Razorpay."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The order status returned by Razorpay."
+              },
+              "attempts": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of payment attempts recorded for the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of payment attempts recorded for the order."
+              },
+              "notes": {
+                "description": "The notes payload returned by Razorpay."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp when the order was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp when the order was created."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Razorpay order payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Razorpay order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching a Razorpay order."
+      }
+    },
+    {
+      "id": "razorpay.get_payment",
+      "service": "razorpay",
+      "name": "get_payment",
+      "description": "Fetch one Razorpay payment by its payment identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Razorpay payment identifier, such as pay_29QQoUBi66xm2f.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for fetching a Razorpay payment."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "payment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique identifier of the Razorpay payment.",
+                "pattern": "\\S"
+              },
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The entity type returned by Razorpay.",
+                "pattern": "\\S"
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The payment amount in the smallest currency subunit."
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO currency code used for the payment.",
+                "pattern": "\\S"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment status returned by Razorpay."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment status returned by Razorpay."
+              },
+              "orderId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The associated Razorpay order identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The associated Razorpay order identifier when present."
+              },
+              "invoiceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The associated Razorpay invoice identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The associated Razorpay invoice identifier when present."
+              },
+              "international": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Razorpay marks this payment as international."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether Razorpay marks this payment as international."
+              },
+              "method": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment method used for the transaction."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment method used for the transaction."
+              },
+              "amountRefunded": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The refunded amount in smallest currency subunits."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The refunded amount in smallest currency subunits."
+              },
+              "refundStatus": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The refund status returned by Razorpay when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The refund status returned by Razorpay when present."
+              },
+              "captured": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the payment has been captured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the payment has been captured."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment description when present."
+              },
+              "cardId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Razorpay card identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Razorpay card identifier when present."
+              },
+              "bank": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The issuing bank when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The issuing bank when present."
+              },
+              "wallet": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The wallet provider when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The wallet provider when present."
+              },
+              "vpa": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The UPI virtual payment address when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The UPI virtual payment address when present."
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer email when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer email when present."
+              },
+              "contact": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The customer contact number when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The customer contact number when present."
+              },
+              "notes": {
+                "description": "The notes payload returned by Razorpay."
+              },
+              "fee": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The fee charged by Razorpay when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The fee charged by Razorpay when present."
+              },
+              "tax": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The tax charged on the fee when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The tax charged on the fee when present."
+              },
+              "errorCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment error code when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment error code when present."
+              },
+              "errorDescription": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment error description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment error description when present."
+              },
+              "errorSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment error source when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment error source when present."
+              },
+              "errorStep": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment error step when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment error step when present."
+              },
+              "errorReason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment error reason when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment error reason when present."
+              },
+              "acquirerData": {
+                "description": "The dynamic acquirer data object returned by Razorpay."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The Unix timestamp when the payment was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Unix timestamp when the payment was created."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Razorpay payment payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Razorpay payment."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when fetching a Razorpay payment."
+      }
+    },
+    {
+      "id": "razorpay.list_orders",
+      "service": "razorpay",
+      "name": "list_orders",
+      "description": "List Razorpay orders with optional receipt, status-window, and expansion filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "authorized": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Filter orders by authorized payment state. Use 1 or 0."
+          },
+          "receipt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Filter orders by an exact receipt value.",
+            "pattern": "\\S"
+          },
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "to": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of orders to return. Razorpay allows up to 100."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of orders to skip for pagination."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "payments",
+                "payments.card",
+                "transfers",
+                "virtual_account"
+              ],
+              "description": "One supported Razorpay order expansion key."
+            },
+            "description": "Additional order sub-entities to expand in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Razorpay orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of orders returned in this response."
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the Razorpay order.",
+                  "pattern": "\\S"
+                },
+                "entity": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The entity type returned by Razorpay.",
+                  "pattern": "\\S"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The order amount in the smallest currency subunit."
+                },
+                "amountPaid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The amount paid against the order."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The amount paid against the order."
+                },
+                "amountDue": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The amount still due for the order."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The amount still due for the order."
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO currency code used for the order.",
+                  "pattern": "\\S"
+                },
+                "receipt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Your internal receipt reference when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Your internal receipt reference when present."
+                },
+                "offerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Razorpay offer identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Razorpay offer identifier when present."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The order status returned by Razorpay."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The order status returned by Razorpay."
+                },
+                "attempts": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of payment attempts recorded for the order."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of payment attempts recorded for the order."
+                },
+                "notes": {
+                  "description": "The notes payload returned by Razorpay."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Unix timestamp when the order was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Unix timestamp when the order was created."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Razorpay order payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Razorpay order."
+            },
+            "description": "The normalized Razorpay orders returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Razorpay collection payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Razorpay orders."
+      }
+    },
+    {
+      "id": "razorpay.list_payments",
+      "service": "razorpay",
+      "name": "list_payments",
+      "description": "List Razorpay payments within an optional time window and pagination range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "to": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "A Unix timestamp in seconds."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of payments to return. Razorpay allows up to 100."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of payments to skip for pagination."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Razorpay payments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of payments returned in this response."
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique identifier of the Razorpay payment.",
+                  "pattern": "\\S"
+                },
+                "entity": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The entity type returned by Razorpay.",
+                  "pattern": "\\S"
+                },
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The payment amount in the smallest currency subunit."
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO currency code used for the payment.",
+                  "pattern": "\\S"
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment status returned by Razorpay."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment status returned by Razorpay."
+                },
+                "orderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The associated Razorpay order identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The associated Razorpay order identifier when present."
+                },
+                "invoiceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The associated Razorpay invoice identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The associated Razorpay invoice identifier when present."
+                },
+                "international": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Razorpay marks this payment as international."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Razorpay marks this payment as international."
+                },
+                "method": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment method used for the transaction."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment method used for the transaction."
+                },
+                "amountRefunded": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The refunded amount in smallest currency subunits."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The refunded amount in smallest currency subunits."
+                },
+                "refundStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The refund status returned by Razorpay when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The refund status returned by Razorpay when present."
+                },
+                "captured": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the payment has been captured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the payment has been captured."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment description when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment description when present."
+                },
+                "cardId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Razorpay card identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Razorpay card identifier when present."
+                },
+                "bank": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The issuing bank when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The issuing bank when present."
+                },
+                "wallet": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The wallet provider when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The wallet provider when present."
+                },
+                "vpa": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The UPI virtual payment address when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The UPI virtual payment address when present."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer email when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer email when present."
+                },
+                "contact": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer contact number when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer contact number when present."
+                },
+                "notes": {
+                  "description": "The notes payload returned by Razorpay."
+                },
+                "fee": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The fee charged by Razorpay when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The fee charged by Razorpay when present."
+                },
+                "tax": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The tax charged on the fee when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The tax charged on the fee when present."
+                },
+                "errorCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment error code when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment error code when present."
+                },
+                "errorDescription": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment error description when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment error description when present."
+                },
+                "errorSource": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment error source when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment error source when present."
+                },
+                "errorStep": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment error step when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment error step when present."
+                },
+                "errorReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment error reason when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment error reason when present."
+                },
+                "acquirerData": {
+                  "description": "The dynamic acquirer data object returned by Razorpay."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The Unix timestamp when the payment was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Unix timestamp when the payment was created."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Razorpay payment payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Razorpay payment."
+            },
+            "description": "The normalized Razorpay payments returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Razorpay collection payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing Razorpay payments."
+      }
+    }
+  ]
+}

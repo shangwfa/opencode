@@ -1,0 +1,1007 @@
+{
+  "service": "eagle_doc",
+  "displayName": "Eagle Doc",
+  "categories": [
+    "AI",
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "EAGLE_DOC_API_KEY",
+      "description": "Eagle Doc API key sent with the api-key header. Subscribe and sign in to the Eagle Doc API dashboard to copy it."
+    }
+  ],
+  "homepageUrl": "https://www.eagle-doc.com/en/products/eagle-doc-apis/",
+  "actions": [
+    {
+      "id": "eagle_doc.get_current_usage",
+      "service": "eagle_doc",
+      "name": "get_current_usage",
+      "description": "Fetch the current billing-month usage counters for the connected Eagle Doc API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for the current usage endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currentMonth": {
+            "type": "string",
+            "description": "The current billing month in `YYYY-MM` format."
+          },
+          "contractQuota": {
+            "type": "integer",
+            "description": "The contract quota returned by Eagle Doc."
+          },
+          "quotaUsed": {
+            "type": "integer",
+            "description": "The number of processed pages used in the current month."
+          },
+          "overUsageAllowed": {
+            "type": "boolean",
+            "description": "Whether over-usage beyond the contract quota is allowed."
+          },
+          "hardLimit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The optional hard limit on processed pages for the current month."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional hard limit on processed pages for the current month."
+          },
+          "overUsage": {
+            "type": "integer",
+            "description": "The number of pages above the contract quota."
+          },
+          "pricePerPageOverUsage": {
+            "type": "number",
+            "description": "The price per page applied to over-usage when returned by Eagle Doc."
+          },
+          "overUsageCost": {
+            "type": "number",
+            "description": "The current over-usage cost calculated by Eagle Doc for this month."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Eagle Doc usage counters for the active billing month."
+      }
+    },
+    {
+      "id": "eagle_doc.get_quota",
+      "service": "eagle_doc",
+      "name": "get_quota",
+      "description": "Fetch the overall Eagle Doc management quota summary tied to the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for the management quota endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "quota": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The quota value returned by Eagle Doc when one is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The quota value returned by Eagle Doc when one is configured."
+          },
+          "quotaUsed": {
+            "type": "integer",
+            "description": "The number of processed pages counted against the quota."
+          },
+          "currentMonth": {
+            "type": "string",
+            "description": "The month identifier returned by Eagle Doc for the quota summary."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Eagle Doc management quota summary returned by the connector."
+      }
+    },
+    {
+      "id": "eagle_doc.list_monthly_usage",
+      "service": "eagle_doc",
+      "name": "list_monthly_usage",
+      "description": "List Eagle Doc monthly usage history together with pricing metadata for each month returned.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for the monthly usage history endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "quotaUsed": {
+                  "type": "integer",
+                  "description": "The number of processed pages used in that month."
+                },
+                "quotaDate": {
+                  "type": "string",
+                  "description": "The month identifier returned by Eagle Doc in `YYYY-MM` format."
+                },
+                "additionalInfo": {
+                  "type": "object",
+                  "properties": {
+                    "PricePerPageOverUsage": {
+                      "type": "number",
+                      "description": "The over-usage price per page when returned."
+                    },
+                    "ContractQuota": {
+                      "type": "integer",
+                      "description": "The contract quota for that month when returned."
+                    },
+                    "PricePerPage": {
+                      "type": "number",
+                      "description": "The in-contract price per page when returned."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Additional monthly pricing metadata returned by Eagle Doc."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Eagle Doc monthly usage row."
+            },
+            "description": "The monthly usage rows returned by Eagle Doc."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The monthly Eagle Doc usage history returned by the connector."
+      }
+    },
+    {
+      "id": "eagle_doc.list_usage_logs",
+      "service": "eagle_doc",
+      "name": "list_usage_logs",
+      "description": "List recent Eagle Doc request log rows with processed page counts and timestamps.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for the usage logs endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pages": {
+                  "type": "integer",
+                  "description": "The number of pages processed by that request."
+                },
+                "time": {
+                  "type": "string",
+                  "description": "The time when Eagle Doc finished processing the request."
+                },
+                "timeRequested": {
+                  "type": "string",
+                  "description": "The time when Eagle Doc received the request for processing."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Eagle Doc request log row."
+            },
+            "description": "The recent request log rows returned by Eagle Doc."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The recent Eagle Doc request logs returned by the connector."
+      }
+    },
+    {
+      "id": "eagle_doc.process_finance_document",
+      "service": "eagle_doc",
+      "name": "process_finance_document",
+      "description": "Upload one invoice, receipt, or PDF to Eagle Doc Finance OCR and return the structured extraction result.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentBase64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Base64-encoded content of the uploaded invoice, receipt, image, or PDF."
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name sent to Eagle Doc for the uploaded document."
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MIME type sent to Eagle Doc for the uploaded document."
+          },
+          "privacy": {
+            "type": "boolean",
+            "description": "Whether Eagle Doc should avoid storing the uploaded file on the server. Eagle Doc defaults this to true."
+          },
+          "polygon": {
+            "type": "boolean",
+            "description": "Whether Eagle Doc should include polygon coordinates for extracted fields."
+          },
+          "fullText": {
+            "type": "boolean",
+            "description": "Whether Eagle Doc should include the full OCR text grouped by page."
+          },
+          "signature": {
+            "type": "boolean",
+            "description": "Whether Eagle Doc should detect signatures inside the uploaded document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentBase64",
+          "fileName"
+        ],
+        "description": "Input parameters for processing one finance document with Eagle Doc."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "docType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The top-level document type returned by Eagle Doc."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The top-level document type returned by Eagle Doc."
+          },
+          "general": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "description": "The extracted field value returned by Eagle Doc."
+                    },
+                    "polygon": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "p1": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "description": "One polygon coordinate value."
+                              },
+                              "description": "The first polygon point as a `[x, y]` coordinate pair.",
+                              "minItems": 2,
+                              "maxItems": 2
+                            },
+                            "p2": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "description": "One polygon coordinate value."
+                              },
+                              "description": "The second polygon point as a `[x, y]` coordinate pair.",
+                              "minItems": 2,
+                              "maxItems": 2
+                            },
+                            "p3": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "description": "One polygon coordinate value."
+                              },
+                              "description": "The third polygon point as a `[x, y]` coordinate pair.",
+                              "minItems": 2,
+                              "maxItems": 2
+                            },
+                            "p4": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "description": "One polygon coordinate value."
+                              },
+                              "description": "The fourth polygon point as a `[x, y]` coordinate pair.",
+                              "minItems": 2,
+                              "maxItems": 2
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                    },
+                    "page": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The 1-based page number where Eagle Doc found this field when returned."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The 1-based page number where Eagle Doc found this field when returned."
+                    },
+                    "confidence": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The confidence score returned by Eagle Doc for this field when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The confidence score returned by Eagle Doc for this field when available."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One normalized Eagle Doc extracted field value."
+                },
+                "description": "The normalized `general` field collection returned by Eagle Doc."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The normalized `general` field collection returned by Eagle Doc."
+          },
+          "productItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "description": "The extracted field value returned by Eagle Doc."
+                  },
+                  "polygon": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "p1": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "description": "One polygon coordinate value."
+                            },
+                            "description": "The first polygon point as a `[x, y]` coordinate pair.",
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          "p2": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "description": "One polygon coordinate value."
+                            },
+                            "description": "The second polygon point as a `[x, y]` coordinate pair.",
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          "p3": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "description": "One polygon coordinate value."
+                            },
+                            "description": "The third polygon point as a `[x, y]` coordinate pair.",
+                            "minItems": 2,
+                            "maxItems": 2
+                          },
+                          "p4": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "description": "One polygon coordinate value."
+                            },
+                            "description": "The fourth polygon point as a `[x, y]` coordinate pair.",
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                  },
+                  "page": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The 1-based page number where Eagle Doc found this field when returned."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The 1-based page number where Eagle Doc found this field when returned."
+                  },
+                  "confidence": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The confidence score returned by Eagle Doc for this field when available."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The confidence score returned by Eagle Doc for this field when available."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "One normalized Eagle Doc extracted field value."
+              },
+              "description": "A keyed collection of extracted Eagle Doc fields normalized into `{ value, polygon, page, confidence }` objects."
+            },
+            "description": "The normalized product item rows returned by Eagle Doc."
+          },
+          "taxes": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "description": "The extracted field value returned by Eagle Doc."
+                      },
+                      "polygon": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "p1": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The first polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p2": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The second polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p3": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The third polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p4": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The fourth polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                      },
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The 1-based page number where Eagle Doc found this field when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The 1-based page number where Eagle Doc found this field when returned."
+                      },
+                      "confidence": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The confidence score returned by Eagle Doc for this field when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The confidence score returned by Eagle Doc for this field when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One normalized Eagle Doc extracted field value."
+                  },
+                  "description": "A keyed collection of extracted Eagle Doc fields normalized into `{ value, polygon, page, confidence }` objects."
+                },
+                "description": "The normalized tax summary rows returned by Eagle Doc."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The normalized tax summary rows returned by Eagle Doc."
+          },
+          "payments": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "description": "The extracted field value returned by Eagle Doc."
+                      },
+                      "polygon": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "p1": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The first polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p2": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The second polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p3": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The third polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p4": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The fourth polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                      },
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The 1-based page number where Eagle Doc found this field when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The 1-based page number where Eagle Doc found this field when returned."
+                      },
+                      "confidence": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The confidence score returned by Eagle Doc for this field when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The confidence score returned by Eagle Doc for this field when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One normalized Eagle Doc extracted field value."
+                  },
+                  "description": "A keyed collection of extracted Eagle Doc fields normalized into `{ value, polygon, page, confidence }` objects."
+                },
+                "description": "The normalized payment rows returned by Eagle Doc when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The normalized payment rows returned by Eagle Doc when present."
+          },
+          "paymentBanks": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "description": "The extracted field value returned by Eagle Doc."
+                      },
+                      "polygon": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "p1": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The first polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p2": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The second polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p3": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The third polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              },
+                              "p4": {
+                                "type": "array",
+                                "items": {
+                                  "type": "number",
+                                  "description": "One polygon coordinate value."
+                                },
+                                "description": "The fourth polygon point as a `[x, y]` coordinate pair.",
+                                "minItems": 2,
+                                "maxItems": 2
+                              }
+                            },
+                            "additionalProperties": false,
+                            "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The polygon coordinates returned for the extracted field when polygon mode is enabled."
+                      },
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The 1-based page number where Eagle Doc found this field when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The 1-based page number where Eagle Doc found this field when returned."
+                      },
+                      "confidence": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The confidence score returned by Eagle Doc for this field when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The confidence score returned by Eagle Doc for this field when available."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "One normalized Eagle Doc extracted field value."
+                  },
+                  "description": "A keyed collection of extracted Eagle Doc fields normalized into `{ value, polygon, page, confidence }` objects."
+                },
+                "description": "The normalized bank payment rows returned by Eagle Doc when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The normalized bank payment rows returned by Eagle Doc when present."
+          },
+          "signatures": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "image": {
+                      "type": "string",
+                      "description": "The Base64-encoded signature image when returned."
+                    },
+                    "binary": {
+                      "type": "string",
+                      "description": "The Base64-encoded binary signature image when returned."
+                    },
+                    "boundingBox": {
+                      "type": "array",
+                      "items": {
+                        "type": "number",
+                        "description": "One bounding box coordinate."
+                      },
+                      "description": "The signature bounding box as `[left, top, right, bottom]` coordinates when returned.",
+                      "minItems": 4,
+                      "maxItems": 4
+                    },
+                    "page": {
+                      "type": "integer",
+                      "description": "The 1-based page number where the signature was detected."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One signature object returned by Eagle Doc when `signature=true` is requested."
+                },
+                "description": "The signature objects returned by Eagle Doc when `signature=true` is enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signature objects returned by Eagle Doc when `signature=true` is enabled."
+          },
+          "signatureImages": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "description": "One signature image payload returned by Eagle Doc."
+                },
+                "description": "The additional signature image payloads returned by Eagle Doc when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The additional signature image payloads returned by Eagle Doc when present."
+          },
+          "qrCodes": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One QR code object returned by Eagle Doc."
+                },
+                "description": "The QR code objects returned by Eagle Doc when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The QR code objects returned by Eagle Doc when present."
+          },
+          "performanceOption": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Eagle Doc processing mode such as `ACCURACY` or `FALLBACK`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Eagle Doc processing mode such as `ACCURACY` or `FALLBACK`."
+          },
+          "fileHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MD5 hash returned by Eagle Doc for the uploaded file."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MD5 hash returned by Eagle Doc for the uploaded file."
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Eagle Doc algorithm version used for the extraction."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Eagle Doc algorithm version used for the extraction."
+          },
+          "numberOfPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The number of pages Eagle Doc processed for the uploaded document."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of pages Eagle Doc processed for the uploaded document."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "number",
+                  "description": "The page width returned by Eagle Doc."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The page height returned by Eagle Doc."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The width and height of one processed page."
+            },
+            "description": "The processed page size metadata returned by Eagle Doc."
+          },
+          "fullText": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One OCR text line."
+                  },
+                  "description": "The OCR text lines returned for one page."
+                },
+                "description": "The page-grouped OCR text returned when `fullText=true` is requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The page-grouped OCR text returned when `fullText=true` is requested."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One detected language code."
+            },
+            "description": "The language codes Eagle Doc detected in the document."
+          },
+          "mainLanguage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The primary language code Eagle Doc detected in the document."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The primary language code Eagle Doc detected in the document."
+          },
+          "templateId": {
+            "anyOf": [
+              {
+                "description": "The template identifier returned by Eagle Doc when present."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The template identifier returned by Eagle Doc when present."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Eagle Doc finance OCR result."
+      }
+    }
+  ]
+}

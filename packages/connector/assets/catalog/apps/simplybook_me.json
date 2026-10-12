@@ -1,0 +1,320 @@
+{
+  "service": "simplybook_me",
+  "displayName": "SimplyBook.me",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "simplybook_me_api_key",
+      "description": "SimplyBook.me API key used with the company login to request JSON-RPC access tokens. Enable the API Custom Feature and find keys in its Settings: https://help.simplybook.me/index.php/API_custom_feature.",
+      "extraFields": [
+        {
+          "key": "companyLogin",
+          "label": "Company Login",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-company-login",
+          "description": "The SimplyBook.me company login passed to getToken and X-Company-Login for API calls."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://simplybook.me/",
+  "actions": [
+    {
+      "id": "simplybook_me.get_available_units",
+      "service": "simplybook_me",
+      "name": "get_available_units",
+      "description": "Get performer ids available for a SimplyBook.me service at a specific date-time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The SimplyBook.me service event id."
+          },
+          "dateTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The requested date and time in YYYY-MM-DD HH:mm:ss format."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The booking count used for availability checks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceId",
+          "dateTime"
+        ],
+        "description": "Input for finding performers available for one service and date-time."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "performerIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "A SimplyBook.me performer unit id."
+            },
+            "description": "Performer unit ids available for the requested slot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "performerIds"
+        ],
+        "description": "The SimplyBook.me available units response."
+      }
+    },
+    {
+      "id": "simplybook_me.get_company_info",
+      "service": "simplybook_me",
+      "name": "get_company_info",
+      "description": "Get public company profile and configuration details from SimplyBook.me.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for fetching SimplyBook.me company information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The company name returned by SimplyBook.me."
+              },
+              "login": {
+                "type": "string",
+                "description": "The company login returned by SimplyBook.me."
+              },
+              "email": {
+                "type": "string",
+                "description": "The company email returned by SimplyBook.me."
+              },
+              "timezone": {
+                "type": "string",
+                "description": "The company timezone returned by SimplyBook.me."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The SimplyBook.me company information object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company"
+        ],
+        "description": "The SimplyBook.me company information response."
+      }
+    },
+    {
+      "id": "simplybook_me.get_start_time_matrix",
+      "service": "simplybook_me",
+      "name": "get_start_time_matrix",
+      "description": "Get available SimplyBook.me start times for a service and performer over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "The first date to include in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "The last date to include in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "serviceId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The SimplyBook.me service event id."
+          },
+          "performerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The SimplyBook.me performer unit id."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The booking count used for availability checks."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "serviceId",
+          "performerId"
+        ],
+        "description": "Input for querying available start times for one service and performer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timesByDate": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "A start time in HH:mm:ss format."
+              },
+              "description": "Start times returned for the date."
+            },
+            "description": "Available start times keyed by date."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timesByDate"
+        ],
+        "description": "The SimplyBook.me start time matrix response."
+      }
+    },
+    {
+      "id": "simplybook_me.list_performers",
+      "service": "simplybook_me",
+      "name": "list_performers",
+      "description": "List SimplyBook.me service performers that can provide services.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isVisibleOnly": {
+            "type": "boolean",
+            "description": "Whether to return only records visible on the public booking site."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for listing public SimplyBook.me records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "performers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The performer unit id returned by SimplyBook.me."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The performer name returned by SimplyBook.me."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The performer email returned by SimplyBook.me."
+                },
+                "is_active": {
+                  "type": "string",
+                  "description": "Whether the performer is active in SimplyBook.me."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A SimplyBook.me performer unit object."
+            },
+            "description": "Performers returned by SimplyBook.me."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "performers"
+        ],
+        "description": "The SimplyBook.me performer list response."
+      }
+    },
+    {
+      "id": "simplybook_me.list_services",
+      "service": "simplybook_me",
+      "name": "list_services",
+      "description": "List SimplyBook.me public service events available for booking.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "isVisibleOnly": {
+            "type": "boolean",
+            "description": "Whether to return only records visible on the public booking site."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for listing public SimplyBook.me records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The service event id returned by SimplyBook.me."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The service name returned by SimplyBook.me."
+                },
+                "duration": {
+                  "type": "string",
+                  "description": "The service duration returned by SimplyBook.me."
+                },
+                "is_public": {
+                  "type": "string",
+                  "description": "Whether the service is public in SimplyBook.me."
+                },
+                "is_active": {
+                  "type": "string",
+                  "description": "Whether the service is active in SimplyBook.me."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A SimplyBook.me service event object."
+            },
+            "description": "Service events returned by SimplyBook.me."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "services"
+        ],
+        "description": "The SimplyBook.me service list response."
+      }
+    }
+  ]
+}

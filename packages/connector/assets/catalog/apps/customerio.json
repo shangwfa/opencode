@@ -1,0 +1,489 @@
+{
+  "service": "customerio",
+  "displayName": "Customer.io",
+  "categories": [
+    "Marketing",
+    "Communication",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "siteId",
+          "label": "Site ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "CUSTOMERIO_SITE_ID",
+          "description": "Customer.io Track API Site ID used as the Basic Auth username. Find it on the Track API Keys page: https://fly.customer.io/settings/api_credentials."
+        },
+        {
+          "key": "apiKey",
+          "label": "Track API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "CUSTOMERIO_TRACK_API_KEY",
+          "description": "Customer.io Track API key used as the Basic Auth password. Create or view it on the Track API Keys page: https://fly.customer.io/settings/api_credentials."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://customer.io/",
+  "actions": [
+    {
+      "id": "customerio.delete_customer",
+      "service": "customerio",
+      "name": "delete_customer",
+      "description": "Delete a Customer.io person and their information through the Track API.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io person identifier in the path. Use the person's id, email address, or cio_id value with the cio_ prefix.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The input payload for deleting a Customer.io person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.identify_customer",
+      "service": "customerio",
+      "name": "identify_customer",
+      "description": "Add or update a Customer.io person through the Track API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io person identifier in the path. Use the person's id, email address, or cio_id value with the cio_ prefix.",
+            "pattern": "\\S"
+          },
+          "attributes": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Customer.io id attribute to assign to the person."
+              },
+              "email": {
+                "type": "string",
+                "description": "The Customer.io email attribute to assign to the person.",
+                "format": "email"
+              },
+              "anonymous_id": {
+                "type": "string",
+                "description": "The anonymous identifier to associate with the person."
+              },
+              "created_at": {
+                "type": "integer",
+                "description": "The Unix timestamp when the person was created."
+              },
+              "_timestamp": {
+                "type": "integer",
+                "description": "The Unix timestamp for when this attribute update occurred."
+              },
+              "_update": {
+                "type": "boolean",
+                "description": "Whether Customer.io should only update an existing person instead of creating a new one."
+              },
+              "unsubscribed": {
+                "type": "boolean",
+                "description": "Whether the person is unsubscribed from all messages."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Customer.io profile attributes to assign to the person."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "attributes"
+        ],
+        "description": "The input payload for identifying a Customer.io person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.merge_customers",
+      "service": "customerio",
+      "name": "merge_customers",
+      "description": "Merge two Customer.io people, keeping the primary profile and deleting the secondary profile.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "primary": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Customer.io person id.",
+                "pattern": "\\S"
+              },
+              "email": {
+                "type": "string",
+                "description": "The Customer.io person email address.",
+                "format": "email"
+              },
+              "cio_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Customer.io cio_id value with the cio_ prefix.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Customer.io person reference identified by exactly one of id, email, or cio_id."
+          },
+          "secondary": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Customer.io person id.",
+                "pattern": "\\S"
+              },
+              "email": {
+                "type": "string",
+                "description": "The Customer.io person email address.",
+                "format": "email"
+              },
+              "cio_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Customer.io cio_id value with the cio_ prefix.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Customer.io person reference identified by exactly one of id, email, or cio_id."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "primary",
+          "secondary"
+        ],
+        "description": "The input payload for merging two Customer.io people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.suppress_customer",
+      "service": "customerio",
+      "name": "suppress_customer",
+      "description": "Delete and suppress a Customer.io person identifier so it cannot be re-added until unsuppressed.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io person identifier in the path. Use the person's id, email address, or cio_id value with the cio_ prefix.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The input payload for suppressing a Customer.io person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.track_anonymous_event",
+      "service": "customerio",
+      "name": "track_anonymous_event",
+      "description": "Track an event for an anonymous person in Customer.io.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "anonymousId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io anonymous_id value for the event.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io event name.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "event",
+              "page",
+              "screen"
+            ],
+            "description": "The Customer.io event type. Use event for standard events, page for page views, or screen for mobile screen views."
+          },
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Customer.io dedupe id for the event.",
+            "pattern": "\\S"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Unix timestamp when the event occurred."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recipient": {
+                "type": "string",
+                "description": "The recipient value used by Customer.io message trigger overrides."
+              },
+              "from_address": {
+                "type": "string",
+                "description": "The from_address value used by Customer.io message trigger overrides."
+              },
+              "reply_to": {
+                "type": "string",
+                "description": "The reply_to value used by Customer.io message trigger overrides."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Additional Customer.io event data for Liquid merge fields, campaign triggers, or attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anonymousId",
+          "name"
+        ],
+        "description": "The input payload for tracking an anonymous Customer.io event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.track_customer_event",
+      "service": "customerio",
+      "name": "track_customer_event",
+      "description": "Track an event associated with an identified Customer.io person.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io person identifier in the path. Use the person's id, email address, or cio_id value with the cio_ prefix.",
+            "pattern": "\\S"
+          },
+          "anonymousId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io anonymous_id value required by Customer.io for screen events.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io event name.",
+            "pattern": "\\S"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "event",
+              "page",
+              "screen"
+            ],
+            "description": "The Customer.io event type. Use event for standard events, page for page views, or screen for mobile screen views."
+          },
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Customer.io dedupe id for the event.",
+            "pattern": "\\S"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Unix timestamp when the event occurred."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recipient": {
+                "type": "string",
+                "description": "The recipient value used by Customer.io message trigger overrides."
+              },
+              "from_address": {
+                "type": "string",
+                "description": "The from_address value used by Customer.io message trigger overrides."
+              },
+              "reply_to": {
+                "type": "string",
+                "description": "The reply_to value used by Customer.io message trigger overrides."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Additional Customer.io event data for Liquid merge fields, campaign triggers, or attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier",
+          "name"
+        ],
+        "description": "The input payload for tracking an event for a Customer.io person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    },
+    {
+      "id": "customerio.unsuppress_customer",
+      "service": "customerio",
+      "name": "unsuppress_customer",
+      "description": "Unsuppress a Customer.io person identifier so a new profile can be created later.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Customer.io person identifier in the path. Use the person's id, email address, or cio_id value with the cio_ prefix.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "identifier"
+        ],
+        "description": "The input payload for unsuppressing a Customer.io person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Customer.io accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The Customer.io Track API acknowledgement."
+      }
+    }
+  ]
+}

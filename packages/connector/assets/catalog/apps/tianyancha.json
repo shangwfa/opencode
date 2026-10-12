@@ -1,0 +1,1620 @@
+{
+  "service": "tianyancha",
+  "displayName": "Tianyancha",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "TIANYANCHA_API_TOKEN",
+      "description": "Tianyancha API token sent with the Authorization header. Obtain it from Data Center > My APIs: https://open.tianyancha.com/"
+    }
+  ],
+  "homepageUrl": "https://www.tianyancha.com/data",
+  "actions": [
+    {
+      "id": "tianyancha.find_company_relationship_paths",
+      "service": "tianyancha",
+      "name": "find_company_relationship_paths",
+      "description": "Find the shortest ownership, employment, legal, business, or historical relationship paths between two companies.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceCompanyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact source company name.",
+            "pattern": "\\S"
+          },
+          "sourceCompanyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Tianyancha source company ID."
+          },
+          "targetCompanyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact target company name.",
+            "pattern": "\\S"
+          },
+          "targetCompanyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Tianyancha target company ID."
+          },
+          "relationshipTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "legal_representative",
+                "employment",
+                "investment",
+                "branch",
+                "legal",
+                "pledge_and_mortgage",
+                "business_cooperation",
+                "shared_contact",
+                "historical_shareholder",
+                "historical_employment",
+                "historical_legal_representative",
+                "all"
+              ],
+              "description": "A relationship category."
+            },
+            "description": "The relationship categories to search. Omit this field to use Tianyancha's default categories.",
+            "minItems": 1
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The maximum relationship search depth. Defaults to 2."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for finding Tianyancha relationship paths between two companies.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "sourceCompanyName"
+                ]
+              },
+              {
+                "required": [
+                  "sourceCompanyId"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "targetCompanyName"
+                ]
+              },
+              {
+                "required": [
+                  "targetCompanyId"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "hasRelationship": {
+            "type": "boolean",
+            "description": "Whether Tianyancha found at least one relationship path."
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The shortest relationship paths returned by Tianyancha."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company relationship-path result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_actual_control",
+      "service": "tianyancha",
+      "name": "get_company_actual_control",
+      "description": "Get a company's suspected actual controllers, ownership ratios, and control paths from Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha actual-control data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "controllers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The suspected actual controllers returned by Tianyancha."
+          },
+          "paths": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The provider-defined ownership paths keyed by Tianyancha path ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha suspected actual-control result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_annual_reports",
+      "service": "tianyancha",
+      "name": "get_company_annual_reports",
+      "description": "Get a company's annual reports, including disclosed financial, shareholder, investment, and social security information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "year": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The report year to retrieve. Omit it to retrieve every available year.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for retrieving Tianyancha company annual reports."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "annualReports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The annual report records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of annual reports returned by Tianyancha."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company annual report result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_basic_info",
+      "service": "tianyancha",
+      "name": "get_company_basic_info",
+      "description": "Get Tianyancha company registration details by company identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha company details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company details result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_contact_info",
+      "service": "tianyancha",
+      "name": "get_company_contact_info",
+      "description": "Get a company's phone numbers, email addresses, websites, and registered address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha company contact details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company contact result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_development_info",
+      "service": "tianyancha",
+      "name": "get_company_development_info",
+      "description": "Get a company's core team, products, financing history, investment events, competitors, and investment institutions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha company development data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "development": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The combined Tianyancha company development result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_intellectual_property",
+      "service": "tianyancha",
+      "name": "get_company_intellectual_property",
+      "description": "Get a company's trademarks, patents, software copyrights, works copyrights, and ICP registrations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha company intellectual property."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "intellectualProperty": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The combined Tianyancha company intellectual-property result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_judicial_risk",
+      "service": "tianyancha",
+      "name": "get_company_judicial_risk",
+      "description": "Get a company's combined legal cases, hearings, court notices, enforcement, dishonesty, filing, and service-announcement data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha judicial risk data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "judicialRisk": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A payload returned by Tianyancha. Available fields depend on the purchased API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The combined Tianyancha judicial risk result."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_risk",
+      "service": "tianyancha",
+      "name": "get_company_risk",
+      "description": "Get a company's Tianyancha risk summary, including own, related, historical, and alert risks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving Tianyancha company risks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "riskLevel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The overall risk level returned by Tianyancha."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The overall risk level returned by Tianyancha."
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Tianyancha risk group with its nested risk categories and entries."
+            },
+            "description": "Risk groups returned by Tianyancha."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company risk summary."
+      }
+    },
+    {
+      "id": "tianyancha.get_company_risk_detail",
+      "service": "tianyancha",
+      "name": "get_company_risk_detail",
+      "description": "Get one page of detailed Tianyancha risk records using a risk ID and type from get_company_risk.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "riskId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The risk ID returned by get_company_risk."
+          },
+          "riskType": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Tianyancha risk type code returned by get_company_risk."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "riskId",
+          "riskType"
+        ],
+        "description": "The input payload for retrieving Tianyancha company risk details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "riskType": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Tianyancha risk type code."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The detailed risk records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of detailed risk records."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The returned one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha company risk detail result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_branches",
+      "service": "tianyancha",
+      "name": "list_company_branches",
+      "description": "List a company's branch organizations and their registration details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company branches."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The company branch records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha branches result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_changes",
+      "service": "tianyancha",
+      "name": "list_company_changes",
+      "description": "List a company's registration changes, including before and after values.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company registration changes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The company registration change records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha changes result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_equity_changes",
+      "service": "tianyancha",
+      "name": "list_company_equity_changes",
+      "description": "List a company's disclosed equity changes, including shareholders before and after each change.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "equityChanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The disclosed equity change records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha equityChanges result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_historical_investments",
+      "service": "tianyancha",
+      "name": "list_company_historical_investments",
+      "description": "List companies previously invested in by a company using Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "historicalInvestments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The historical outbound investment records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha historicalInvestments result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_historical_shareholders",
+      "service": "tianyancha",
+      "name": "list_company_historical_shareholders",
+      "description": "List a company's historical shareholders, ownership ratios, and subscribed capital from Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "historicalShareholders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The historical shareholder records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha historicalShareholders result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_investments",
+      "service": "tianyancha",
+      "name": "list_company_investments",
+      "description": "List companies directly invested in by a company using Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company investments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "investments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The directly invested company records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha investments result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_key_personnel",
+      "service": "tianyancha",
+      "name": "list_company_key_personnel",
+      "description": "List a company's directors, supervisors, and senior managers from Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company key personnel."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "personnel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The directors, supervisors, and senior managers returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha personnel result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_news",
+      "service": "tianyancha",
+      "name": "list_company_news",
+      "description": "List Tianyancha news for an exact company, optionally filtered by publication date and tags.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact company name.",
+            "pattern": "\\S"
+          },
+          "companyId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Tianyancha company ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The earliest publication date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The latest publication date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A Tianyancha news tag."
+            },
+            "description": "The Tianyancha news tags to include.",
+            "minItems": 1
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Tianyancha company news.",
+        "anyOf": [
+          {
+            "required": [
+              "companyName"
+            ]
+          },
+          {
+            "required": [
+              "companyId"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "news": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The company news records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha news result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_shareholders",
+      "service": "tianyancha",
+      "name": "list_company_shareholders",
+      "description": "List a company's shareholders and contribution details from Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          },
+          "source": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "The shareholder data source: 1 for business registration or 2 for the latest public filing. Defaults to 1."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company shareholders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shareholders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The shareholder and contribution records returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha shareholders result."
+      }
+    },
+    {
+      "id": "tianyancha.list_company_ultimate_beneficiaries",
+      "service": "tianyancha",
+      "name": "list_company_ultimate_beneficiaries",
+      "description": "List a company's ultimate beneficiaries, ownership percentages, and ownership chains from Tianyancha.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A company name, Tianyancha company ID, registration number, or unified social credit code.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for listing Tianyancha company ultimate beneficiaries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "beneficiaries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The ultimate beneficiary records and ownership chains returned by Tianyancha."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha beneficiaries result."
+      }
+    },
+    {
+      "id": "tianyancha.search_companies",
+      "service": "tianyancha",
+      "name": "search_companies",
+      "description": "Search Tianyancha for companies by keyword and return matching company records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company search keyword.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for searching companies with Tianyancha."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The company records matching the search keyword."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha companies result."
+      }
+    },
+    {
+      "id": "tianyancha.search_companies_advanced",
+      "service": "tianyancha",
+      "name": "search_companies_advanced",
+      "description": "Search Tianyancha for companies by keyword, industry, and region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The company search keyword.",
+            "pattern": "\\S"
+          },
+          "industryCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GB/T 4754-2017 industry code used to filter companies.",
+            "pattern": "\\S"
+          },
+          "areaCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tianyancha administrative area code used to filter companies.",
+            "pattern": "\\S"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for an advanced Tianyancha company search."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The companies matching the search filters."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha companies result."
+      }
+    },
+    {
+      "id": "tianyancha.search_tenders",
+      "service": "tianyancha",
+      "name": "search_tenders",
+      "description": "Search Tianyancha tender and bid notices by keyword, participant role, notice type, province, and publication date.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A keyword matched against titles, purchasers, or suppliers.",
+            "pattern": "\\S"
+          },
+          "searchTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "purchaser",
+                "supplier"
+              ],
+              "description": "A tender search field."
+            },
+            "description": "The fields to search. Omit this field to use Tianyancha's default.",
+            "minItems": 1
+          },
+          "noticeType": {
+            "type": "string",
+            "enum": [
+              "forecast",
+              "announcement",
+              "result"
+            ],
+            "description": "The tender notice type to include."
+          },
+          "province": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The province used to filter results.",
+            "pattern": "\\S"
+          },
+          "publishStartDate": {
+            "type": "string",
+            "description": "The earliest publication date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "publishEndDate": {
+            "type": "string",
+            "description": "The latest publication date to include, in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number. Defaults to 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of records per page. Defaults to 20 and cannot exceed 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ],
+        "description": "The input payload for searching Tianyancha tender and bid notices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tenders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A record returned by Tianyancha. Available fields depend on the purchased API."
+            },
+            "description": "The tender and bid notices matching the search filters."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records reported by Tianyancha."
+          },
+          "pageNum": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of records per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Tianyancha tenders result."
+      }
+    },
+    {
+      "id": "tianyancha.verify_company_identity",
+      "service": "tianyancha",
+      "name": "verify_company_identity",
+      "description": "Verify that a company name, legal representative, and registration code identify the same company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact company name to verify.",
+            "pattern": "\\S"
+          },
+          "legalPersonName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The legal representative name to verify.",
+            "pattern": "\\S"
+          },
+          "registrationCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unified social credit code, registration number, or organization code to verify.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for verifying a Tianyancha company identity."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matchStatus": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "The match status: 0 for no match, 1 for a full match, or 2 when the company name may be a former name and the other fields match."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The match status: 0 for no match, 1 for a full match, or 2 when the company name may be a former name and the other fields match."
+          },
+          "remark": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The verification explanation returned by Tianyancha."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The verification explanation returned by Tianyancha."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tianyancha company identity verification result."
+      }
+    }
+  ]
+}

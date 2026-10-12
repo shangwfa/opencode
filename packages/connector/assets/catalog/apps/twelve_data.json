@@ -1,0 +1,1230 @@
+{
+  "service": "twelve_data",
+  "displayName": "Twelve Data",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TWELVE_DATA_API_KEY",
+      "description": "Twelve Data API key used with the Authorization: apikey header. Sign up and find it in your Twelve Data dashboard as described at https://twelvedata.com/docs.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://twelvedata.com",
+  "actions": [
+    {
+      "id": "twelve_data.earliest_timestamp",
+      "service": "twelve_data",
+      "name": "earliest_timestamp",
+      "description": "Fetch the earliest available historical timestamp for an instrument at a given interval.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "interval": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The interval between two consecutive time-series points."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) of the exchange."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The output timezone, such as Exchange, UTC, or an IANA timezone name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "interval"
+        ],
+        "description": "Input parameters for querying the earliest available timestamp. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datetime": {
+            "type": "string",
+            "description": "The earliest available datetime for the instrument."
+          },
+          "unixTime": {
+            "type": "integer",
+            "description": "The earliest datetime converted to Unix time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datetime",
+          "unixTime"
+        ],
+        "description": "The earliest available timestamp for the requested instrument."
+      }
+    },
+    {
+      "id": "twelve_data.eod",
+      "service": "twelve_data",
+      "name": "eod",
+      "description": "Fetch the end-of-day close price for a specific instrument.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) under ISO 10383."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class of the instrument."
+          },
+          "prepost": {
+            "type": "boolean",
+            "description": "Whether to include pre-market and post-market data when supported."
+          },
+          "dp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11,
+            "description": "The number of decimal places for floating values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching the latest price of an instrument. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The instrument symbol."
+          },
+          "exchange": {
+            "type": "string",
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "description": "The Market Identifier Code (MIC) of the exchange."
+          },
+          "currency": {
+            "type": "string",
+            "description": "The trading currency of the instrument."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "The end-of-day datetime returned by Twelve Data."
+          },
+          "close": {
+            "type": "string",
+            "description": "The end-of-day close price."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "exchange",
+          "datetime",
+          "close"
+        ],
+        "description": "The end-of-day close snapshot."
+      }
+    },
+    {
+      "id": "twelve_data.exchanges",
+      "service": "twelve_data",
+      "name": "exchanges",
+      "description": "List equity exchanges and their timezone and access metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class to filter exchanges by."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange name to filter by."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) to filter by."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country name or alpha code to filter exchanges by."
+          },
+          "showPlan": {
+            "type": "boolean",
+            "description": "Whether to include plan availability metadata for each exchange."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying the exchanges catalog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A single exchange catalog entry."
+            },
+            "description": "The matching exchanges."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The exchanges catalog response."
+      }
+    },
+    {
+      "id": "twelve_data.forex_pairs",
+      "service": "twelve_data",
+      "name": "forex_pairs",
+      "description": "List available forex pairs with base and quote currency metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The forex pair symbol to filter by."
+          },
+          "currencyBase": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base currency code to filter by."
+          },
+          "currencyQuote": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The quote currency code to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying the forex pairs catalog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A single forex pair catalog entry."
+            },
+            "description": "The matching forex pairs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The forex pairs catalog response."
+      }
+    },
+    {
+      "id": "twelve_data.market_movers",
+      "service": "twelve_data",
+      "name": "market_movers",
+      "description": "Fetch the top gaining or losing instruments for a market family such as stocks, forex, or crypto.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "market": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The market family, such as stocks, forex, or crypto."
+          },
+          "direction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The direction of the snapshot, such as gainers or losers."
+          },
+          "outputSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of market mover rows to return."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country name or alpha code, applicable to non-currency markets."
+          },
+          "priceGreaterThan": {
+            "type": "number",
+            "description": "A minimum last price threshold for returned instruments."
+          },
+          "dp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11,
+            "description": "The number of decimal places for floating values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "market"
+        ],
+        "description": "Input parameters for fetching current market movers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A single market mover entry."
+            },
+            "description": "The ranked market mover rows."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "values"
+        ],
+        "description": "The market movers response."
+      }
+    },
+    {
+      "id": "twelve_data.market_state",
+      "service": "twelve_data",
+      "name": "market_state",
+      "description": "List the current open or closed state of exchanges together with timing data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange name to filter by."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) to filter by."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country name or alpha code to filter exchanges by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying current market state."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The exchange name."
+            },
+            "code": {
+              "type": "string",
+              "description": "The Market Identifier Code (MIC) of the exchange."
+            },
+            "country": {
+              "type": "string",
+              "description": "The country where the exchange is located."
+            },
+            "isMarketOpen": {
+              "type": "boolean",
+              "description": "Whether the exchange is currently open."
+            },
+            "timeAfterOpen": {
+              "type": "string",
+              "description": "The elapsed time since the market opened."
+            },
+            "timeToOpen": {
+              "type": "string",
+              "description": "The remaining time until the market opens."
+            },
+            "timeToClose": {
+              "type": "string",
+              "description": "The remaining time until the market closes."
+            }
+          },
+          "additionalProperties": false,
+          "description": "A single market state row."
+        },
+        "description": "The current market state response."
+      }
+    },
+    {
+      "id": "twelve_data.price",
+      "service": "twelve_data",
+      "name": "price",
+      "description": "Fetch the latest available market price for a specific instrument.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) under ISO 10383."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class of the instrument."
+          },
+          "prepost": {
+            "type": "boolean",
+            "description": "Whether to include pre-market and post-market data when supported."
+          },
+          "dp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11,
+            "description": "The number of decimal places for floating values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching the latest price of an instrument. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "string",
+            "description": "The latest available price for the instrument."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "price"
+        ],
+        "description": "The latest price response."
+      }
+    },
+    {
+      "id": "twelve_data.profile",
+      "service": "twelve_data",
+      "name": "profile",
+      "description": "Fetch the company profile for an instrument, including sector and contact fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) of the exchange."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching a company profile. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The ticker symbol of the company."
+          },
+          "name": {
+            "type": "string",
+            "description": "The company name."
+          },
+          "exchange": {
+            "type": "string",
+            "description": "The exchange where the company is listed."
+          },
+          "micCode": {
+            "type": "string",
+            "description": "The Market Identifier Code (MIC) of the exchange."
+          },
+          "sector": {
+            "type": "string",
+            "description": "The sector where the company operates."
+          },
+          "industry": {
+            "type": "string",
+            "description": "The industry where the company operates."
+          },
+          "employees": {
+            "type": "integer",
+            "description": "The number of company employees."
+          },
+          "website": {
+            "type": "string",
+            "description": "The company website."
+          },
+          "description": {
+            "type": "string",
+            "description": "The business description of the company."
+          },
+          "type": {
+            "type": "string",
+            "description": "The issue type of the stock."
+          },
+          "ceo": {
+            "type": "string",
+            "description": "The chief executive officer of the company."
+          },
+          "address": {
+            "type": "string",
+            "description": "The primary street address of the company."
+          },
+          "address2": {
+            "type": "string",
+            "description": "The secondary address line of the company."
+          },
+          "city": {
+            "type": "string",
+            "description": "The city of the company headquarters."
+          },
+          "zip": {
+            "type": "string",
+            "description": "The postal code of the company headquarters."
+          },
+          "state": {
+            "type": "string",
+            "description": "The state of the company headquarters."
+          },
+          "country": {
+            "type": "string",
+            "description": "The country of the company headquarters."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The public phone number of the company."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "name",
+          "exchange"
+        ],
+        "description": "The company profile returned by Twelve Data."
+      }
+    },
+    {
+      "id": "twelve_data.quote",
+      "service": "twelve_data",
+      "name": "quote",
+      "description": "Fetch a real-time quote snapshot with price, change, volume, and 52-week range fields.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) under ISO 10383."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class of the instrument."
+          },
+          "interval": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The interval of the quote."
+          },
+          "volumeTimePeriod": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of periods used to calculate the average volume."
+          },
+          "prepost": {
+            "type": "boolean",
+            "description": "Whether to include pre-market and post-market data when supported."
+          },
+          "eod": {
+            "type": "boolean",
+            "description": "Whether to return the quote for the closed day."
+          },
+          "rollingPeriod": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "The number of hours used to calculate rolling change."
+          },
+          "dp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11,
+            "description": "The number of decimal places for floating values."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The output timezone, such as Exchange, UTC, or an IANA timezone name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for fetching a real-time quote snapshot. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The instrument symbol."
+          },
+          "name": {
+            "type": "string",
+            "description": "The instrument name."
+          },
+          "exchange": {
+            "type": "string",
+            "description": "The exchange where the instrument is traded."
+          },
+          "datetime": {
+            "type": "string",
+            "description": "The datetime of the quote in the requested timezone."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Unix timestamp of the returned bar."
+          },
+          "open": {
+            "type": "string",
+            "description": "The opening price of the returned bar."
+          },
+          "high": {
+            "type": "string",
+            "description": "The highest price of the returned bar."
+          },
+          "low": {
+            "type": "string",
+            "description": "The lowest price of the returned bar."
+          },
+          "close": {
+            "type": "string",
+            "description": "The closing price of the returned bar."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "symbol",
+          "name",
+          "exchange",
+          "datetime",
+          "timestamp",
+          "open",
+          "high",
+          "low",
+          "close"
+        ],
+        "description": "The latest quote snapshot for the requested instrument."
+      }
+    },
+    {
+      "id": "twelve_data.stocks",
+      "service": "twelve_data",
+      "name": "stocks",
+      "description": "List stock symbols and metadata from the Twelve Data stock catalog with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) under ISO 10383."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class of the instrument."
+          },
+          "cik": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CIK identifier of the instrument."
+          },
+          "showPlan": {
+            "type": "boolean",
+            "description": "Whether to include plan availability metadata for each stock."
+          },
+          "includeDelisted": {
+            "type": "boolean",
+            "description": "Whether to include delisted identifiers."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying the stock symbol catalog."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A single stock catalog entry."
+            },
+            "description": "The matching stock catalog entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The stock catalog response."
+      }
+    },
+    {
+      "id": "twelve_data.symbol_search",
+      "service": "twelve_data",
+      "name": "symbol_search",
+      "description": "Search financial instruments by symbol or name and return the most relevant matches.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The text to search, such as a symbol, ISIN, FIGI, or a partial instrument name."
+          },
+          "outputSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 120,
+            "description": "The maximum number of matches to return."
+          },
+          "showPlan": {
+            "type": "boolean",
+            "description": "Whether to include plan availability metadata for each matching instrument."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Input parameters for searching symbols."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "description": "The matched instrument symbol."
+                },
+                "instrumentName": {
+                  "type": "string",
+                  "description": "The matched instrument name."
+                },
+                "exchange": {
+                  "type": "string",
+                  "description": "The exchange where the instrument is traded."
+                },
+                "micCode": {
+                  "type": "string",
+                  "description": "The Market Identifier Code (MIC) of the exchange."
+                },
+                "exchangeTimezone": {
+                  "type": "string",
+                  "description": "The timezone where the exchange is located."
+                },
+                "instrumentType": {
+                  "type": "string",
+                  "description": "The matched instrument type."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "The country of the matched exchange."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "The trading currency of the matched instrument."
+                },
+                "access": {
+                  "type": "object",
+                  "properties": {
+                    "global": {
+                      "type": "string",
+                      "description": "The overall access tier for the symbol or exchange."
+                    },
+                    "plan": {
+                      "type": "string",
+                      "description": "The individual plan required for the symbol or exchange."
+                    },
+                    "planBusiness": {
+                      "type": "string",
+                      "description": "The business plan required for the symbol or exchange."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The plan availability metadata returned by Twelve Data."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "instrumentName",
+                "exchange",
+                "micCode",
+                "exchangeTimezone",
+                "instrumentType",
+                "country",
+                "currency"
+              ],
+              "description": "A single symbol search match."
+            },
+            "description": "The ordered list of symbol search matches."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The symbol search results returned by Twelve Data."
+      }
+    },
+    {
+      "id": "twelve_data.time_series",
+      "service": "twelve_data",
+      "name": "time_series",
+      "description": "Fetch historical OHLCV time-series data with metadata for a specific instrument and interval.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The symbol ticker of the instrument."
+          },
+          "figi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Financial Instrument Global Identifier (FIGI) of the instrument."
+          },
+          "isin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The International Securities Identification Number (ISIN) of the instrument."
+          },
+          "cusip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CUSIP identifier of the instrument to request."
+          },
+          "exchange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exchange where the instrument is traded."
+          },
+          "micCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Market Identifier Code (MIC) under ISO 10383."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The country where the instrument is traded, using a country name or alpha code."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The asset class of the instrument."
+          },
+          "interval": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The interval between two consecutive time-series points."
+          },
+          "outputSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "The maximum number of time-series points to return."
+          },
+          "prepost": {
+            "type": "boolean",
+            "description": "Whether to include pre-market and post-market data when supported."
+          },
+          "dp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11,
+            "description": "The number of decimal places for floating values."
+          },
+          "order": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The sorting order of the output."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The output timezone, such as Exchange, UTC, or an IANA timezone name."
+          },
+          "date": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An exact date or a human-readable value such as today or yesterday."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The starting date or datetime for the historical selection window."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ending date or datetime for the historical selection window."
+          },
+          "previousClose": {
+            "type": "boolean",
+            "description": "Whether to include the previous bar close price in each returned value."
+          },
+          "adjust": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The adjusting mode for prices."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "interval"
+        ],
+        "description": "Input parameters for fetching historical time series data. Provide at least one of symbol, figi, isin, or cusip."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "symbol": {
+                "type": "string",
+                "description": "The instrument symbol."
+              },
+              "interval": {
+                "type": "string",
+                "description": "The interval between two consecutive data points."
+              },
+              "currency": {
+                "type": "string",
+                "description": "The trading currency of the instrument."
+              },
+              "exchangeTimezone": {
+                "type": "string",
+                "description": "The timezone of the exchange."
+              },
+              "exchange": {
+                "type": "string",
+                "description": "The exchange where the instrument is traded."
+              },
+              "micCode": {
+                "type": "string",
+                "description": "The Market Identifier Code (MIC) of the exchange."
+              },
+              "type": {
+                "type": "string",
+                "description": "The asset class of the instrument."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "symbol",
+              "interval"
+            ],
+            "description": "The metadata describing the requested time series."
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "datetime": {
+                  "type": "string",
+                  "description": "The datetime when the bar was opened."
+                },
+                "open": {
+                  "type": "string",
+                  "description": "The opening price of the bar."
+                },
+                "high": {
+                  "type": "string",
+                  "description": "The highest price of the bar."
+                },
+                "low": {
+                  "type": "string",
+                  "description": "The lowest price of the bar."
+                },
+                "close": {
+                  "type": "string",
+                  "description": "The closing price of the bar."
+                },
+                "volume": {
+                  "type": "string",
+                  "description": "The trading volume of the bar."
+                },
+                "previousClose": {
+                  "type": "string",
+                  "description": "The previous bar close when previousClose is requested."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "datetime",
+                "open",
+                "high",
+                "low",
+                "close"
+              ],
+              "description": "A single historical bar in the returned time series."
+            },
+            "description": "The chronological time series values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meta",
+          "values"
+        ],
+        "description": "The historical time series response."
+      }
+    }
+  ]
+}

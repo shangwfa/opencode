@@ -1,0 +1,1160 @@
+{
+  "service": "viggle",
+  "displayName": "Viggle",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "VIGGLE_API_KEY",
+      "description": "Viggle API key sent as a Bearer token. Create or manage keys in the Viggle Dashboard API Keys page: https://portal.viggle.ai/api-keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://viggle.ai",
+  "actions": [
+    {
+      "id": "viggle.create_character",
+      "service": "viggle",
+      "name": "create_character",
+      "description": "Create a reusable Viggle character from a publicly accessible image URL and return the preprocessing handle.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The display name for the character."
+          },
+          "image_url": {
+            "type": "string",
+            "description": "The publicly accessible character image URL.",
+            "format": "uri"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "V3_Preview",
+              "V4_Preview"
+            ],
+            "description": "The Viggle model to use for preprocessing or rendering."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "image_url"
+        ],
+        "description": "Input parameters for creating a Viggle character from an image URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "character": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The character identifier."
+              },
+              "job_id": {
+                "type": "string",
+                "description": "The character preprocessing job identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The initial character status."
+              },
+              "credits_reserved": {
+                "type": "number",
+                "description": "The number of credits reserved by Viggle."
+              },
+              "message": {
+                "type": "string",
+                "description": "The creation message returned by Viggle."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status"
+            ],
+            "description": "The response returned after starting character creation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created character response wrapper."
+      },
+      "followUpActions": [
+        "viggle.get_character"
+      ]
+    },
+    {
+      "id": "viggle.create_render_job",
+      "service": "viggle",
+      "name": "create_render_job",
+      "description": "Create a Viggle render job from URL inputs or preprocessed character and scene IDs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref_image_url": {
+            "type": "string",
+            "description": "The public character image URL for on-demand rendering.",
+            "format": "uri"
+          },
+          "driving_video_url": {
+            "type": "string",
+            "description": "The public driving video URL for on-demand rendering.",
+            "format": "uri"
+          },
+          "character_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ready character ID for preprocessed rendering."
+          },
+          "scene_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ready scene ID for preprocessed rendering."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "V3_Preview",
+              "V4_Preview"
+            ],
+            "description": "The Viggle model to use for preprocessing or rendering."
+          },
+          "background_mode": {
+            "type": "string",
+            "enum": [
+              "original",
+              "solid",
+              "transparent"
+            ],
+            "description": "The background handling mode for the rendered video."
+          },
+          "bg_color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The RGB string for solid backgrounds, such as \"0,255,0\"."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for creating a Viggle render job."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "render": {
+            "type": "object",
+            "properties": {
+              "job_id": {
+                "type": "string",
+                "description": "The render job identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The initial render job status."
+              },
+              "mode": {
+                "type": "string",
+                "description": "The render mode selected by Viggle."
+              },
+              "enqueued_at": {
+                "type": "string",
+                "description": "The timestamp when the job was enqueued.",
+                "format": "date-time"
+              },
+              "poll_url": {
+                "type": "string",
+                "description": "The relative URL for polling the job status."
+              },
+              "status_url": {
+                "type": "string",
+                "description": "The relative URL for retrieving the job status."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "job_id",
+              "status"
+            ],
+            "description": "The response returned after creating a render job."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created render job response wrapper."
+      },
+      "followUpActions": [
+        "viggle.get_render_job_status"
+      ]
+    },
+    {
+      "id": "viggle.delete_character",
+      "service": "viggle",
+      "name": "delete_character",
+      "description": "Soft-delete a Viggle character by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The character identifier to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Viggle character."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Viggle accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The delete response returned by Viggle."
+      }
+    },
+    {
+      "id": "viggle.delete_scene",
+      "service": "viggle",
+      "name": "delete_scene",
+      "description": "Soft-delete a Viggle scene by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The scene identifier to delete."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Viggle scene."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Viggle accepted the delete request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The delete response returned by Viggle."
+      }
+    },
+    {
+      "id": "viggle.get_character",
+      "service": "viggle",
+      "name": "get_character",
+      "description": "Get a Viggle character by ID, including preprocessing status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "character_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The character identifier returned by Viggle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Viggle character."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "character": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The character identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The character display name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "processing",
+                  "ready",
+                  "failed"
+                ],
+                "description": "The Viggle character processing status."
+              },
+              "has_v3_encoding": {
+                "type": "boolean",
+                "description": "Whether V3_Preview encoding is available for this character."
+              },
+              "has_v4_encoding": {
+                "type": "boolean",
+                "description": "Whether V4_Preview encoding is available for this character."
+              },
+              "job_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "thumbnail_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "credits_used": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric value returned by Viggle."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              },
+              "completed_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "status"
+            ],
+            "description": "A Viggle character detail response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle character response wrapper."
+      }
+    },
+    {
+      "id": "viggle.get_credit_balance",
+      "service": "viggle",
+      "name": "get_credit_balance",
+      "description": "Get the current Viggle credit balance for the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credit_balance": {
+            "type": "object",
+            "properties": {
+              "balance": {
+                "type": "number",
+                "description": "The current credit balance."
+              },
+              "credits": {
+                "type": "number",
+                "description": "The credit balance alias returned by Viggle."
+              },
+              "total_purchased": {
+                "type": "number",
+                "description": "The total number of purchased credits."
+              },
+              "total_used": {
+                "type": "number",
+                "description": "The total number of used credits."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The timestamp when the balance was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "balance"
+            ],
+            "description": "The Viggle credit balance response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle credit balance wrapper."
+      }
+    },
+    {
+      "id": "viggle.get_render_job_status",
+      "service": "viggle",
+      "name": "get_render_job_status",
+      "description": "Get a Viggle render job status and return the video URL when rendering is complete.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The render job identifier returned by Viggle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Viggle render job status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "render": {
+            "type": "object",
+            "properties": {
+              "job_id": {
+                "type": "string",
+                "description": "The render job identifier."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "processing",
+                  "complete",
+                  "failed",
+                  "cancelled"
+                ],
+                "description": "The Viggle render job status."
+              },
+              "mode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "checkpoint": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "progress_pct": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric value returned by Viggle."
+              },
+              "cdn_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "mask_cdn_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error_code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "progress": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "completed_chunks": {
+                        "type": "integer",
+                        "description": "The number of completed chunks."
+                      },
+                      "total_chunks": {
+                        "type": "integer",
+                        "description": "The total number of chunks."
+                      },
+                      "percent": {
+                        "type": "number",
+                        "description": "The completion percentage."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The legacy progress object returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The legacy progress object returned by Viggle."
+              },
+              "download_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "chunks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A chunk."
+                },
+                "description": "The compatibility chunks array returned by Viggle."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              },
+              "completed_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "job_id",
+              "status"
+            ],
+            "description": "The current Viggle render job status response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle render job status response wrapper."
+      }
+    },
+    {
+      "id": "viggle.get_scene",
+      "service": "viggle",
+      "name": "get_scene",
+      "description": "Get a Viggle scene by ID, including preprocessing status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The scene identifier returned by Viggle."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Viggle scene."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scene": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The scene identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The scene display name."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "ready",
+                  "failed"
+                ],
+                "description": "The Viggle scene processing status."
+              },
+              "duration_seconds": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric value returned by Viggle."
+              },
+              "fps": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric value returned by Viggle."
+              },
+              "total_frames": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Viggle."
+              },
+              "width": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Viggle."
+              },
+              "height": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Viggle."
+              },
+              "job_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "error_message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Viggle."
+              },
+              "credits_used": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The numeric value returned by Viggle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The numeric value returned by Viggle."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              },
+              "completed_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The timestamp returned by Viggle.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The timestamp returned by Viggle."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "status"
+            ],
+            "description": "A Viggle scene detail response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle scene response wrapper."
+      }
+    },
+    {
+      "id": "viggle.import_template",
+      "service": "viggle",
+      "name": "import_template",
+      "description": "Import a Viggle template as a reusable scene.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Viggle template UUID to import."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional display name for the imported scene."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template_uuid"
+        ],
+        "description": "Input parameters for importing a Viggle template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scene": {
+            "type": "object",
+            "properties": {
+              "scene_id": {
+                "type": "string",
+                "description": "The imported scene identifier."
+              },
+              "job_id": {
+                "type": "string",
+                "description": "The scene import job identifier."
+              },
+              "status": {
+                "type": "string",
+                "description": "The initial scene import status."
+              },
+              "message": {
+                "type": "string",
+                "description": "The import message returned by Viggle."
+              },
+              "character_uuids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One tracked person identifier."
+                },
+                "description": "Tracked person identifiers returned for multi-person templates."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "scene_id",
+              "status"
+            ],
+            "description": "The response returned after importing a Viggle template."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The imported scene response wrapper."
+      },
+      "followUpActions": [
+        "viggle.get_scene"
+      ]
+    },
+    {
+      "id": "viggle.list_characters",
+      "service": "viggle",
+      "name": "list_characters",
+      "description": "List Viggle characters for the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based number of items to skip."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Viggle characters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The character identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The character display name."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "processing",
+                    "ready",
+                    "failed"
+                  ],
+                  "description": "The Viggle character processing status."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp returned by Viggle.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp returned by Viggle."
+                },
+                "completed_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp returned by Viggle.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp returned by Viggle."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "status"
+              ],
+              "description": "A Viggle character list item."
+            },
+            "description": "The characters returned by Viggle."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of characters returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle character list response."
+      }
+    },
+    {
+      "id": "viggle.list_scenes",
+      "service": "viggle",
+      "name": "list_scenes",
+      "description": "List Viggle scenes for the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of items to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based number of items to skip."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Viggle scenes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The scene identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The scene display name."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "ready",
+                    "failed"
+                  ],
+                  "description": "The Viggle scene processing status."
+                },
+                "duration_seconds": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The numeric value returned by Viggle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The numeric value returned by Viggle."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp returned by Viggle.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp returned by Viggle."
+                },
+                "completed_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The timestamp returned by Viggle.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The timestamp returned by Viggle."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "status"
+              ],
+              "description": "A Viggle scene list item."
+            },
+            "description": "The scenes returned by Viggle."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of scenes returned."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Viggle scene list response."
+      }
+    }
+  ]
+}

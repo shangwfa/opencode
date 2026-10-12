@@ -1,0 +1,383 @@
+{
+  "service": "flowiseai",
+  "displayName": "FlowiseAI",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FLOWISE_API_KEY",
+      "description": "FlowiseAI chatflow-level API key used with the Authorization: Bearer <apiKey> header. Create or manage it in your FlowiseAI dashboard API Keys section, then assign it to the target flow: https://docs.flowiseai.com/configuration/authorization/chatflow-level.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://your-flowise-host/api/v1",
+          "description": "The FlowiseAI API base URL for your deployment. Use the same API root that serves the official /chatflows and /prediction endpoints for your FlowiseAI instance."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://flowiseai.com",
+  "actions": [
+    {
+      "id": "flowiseai.get_chatflow",
+      "service": "flowiseai",
+      "name": "get_chatflow",
+      "description": "Fetch the FlowiseAI chatflow currently protected by the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chatflow": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The FlowiseAI chatflow identifier.",
+                "pattern": "\\S"
+              },
+              "name": {
+                "type": "string",
+                "description": "The FlowiseAI chatflow name."
+              },
+              "flowData": {
+                "type": "string",
+                "description": "The serialized FlowiseAI flow definition."
+              },
+              "deployed": {
+                "type": "boolean",
+                "description": "Whether the chatflow is deployed."
+              },
+              "isPublic": {
+                "type": "boolean",
+                "description": "Whether the chatflow remains publicly accessible."
+              },
+              "apiKeyId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The FlowiseAI API key identifier assigned to the chatflow."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The FlowiseAI API key identifier assigned to the chatflow."
+              },
+              "chatbotConfig": {
+                "type": "string",
+                "description": "The serialized FlowiseAI chatbot configuration."
+              },
+              "apiConfig": {
+                "type": "string",
+                "description": "The serialized FlowiseAI API configuration."
+              },
+              "analytic": {
+                "type": "string",
+                "description": "The serialized FlowiseAI analytics configuration."
+              },
+              "speechToText": {
+                "type": "string",
+                "description": "The serialized FlowiseAI speech-to-text configuration."
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional FlowiseAI category string."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional FlowiseAI category string."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "CHATFLOW",
+                  "MULTIAGENT"
+                ],
+                "description": "The FlowiseAI flow type."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The ISO timestamp when the chatflow was created.",
+                "format": "date-time"
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The ISO timestamp when the chatflow was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The protected FlowiseAI chatflow tied to the API key."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized chatflow metadata returned by FlowiseAI."
+      }
+    },
+    {
+      "id": "flowiseai.send_message",
+      "service": "flowiseai",
+      "name": "send_message",
+      "description": "Send a JSON-only prediction request to the FlowiseAI chatflow protected by the connected API key.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user message to send to the FlowiseAI chatflow.",
+            "pattern": "\\S"
+          },
+          "form": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The form payload to send instead of question for Agentflow V2."
+          },
+          "overrideConfig": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "FlowiseAI runtime overrideConfig values such as variables or session identifiers."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "apiMessage",
+                    "userMessage"
+                  ],
+                  "description": "The role of one prior chat message."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The content of the prior message."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One prior message passed back to FlowiseAI."
+            },
+            "description": "Previous conversation messages to pass back for context."
+          },
+          "humanInput": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "proceed",
+                  "reject"
+                ],
+                "description": "The human decision used to resume execution."
+              },
+              "feedback": {
+                "type": "string",
+                "description": "Optional feedback returned to the paused flow."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "description": "Human feedback used to resume a stopped FlowiseAI execution."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for sending a JSON-only prediction request to a FlowiseAI chatflow.",
+        "anyOf": [
+          {
+            "required": [
+              "question"
+            ]
+          },
+          {
+            "required": [
+              "form"
+            ]
+          },
+          {
+            "required": [
+              "humanInput"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The AI-generated response text."
+          },
+          "json": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "The optional structured JSON payload returned by FlowiseAI."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional structured JSON payload returned by FlowiseAI."
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The original question echoed by FlowiseAI when it returns one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The original question echoed by FlowiseAI when it returns one."
+          },
+          "chatId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FlowiseAI chat session identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FlowiseAI chat session identifier."
+          },
+          "chatMessageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FlowiseAI chat message identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FlowiseAI chat message identifier."
+          },
+          "sessionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FlowiseAI session identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FlowiseAI session identifier."
+          },
+          "memoryType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The FlowiseAI memory type used for this response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The FlowiseAI memory type used for this response."
+          },
+          "sourceDocuments": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pageContent": {
+                      "type": "string",
+                      "description": "The page content retrieved by FlowiseAI."
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "One metadata value."
+                      },
+                      "description": "The document metadata returned by FlowiseAI."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One source document returned by FlowiseAI."
+                },
+                "description": "The source documents returned by FlowiseAI."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The source documents returned by FlowiseAI."
+          },
+          "usedTools": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tool": {
+                      "type": "string",
+                      "description": "The tool name that FlowiseAI used."
+                    },
+                    "toolInput": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "The input object passed to the tool."
+                    },
+                    "toolOutput": {
+                      "type": "string",
+                      "description": "The output returned by the tool."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "One tool call returned by FlowiseAI."
+                },
+                "description": "The tools invoked by FlowiseAI while producing the response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tools invoked by FlowiseAI while producing the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized FlowiseAI prediction response."
+      }
+    }
+  ]
+}

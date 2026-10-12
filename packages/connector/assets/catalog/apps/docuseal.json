@@ -1,0 +1,961 @@
+{
+  "service": "docuseal",
+  "displayName": "DocuSeal",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DOCUSEAL_API_KEY",
+      "description": "DocuSeal API key sent with the X-Auth-Token header. Create or copy it from the DocuSeal API settings page.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "com",
+          "description": "DocuSeal API region for your account. Use com for https://api.docuseal.com or eu for https://api.docuseal.eu."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.docuseal.com",
+  "actions": [
+    {
+      "id": "docuseal.create_submission",
+      "service": "docuseal",
+      "name": "create_submission",
+      "description": "Create a DocuSeal signature request from an existing template and return the created submitters.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "template_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DocuSeal numeric identifier."
+          },
+          "submitters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The name of the submitter."
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The role name or title of the submitter."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The email address of the submitter.",
+                  "format": "email"
+                },
+                "phone": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The E.164 phone number of the submitter."
+                },
+                "values": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Pre-filled values keyed by template field name."
+                },
+                "external_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Your application-specific submitter identifier."
+                },
+                "completed": {
+                  "type": "boolean",
+                  "description": "Whether to mark the submitter as completed and auto-signed via API."
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Metadata object with additional submitter information."
+                },
+                "send_email": {
+                  "type": "boolean",
+                  "description": "Whether DocuSeal should email this submitter."
+                },
+                "send_sms": {
+                  "type": "boolean",
+                  "description": "Whether DocuSeal should send this request via SMS."
+                },
+                "reply_to": {
+                  "type": "string",
+                  "description": "Reply-To address for this submitter's notification emails.",
+                  "format": "email"
+                },
+                "completed_redirect_url": {
+                  "type": "string",
+                  "description": "Submitter-specific URL to redirect to after completion.",
+                  "format": "uri"
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The order of the submitter in the workflow."
+                },
+                "require_phone_2fa": {
+                  "type": "boolean",
+                  "description": "Whether to require phone 2FA for this submitter."
+                },
+                "require_email_2fa": {
+                  "type": "boolean",
+                  "description": "Whether to require email 2FA for this submitter."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "subject": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Custom signature request email subject."
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Custom signature request email body."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Custom signature request email message settings."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Document template field name."
+                      },
+                      "default_value": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "description": "A string field value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric field value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean field value."
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "string",
+                                  "description": "A string item."
+                                },
+                                {
+                                  "type": "number",
+                                  "description": "A numeric item."
+                                },
+                                {
+                                  "type": "boolean",
+                                  "description": "A boolean item."
+                                }
+                              ],
+                              "description": "One array item value."
+                            },
+                            "description": "An array field value."
+                          }
+                        ],
+                        "description": "Default field value."
+                      },
+                      "readonly": {
+                        "type": "boolean",
+                        "description": "Whether the submitter can edit the predefined field value."
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "description": "Whether the field is required."
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Field title displayed on the signing form."
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Field description displayed on the signing form."
+                      },
+                      "validation": {
+                        "type": "object",
+                        "properties": {
+                          "pattern": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "HTML field validation pattern string."
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A custom error message to display on validation failure."
+                          },
+                          "min": {
+                            "oneOf": [
+                              {
+                                "type": "number",
+                                "description": "A numeric minimum value."
+                              },
+                              {
+                                "type": "string",
+                                "description": "A string minimum value."
+                              }
+                            ],
+                            "description": "The minimum value constraint."
+                          },
+                          "max": {
+                            "oneOf": [
+                              {
+                                "type": "number",
+                                "description": "A numeric maximum value."
+                              },
+                              {
+                                "type": "string",
+                                "description": "A string maximum value."
+                              }
+                            ],
+                            "description": "The maximum value constraint."
+                          },
+                          "step": {
+                            "type": "number",
+                            "description": "Increment step for a number field."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Validation rules for a DocuSeal submitter field."
+                      },
+                      "preferences": {
+                        "type": "object",
+                        "properties": {
+                          "font_size": {
+                            "type": "integer",
+                            "description": "Font size of the field value in pixels."
+                          },
+                          "font_type": {
+                            "type": "string",
+                            "enum": [
+                              "bold",
+                              "italic",
+                              "bold_italic"
+                            ],
+                            "description": "Font type of the field value."
+                          },
+                          "font": {
+                            "type": "string",
+                            "enum": [
+                              "Times",
+                              "Helvetica",
+                              "Courier"
+                            ],
+                            "description": "Font family of the field value."
+                          },
+                          "color": {
+                            "type": "string",
+                            "enum": [
+                              "black",
+                              "white",
+                              "blue"
+                            ],
+                            "description": "Font color of the field value."
+                          },
+                          "background": {
+                            "type": "string",
+                            "enum": [
+                              "black",
+                              "white",
+                              "blue"
+                            ],
+                            "description": "Field box background color."
+                          },
+                          "align": {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "center",
+                              "right"
+                            ],
+                            "description": "Horizontal alignment of the field text value."
+                          },
+                          "valign": {
+                            "type": "string",
+                            "enum": [
+                              "top",
+                              "center",
+                              "bottom"
+                            ],
+                            "description": "Vertical alignment of the field text value."
+                          },
+                          "format": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Data format for different field types."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Price value of the payment field."
+                          },
+                          "currency": {
+                            "type": "string",
+                            "enum": [
+                              "USD",
+                              "EUR",
+                              "GBP",
+                              "CAD",
+                              "AUD"
+                            ],
+                            "description": "Currency value of the payment field."
+                          },
+                          "mask": {
+                            "oneOf": [
+                              {
+                                "type": "integer",
+                                "description": "A numeric mask setting."
+                              },
+                              {
+                                "type": "boolean",
+                                "description": "A boolean mask setting."
+                              }
+                            ],
+                            "description": "Mask setting for the field."
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "One signature reason."
+                            },
+                            "description": "An array of signature reasons to choose from."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Display and formatting preferences for a DocuSeal field value."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "name"
+                    ],
+                    "description": "A field configuration for one DocuSeal submitter."
+                  },
+                  "description": "Field configurations for this submitter."
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One role name."
+                  },
+                  "description": "Role names to merge into this submitter."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One DocuSeal submitter for a signature request."
+            },
+            "description": "The submitters for the signature request.",
+            "minItems": 1
+          },
+          "send_email": {
+            "type": "boolean",
+            "description": "Whether to send signature request emails."
+          },
+          "send_sms": {
+            "type": "boolean",
+            "description": "Whether to send signature requests via SMS."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "preserved",
+              "random"
+            ],
+            "description": "Submission delivery order."
+          },
+          "completed_redirect_url": {
+            "type": "string",
+            "description": "URL to redirect to after submission completion.",
+            "format": "uri"
+          },
+          "bcc_completed": {
+            "type": "string",
+            "description": "BCC address for signed documents after completion.",
+            "format": "email"
+          },
+          "reply_to": {
+            "type": "string",
+            "description": "Reply-To address for notification emails.",
+            "format": "email"
+          },
+          "expire_at": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Expiration date and time for the submission."
+          },
+          "variables": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Dynamic content variables for the template."
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "subject": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Custom signature request email subject."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Custom signature request email body."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Custom signature request email message settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template_id",
+          "submitters"
+        ],
+        "description": "The input for creating a DocuSeal submission from an existing template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "submitters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The DocuSeal numeric identifier."
+                },
+                "submissionId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The DocuSeal numeric identifier."
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "The submitter UUID."
+                },
+                "email": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "role": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "externalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "embedSrc": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "sentAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "openedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "declinedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw DocuSeal object payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A compact DocuSeal submitter response returned after creating a submission."
+            },
+            "description": "The submitters returned by DocuSeal."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw DocuSeal object payload."
+            },
+            "description": "The raw submitter objects returned by DocuSeal."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connector-normalized DocuSeal submission creation result."
+      }
+    },
+    {
+      "id": "docuseal.get_template",
+      "service": "docuseal",
+      "name": "get_template",
+      "description": "Retrieve one DocuSeal template by ID and return compact metadata with the raw template payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DocuSeal numeric identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for retrieving a DocuSeal template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DocuSeal numeric identifier."
+          },
+          "slug": {
+            "type": "string",
+            "description": "The unique template slug."
+          },
+          "name": {
+            "type": "string",
+            "description": "The template name."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The string value returned by DocuSeal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The string value returned by DocuSeal."
+          },
+          "externalId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The string value returned by DocuSeal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The string value returned by DocuSeal."
+          },
+          "folderName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The string value returned by DocuSeal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The string value returned by DocuSeal."
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The string value returned by DocuSeal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The string value returned by DocuSeal."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The date and time when the template was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The date and time when the template was last updated."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw DocuSeal object payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A compact DocuSeal template summary returned by the connector."
+      }
+    },
+    {
+      "id": "docuseal.list_templates",
+      "service": "docuseal",
+      "name": "list_templates",
+      "description": "List DocuSeal document templates with optional filters and ID-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter templates by partial name match."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter templates by unique slug."
+          },
+          "external_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter templates by external ID."
+          },
+          "folder": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter templates by folder name."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether to return archived templates instead of active ones."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of templates to return. The documented maximum is 100."
+          },
+          "after": {
+            "type": "integer",
+            "description": "Return templates with IDs greater than this value."
+          },
+          "before": {
+            "type": "integer",
+            "description": "Return templates with IDs less than this value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters and pagination options for listing DocuSeal templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The DocuSeal numeric identifier."
+                },
+                "slug": {
+                  "type": "string",
+                  "description": "The unique template slug."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The template name."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "externalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "folderName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by DocuSeal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by DocuSeal."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The date and time when the template was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The date and time when the template was last updated."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw DocuSeal object payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A compact DocuSeal template summary returned by the connector."
+            },
+            "description": "The templates returned by DocuSeal."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "count": {
+                "type": "integer",
+                "description": "The number of records returned in this page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ID cursor for loading the next page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ID cursor for loading the next page."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The ID cursor for loading the previous page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ID cursor for loading the previous page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "DocuSeal pagination metadata."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw DocuSeal object payload."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The connector-normalized DocuSeal template list."
+      }
+    }
+  ]
+}

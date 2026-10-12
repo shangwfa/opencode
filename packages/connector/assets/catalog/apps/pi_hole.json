@@ -1,0 +1,2450 @@
+{
+  "service": "pi_hole",
+  "displayName": "Pi-hole",
+  "categories": [
+    "Infrastructure"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Application Password",
+      "placeholder": "PI_HOLE_APP_PASSWORD",
+      "description": "Pi-hole application password used to authenticate against the instance API. Use an application password, not your account password, because application passwords bypass two-factor authentication. Create one from your Pi-hole web interface under Settings -> All settings -> API.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance Base URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "http://pi.hole",
+          "description": "The root URL for your Pi-hole instance, for example http://pi.hole or https://pi.hole:8443. The API is served below this root."
+        },
+        {
+          "key": "apiPath",
+          "label": "API Path",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "api",
+          "description": "The URL path below the instance root where the Pi-hole API is served, normally api. Change this only when a reverse proxy rewrites the API to a different subpath."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://pi-hole.net",
+  "actions": [
+    {
+      "id": "pi_hole.add_domain",
+      "service": "pi_hole",
+      "name": "add_domain",
+      "description": "Add one or more allow or deny domain entries to Pi-hole, either exact or as regular expressions.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The single domain value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One domain value."
+                },
+                "description": "One or more domain values."
+              }
+            ],
+            "description": "The domain to add, or an array of domains."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "description": "Whether the domain entry allows or denies the domain."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "regex"
+            ],
+            "description": "Whether the domain entry matches exactly or as a regular expression."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An optional comment for the entry."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional comment for the entry."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the entry is enabled; defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "type",
+          "kind"
+        ],
+        "description": "Input parameters for adding one or more Pi-hole domain entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.add_list",
+      "service": "pi_hole",
+      "name": "add_list",
+      "description": "Add one or more allowlist or blocklist entries (addresses) to Pi-hole.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The single list address value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One list address value."
+                },
+                "description": "One or more list address values."
+              }
+            ],
+            "description": "The list address, for example https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts, or an array of addresses."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "block"
+            ],
+            "description": "Whether the list is an allowlist or a blocklist."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An optional comment for the list."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional comment for the list."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the list is enabled; defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "type"
+        ],
+        "description": "Input parameters for adding one or more Pi-hole lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.batch_delete_clients",
+      "service": "pi_hole",
+      "name": "batch_delete_clients",
+      "description": "Delete multiple Pi-hole client entries in one request. Reports deleted=false when none of the clients exist.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One client identifier."
+            },
+            "description": "The client identifiers to delete (IP / MAC / hostname / interface)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Input parameters for deleting multiple Pi-hole clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.batch_delete_domains",
+      "service": "pi_hole",
+      "name": "batch_delete_domains",
+      "description": "Delete multiple Pi-hole domain entries in one request. Reports deleted=false when none of the entries exist.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "domain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The domain of the entry."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "deny"
+                  ],
+                  "description": "Whether the domain entry allows or denies the domain."
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "exact",
+                    "regex"
+                  ],
+                  "description": "Whether the domain entry matches exactly or as a regular expression."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "domain",
+                "type",
+                "kind"
+              ],
+              "description": "One domain entry to delete."
+            },
+            "description": "The domain entries to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Input parameters for deleting multiple Pi-hole domain entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.batch_delete_groups",
+      "service": "pi_hole",
+      "name": "batch_delete_groups",
+      "description": "Delete multiple Pi-hole groups by name in one request. Reports deleted=false when none of the groups exist.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One group name."
+            },
+            "description": "The group names to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Input parameters for deleting multiple Pi-hole groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.batch_delete_lists",
+      "service": "pi_hole",
+      "name": "batch_delete_lists",
+      "description": "Delete multiple Pi-hole allowlist or blocklist entries in one request. Reports deleted=false when none of the entries exist.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The address of the list entry."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "block"
+                  ],
+                  "description": "Whether the list is an allowlist or a blocklist."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "address",
+                "type"
+              ],
+              "description": "One list entry to delete."
+            },
+            "description": "The list entries to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "description": "Input parameters for deleting multiple Pi-hole lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.create_client",
+      "service": "pi_hole",
+      "name": "create_client",
+      "description": "Register one or more Pi-hole clients identified by IP address, MAC address, hostname, or interface.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The single client identifier value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One client identifier value."
+                },
+                "description": "One or more client identifier values."
+              }
+            ],
+            "description": "The client identifier (IP / MAC / hostname / interface), or an array of identifiers."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An optional comment for the client."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional comment for the client."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "client"
+        ],
+        "description": "Input parameters for registering one or more Pi-hole clients."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.create_group",
+      "service": "pi_hole",
+      "name": "create_group",
+      "description": "Create one or more Pi-hole groups, optionally with a comment and enabled state.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The single group name value."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One group name value."
+                },
+                "description": "One or more group name values."
+              }
+            ],
+            "description": "The group name, or an array of group names to create."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An optional comment for the group."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional comment for the group."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the group is enabled; defaults to true."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for creating one or more Pi-hole groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.delete_client",
+      "service": "pi_hole",
+      "name": "delete_client",
+      "description": "Delete one Pi-hole client entry by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client identifier to delete (IP / MAC / hostname / interface)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "client"
+        ],
+        "description": "Input parameters for deleting one Pi-hole client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.delete_domain",
+      "service": "pi_hole",
+      "name": "delete_domain",
+      "description": "Delete one Pi-hole allow or deny domain entry.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "description": "Whether the domain entry allows or denies the domain."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "regex"
+            ],
+            "description": "Whether the domain entry matches exactly or as a regular expression."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain of the entry to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "kind",
+          "domain"
+        ],
+        "description": "Input parameters for deleting one Pi-hole domain entry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.delete_group",
+      "service": "pi_hole",
+      "name": "delete_group",
+      "description": "Delete one Pi-hole group by name.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the group to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for deleting one Pi-hole group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.delete_list",
+      "service": "pi_hole",
+      "name": "delete_list",
+      "description": "Delete one Pi-hole allowlist or blocklist entry by address.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the list to delete."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "block"
+            ],
+            "description": "Whether the list is an allowlist or a blocklist."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "type"
+        ],
+        "description": "Input parameters for deleting one Pi-hole list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "pi_hole.export_backup",
+      "service": "pi_hole",
+      "name": "export_backup",
+      "description": "Create a complete Pi-hole teleporter backup archive (teleporter.zip) with all settings, lists, and clients.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Transit file id when stored locally."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Transit file id when stored locally."
+              },
+              "downloadUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Download URL of the stored transit file."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Download URL of the stored transit file."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The archive file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "description": "The archive MIME type."
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The archive size in bytes."
+              },
+              "data": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The archive content base64-encoded when no transit storage is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The archive content base64-encoded when no transit storage is available."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "downloadUrl",
+              "name",
+              "mimeType",
+              "sizeBytes",
+              "data"
+            ],
+            "description": "The backup archive metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The Pi-hole teleporter backup archive."
+      }
+    },
+    {
+      "id": "pi_hole.flush_dns_logs",
+      "service": "pi_hole",
+      "name": "flush_dns_logs",
+      "description": "Flush the Pi-hole DNS query log.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The flush result status returned by the instance, normally success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The flush result status returned by the instance, normally success."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The DNS log flush result."
+      }
+    },
+    {
+      "id": "pi_hole.get_config",
+      "service": "pi_hole",
+      "name": "get_config",
+      "description": "Fetch the current Pi-hole configuration, such as DNS settings, privacy level, and API settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Pi-hole configuration payload returned by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The current Pi-hole configuration."
+      }
+    },
+    {
+      "id": "pi_hole.get_dhcp_leases",
+      "service": "pi_hole",
+      "name": "get_dhcp_leases",
+      "description": "Fetch the currently active DHCP leases assigned by the Pi-hole DHCP server.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "leases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One active DHCP lease."
+            },
+            "description": "The active DHCP leases."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "leases"
+        ],
+        "description": "The active Pi-hole DHCP leases."
+      }
+    },
+    {
+      "id": "pi_hole.get_dns_blocking_status",
+      "service": "pi_hole",
+      "name": "get_dns_blocking_status",
+      "description": "Fetch whether Pi-hole DNS blocking is currently enabled, disabled, failed, or unknown.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blocking": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "failed",
+              "unknown"
+            ],
+            "description": "The Pi-hole blocking status."
+          },
+          "timer": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Remaining seconds until the blocking mode is toggled automatically, or null when no timer is active."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining seconds until the blocking mode is toggled automatically, or null when no timer is active."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blocking",
+          "timer"
+        ],
+        "description": "The current Pi-hole DNS blocking status."
+      }
+    },
+    {
+      "id": "pi_hole.get_history",
+      "service": "pi_hole",
+      "name": "get_history",
+      "description": "Fetch the Pi-hole activity graph data: query totals over time with cached, blocked, and forwarded splits.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole activity graph entry."
+            },
+            "description": "The activity graph entries over time."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "history"
+        ],
+        "description": "The Pi-hole activity graph data."
+      }
+    },
+    {
+      "id": "pi_hole.get_network_devices",
+      "service": "pi_hole",
+      "name": "get_network_devices",
+      "description": "Fetch the devices seen on the local network by Pi-hole.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One network device."
+            },
+            "description": "The network devices seen by Pi-hole."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "devices"
+        ],
+        "description": "The network devices seen by Pi-hole."
+      }
+    },
+    {
+      "id": "pi_hole.get_overview",
+      "service": "pi_hole",
+      "name": "get_overview",
+      "description": "Fetch the Pi-hole activity overview: total and blocked queries, blocked query percentage, unique clients and domains, and the blocking and gravity list status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Pi-hole overview payload returned by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summary"
+        ],
+        "description": "The Pi-hole activity overview."
+      }
+    },
+    {
+      "id": "pi_hole.get_queries",
+      "service": "pi_hole",
+      "name": "get_queries",
+      "description": "Query the Pi-hole DNS log with optional filters. By default returns the most recent queries; each response exposes a cursor for the next chunk.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "number",
+            "description": "Only return queries from this Unix timestamp onward."
+          },
+          "until": {
+            "type": "number",
+            "description": "Only return queries up to this Unix timestamp."
+          },
+          "length": {
+            "type": "integer",
+            "description": "Maximum number of results to return."
+          },
+          "start": {
+            "type": "integer",
+            "description": "Offset from the first record."
+          },
+          "cursor": {
+            "type": "integer",
+            "description": "Database ID of the most recent query to show; use the cursor of a previous response."
+          },
+          "domain": {
+            "type": "string",
+            "description": "Filter by queried domain, * wildcards supported."
+          },
+          "clientIp": {
+            "type": "string",
+            "description": "Filter by requesting client IP address, * wildcards supported."
+          },
+          "clientName": {
+            "type": "string",
+            "description": "Filter by requesting client hostname, * wildcards supported."
+          },
+          "upstream": {
+            "type": "string",
+            "description": "Filter by upstream destination (may also be cache, blocklist, or permitted), * wildcards supported."
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by query type, for example A or AAAA."
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by query status, for example GRAVITY or FORWARDED."
+          },
+          "reply": {
+            "type": "string",
+            "description": "Filter by reply type, for example NODATA or NXDOMAIN."
+          },
+          "dnssec": {
+            "type": "string",
+            "description": "Filter by DNSSEC status, for example SECURE or INSECURE."
+          },
+          "disk": {
+            "type": "boolean",
+            "description": "Read queries from the long-term on-disk database instead of the in-memory database."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for querying the Pi-hole DNS log."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole query record."
+            },
+            "description": "The Pi-hole query records."
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Database ID of the most recent query shown, for the next chunk."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Database ID of the most recent query shown, for the next chunk."
+          },
+          "recordsTotal": {
+            "type": "integer",
+            "description": "Total number of available queries."
+          },
+          "recordsFiltered": {
+            "type": "integer",
+            "description": "Number of available queries after filtering."
+          },
+          "earliestTimestamp": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Earliest timestamp of queries held in the in-memory database (Unix time)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Earliest timestamp of queries held in the in-memory database (Unix time)."
+          },
+          "earliestTimestampDisk": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Earliest timestamp of queries held in the long-term on-disk database (Unix time)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Earliest timestamp of queries held in the long-term on-disk database (Unix time)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queries",
+          "cursor",
+          "recordsTotal",
+          "recordsFiltered",
+          "earliestTimestamp",
+          "earliestTimestampDisk"
+        ],
+        "description": "The requested Pi-hole query records."
+      }
+    },
+    {
+      "id": "pi_hole.get_query_types",
+      "service": "pi_hole",
+      "name": "get_query_types",
+      "description": "Fetch the number of queries of each DNS query type that Pi-hole has seen.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Query type counts keyed by DNS query type, for example A or AAAA."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "types"
+        ],
+        "description": "The Pi-hole query type counts."
+      }
+    },
+    {
+      "id": "pi_hole.get_recent_blocked",
+      "service": "pi_hole",
+      "name": "get_recent_blocked",
+      "description": "Fetch the domains most recently blocked by Pi-hole.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Maximum number of blocked domains to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing the most recently blocked domains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blocked": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One blocked domain name."
+            },
+            "description": "The most recently blocked domains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blocked"
+        ],
+        "description": "The most recently blocked domains."
+      }
+    },
+    {
+      "id": "pi_hole.get_top_clients",
+      "service": "pi_hole",
+      "name": "get_top_clients",
+      "description": "Fetch the clients that have queried Pi-hole the most, optionally limited to blocked ones.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Maximum number of entries to return."
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "Only include blocked queries in the result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Pi-hole top-entries query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole top client entry."
+            },
+            "description": "The top client entries."
+          },
+          "totalQueries": {
+            "type": "integer",
+            "description": "Total number of queries in the requested window."
+          },
+          "blockedQueries": {
+            "type": "integer",
+            "description": "Number of blocked queries in the requested window."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients",
+          "totalQueries",
+          "blockedQueries"
+        ],
+        "description": "The Pi-hole top clients."
+      }
+    },
+    {
+      "id": "pi_hole.get_top_domains",
+      "service": "pi_hole",
+      "name": "get_top_domains",
+      "description": "Fetch the domains Pi-hole has handled the most, optionally limited to blocked ones.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Maximum number of entries to return."
+          },
+          "blocked": {
+            "type": "boolean",
+            "description": "Only include blocked queries in the result."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Pi-hole top-entries query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole top domain entry."
+            },
+            "description": "The top domain entries."
+          },
+          "totalQueries": {
+            "type": "integer",
+            "description": "Total number of queries in the requested window."
+          },
+          "blockedQueries": {
+            "type": "integer",
+            "description": "Number of blocked queries in the requested window."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains",
+          "totalQueries",
+          "blockedQueries"
+        ],
+        "description": "The Pi-hole top domains."
+      }
+    },
+    {
+      "id": "pi_hole.get_upstreams",
+      "service": "pi_hole",
+      "name": "get_upstreams",
+      "description": "Fetch metrics about Pi-hole's DNS upstream destinations, including response times.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "upstreams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole upstream entry."
+            },
+            "description": "The upstream destination entries."
+          },
+          "forwardedQueries": {
+            "type": "integer",
+            "description": "Number of queries forwarded to upstream destinations."
+          },
+          "totalQueries": {
+            "type": "integer",
+            "description": "Total number of queries in the window."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "upstreams",
+          "forwardedQueries",
+          "totalQueries"
+        ],
+        "description": "The Pi-hole upstream metrics."
+      }
+    },
+    {
+      "id": "pi_hole.import_backup",
+      "service": "pi_hole",
+      "name": "import_backup",
+      "description": "Restore a Pi-hole teleporter backup archive (a previously exported teleporter.zip) to this instance.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The teleporter archive to restore."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "Input parameters for restoring one Pi-hole backup archive."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The name of a restored file."
+            },
+            "description": "The files restored from the archive."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "description": "The Pi-hole teleporter import result."
+      }
+    },
+    {
+      "id": "pi_hole.list_clients",
+      "service": "pi_hole",
+      "name": "list_clients",
+      "description": "List all Pi-hole clients and their group memberships.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole client."
+            },
+            "description": "The Pi-hole clients."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clients"
+        ],
+        "description": "The Pi-hole clients."
+      }
+    },
+    {
+      "id": "pi_hole.list_domains",
+      "service": "pi_hole",
+      "name": "list_domains",
+      "description": "List the individual Pi-hole domain entries, optionally restricted to one type or kind.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "description": "Whether the domain entry allows or denies the domain."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "regex"
+            ],
+            "description": "Whether the domain entry matches exactly or as a regular expression."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Pi-hole domain entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole domain entry."
+            },
+            "description": "The Pi-hole domain entries."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "The Pi-hole domain entries."
+      }
+    },
+    {
+      "id": "pi_hole.list_groups",
+      "service": "pi_hole",
+      "name": "list_groups",
+      "description": "List all Pi-hole groups and their memberships.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole group."
+            },
+            "description": "The Pi-hole groups."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groups"
+        ],
+        "description": "The Pi-hole groups."
+      }
+    },
+    {
+      "id": "pi_hole.list_lists",
+      "service": "pi_hole",
+      "name": "list_lists",
+      "description": "List the Pi-hole allowlists and blocklists (subscription lists).",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "block"
+            ],
+            "description": "Whether the list is an allowlist or a blocklist."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Pi-hole lists; restrict to one list type when needed."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lists": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Pi-hole list."
+            },
+            "description": "The Pi-hole lists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lists"
+        ],
+        "description": "The Pi-hole lists."
+      }
+    },
+    {
+      "id": "pi_hole.restart_dns",
+      "service": "pi_hole",
+      "name": "restart_dns",
+      "description": "Restart Pi-hole's DNS server and reload its DNS configuration.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The restart result status returned by the instance, normally success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The restart result status returned by the instance, normally success."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "description": "The DNS restart result."
+      }
+    },
+    {
+      "id": "pi_hole.run_gravity",
+      "service": "pi_hole",
+      "name": "run_gravity",
+      "description": "Run the Pi-hole gravity update to refresh the blocklists. The instance streams the gravity log; the action reports a best-effort status from the log plus the tail of the stream.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Best-effort gravity outcome inferred from the stream: success, failed, or null when the stream gives no clear signal."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Best-effort gravity outcome inferred from the stream: success, failed, or null when the stream gives no clear signal."
+          },
+          "output": {
+            "type": "string",
+            "description": "The tail of the gravity log stream as relayed by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "output"
+        ],
+        "description": "The Pi-hole gravity run result."
+      }
+    },
+    {
+      "id": "pi_hole.search_domain",
+      "service": "pi_hole",
+      "name": "search_domain",
+      "description": "Search whether a domain appears in Pi-hole's allowlists, blocklists, or gravity lists, to understand why it is blocked or allowed.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain (or part of it) to search for in Pi-hole's lists."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Allow partial matches; may not find complex regex entries."
+          },
+          "maxResults": {
+            "type": "integer",
+            "description": "Maximum number of results per match type; the instance caps this internally."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Input parameters for searching Pi-hole's lists."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Pi-hole search result payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "search"
+        ],
+        "description": "The Pi-hole list search result."
+      }
+    },
+    {
+      "id": "pi_hole.set_dns_blocking",
+      "service": "pi_hole",
+      "name": "set_dns_blocking",
+      "description": "Enable or disable Pi-hole DNS blocking, optionally for a limited time after which the opposite mode is restored automatically.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "blocking": {
+            "type": "boolean",
+            "description": "Whether DNS blocking should be enabled."
+          },
+          "timer": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Optional timer in seconds after which the opposite blocking mode is applied automatically; pass null to cancel a running timer."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional timer in seconds after which the opposite blocking mode is applied automatically; pass null to cancel a running timer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blocking"
+        ],
+        "description": "Input parameters for changing the Pi-hole DNS blocking status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "blocking": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "failed",
+              "unknown"
+            ],
+            "description": "The Pi-hole blocking status."
+          },
+          "timer": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "Remaining seconds until the blocking mode is toggled automatically, or null when no timer is active."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining seconds until the blocking mode is toggled automatically, or null when no timer is active."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "blocking",
+          "timer"
+        ],
+        "description": "The current Pi-hole DNS blocking status."
+      }
+    },
+    {
+      "id": "pi_hole.update_client",
+      "service": "pi_hole",
+      "name": "update_client",
+      "description": "Update one Pi-hole client's comment or group memberships.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The client identifier to update (IP / MAC / hostname / interface)."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new comment for the client; pass null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new comment for the client; pass null to clear it."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "client"
+        ],
+        "description": "Input parameters for updating one Pi-hole client."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.update_config",
+      "service": "pi_hole",
+      "name": "update_config",
+      "description": "Change part of the Pi-hole configuration, for example DNS upstreams, the privacy level, or API settings. The provided fields are merged into the current configuration.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Pi-hole configuration fields to change, using the same structure as the configuration payload."
+          },
+          "restart": {
+            "type": "boolean",
+            "description": "Whether the instance may restart its DNS server when the change requires it; defaults to true. Pass false to apply the change without a disruptive DNS restart."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "Input parameters for changing the Pi-hole configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The updated Pi-hole configuration payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The updated Pi-hole configuration."
+      }
+    },
+    {
+      "id": "pi_hole.update_domain",
+      "service": "pi_hole",
+      "name": "update_domain",
+      "description": "Update one Pi-hole domain entry: change its comment, enabled state, or group memberships.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "description": "Whether the domain entry allows or denies the domain."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "regex"
+            ],
+            "description": "Whether the domain entry matches exactly or as a regular expression."
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The domain of the entry to update."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new comment for the entry; pass null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new comment for the entry; pass null to clear it."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the entry is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "kind",
+          "domain"
+        ],
+        "description": "Input parameters for updating one Pi-hole domain entry."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.update_group",
+      "service": "pi_hole",
+      "name": "update_group",
+      "description": "Update one Pi-hole group: rename it, or change its comment or enabled state.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current group name to update."
+          },
+          "newName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new group name when renaming the group."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new comment for the group; pass null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new comment for the group; pass null to clear it."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the group is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input parameters for updating one Pi-hole group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    },
+    {
+      "id": "pi_hole.update_list",
+      "service": "pi_hole",
+      "name": "update_list",
+      "description": "Update one Pi-hole list: change its comment, enabled state, or group memberships.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the list to update."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "block"
+            ],
+            "description": "Whether the list is an allowlist or a blocklist."
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The new comment for the list; pass null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new comment for the list; pass null to clear it."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Pi-hole group ID."
+            },
+            "description": "The group IDs the item belongs to; defaults to group 0 when omitted."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the list is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address",
+          "type"
+        ],
+        "description": "Input parameters for updating one Pi-hole list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "processed": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "success": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One written item."
+                    },
+                    "description": "The items that were written successfully."
+                  },
+                  "errors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "One failed item and its error message."
+                    },
+                    "description": "The items that could not be written, with their error messages."
+                  }
+                },
+                "additionalProperties": true,
+                "required": [
+                  "success",
+                  "errors"
+                ],
+                "description": "The write result reported by the instance."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The write result reported by the instance."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "processed"
+        ],
+        "description": "The Pi-hole write result."
+      }
+    }
+  ]
+}

@@ -1,0 +1,839 @@
+{
+  "service": "docugenerate",
+  "displayName": "DocuGenerate",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DOCUGENERATE_API_KEY",
+      "description": "DocuGenerate API key sent with the Authorization header. Create or view the key on the Developers settings page: https://app.docugenerate.com/settings/developers.",
+      "extraFields": [
+        {
+          "key": "region",
+          "label": "Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "us",
+          "description": "Optional DocuGenerate processing region: us, eu, uk, or au. The default is us. See the official regional endpoint guide: https://www.docugenerate.com/help/articles/can-i-use-regional-api-endpoints/."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.docugenerate.com",
+  "actions": [
+    {
+      "id": "docugenerate.delete_document",
+      "service": "docugenerate",
+      "name": "delete_document",
+      "description": "Permanently delete one generated DocuGenerate document by document ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DocuGenerate document ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId"
+        ],
+        "description": "The input for deleting one generated document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the document was deleted."
+          },
+          "documentId": {
+            "type": "string",
+            "description": "The deleted DocuGenerate document ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "documentId"
+        ],
+        "description": "Confirmation that DocuGenerate deleted the document."
+      }
+    },
+    {
+      "id": "docugenerate.generate_document",
+      "service": "docugenerate",
+      "name": "generate_document",
+      "description": "Generate and store a DocuGenerate document from a template and JSON merge data, returning a download URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the template used to generate the document."
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "One JSON object whose keys match merge tags in the DocuGenerate template."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One JSON object whose keys match merge tags in the DocuGenerate template."
+                },
+                "description": "A non-empty list of JSON merge-data objects.",
+                "minItems": 1
+              }
+            ],
+            "description": "The JSON merge data used to generate one or more documents."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The logical name used to identify the generated document."
+          },
+          "outputName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The generated filename without its extension."
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              ".docx",
+              ".doc",
+              ".odt",
+              ".txt",
+              ".html",
+              ".png",
+              ".pdf",
+              ".pdf/a-1b",
+              ".pdf/a-2b",
+              ".pdf/a-3b"
+            ],
+            "description": "The generated document format."
+          },
+          "outputQuality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The output quality for PDF, PDF/A, or PNG generation, from 1 through 100."
+          },
+          "singleFile": {
+            "type": "boolean",
+            "description": "Whether multiple merge-data objects are combined into one output file."
+          },
+          "pageBreak": {
+            "type": "boolean",
+            "description": "Whether to insert a page break after each merge-data object in a combined output."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "data"
+        ],
+        "description": "The template, JSON merge data, and output options for generating a stored document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The document ID."
+              },
+              "templateId": {
+                "type": "string",
+                "description": "The ID of the template used to generate the document."
+              },
+              "created": {
+                "type": "number",
+                "description": "The document creation time in Unix epoch milliseconds."
+              },
+              "name": {
+                "type": "string",
+                "description": "The logical document name."
+              },
+              "dataLength": {
+                "type": "number",
+                "description": "The number of merge-data objects used to generate the document."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The generated document filename."
+              },
+              "format": {
+                "type": "string",
+                "description": "The generated document format."
+              },
+              "documentUrl": {
+                "type": "string",
+                "description": "The download URL for the generated document.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "templateId",
+              "created",
+              "name",
+              "dataLength",
+              "filename",
+              "format",
+              "documentUrl"
+            ],
+            "description": "A connector-normalized DocuGenerate document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The stored document generated by DocuGenerate."
+      }
+    },
+    {
+      "id": "docugenerate.get_document",
+      "service": "docugenerate",
+      "name": "get_document",
+      "description": "Retrieve one generated DocuGenerate document by document ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DocuGenerate document ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId"
+        ],
+        "description": "The input for retrieving one generated document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The document ID."
+              },
+              "templateId": {
+                "type": "string",
+                "description": "The ID of the template used to generate the document."
+              },
+              "created": {
+                "type": "number",
+                "description": "The document creation time in Unix epoch milliseconds."
+              },
+              "name": {
+                "type": "string",
+                "description": "The logical document name."
+              },
+              "dataLength": {
+                "type": "number",
+                "description": "The number of merge-data objects used to generate the document."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The generated document filename."
+              },
+              "format": {
+                "type": "string",
+                "description": "The generated document format."
+              },
+              "documentUrl": {
+                "type": "string",
+                "description": "The download URL for the generated document.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "templateId",
+              "created",
+              "name",
+              "dataLength",
+              "filename",
+              "format",
+              "documentUrl"
+            ],
+            "description": "A connector-normalized DocuGenerate document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The requested generated document."
+      }
+    },
+    {
+      "id": "docugenerate.get_template",
+      "service": "docugenerate",
+      "name": "get_template",
+      "description": "Retrieve one DocuGenerate template by template ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DocuGenerate template ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "The input for retrieving one DocuGenerate template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The template ID."
+              },
+              "created": {
+                "type": "number",
+                "description": "The template creation time in Unix epoch milliseconds."
+              },
+              "updated": {
+                "type": "number",
+                "description": "The template update time in Unix epoch milliseconds."
+              },
+              "name": {
+                "type": "string",
+                "description": "The template name."
+              },
+              "pageCount": {
+                "type": "number",
+                "description": "The number of pages in the template."
+              },
+              "delimiters": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "type": "string",
+                    "description": "The left delimiter for template tags."
+                  },
+                  "right": {
+                    "type": "string",
+                    "description": "The right delimiter for template tags."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "left",
+                  "right"
+                ],
+                "description": "The delimiters used to identify template tags."
+              },
+              "tags": {
+                "type": "object",
+                "properties": {
+                  "valid": {
+                    "type": "array",
+                    "items": {
+                      "description": "A string tag or nested tag structure returned by DocuGenerate."
+                    },
+                    "description": "The valid template tags, including strings or nested tag structures."
+                  },
+                  "invalid": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "An invalid template tag."
+                    },
+                    "description": "The invalid or unclosed template tags."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "valid",
+                  "invalid"
+                ],
+                "description": "The valid and invalid tags extracted from the template."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The filename of the uploaded template file."
+              },
+              "format": {
+                "type": "string",
+                "description": "The format of the uploaded template file."
+              },
+              "region": {
+                "type": "string",
+                "enum": [
+                  "us",
+                  "eu",
+                  "uk",
+                  "au"
+                ],
+                "description": "The storage region for the template and new documents."
+              },
+              "templateUrl": {
+                "type": "string",
+                "description": "The download URL for the uploaded template file.",
+                "format": "uri"
+              },
+              "previewUrl": {
+                "type": "string",
+                "description": "The download URL for the template PDF preview.",
+                "format": "uri"
+              },
+              "imageUrl": {
+                "type": "string",
+                "description": "The download URL for the first-page template image.",
+                "format": "uri"
+              },
+              "enhancedSyntax": {
+                "type": "boolean",
+                "description": "Whether enhanced template syntax is enabled."
+              },
+              "versioningEnabled": {
+                "type": "boolean",
+                "description": "Whether template file versioning is enabled."
+              },
+              "folder": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One folder name in the template path."
+                },
+                "description": "The ordered template folder path from root to leaf.",
+                "maxItems": 100
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "created",
+              "updated",
+              "name",
+              "pageCount",
+              "delimiters",
+              "tags",
+              "filename",
+              "format",
+              "region",
+              "templateUrl",
+              "previewUrl",
+              "imageUrl",
+              "enhancedSyntax",
+              "versioningEnabled",
+              "folder"
+            ],
+            "description": "A connector-normalized DocuGenerate template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template"
+        ],
+        "description": "The requested DocuGenerate template."
+      }
+    },
+    {
+      "id": "docugenerate.list_documents",
+      "service": "docugenerate",
+      "name": "list_documents",
+      "description": "List all DocuGenerate documents generated from one template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the template used to generate the documents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "The template filter for listing generated documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The document ID."
+                },
+                "templateId": {
+                  "type": "string",
+                  "description": "The ID of the template used to generate the document."
+                },
+                "created": {
+                  "type": "number",
+                  "description": "The document creation time in Unix epoch milliseconds."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The logical document name."
+                },
+                "dataLength": {
+                  "type": "number",
+                  "description": "The number of merge-data objects used to generate the document."
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "The generated document filename."
+                },
+                "format": {
+                  "type": "string",
+                  "description": "The generated document format."
+                },
+                "documentUrl": {
+                  "type": "string",
+                  "description": "The download URL for the generated document.",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "templateId",
+                "created",
+                "name",
+                "dataLength",
+                "filename",
+                "format",
+                "documentUrl"
+              ],
+              "description": "A connector-normalized DocuGenerate document."
+            },
+            "description": "The generated documents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents"
+        ],
+        "description": "The documents generated from the selected template."
+      }
+    },
+    {
+      "id": "docugenerate.list_templates",
+      "service": "docugenerate",
+      "name": "list_templates",
+      "description": "List DocuGenerate templates, optionally filtered by an exact folder path.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One non-empty folder name."
+            },
+            "description": "The ordered folder path from root to leaf.",
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false,
+        "description": "The optional folder filter for listing DocuGenerate templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The template ID."
+                },
+                "created": {
+                  "type": "number",
+                  "description": "The template creation time in Unix epoch milliseconds."
+                },
+                "updated": {
+                  "type": "number",
+                  "description": "The template update time in Unix epoch milliseconds."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The template name."
+                },
+                "pageCount": {
+                  "type": "number",
+                  "description": "The number of pages in the template."
+                },
+                "delimiters": {
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "string",
+                      "description": "The left delimiter for template tags."
+                    },
+                    "right": {
+                      "type": "string",
+                      "description": "The right delimiter for template tags."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "left",
+                    "right"
+                  ],
+                  "description": "The delimiters used to identify template tags."
+                },
+                "tags": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "array",
+                      "items": {
+                        "description": "A string tag or nested tag structure returned by DocuGenerate."
+                      },
+                      "description": "The valid template tags, including strings or nested tag structures."
+                    },
+                    "invalid": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "An invalid template tag."
+                      },
+                      "description": "The invalid or unclosed template tags."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "valid",
+                    "invalid"
+                  ],
+                  "description": "The valid and invalid tags extracted from the template."
+                },
+                "filename": {
+                  "type": "string",
+                  "description": "The filename of the uploaded template file."
+                },
+                "format": {
+                  "type": "string",
+                  "description": "The format of the uploaded template file."
+                },
+                "region": {
+                  "type": "string",
+                  "enum": [
+                    "us",
+                    "eu",
+                    "uk",
+                    "au"
+                  ],
+                  "description": "The storage region for the template and new documents."
+                },
+                "templateUrl": {
+                  "type": "string",
+                  "description": "The download URL for the uploaded template file.",
+                  "format": "uri"
+                },
+                "previewUrl": {
+                  "type": "string",
+                  "description": "The download URL for the template PDF preview.",
+                  "format": "uri"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "description": "The download URL for the first-page template image.",
+                  "format": "uri"
+                },
+                "enhancedSyntax": {
+                  "type": "boolean",
+                  "description": "Whether enhanced template syntax is enabled."
+                },
+                "versioningEnabled": {
+                  "type": "boolean",
+                  "description": "Whether template file versioning is enabled."
+                },
+                "folder": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One folder name in the template path."
+                  },
+                  "description": "The ordered template folder path from root to leaf.",
+                  "maxItems": 100
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "created",
+                "updated",
+                "name",
+                "pageCount",
+                "delimiters",
+                "tags",
+                "filename",
+                "format",
+                "region",
+                "templateUrl",
+                "previewUrl",
+                "imageUrl",
+                "enhancedSyntax",
+                "versioningEnabled",
+                "folder"
+              ],
+              "description": "A connector-normalized DocuGenerate template."
+            },
+            "description": "The matching templates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ],
+        "description": "The DocuGenerate templates returned by the query."
+      }
+    },
+    {
+      "id": "docugenerate.update_document",
+      "service": "docugenerate",
+      "name": "update_document",
+      "description": "Rename one generated DocuGenerate document by document ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DocuGenerate document ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new logical document name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "name"
+        ],
+        "description": "The document ID and replacement logical name."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The document ID."
+              },
+              "templateId": {
+                "type": "string",
+                "description": "The ID of the template used to generate the document."
+              },
+              "created": {
+                "type": "number",
+                "description": "The document creation time in Unix epoch milliseconds."
+              },
+              "name": {
+                "type": "string",
+                "description": "The logical document name."
+              },
+              "dataLength": {
+                "type": "number",
+                "description": "The number of merge-data objects used to generate the document."
+              },
+              "filename": {
+                "type": "string",
+                "description": "The generated document filename."
+              },
+              "format": {
+                "type": "string",
+                "description": "The generated document format."
+              },
+              "documentUrl": {
+                "type": "string",
+                "description": "The download URL for the generated document.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "templateId",
+              "created",
+              "name",
+              "dataLength",
+              "filename",
+              "format",
+              "documentUrl"
+            ],
+            "description": "A connector-normalized DocuGenerate document."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The renamed generated document."
+      }
+    }
+  ]
+}

@@ -1,0 +1,678 @@
+{
+  "service": "sendspark",
+  "displayName": "Sendspark",
+  "categories": [
+    "Marketing",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Workspace API Key",
+      "placeholder": "SENDSPARK_WORKSPACE_API_KEY",
+      "description": "Sendspark workspace API key sent with the x-api-key header. Create or view it in the Sendspark API Credentials tab: https://sendspark.com/settings/api-credentials.",
+      "extraFields": [
+        {
+          "key": "userApiSecret",
+          "label": "User API Secret",
+          "inputType": "password",
+          "placeholder": "SENDSPARK_USER_API_SECRET",
+          "description": "Sendspark user API secret sent with the x-api-secret header. Generate it from the Sendspark API Credentials tab: https://sendspark.com/settings/api-credentials.",
+          "required": true,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://sendspark.com/",
+  "actions": [
+    {
+      "id": "sendspark.add_prospect",
+      "service": "sendspark",
+      "name": "add_prospect",
+      "description": "Add a prospect to a Sendspark dynamic video campaign.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark workspace identifier."
+          },
+          "dynamicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark dynamic video campaign identifier."
+          },
+          "processAndAuthorizeCharge": {
+            "type": "boolean",
+            "description": "Whether to acknowledge and authorize charges associated with processing this prospect."
+          },
+          "prospect": {
+            "type": "object",
+            "properties": {
+              "contactName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The full name of the prospect."
+              },
+              "contactEmail": {
+                "type": "string",
+                "description": "The email address of the prospect.",
+                "format": "email"
+              },
+              "backgroundUrl": {
+                "type": "string",
+                "description": "The background image URL to use in the personalized video.",
+                "format": "uri"
+              },
+              "company": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The company name of the prospect."
+              },
+              "jobTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The job title of the prospect."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "contactName",
+              "contactEmail"
+            ],
+            "description": "Prospect fields used to create a Sendspark dynamic video."
+          },
+          "prospectDepurationConfig": {
+            "type": "object",
+            "properties": {
+              "payloadDepurationStrategy": {
+                "type": "string",
+                "enum": [
+                  "keep-first-valid",
+                  "keep-last-valid"
+                ],
+                "description": "How Sendspark should resolve duplicate prospect payload entries."
+              },
+              "forceCreation": {
+                "type": "boolean",
+                "description": "Whether Sendspark should create the prospect despite duplicates."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "payloadDepurationStrategy"
+            ],
+            "description": "Duplicate handling settings used when adding a Sendspark prospect."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "dynamicId",
+          "processAndAuthorizeCharge",
+          "prospect"
+        ],
+        "description": "Input parameters for adding a prospect to a Sendspark dynamic campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prospects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contactEmail": {
+                  "type": "string",
+                  "description": "The prospect email address.",
+                  "format": "email"
+                },
+                "contactName": {
+                  "type": "string",
+                  "description": "The prospect full name when returned by Sendspark."
+                },
+                "backgroundUrl": {
+                  "type": "string",
+                  "description": "The background image URL used for the dynamic video."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The current prospect processing status."
+                },
+                "valid": {
+                  "type": "boolean",
+                  "description": "Whether Sendspark considers the prospect data valid."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the prospect was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The timestamp when the prospect was last updated."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The prospect identifier returned by Sendspark."
+                },
+                "_id": {
+                  "type": "string",
+                  "description": "The internal prospect identifier returned by Sendspark."
+                },
+                "shareUrl": {
+                  "type": "string",
+                  "description": "The public share URL for the completed video."
+                },
+                "embedUrl": {
+                  "type": "string",
+                  "description": "The embeddable URL for the completed video."
+                },
+                "company": {
+                  "type": "string",
+                  "description": "The prospect company name."
+                },
+                "jobTitle": {
+                  "type": "string",
+                  "description": "The prospect job title."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Sendspark prospect returned by the dynamic campaign API."
+            },
+            "description": "The prospect records returned by Sendspark."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An upstream field value."
+            },
+            "description": "Additional upstream fields returned by Sendspark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prospects",
+          "raw"
+        ],
+        "description": "The Sendspark prospect creation response."
+      }
+    },
+    {
+      "id": "sendspark.create_dynamic_campaign",
+      "service": "sendspark",
+      "name": "create_dynamic_campaign",
+      "description": "Create a Sendspark dynamic video campaign in a workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark workspace identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique campaign name within the workspace."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "name"
+        ],
+        "description": "Input parameters for creating a Sendspark dynamic campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique campaign record identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The dynamic video campaign name."
+              },
+              "workspace": {
+                "type": "string",
+                "description": "The workspace identifier associated with the campaign."
+              },
+              "status": {
+                "type": "string",
+                "description": "The campaign status returned by Sendspark."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the campaign was created."
+              },
+              "campaign_id": {
+                "type": "string",
+                "description": "The Sendspark campaign ID when returned by the API."
+              },
+              "summary": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Processing summary counts returned for the campaign."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Sendspark dynamic video campaign returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An upstream field value."
+            },
+            "description": "Additional upstream fields returned by Sendspark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign",
+          "raw"
+        ],
+        "description": "The created Sendspark dynamic video campaign response."
+      }
+    },
+    {
+      "id": "sendspark.get_dynamic_campaign",
+      "service": "sendspark",
+      "name": "get_dynamic_campaign",
+      "description": "Get one Sendspark dynamic video campaign by workspace and campaign ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark workspace identifier."
+          },
+          "dynamicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark dynamic video campaign identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "dynamicId"
+        ],
+        "description": "Input parameters for getting a Sendspark dynamic campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The unique campaign record identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The dynamic video campaign name."
+              },
+              "workspace": {
+                "type": "string",
+                "description": "The workspace identifier associated with the campaign."
+              },
+              "status": {
+                "type": "string",
+                "description": "The campaign status returned by Sendspark."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the campaign was created."
+              },
+              "campaign_id": {
+                "type": "string",
+                "description": "The Sendspark campaign ID when returned by the API."
+              },
+              "summary": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Processing summary counts returned for the campaign."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Sendspark dynamic video campaign returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An upstream field value."
+            },
+            "description": "Additional upstream fields returned by Sendspark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaign",
+          "raw"
+        ],
+        "description": "A Sendspark dynamic video campaign response."
+      }
+    },
+    {
+      "id": "sendspark.get_prospect_by_email",
+      "service": "sendspark",
+      "name": "get_prospect_by_email",
+      "description": "Get Sendspark prospect data by email for a dynamic campaign, including generated video URLs when available.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark workspace identifier."
+          },
+          "dynamicId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark dynamic video campaign identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The prospect email address to look up.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "dynamicId",
+          "email"
+        ],
+        "description": "Input parameters for getting a Sendspark prospect by email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prospect": {
+            "type": "object",
+            "properties": {
+              "contactEmail": {
+                "type": "string",
+                "description": "The prospect email address.",
+                "format": "email"
+              },
+              "contactName": {
+                "type": "string",
+                "description": "The prospect full name when returned by Sendspark."
+              },
+              "backgroundUrl": {
+                "type": "string",
+                "description": "The background image URL used for the dynamic video."
+              },
+              "status": {
+                "type": "string",
+                "description": "The current prospect processing status."
+              },
+              "valid": {
+                "type": "boolean",
+                "description": "Whether Sendspark considers the prospect data valid."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The timestamp when the prospect was created."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "The timestamp when the prospect was last updated."
+              },
+              "id": {
+                "type": "string",
+                "description": "The prospect identifier returned by Sendspark."
+              },
+              "_id": {
+                "type": "string",
+                "description": "The internal prospect identifier returned by Sendspark."
+              },
+              "shareUrl": {
+                "type": "string",
+                "description": "The public share URL for the completed video."
+              },
+              "embedUrl": {
+                "type": "string",
+                "description": "The embeddable URL for the completed video."
+              },
+              "company": {
+                "type": "string",
+                "description": "The prospect company name."
+              },
+              "jobTitle": {
+                "type": "string",
+                "description": "The prospect job title."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Sendspark prospect returned by the dynamic campaign API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An upstream field value."
+            },
+            "description": "Additional upstream fields returned by Sendspark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prospect",
+          "raw"
+        ],
+        "description": "A Sendspark prospect lookup response."
+      }
+    },
+    {
+      "id": "sendspark.list_dynamic_campaigns",
+      "service": "sendspark",
+      "name": "list_dynamic_campaigns",
+      "description": "List Sendspark dynamic video campaigns in a workspace with optional pagination and search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Sendspark workspace identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Number of campaigns per page. Sendspark supports a maximum of 20."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based pagination offset."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search campaigns by campaign name."
+          },
+          "filters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter campaigns by creator ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "description": "Input parameters for listing Sendspark dynamic video campaigns."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The unique campaign record identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The dynamic video campaign name."
+                },
+                "workspace": {
+                  "type": "string",
+                  "description": "The workspace identifier associated with the campaign."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The campaign status returned by Sendspark."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the campaign was created."
+                },
+                "campaign_id": {
+                  "type": "string",
+                  "description": "The Sendspark campaign ID when returned by the API."
+                },
+                "summary": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Processing summary counts returned for the campaign."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Sendspark dynamic video campaign returned by the API."
+            },
+            "description": "The campaigns returned by Sendspark."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page size returned by Sendspark."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page size returned by Sendspark."
+              },
+              "offset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The page offset returned by Sendspark."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The page offset returned by Sendspark."
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total result count returned by Sendspark."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total result count returned by Sendspark."
+              },
+              "raw": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "An upstream field value."
+                },
+                "description": "Additional upstream fields returned by Sendspark."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Sendspark."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "description": "The next page link or link metadata returned by Sendspark."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page link or link metadata returned by Sendspark."
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "description": "The previous page link or link metadata returned by Sendspark."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page link or link metadata returned by Sendspark."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination links returned by Sendspark."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "An upstream field value."
+            },
+            "description": "Additional upstream fields returned by Sendspark."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaigns",
+          "pagination",
+          "links",
+          "raw"
+        ],
+        "description": "A page of Sendspark dynamic video campaigns."
+      }
+    }
+  ]
+}

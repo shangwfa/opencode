@@ -1,0 +1,525 @@
+{
+  "service": "bettercontact",
+  "displayName": "BetterContact",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "bc_...",
+      "description": "BetterContact API key used with the X-API-Key header. Find it in the BetterContact API Requests page: https://app.bettercontact.rocks/api_requests.",
+      "extraFields": [
+        {
+          "key": "accountEmail",
+          "label": "Account Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "name@company.com",
+          "description": "Email address of your BetterContact account. Use the same email address you sign in with at https://app.bettercontact.rocks/."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://bettercontact.rocks",
+  "actions": [
+    {
+      "id": "bettercontact.get_account_balance",
+      "service": "bettercontact",
+      "name": "get_account_balance",
+      "description": "Get BetterContact credits for the connected account email or an optional email override.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Optional BetterContact account email to query instead of the email stored during connection.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Optional BetterContact account email override."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether BetterContact reported success for the account request."
+          },
+          "creditsLeft": {
+            "type": "integer",
+            "description": "The remaining BetterContact credits for the queried account."
+          },
+          "email": {
+            "type": "string",
+            "description": "The BetterContact account email returned by the credits endpoint.",
+            "format": "email"
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw BetterContact payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "creditsLeft",
+          "email",
+          "raw"
+        ],
+        "description": "The BetterContact account balance response."
+      }
+    },
+    {
+      "id": "bettercontact.get_enrichment_result",
+      "service": "bettercontact",
+      "name": "get_enrichment_result",
+      "description": "Get the current BetterContact enrichment result for a submitted request ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BetterContact request ID returned by submit_enrichment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "description": "Input for getting BetterContact enrichment results."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BetterContact request ID."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BetterContact request status string."
+          },
+          "creditsConsumed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The BetterContact credits consumed by this enrichment request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The BetterContact credits consumed by this enrichment request when available."
+          },
+          "creditsLeft": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The BetterContact credits remaining after this enrichment request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The BetterContact credits remaining after this enrichment request when available."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The total number of submitted leads."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The total number of submitted leads."
+                  },
+                  "valid": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of leads with a valid contact result."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of leads with a valid contact result."
+                  },
+                  "catchAll": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of catch-all email results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of catch-all email results."
+                  },
+                  "catchAllSafe": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of safe catch-all email results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of safe catch-all email results."
+                  },
+                  "catchAllNotSafe": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of unsafe catch-all email results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of unsafe catch-all email results."
+                  },
+                  "undeliverable": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of undeliverable email results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of undeliverable email results."
+                  },
+                  "notFound": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "The number of leads for which no contact data was found."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The number of leads for which no contact data was found."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Summary counters returned by BetterContact enrichment results when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Summary counters returned by BetterContact enrichment results when available."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "enriched": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether BetterContact enriched this lead."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether BetterContact enriched this lead."
+                },
+                "emailProvider": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The BetterContact email provider label returned for this lead when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The BetterContact email provider label returned for this lead when available."
+                },
+                "contactFirstName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The enriched contact first name when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enriched contact first name when available."
+                },
+                "contactLastName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The enriched contact last name when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enriched contact last name when available."
+                },
+                "contactEmailAddress": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The enriched work email address when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enriched work email address when available."
+                },
+                "contactEmailAddressStatus": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The BetterContact email status string when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The BetterContact email status string when available."
+                },
+                "contactGender": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The enriched contact gender when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enriched contact gender when available."
+                },
+                "contactJobTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The enriched contact job title when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The enriched contact job title when available."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw BetterContact payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One normalized BetterContact enrichment result record."
+            },
+            "description": "The normalized BetterContact enrichment result records."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw BetterContact payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "status",
+          "creditsConsumed",
+          "creditsLeft",
+          "summary",
+          "results",
+          "raw"
+        ],
+        "description": "The normalized BetterContact enrichment result."
+      }
+    },
+    {
+      "id": "bettercontact.submit_enrichment",
+      "service": "bettercontact",
+      "name": "submit_enrichment",
+      "description": "Submit one or more leads to BetterContact waterfall enrichment and return the request handle.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "leads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact last name."
+                },
+                "company": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact company name when known."
+                },
+                "companyDomain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The contact company domain when known."
+                },
+                "linkedinUrl": {
+                  "type": "string",
+                  "description": "The public LinkedIn profile URL for the contact.",
+                  "format": "uri"
+                },
+                "customFields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Arbitrary custom fields BetterContact should echo back in the enrichment result."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "firstName",
+                "lastName"
+              ],
+              "description": "One lead submitted to BetterContact for enrichment.",
+              "anyOf": [
+                {
+                  "required": [
+                    "company"
+                  ]
+                },
+                {
+                  "required": [
+                    "companyDomain"
+                  ]
+                }
+              ]
+            },
+            "description": "The leads to enrich. BetterContact supports up to 100 leads per request.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "enrichEmailAddress": {
+            "type": "boolean",
+            "description": "Whether BetterContact should enrich work email addresses for the submitted leads."
+          },
+          "enrichPhoneNumber": {
+            "type": "boolean",
+            "description": "Whether BetterContact should enrich direct phone numbers for the submitted leads."
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "Optional webhook URL where BetterContact should push the enrichment result.",
+            "format": "uri"
+          },
+          "processFlowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional BetterContact process flow ID when your account uses the process flow add-on."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "leads",
+          "enrichEmailAddress",
+          "enrichPhoneNumber"
+        ],
+        "description": "Input for submitting BetterContact enrichment.",
+        "anyOf": [
+          {
+            "properties": {
+              "enrichEmailAddress": {
+                "const": true
+              }
+            },
+            "required": [
+              "enrichEmailAddress"
+            ]
+          },
+          {
+            "properties": {
+              "enrichPhoneNumber": {
+                "const": true
+              }
+            },
+            "required": [
+              "enrichPhoneNumber"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether BetterContact accepted the enrichment request."
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BetterContact request ID used to fetch enrichment results."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BetterContact acceptance message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "requestId",
+          "message"
+        ],
+        "description": "The BetterContact enrichment submission response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,850 @@
+{
+  "service": "feedier",
+  "displayName": "Feedier",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Private API Key",
+      "placeholder": "FEEDIER_PRIVATE_API_KEY",
+      "description": "Feedier private API key sent as a Bearer token. Create or view it in Organization Settings > API: https://dashboard.feedier.com.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.feedier.ai",
+  "actions": [
+    {
+      "id": "feedier.create_report",
+      "service": "feedier",
+      "name": "create_report",
+      "description": "Create a Feedier analytical report.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The user ID to associate with the report."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The report name."
+          },
+          "fql": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A serialized Feedier FQL expression."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One Feedier FQL rule."
+                },
+                "description": "Feedier FQL rules represented as JSON objects."
+              }
+            ],
+            "description": "The Feedier FQL value applied to report components."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "master",
+              "private",
+              "public"
+            ],
+            "description": "The Feedier report visibility type."
+          },
+          "team_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The team ID that should own the report."
+          },
+          "master_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The master report ID to clone as a template."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "blank",
+              "prefilled"
+            ],
+            "description": "The initial Feedier report format."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Fields for creating a Feedier report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The report ID."
+              },
+              "user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID associated with the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID associated with the report, or null."
+              },
+              "team_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The team ID that owns the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team ID that owns the report, or null."
+              },
+              "name": {
+                "type": "string",
+                "description": "The report name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The report visibility type."
+              },
+              "status": {
+                "type": "string",
+                "description": "The report publication status."
+              },
+              "fql": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The serialized global FQL expression, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The serialized global FQL expression, or null."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The report color palette, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The report color palette, or null."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The report creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The report update timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "user_id",
+              "team_id",
+              "name",
+              "type",
+              "status",
+              "fql",
+              "color",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Feedier analytical report."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "feedier.create_report_share_link",
+      "service": "feedier",
+      "name": "create_report_share_link",
+      "description": "Generate a new expiring share link for a Feedier report.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Feedier report ID."
+          },
+          "expiration": {
+            "type": "string",
+            "enum": [
+              "seven_days",
+              "thirty_days",
+              "ninety_days",
+              "four_months"
+            ],
+            "description": "The lifetime of the generated share link."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id"
+        ],
+        "description": "Fields for generating a Feedier report share link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "share_link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The share-link record ID."
+              },
+              "token": {
+                "type": "string",
+                "description": "The generated share token."
+              },
+              "public_link": {
+                "type": "string",
+                "description": "The public report URL.",
+                "format": "uri"
+              },
+              "expires_at": {
+                "type": "string",
+                "description": "The share-link expiration timestamp."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The share-link creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The share-link update timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "token",
+              "public_link",
+              "expires_at",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "The generated Feedier share-link record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "share_link"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "feedier.delete_report",
+      "service": "feedier",
+      "name": "delete_report",
+      "description": "Delete a Feedier report by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Feedier report ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the report deletion succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "feedier.get_report",
+      "service": "feedier",
+      "name": "get_report",
+      "description": "Get a Feedier report by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Feedier report ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The report ID."
+              },
+              "user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID associated with the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID associated with the report, or null."
+              },
+              "team_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The team ID that owns the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team ID that owns the report, or null."
+              },
+              "name": {
+                "type": "string",
+                "description": "The report name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The report visibility type."
+              },
+              "status": {
+                "type": "string",
+                "description": "The report publication status."
+              },
+              "fql": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The serialized global FQL expression, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The serialized global FQL expression, or null."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The report color palette, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The report color palette, or null."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The report creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The report update timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "user_id",
+              "team_id",
+              "name",
+              "type",
+              "status",
+              "fql",
+              "color",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Feedier analytical report."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "feedier.list_reports",
+      "service": "feedier",
+      "name": "list_reports",
+      "description": "List Feedier reports with pagination, filters, and sorting.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to retrieve."
+          },
+          "name": {
+            "type": "string",
+            "description": "Filter reports by name."
+          },
+          "user_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter reports by user ID."
+          },
+          "team_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter reports by team ID."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "-name",
+              "created_at",
+              "-created_at"
+            ],
+            "description": "The report field to sort by; prefix with a minus for descending order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Feedier reports."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "The report ID."
+                },
+                "user_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The user ID associated with the report, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The user ID associated with the report, or null."
+                },
+                "team_id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The team ID that owns the report, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The team ID that owns the report, or null."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The report name."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The report visibility type."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The report publication status."
+                },
+                "fql": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The serialized global FQL expression, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The serialized global FQL expression, or null."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The report color palette, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The report color palette, or null."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The report creation timestamp."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The report update timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "user_id",
+                "team_id",
+                "name",
+                "type",
+                "status",
+                "fql",
+                "color",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "A Feedier analytical report."
+            },
+            "description": "Reports returned by Feedier."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The first page URL, or null.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The first page URL, or null."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last page URL, or null.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last page URL, or null."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The previous page URL, or null.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous page URL, or null."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next page URL, or null.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next page URL, or null."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "first",
+              "last",
+              "prev",
+              "next"
+            ],
+            "description": "Feedier pagination links."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "current_page": {
+                "type": "integer",
+                "description": "The current page number."
+              },
+              "last_page": {
+                "type": "integer",
+                "description": "The last available page number."
+              },
+              "per_page": {
+                "type": "integer",
+                "description": "The number of reports per page."
+              },
+              "total": {
+                "type": "integer",
+                "description": "The total number of reports."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "current_page",
+              "last_page",
+              "per_page",
+              "total"
+            ],
+            "description": "Feedier pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reports",
+          "links",
+          "meta"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "feedier.update_report",
+      "service": "feedier",
+      "name": "update_report",
+      "description": "Update editable fields on a Feedier report.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Feedier report ID."
+          },
+          "user_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The user ID to associate with the report."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The report name."
+          },
+          "fql": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A serialized Feedier FQL expression."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "One Feedier FQL rule."
+                },
+                "description": "Feedier FQL rules represented as JSON objects."
+              }
+            ],
+            "description": "The Feedier FQL value applied to report components."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "master",
+              "private",
+              "public"
+            ],
+            "description": "The Feedier report visibility type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "description": "The report ID."
+              },
+              "user_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The user ID associated with the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The user ID associated with the report, or null."
+              },
+              "team_id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The team ID that owns the report, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The team ID that owns the report, or null."
+              },
+              "name": {
+                "type": "string",
+                "description": "The report name."
+              },
+              "type": {
+                "type": "string",
+                "description": "The report visibility type."
+              },
+              "status": {
+                "type": "string",
+                "description": "The report publication status."
+              },
+              "fql": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The serialized global FQL expression, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The serialized global FQL expression, or null."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The report color palette, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The report color palette, or null."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The report creation timestamp."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The report update timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "user_id",
+              "team_id",
+              "name",
+              "type",
+              "status",
+              "fql",
+              "color",
+              "created_at",
+              "updated_at"
+            ],
+            "description": "A Feedier analytical report."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

@@ -1,0 +1,2818 @@
+{
+  "service": "crossref",
+  "displayName": "Crossref",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "no_auth",
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "no_auth"
+    },
+    {
+      "type": "api_key",
+      "label": "Metadata Plus API Key",
+      "placeholder": "CROSSREF_PLUS_API_KEY",
+      "description": "Optional Metadata Plus API key from https://manage.crossref.org/keys"
+    }
+  ],
+  "homepageUrl": "https://www.crossref.org/",
+  "actions": [
+    {
+      "id": "crossref.export_work_citation",
+      "service": "crossref",
+      "name": "export_work_citation",
+      "description": "Export one DOI as BibTeX, RIS, CSL JSON, a formatted citation, RDF, Turtle, or UNIXREF XML.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DOI of the work, such as 10.1038/nphys1170. A doi.org URL is also accepted.",
+            "pattern": "\\S"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "bibtex",
+              "ris",
+              "csl_json",
+              "formatted",
+              "rdf_xml",
+              "turtle",
+              "unixref_xml",
+              "unixsd_xml"
+            ],
+            "description": "The citation or metadata format to export.",
+            "default": "bibtex"
+          },
+          "style": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Crossref CSL style identifier used only with formatted output, such as apa.",
+            "pattern": "\\S"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Crossref locale identifier used only with formatted output, such as en-US.",
+            "pattern": "\\S"
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doi"
+        ],
+        "description": "Input parameters for exporting one Crossref work."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "description": "The normalized DOI used for the request."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "bibtex",
+              "ris",
+              "csl_json",
+              "formatted",
+              "rdf_xml",
+              "turtle",
+              "unixref_xml",
+              "unixsd_xml"
+            ],
+            "description": "The citation or metadata format to export."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "The response media type returned by Crossref."
+          },
+          "content": {
+            "type": "string",
+            "description": "The exported citation or metadata content."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The exported Crossref citation or metadata content."
+      }
+    },
+    {
+      "id": "crossref.get_resource",
+      "service": "crossref",
+      "name": "get_resource",
+      "description": "Get one Crossref journal, member, funder, DOI prefix, or work type record.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string",
+            "enum": [
+              "journal",
+              "member",
+              "funder",
+              "prefix",
+              "type"
+            ],
+            "description": "The Crossref resource type to retrieve."
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The resource identifier, such as an ISSN, member ID, funder ID, DOI prefix, or type ID.",
+            "pattern": "\\S"
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceType",
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Crossref resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The resource identifier derived from the Crossref response."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The resource identifier derived from the Crossref response."
+              },
+              "displayName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The primary resource title, name, or label."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The primary resource title, name, or label."
+              },
+              "location": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The resource location when Crossref returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The resource location when Crossref returns one."
+              },
+              "uri": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The canonical resource URI when Crossref returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The canonical resource URI when Crossref returns one."
+              },
+              "workCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of works associated with the resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of works associated with the resource."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Crossref metadata object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Crossref resource."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one Crossref resource."
+      }
+    },
+    {
+      "id": "crossref.get_work",
+      "service": "crossref",
+      "name": "get_work",
+      "description": "Get the current Crossref metadata record for one DOI.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DOI of the work, such as 10.1038/nphys1170. A doi.org URL is also accepted.",
+            "pattern": "\\S"
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doi"
+        ],
+        "description": "Input parameters for retrieving one Crossref work."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "work": {
+            "type": "object",
+            "properties": {
+              "doi": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The DOI of the work."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The DOI of the work."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The primary work title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The primary work title."
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The primary work subtitle."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The primary work subtitle."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Crossref work type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Crossref work type."
+              },
+              "publisher": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The work publisher."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The work publisher."
+              },
+              "containerTitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The primary journal, book, or container title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The primary journal, book, or container title."
+              },
+              "publishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The normalized publication date at the available precision."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The normalized publication date at the available precision."
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The canonical URL returned by Crossref."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The canonical URL returned by Crossref."
+              },
+              "abstract": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The abstract deposited with Crossref when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The abstract deposited with Crossref when available."
+              },
+              "authors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "given": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The contributor given name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The contributor given name."
+                    },
+                    "family": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The contributor family name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The contributor family name."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The contributor literal or organization name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The contributor literal or organization name."
+                    },
+                    "orcid": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The contributor ORCID URL or identifier."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The contributor ORCID URL or identifier."
+                    },
+                    "sequence": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The contributor sequence value returned by Crossref."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The contributor sequence value returned by Crossref."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A normalized Crossref contributor."
+                },
+                "description": "The normalized work contributors."
+              },
+              "referenceCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of references deposited for the work."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of references deposited for the work."
+              },
+              "citedByCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The number of Crossref citations to the work."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The number of Crossref citations to the work."
+              },
+              "score": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The relevance score returned for a search result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The relevance score returned for a search result."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Crossref metadata object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Crossref work."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned for one Crossref work."
+      }
+    },
+    {
+      "id": "crossref.get_work_agency",
+      "service": "crossref",
+      "name": "get_work_agency",
+      "description": "Get the DOI registration agency reported by Crossref for one work.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The DOI of the work, such as 10.1038/nphys1170. A doi.org URL is also accepted.",
+            "pattern": "\\S"
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "doi"
+        ],
+        "description": "Input parameters for retrieving the registration agency for a DOI."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "doi": {
+            "type": "string",
+            "description": "The normalized DOI used for the request."
+          },
+          "agency": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The registration agency identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The registration agency identifier."
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The registration agency display label."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The registration agency display label."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Crossref metadata object."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The normalized DOI registration agency."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The DOI registration agency response."
+      }
+    },
+    {
+      "id": "crossref.list_changed_works",
+      "service": "crossref",
+      "name": "list_changed_works",
+      "description": "Page through Crossref works created, updated by members, or re-indexed since a point in time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "changeSource": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "indexed"
+            ],
+            "description": "The Crossref timestamp used to detect changes.",
+            "default": "indexed"
+          },
+          "fromDate": {
+            "type": "string",
+            "minLength": 4,
+            "description": "The inclusive lower Crossref timestamp for this bounded synchronization window.",
+            "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2}(?:T\\d{2}(?::\\d{2}(?::\\d{2})?)?Z?)?)?)?$"
+          },
+          "untilDate": {
+            "type": "string",
+            "minLength": 4,
+            "description": "The inclusive upper Crossref timestamp fixed before reading the first page of this synchronization window.",
+            "pattern": "^\\d{4}(?:-\\d{2}(?:-\\d{2}(?:T\\d{2}(?::\\d{2}(?::\\d{2})?)?Z?)?)?)?$"
+          },
+          "workType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional Crossref work type filter, such as journal-article or book-chapter.",
+            "pattern": "\\S"
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of changed works to return per cursor page.",
+            "default": 100
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000,
+            "description": "Use * for the first cursor page, then reuse nextCursor with the exact same action and query. The wrapped Crossref cursor expires after five minutes of inactivity.",
+            "default": "*"
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fromDate",
+          "untilDate"
+        ],
+        "description": "Input parameters for incrementally synchronizing Crossref works."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records."
+              },
+              "returnedCount": {
+                "type": "integer",
+                "description": "The actual number of records returned in this response page."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized pagination metadata from a Crossref list response."
+          },
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DOI of the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DOI of the work."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work subtitle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work subtitle."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Crossref work type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Crossref work type."
+                },
+                "publisher": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The work publisher."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The work publisher."
+                },
+                "containerTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary journal, book, or container title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary journal, book, or container title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized publication date at the available precision."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized publication date at the available precision."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The canonical URL returned by Crossref."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The canonical URL returned by Crossref."
+                },
+                "abstract": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The abstract deposited with Crossref when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The abstract deposited with Crossref when available."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "given": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor given name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor given name."
+                      },
+                      "family": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor family name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor family name."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor literal or organization name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor literal or organization name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor ORCID URL or identifier."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor ORCID URL or identifier."
+                      },
+                      "sequence": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor sequence value returned by Crossref."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor sequence value returned by Crossref."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Crossref contributor."
+                  },
+                  "description": "The normalized work contributors."
+                },
+                "referenceCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of references deposited for the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of references deposited for the work."
+                },
+                "citedByCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of Crossref citations to the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of Crossref citations to the work."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The relevance score returned for a search result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The relevance score returned for a search result."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crossref metadata object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Crossref work."
+            },
+            "description": "The normalized Crossref works."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Crossref metadata object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized response from a Crossref works list."
+      }
+    },
+    {
+      "id": "crossref.list_citation_locales",
+      "service": "crossref",
+      "name": "list_citation_locales",
+      "description": "List the locale identifiers accepted for formatted Crossref citations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Crossref citation locales."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of values returned by Crossref."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Crossref citation style or locale identifier."
+            },
+            "description": "The supported Crossref values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of values supported by Crossref content negotiation."
+      }
+    },
+    {
+      "id": "crossref.list_citation_styles",
+      "service": "crossref",
+      "name": "list_citation_styles",
+      "description": "List the CSL style identifiers accepted for formatted Crossref citations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Crossref citation styles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "type": "integer",
+            "description": "The total number of values returned by Crossref."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Crossref citation style or locale identifier."
+            },
+            "description": "The supported Crossref values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of values supported by Crossref content negotiation."
+      }
+    },
+    {
+      "id": "crossref.list_resources",
+      "service": "crossref",
+      "name": "list_resources",
+      "description": "List or search Crossref journals, members, funders, work types, or licenses.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "type": "string",
+                "enum": [
+                  "journals",
+                  "licenses"
+                ],
+                "description": "The Crossref resource collection to list."
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of results to return. Use 0 for counts only."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "The zero-based result offset. Crossref recommends cursor pagination for deep result sets."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "collection"
+            ],
+            "description": "Offset or count-only journal or license request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "type": "string",
+                "enum": [
+                  "journals",
+                  "licenses"
+                ],
+                "description": "The Crossref resource collection to list."
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of results to return in this cursor page."
+              },
+              "cursor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000,
+                "description": "Use * for the first cursor page, then reuse nextCursor with the exact same action and query. The wrapped Crossref cursor expires after five minutes of inactivity."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "collection",
+              "cursor"
+            ],
+            "description": "Cursor-paginated journal or license request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "type": "string",
+                "enum": [
+                  "members",
+                  "funders"
+                ],
+                "description": "The Crossref resource collection to list."
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref resource filter expression supported by members and funders."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of results to return. Use 0 for counts only."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "The zero-based result offset. Crossref recommends cursor pagination for deep result sets."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "collection"
+            ],
+            "description": "Offset or count-only member or funder request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "type": "string",
+                "enum": [
+                  "members",
+                  "funders"
+                ],
+                "description": "The Crossref resource collection to list."
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref resource filter expression supported by members and funders."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of results to return in this cursor page."
+              },
+              "cursor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000,
+                "description": "Use * for the first cursor page, then reuse nextCursor with the exact same action and query. The wrapped Crossref cursor expires after five minutes of inactivity."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "collection",
+              "cursor"
+            ],
+            "description": "Cursor-paginated member or funder request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "const": "types",
+                "type": "string",
+                "description": "The Crossref work type collection."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of results to return. Use 0 for counts only."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "The zero-based result offset. Crossref recommends cursor pagination for deep result sets."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "collection"
+            ],
+            "description": "Work type collection request."
+          }
+        ],
+        "description": "Input parameters for listing one Crossref resource collection in a supported pagination mode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records."
+              },
+              "returnedCount": {
+                "type": "integer",
+                "description": "The actual number of records returned in this response page."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized pagination metadata from a Crossref list response."
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource identifier derived from the Crossref response."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource identifier derived from the Crossref response."
+                },
+                "displayName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary resource title, name, or label."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary resource title, name, or label."
+                },
+                "location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The resource location when Crossref returns one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The resource location when Crossref returns one."
+                },
+                "uri": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The canonical resource URI when Crossref returns one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The canonical resource URI when Crossref returns one."
+                },
+                "workCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of works associated with the resource."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of works associated with the resource."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crossref metadata object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Crossref resource."
+            },
+            "description": "The normalized Crossref resources."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Crossref resource list response."
+      }
+    },
+    {
+      "id": "crossref.list_scoped_works",
+      "service": "crossref",
+      "name": "list_scoped_works",
+      "description": "List works associated with one Crossref journal, member, funder, DOI prefix, or work type.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "journal",
+                  "member",
+                  "funder",
+                  "prefix",
+                  "type"
+                ],
+                "description": "The Crossref resource type to retrieve."
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The scope identifier, such as an ISSN, member ID, funder ID, DOI prefix, or work type ID.",
+                "pattern": "\\S"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of results to return. Use 0 for counts only."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "The zero-based result offset. Crossref recommends cursor pagination for deep result sets."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "id"
+            ],
+            "description": "Offset or count-only Crossref works request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "journal",
+                  "member",
+                  "funder",
+                  "prefix",
+                  "type"
+                ],
+                "description": "The Crossref resource type to retrieve."
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The scope identifier, such as an ISSN, member ID, funder ID, DOI prefix, or work type ID.",
+                "pattern": "\\S"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "cursor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000,
+                "description": "Use * for the first cursor page, then reuse nextCursor with the exact same action and query. The wrapped Crossref cursor expires after five minutes of inactivity."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of results to return in this cursor page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "id",
+              "cursor"
+            ],
+            "description": "Cursor-paginated Crossref works request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "journal",
+                  "member",
+                  "funder",
+                  "prefix",
+                  "type"
+                ],
+                "description": "The Crossref resource type to retrieve."
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The scope identifier, such as an ISSN, member ID, funder ID, DOI prefix, or work type ID.",
+                "pattern": "\\S"
+              },
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "sample": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of randomly sampled works to request."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "id",
+              "sample"
+            ],
+            "description": "Randomly sampled Crossref works request."
+          }
+        ],
+        "description": "Input parameters for listing scoped Crossref works in one supported pagination mode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records."
+              },
+              "returnedCount": {
+                "type": "integer",
+                "description": "The actual number of records returned in this response page."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized pagination metadata from a Crossref list response."
+          },
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DOI of the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DOI of the work."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work subtitle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work subtitle."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Crossref work type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Crossref work type."
+                },
+                "publisher": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The work publisher."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The work publisher."
+                },
+                "containerTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary journal, book, or container title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary journal, book, or container title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized publication date at the available precision."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized publication date at the available precision."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The canonical URL returned by Crossref."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The canonical URL returned by Crossref."
+                },
+                "abstract": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The abstract deposited with Crossref when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The abstract deposited with Crossref when available."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "given": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor given name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor given name."
+                      },
+                      "family": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor family name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor family name."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor literal or organization name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor literal or organization name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor ORCID URL or identifier."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor ORCID URL or identifier."
+                      },
+                      "sequence": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor sequence value returned by Crossref."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor sequence value returned by Crossref."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Crossref contributor."
+                  },
+                  "description": "The normalized work contributors."
+                },
+                "referenceCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of references deposited for the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of references deposited for the work."
+                },
+                "citedByCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of Crossref citations to the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of Crossref citations to the work."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The relevance score returned for a search result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The relevance score returned for a search result."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crossref metadata object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Crossref work."
+            },
+            "description": "The normalized Crossref works."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Crossref metadata object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized response from a Crossref works list."
+      }
+    },
+    {
+      "id": "crossref.list_works",
+      "service": "crossref",
+      "name": "list_works",
+      "description": "Search, filter, sort, sample, facet, or page through works registered with Crossref.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The number of results to return. Use 0 for counts only."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000,
+                "description": "The zero-based result offset. Crossref recommends cursor pagination for deep result sets."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Offset or count-only Crossref works request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "cursor": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 12000,
+                "description": "Use * for the first cursor page, then reuse nextCursor with the exact same action and query. The wrapped Crossref cursor expires after five minutes of inactivity."
+              },
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of results to return in this cursor page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "cursor"
+            ],
+            "description": "Cursor-paginated Crossref works request."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A full-text query across the metadata fields supported by the selected endpoint."
+              },
+              "queryBibliographic": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A bibliographic query across titles, authors, ISSNs, and publication years."
+              },
+              "queryTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to work titles."
+              },
+              "queryAuthor": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to contributor names."
+              },
+              "queryContainerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A query limited to journal or container titles."
+              },
+              "filter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref filter expression, such as from-pub-date:2024-01-01,type:journal-article."
+              },
+              "sort": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "deposited",
+                  "indexed",
+                  "is-referenced-by-count",
+                  "issued",
+                  "published",
+                  "published-online",
+                  "published-print",
+                  "references-count",
+                  "relevance",
+                  "score",
+                  "updated"
+                ],
+                "description": "The field used to sort Crossref works."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "The result sort direction."
+              },
+              "facet": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Crossref facet expression, such as type-name:* or published:10."
+              },
+              "mailto": {
+                "type": "string",
+                "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+                "format": "email"
+              },
+              "sample": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "The number of randomly sampled works to request."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "sample"
+            ],
+            "description": "Randomly sampled Crossref works request."
+          }
+        ],
+        "description": "Input parameters for listing Crossref works in one supported pagination mode."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records."
+              },
+              "returnedCount": {
+                "type": "integer",
+                "description": "The actual number of records returned in this response page."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized pagination metadata from a Crossref list response."
+          },
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DOI of the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DOI of the work."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work subtitle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work subtitle."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Crossref work type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Crossref work type."
+                },
+                "publisher": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The work publisher."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The work publisher."
+                },
+                "containerTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary journal, book, or container title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary journal, book, or container title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized publication date at the available precision."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized publication date at the available precision."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The canonical URL returned by Crossref."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The canonical URL returned by Crossref."
+                },
+                "abstract": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The abstract deposited with Crossref when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The abstract deposited with Crossref when available."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "given": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor given name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor given name."
+                      },
+                      "family": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor family name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor family name."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor literal or organization name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor literal or organization name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor ORCID URL or identifier."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor ORCID URL or identifier."
+                      },
+                      "sequence": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor sequence value returned by Crossref."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor sequence value returned by Crossref."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Crossref contributor."
+                  },
+                  "description": "The normalized work contributors."
+                },
+                "referenceCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of references deposited for the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of references deposited for the work."
+                },
+                "citedByCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of Crossref citations to the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of Crossref citations to the work."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The relevance score returned for a search result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The relevance score returned for a search result."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crossref metadata object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Crossref work."
+            },
+            "description": "The normalized Crossref works."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Crossref metadata object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized response from a Crossref works list."
+      }
+    },
+    {
+      "id": "crossref.match_reference",
+      "service": "crossref",
+      "name": "match_reference",
+      "description": "Find the most relevant Crossref work candidates for a formatted bibliographic reference.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A complete bibliographic reference containing details such as title, author, year, and venue.",
+            "pattern": "\\S"
+          },
+          "rows": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The maximum number of ranked candidate works to return.",
+            "default": 5
+          },
+          "mailto": {
+            "type": "string",
+            "description": "An email address that identifies the caller to Crossref and enables the polite API pool.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reference"
+        ],
+        "description": "Input parameters for matching a bibliographic reference."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records."
+              },
+              "returnedCount": {
+                "type": "integer",
+                "description": "The actual number of records returned in this response page."
+              },
+              "nextCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next connector cursor for cursor-mode requests. It wraps an upstream Crossref cursor that expires after five minutes of inactivity. Its presence does not guarantee another record; stop when returnedCount is smaller than the requested rows."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Normalized pagination metadata from a Crossref list response."
+          },
+          "works": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DOI of the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DOI of the work."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work title."
+                },
+                "subtitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary work subtitle."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary work subtitle."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Crossref work type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Crossref work type."
+                },
+                "publisher": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The work publisher."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The work publisher."
+                },
+                "containerTitle": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The primary journal, book, or container title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The primary journal, book, or container title."
+                },
+                "publishedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The normalized publication date at the available precision."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The normalized publication date at the available precision."
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The canonical URL returned by Crossref."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The canonical URL returned by Crossref."
+                },
+                "abstract": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The abstract deposited with Crossref when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The abstract deposited with Crossref when available."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "given": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor given name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor given name."
+                      },
+                      "family": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor family name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor family name."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor literal or organization name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor literal or organization name."
+                      },
+                      "orcid": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor ORCID URL or identifier."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor ORCID URL or identifier."
+                      },
+                      "sequence": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The contributor sequence value returned by Crossref."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The contributor sequence value returned by Crossref."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A normalized Crossref contributor."
+                  },
+                  "description": "The normalized work contributors."
+                },
+                "referenceCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of references deposited for the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of references deposited for the work."
+                },
+                "citedByCount": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of Crossref citations to the work."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of Crossref citations to the work."
+                },
+                "score": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The relevance score returned for a search result."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The relevance score returned for a search result."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Crossref metadata object."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Crossref work."
+            },
+            "description": "The normalized Crossref works."
+          },
+          "facets": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Crossref metadata object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized response from a Crossref works list."
+      }
+    }
+  ]
+}

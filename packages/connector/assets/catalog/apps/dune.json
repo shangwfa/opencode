@@ -1,0 +1,925 @@
+{
+  "service": "dune",
+  "displayName": "Dune",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DUNE_API_KEY",
+      "description": "Dune API key sent in the X-Dune-API-Key header. Create a key in Dune under Settings > API: https://dune.com/settings/api."
+    }
+  ],
+  "homepageUrl": "https://dune.com/",
+  "actions": [
+    {
+      "id": "dune.execute_query",
+      "service": "dune",
+      "name": "execute_query",
+      "description": "Execute a saved Dune query and return an execution ID for status polling and result retrieval.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "queryParameters": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Values keyed by the parameter names defined on the saved query."
+          },
+          "performance": {
+            "type": "string",
+            "enum": [
+              "small",
+              "medium",
+              "large"
+            ],
+            "description": "Dune execution performance tier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Saved Dune query execution request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUERY_STATE_PENDING",
+              "QUERY_STATE_EXECUTING",
+              "QUERY_STATE_FAILED",
+              "QUERY_STATE_COMPLETED",
+              "QUERY_STATE_CANCELED",
+              "QUERY_STATE_EXPIRED",
+              "QUERY_STATE_COMPLETED_PARTIAL"
+            ],
+            "description": "Dune execution state."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "execution_id",
+          "state"
+        ],
+        "description": "Started Dune query execution."
+      },
+      "followUpActions": [
+        "dune.get_execution_status",
+        "dune.get_execution_result"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "dune.execute_query",
+        "statusActionId": "dune.get_execution_status"
+      }
+    },
+    {
+      "id": "dune.get_execution_result",
+      "service": "dune",
+      "name": "get_execution_result",
+      "description": "Get the JSON result and metadata for a Dune execution.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of result rows to return. Cannot be combined with sampleCount."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based row offset used for pagination. Cannot be combined with sampleCount."
+          },
+          "columns": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated column names to return."
+          },
+          "filters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dune result filter expression. Cannot be combined with sampleCount."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dune result ordering expression, such as `volume desc` or `project asc, volume desc`."
+          },
+          "sampleCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of rows to sample uniformly. Cannot be combined with limit, offset, or filters."
+          },
+          "allowPartialResults": {
+            "type": "boolean",
+            "description": "Return a stored partial result when the full result was truncated."
+          },
+          "ignoreMaxCreditsPerRequest": {
+            "type": "boolean",
+            "description": "Bypass Dune's configured maximum credits per request. This may increase cost."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "executionId"
+        ],
+        "description": "Dune execution result request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          },
+          "query_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUERY_STATE_PENDING",
+              "QUERY_STATE_EXECUTING",
+              "QUERY_STATE_FAILED",
+              "QUERY_STATE_COMPLETED",
+              "QUERY_STATE_CANCELED",
+              "QUERY_STATE_EXPIRED",
+              "QUERY_STATE_COMPLETED_PARTIAL"
+            ],
+            "description": "Dune execution state."
+          },
+          "is_execution_finished": {
+            "type": "boolean",
+            "description": "Whether the execution is in a terminal state."
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "Time when Dune submitted the execution.",
+            "format": "date-time"
+          },
+          "execution_started_at": {
+            "type": "string",
+            "description": "Time when Dune started the execution.",
+            "format": "date-time"
+          },
+          "execution_ended_at": {
+            "type": "string",
+            "description": "Time when Dune ended the execution.",
+            "format": "date-time"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "description": "Time when the execution was canceled.",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Time when the stored execution result expires.",
+            "format": "date-time"
+          },
+          "execution_cost_credits": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Credits consumed by the execution."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Error type returned by Dune."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable execution error message."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific error metadata, such as a SQL line and column."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution error details."
+          },
+          "result_metadata": {
+            "type": "object",
+            "properties": {
+              "column_names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "description": "Result column names."
+              },
+              "column_types": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Dune column type."
+                },
+                "description": "Dune types for result columns."
+              },
+              "datapoint_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of result cells used for billing."
+              },
+              "execution_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Execution duration in milliseconds."
+              },
+              "pending_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Time spent pending in milliseconds."
+              },
+              "result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Size of the current result page in bytes."
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of rows in the current result page."
+              },
+              "total_result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total result size in bytes."
+              },
+              "total_row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total rows in the complete result."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution result metadata."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Result metadata and rows returned by Dune."
+          },
+          "next_offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Offset for the next page of rows."
+          },
+          "next_uri": {
+            "type": "string",
+            "description": "Dune URL for the next page of rows.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "execution_id"
+        ],
+        "description": "Dune execution or latest-query result."
+      }
+    },
+    {
+      "id": "dune.get_execution_status",
+      "service": "dune",
+      "name": "get_execution_status",
+      "description": "Get the current state and metadata for a Dune query execution.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "executionId"
+        ],
+        "description": "Dune execution status request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          },
+          "query_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUERY_STATE_PENDING",
+              "QUERY_STATE_EXECUTING",
+              "QUERY_STATE_FAILED",
+              "QUERY_STATE_COMPLETED",
+              "QUERY_STATE_CANCELED",
+              "QUERY_STATE_EXPIRED",
+              "QUERY_STATE_COMPLETED_PARTIAL"
+            ],
+            "description": "Dune execution state."
+          },
+          "is_execution_finished": {
+            "type": "boolean",
+            "description": "Whether the execution is in a terminal state."
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "Time when Dune submitted the execution.",
+            "format": "date-time"
+          },
+          "execution_started_at": {
+            "type": "string",
+            "description": "Time when Dune started the execution.",
+            "format": "date-time"
+          },
+          "execution_ended_at": {
+            "type": "string",
+            "description": "Time when Dune ended the execution.",
+            "format": "date-time"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "description": "Time when the execution was canceled.",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Time when the stored execution result expires.",
+            "format": "date-time"
+          },
+          "execution_cost_credits": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Credits consumed by the execution."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Error type returned by Dune."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable execution error message."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific error metadata, such as a SQL line and column."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution error details."
+          },
+          "result_metadata": {
+            "type": "object",
+            "properties": {
+              "column_names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "description": "Result column names."
+              },
+              "column_types": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Dune column type."
+                },
+                "description": "Dune types for result columns."
+              },
+              "datapoint_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of result cells used for billing."
+              },
+              "execution_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Execution duration in milliseconds."
+              },
+              "pending_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Time spent pending in milliseconds."
+              },
+              "result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Size of the current result page in bytes."
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of rows in the current result page."
+              },
+              "total_result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total result size in bytes."
+              },
+              "total_row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total rows in the complete result."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution result metadata."
+          },
+          "max_inflight_interactive_executions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum number of interactive executions allowed concurrently."
+          },
+          "max_inflight_interactive_reached": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of interactive executions still in progress when the account concurrency limit is reached."
+          },
+          "queue_position": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current execution queue position."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "execution_id",
+          "state"
+        ],
+        "description": "Dune execution status."
+      }
+    },
+    {
+      "id": "dune.get_latest_query_result",
+      "service": "dune",
+      "name": "get_latest_query_result",
+      "description": "Get the latest stored JSON result for a Dune query without starting a new execution.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of result rows to return. Cannot be combined with sampleCount."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based row offset used for pagination. Cannot be combined with sampleCount."
+          },
+          "columns": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated column names to return."
+          },
+          "filters": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dune result filter expression. Cannot be combined with sampleCount."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dune result ordering expression, such as `volume desc` or `project asc, volume desc`."
+          },
+          "sampleCount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of rows to sample uniformly. Cannot be combined with limit, offset, or filters."
+          },
+          "allowPartialResults": {
+            "type": "boolean",
+            "description": "Return a stored partial result when the full result was truncated."
+          },
+          "ignoreMaxCreditsPerRequest": {
+            "type": "boolean",
+            "description": "Bypass Dune's configured maximum credits per request. This may increase cost."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Latest Dune query result request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique ID of a Dune query execution."
+          },
+          "query_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "QUERY_STATE_PENDING",
+              "QUERY_STATE_EXECUTING",
+              "QUERY_STATE_FAILED",
+              "QUERY_STATE_COMPLETED",
+              "QUERY_STATE_CANCELED",
+              "QUERY_STATE_EXPIRED",
+              "QUERY_STATE_COMPLETED_PARTIAL"
+            ],
+            "description": "Dune execution state."
+          },
+          "is_execution_finished": {
+            "type": "boolean",
+            "description": "Whether the execution is in a terminal state."
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "Time when Dune submitted the execution.",
+            "format": "date-time"
+          },
+          "execution_started_at": {
+            "type": "string",
+            "description": "Time when Dune started the execution.",
+            "format": "date-time"
+          },
+          "execution_ended_at": {
+            "type": "string",
+            "description": "Time when Dune ended the execution.",
+            "format": "date-time"
+          },
+          "cancelled_at": {
+            "type": "string",
+            "description": "Time when the execution was canceled.",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Time when the stored execution result expires.",
+            "format": "date-time"
+          },
+          "execution_cost_credits": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Credits consumed by the execution."
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Error type returned by Dune."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable execution error message."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Provider-specific error metadata, such as a SQL line and column."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution error details."
+          },
+          "result_metadata": {
+            "type": "object",
+            "properties": {
+              "column_names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Column name."
+                },
+                "description": "Result column names."
+              },
+              "column_types": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Dune column type."
+                },
+                "description": "Dune types for result columns."
+              },
+              "datapoint_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of result cells used for billing."
+              },
+              "execution_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Execution duration in milliseconds."
+              },
+              "pending_time_millis": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Time spent pending in milliseconds."
+              },
+              "result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Size of the current result page in bytes."
+              },
+              "row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of rows in the current result page."
+              },
+              "total_result_set_bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total result size in bytes."
+              },
+              "total_row_count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Total rows in the complete result."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Dune execution result metadata."
+          },
+          "result": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Result metadata and rows returned by Dune."
+          },
+          "next_offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Offset for the next page of rows."
+          },
+          "next_uri": {
+            "type": "string",
+            "description": "Dune URL for the next page of rows.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "execution_id"
+        ],
+        "description": "Dune execution or latest-query result."
+      }
+    },
+    {
+      "id": "dune.get_query",
+      "service": "dune",
+      "name": "get_query",
+      "description": "Get SQL, parameters, ownership, and state for a Dune query.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Dune query lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Unique numeric ID of a Dune query."
+          },
+          "name": {
+            "type": "string",
+            "description": "Query name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Query description."
+          },
+          "owner": {
+            "type": "string",
+            "description": "Owner username or team handle."
+          },
+          "query_sql": {
+            "type": "string",
+            "description": "SQL text of the query."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Dune query parameter."
+            },
+            "description": "Parameters defined by the query."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Tag."
+            },
+            "description": "Query tags."
+          },
+          "is_private": {
+            "type": "boolean",
+            "description": "Whether the query is private."
+          },
+          "is_archived": {
+            "type": "boolean",
+            "description": "Whether the query is archived."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "query_id",
+          "name",
+          "description",
+          "owner",
+          "query_sql",
+          "parameters",
+          "tags",
+          "is_private",
+          "is_archived"
+        ],
+        "description": "Dune query details."
+      }
+    },
+    {
+      "id": "dune.list_queries",
+      "service": "dune",
+      "name": "list_queries",
+      "description": "List queries owned by the Dune account associated with the API key.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of queries to return. Dune defaults to 20."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of queries to skip. Dune defaults to 0."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination for listing Dune queries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Unique numeric ID of a Dune query."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Query name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Query description."
+                },
+                "owner": {
+                  "type": "string",
+                  "description": "Owner username or team handle."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Tag."
+                  },
+                  "description": "Query tags."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation time.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "Last update time.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "owner",
+                "tags",
+                "created_at",
+                "updated_at"
+              ],
+              "description": "Dune query overview."
+            },
+            "description": "Queries owned by the account."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of queries available."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated Dune query list."
+      }
+    }
+  ]
+}

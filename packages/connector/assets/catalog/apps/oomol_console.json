@@ -1,0 +1,4035 @@
+{
+  "service": "oomol_console",
+  "displayName": "OOMOL Console",
+  "description": "Inspect OOMOL teams, billing, usage, members, and connector execution history.",
+  "categories": [
+    "Productivity",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "OOMOL API Key",
+      "placeholder": "OOMOL_API_KEY",
+      "description": "OOMOL API key used as a Bearer token for Console APIs.",
+      "extraFields": [
+        {
+          "key": "teamId",
+          "label": "Default Team ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "team-id",
+          "description": "Optional OOMOL team ID used by team-scoped actions. You can discover accessible teams with list_teams."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://console.oomol.com",
+  "actions": [
+    {
+      "id": "oomol_console.add_member",
+      "service": "oomol_console",
+      "name": "add_member",
+      "description": "Add an OOMOL user to the current team with the member role.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact OOMOL user identifier to add.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for adding a member to the current OOMOL team."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the member was added successfully."
+          },
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The current OOMOL team identifier.",
+            "pattern": "\\S"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OOMOL user identifier that was added.",
+            "pattern": "\\S"
+          },
+          "role": {
+            "const": "member",
+            "type": "string",
+            "description": "The role assigned to the new team member."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that the OOMOL team member was added."
+      }
+    },
+    {
+      "id": "oomol_console.create_connection_permission_group",
+      "service": "oomol_console",
+      "name": "create_connection_permission_group",
+      "description": "Create a custom Connection permission group and replace the assignments of its members.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID in the current OOMOL team.",
+            "pattern": "\\S"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact revision returned by list_connection_permission_groups.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The permission group display name.",
+            "pattern": "\\S"
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact current-team member identifier.",
+              "pattern": "\\S"
+            },
+            "description": "The complete member set that should belong to the permission group after this mutation.",
+            "uniqueItems": true
+          },
+          "actionPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use every provider action and generic execution surface."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission that denies every provider action."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow only selected provider actions."
+                  },
+                  "actionNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A configurable provider action name."
+                    },
+                    "description": "The exact provider action names allowed by the permission group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use only an explicit non-empty action allowlist."
+              }
+            ],
+            "description": "The action permission assigned by a permission group."
+          },
+          "triggerPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Allow every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Deny every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow selected Triggers."
+                  },
+                  "triggerIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                    },
+                    "description": "The full Trigger IDs allowed by this group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "triggerIds"
+                ],
+                "description": "Allow only selected Trigger IDs."
+              }
+            ],
+            "description": "The independent Trigger permission for this group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "revision",
+          "name",
+          "memberIds",
+          "actionPermission"
+        ],
+        "description": "The custom permission group to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Connector App ID.",
+                "pattern": "\\S"
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provider service identifier.",
+                "pattern": "\\S"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Connection display name."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional team-local Connection alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional team-local Connection alias."
+              },
+              "accountLabel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider account label for the Connection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider account label for the Connection."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "reauth_required",
+                      "error",
+                      "disconnected"
+                    ],
+                    "description": "The current Connection status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Connection status."
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default Connection for its provider."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A manageable Connection in the current OOMOL team."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ETag revision required by subsequent permission-group mutations.",
+            "pattern": "\\S"
+          },
+          "defaultGroup": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "default",
+                "type": "string",
+                "description": "The permission group kind."
+              },
+              "name": {
+                "const": "Default permission group",
+                "type": "string",
+                "description": "The stable default permission group name."
+              },
+              "memberScope": {
+                "const": "all",
+                "type": "string",
+                "description": "The members covered by the default permission group."
+              },
+              "deletable": {
+                "const": false,
+                "type": "boolean",
+                "description": "Whether the default permission group can be deleted."
+              },
+              "actionPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use every provider action and generic execution surface."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission that denies every provider action."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow only selected provider actions."
+                      },
+                      "actionNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A configurable provider action name."
+                        },
+                        "description": "The exact provider action names allowed by the permission group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use only an explicit non-empty action allowlist."
+                  }
+                ],
+                "description": "The action permission assigned by a permission group."
+              },
+              "triggerPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Allow every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Deny every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow selected Triggers."
+                      },
+                      "triggerIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                        },
+                        "description": "The full Trigger IDs allowed by this group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "triggerIds"
+                    ],
+                    "description": "Allow only selected Trigger IDs."
+                  }
+                ],
+                "description": "The independent Trigger permission for this group."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name",
+              "memberScope",
+              "deletable",
+              "actionPermission"
+            ],
+            "description": "The non-deletable default permission group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "custom",
+                  "type": "string",
+                  "description": "The permission group kind."
+                },
+                "groupId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable permission group identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission group display name.",
+                  "pattern": "\\S"
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An assigned OOMOL team member identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The current-team member identifiers assigned to this permission group."
+                },
+                "actionPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use every provider action and generic execution surface."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission that denies every provider action."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow only selected provider actions."
+                        },
+                        "actionNames": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A configurable provider action name."
+                          },
+                          "description": "The exact provider action names allowed by the permission group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use only an explicit non-empty action allowlist."
+                    }
+                  ],
+                  "description": "The action permission assigned by a permission group."
+                },
+                "triggerPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Allow every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Deny every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow selected Triggers."
+                        },
+                        "triggerIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                          },
+                          "description": "The full Trigger IDs allowed by this group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "triggerIds"
+                      ],
+                      "description": "Allow only selected Trigger IDs."
+                    }
+                  ],
+                  "description": "The independent Trigger permission for this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "groupId",
+                "name",
+                "memberIds",
+                "actionPermission"
+              ],
+              "description": "A custom Connection permission group."
+            },
+            "description": "The custom permission groups for the Connection."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The members of the current OOMOL team."
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider action name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The provider action description."
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "destructive"
+                  ],
+                  "description": "The provider action operation type."
+                },
+                "configurable": {
+                  "type": "boolean",
+                  "description": "Whether this action can be selected individually."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A provider action that can be considered for permission-group access."
+            },
+            "description": "The provider actions available when configuring permission groups."
+          },
+          "createdGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The created permission group identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated permission groups and the created group identifier.",
+        "required": [
+          "createdGroupId"
+        ]
+      }
+    },
+    {
+      "id": "oomol_console.delete_connection_permission_group",
+      "service": "oomol_console",
+      "name": "delete_connection_permission_group",
+      "description": "Delete a custom Connection permission group so its members return to the default group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID in the current OOMOL team.",
+            "pattern": "\\S"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact revision returned by list_connection_permission_groups.",
+            "pattern": "\\S"
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The permission group identifier to delete.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The custom permission group to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Connector App ID.",
+                "pattern": "\\S"
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provider service identifier.",
+                "pattern": "\\S"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Connection display name."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional team-local Connection alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional team-local Connection alias."
+              },
+              "accountLabel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider account label for the Connection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider account label for the Connection."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "reauth_required",
+                      "error",
+                      "disconnected"
+                    ],
+                    "description": "The current Connection status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Connection status."
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default Connection for its provider."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A manageable Connection in the current OOMOL team."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ETag revision required by subsequent permission-group mutations.",
+            "pattern": "\\S"
+          },
+          "defaultGroup": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "default",
+                "type": "string",
+                "description": "The permission group kind."
+              },
+              "name": {
+                "const": "Default permission group",
+                "type": "string",
+                "description": "The stable default permission group name."
+              },
+              "memberScope": {
+                "const": "all",
+                "type": "string",
+                "description": "The members covered by the default permission group."
+              },
+              "deletable": {
+                "const": false,
+                "type": "boolean",
+                "description": "Whether the default permission group can be deleted."
+              },
+              "actionPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use every provider action and generic execution surface."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission that denies every provider action."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow only selected provider actions."
+                      },
+                      "actionNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A configurable provider action name."
+                        },
+                        "description": "The exact provider action names allowed by the permission group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use only an explicit non-empty action allowlist."
+                  }
+                ],
+                "description": "The action permission assigned by a permission group."
+              },
+              "triggerPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Allow every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Deny every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow selected Triggers."
+                      },
+                      "triggerIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                        },
+                        "description": "The full Trigger IDs allowed by this group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "triggerIds"
+                    ],
+                    "description": "Allow only selected Trigger IDs."
+                  }
+                ],
+                "description": "The independent Trigger permission for this group."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name",
+              "memberScope",
+              "deletable",
+              "actionPermission"
+            ],
+            "description": "The non-deletable default permission group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "custom",
+                  "type": "string",
+                  "description": "The permission group kind."
+                },
+                "groupId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable permission group identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission group display name.",
+                  "pattern": "\\S"
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An assigned OOMOL team member identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The current-team member identifiers assigned to this permission group."
+                },
+                "actionPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use every provider action and generic execution surface."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission that denies every provider action."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow only selected provider actions."
+                        },
+                        "actionNames": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A configurable provider action name."
+                          },
+                          "description": "The exact provider action names allowed by the permission group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use only an explicit non-empty action allowlist."
+                    }
+                  ],
+                  "description": "The action permission assigned by a permission group."
+                },
+                "triggerPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Allow every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Deny every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow selected Triggers."
+                        },
+                        "triggerIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                          },
+                          "description": "The full Trigger IDs allowed by this group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "triggerIds"
+                      ],
+                      "description": "Allow only selected Trigger IDs."
+                    }
+                  ],
+                  "description": "The independent Trigger permission for this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "groupId",
+                "name",
+                "memberIds",
+                "actionPermission"
+              ],
+              "description": "A custom Connection permission group."
+            },
+            "description": "The custom permission groups for the Connection."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The members of the current OOMOL team."
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider action name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The provider action description."
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "destructive"
+                  ],
+                  "description": "The provider action operation type."
+                },
+                "configurable": {
+                  "type": "boolean",
+                  "description": "Whether this action can be selected individually."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A provider action that can be considered for permission-group access."
+            },
+            "description": "The provider actions available when configuring permission groups."
+          },
+          "deletedGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deleted permission group identifier.",
+            "pattern": "\\S"
+          },
+          "affectedMemberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An affected OOMOL team member identifier.",
+              "pattern": "\\S"
+            },
+            "description": "The members returned to the default permission group."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated permission groups and details of the deleted group.",
+        "required": [
+          "deletedGroupId",
+          "affectedMemberIds"
+        ]
+      }
+    },
+    {
+      "id": "oomol_console.get_balance",
+      "service": "oomol_console",
+      "name": "get_balance",
+      "description": "Return every available balance lot for the authenticated OOMOL account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the OOMOL account balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "const": "account",
+            "type": "string",
+            "description": "The billing scope represented by this result."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The balance lot identifier.",
+                  "pattern": "\\S"
+                },
+                "sourceType": {
+                  "type": "string",
+                  "description": "The source type that created the balance lot."
+                },
+                "serviceScope": {
+                  "type": "string",
+                  "description": "The service scope that can consume the balance lot."
+                },
+                "paymentAmount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The payment amount associated with the lot."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment amount associated with the lot."
+                },
+                "currency": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The payment currency associated with the lot."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The payment currency associated with the lot."
+                },
+                "currentCredit": {
+                  "type": "string",
+                  "description": "The remaining credit represented as an exact decimal string."
+                },
+                "originalCredit": {
+                  "type": "string",
+                  "description": "The original credit represented as an exact decimal string."
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "Whether the balance lot is currently available."
+                },
+                "orderNumber": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The billing order number associated with the lot."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The billing order number associated with the lot."
+                },
+                "promoCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The promotional code associated with the lot."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The promotional code associated with the lot."
+                },
+                "expiresAt": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The expiration timestamp in milliseconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The expiration timestamp in milliseconds."
+                },
+                "createdAt": {
+                  "type": "number",
+                  "description": "The creation timestamp in milliseconds."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One available OOMOL balance lot."
+            },
+            "description": "All available balance lots across every upstream page."
+          },
+          "nextToken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next page token, always null after full aggregation."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page token, always null after full aggregation."
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "originalCredit": {
+                    "type": "string",
+                    "description": "The original aggregate credit as an exact decimal string."
+                  },
+                  "currentCredit": {
+                    "type": "string",
+                    "description": "The remaining aggregate credit as an exact decimal string."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The aggregate credit totals returned by OOMOL Insight."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The aggregate credit totals returned by OOMOL Insight."
+          },
+          "deficit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The account deficit as an exact decimal string."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account deficit as an exact decimal string."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The complete available balance for the OOMOL account."
+      }
+    },
+    {
+      "id": "oomol_console.get_billing_summary",
+      "service": "oomol_console",
+      "name": "get_billing_summary",
+      "description": "Return the compact OOMOL account billing metrics shown by Console.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "The number of trailing days to include.",
+            "default": 30
+          },
+          "utcOffset": {
+            "type": "integer",
+            "minimum": -12,
+            "maximum": 14,
+            "description": "The UTC offset in whole hours used for daily boundaries.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The time window used to summarize OOMOL account billing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "const": "account",
+            "type": "string",
+            "description": "The billing scope represented by this result."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "description": "The number of trailing days included in the summary."
+              },
+              "startTime": {
+                "type": "number",
+                "description": "The period start timestamp in milliseconds."
+              },
+              "endTime": {
+                "type": "number",
+                "description": "The period end timestamp in milliseconds."
+              },
+              "utcOffset": {
+                "type": "integer",
+                "description": "The UTC offset used for daily boundaries."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The requested billing summary period."
+          },
+          "generalBalanceCredit": {
+            "type": "string",
+            "description": "The remaining GENERAL credit as an exact decimal string."
+          },
+          "scopedAllowanceCredit": {
+            "type": "string",
+            "description": "The remaining non-general visible allowance as an exact decimal string."
+          },
+          "deficit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The account deficit as an exact decimal string."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account deficit as an exact decimal string."
+          },
+          "spentCredit": {
+            "type": "string",
+            "description": "The credit spent during the period as an exact decimal string."
+          },
+          "meteredEvents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of metered events during the period."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A compact billing summary for the OOMOL account."
+      }
+    },
+    {
+      "id": "oomol_console.get_current_scope",
+      "service": "oomol_console",
+      "name": "get_current_scope",
+      "description": "Return the current OOMOL team scope.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the current OOMOL scope."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "team",
+                "type": "string",
+                "description": "The execution scope kind."
+              },
+              "team": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The OOMOL team identifier.",
+                    "pattern": "\\S"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The team display name."
+                  },
+                  "avatar": {
+                    "type": "string",
+                    "description": "The team avatar URL."
+                  },
+                  "creatorUserId": {
+                    "type": "string",
+                    "description": "The user identifier of the team creator."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "paused"
+                    ],
+                    "description": "The current team status."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "creator",
+                      "admin",
+                      "member",
+                      "guest"
+                    ],
+                    "description": "The role held by the principal in the team."
+                  },
+                  "writable": {
+                    "type": "boolean",
+                    "description": "Whether the authenticated principal can modify the team."
+                  },
+                  "systemCreated": {
+                    "type": "boolean",
+                    "description": "Whether OOMOL created the team as the account's default team."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "description": "A team visible to the authenticated OOMOL principal."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The current team scope."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current OOMOL execution scope."
+      }
+    },
+    {
+      "id": "oomol_console.get_team_summary",
+      "service": "oomol_console",
+      "name": "get_team_summary",
+      "description": "Return metadata and member counts for the current OOMOL team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading the current team summary."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "team": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The OOMOL team identifier.",
+                "pattern": "\\S"
+              },
+              "name": {
+                "type": "string",
+                "description": "The team display name."
+              },
+              "avatar": {
+                "type": "string",
+                "description": "The team avatar URL."
+              },
+              "creatorUserId": {
+                "type": "string",
+                "description": "The user identifier of the team creator."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "paused"
+                ],
+                "description": "The current team status."
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "creator",
+                  "admin",
+                  "member",
+                  "guest"
+                ],
+                "description": "The role held by the principal in the team."
+              },
+              "writable": {
+                "type": "boolean",
+                "description": "Whether the authenticated principal can modify the team."
+              },
+              "systemCreated": {
+                "type": "boolean",
+                "description": "Whether OOMOL created the team as the account's default team."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "A team visible to the authenticated OOMOL principal."
+          },
+          "members": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of team members."
+              },
+              "active": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of active team members."
+              },
+              "disabled": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of disabled team members."
+              },
+              "users": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of user members."
+              },
+              "serviceAccounts": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of service-account members."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Derived counts for members of the current team."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A summary of the current OOMOL team."
+      }
+    },
+    {
+      "id": "oomol_console.get_usage_breakdown",
+      "service": "oomol_console",
+      "name": "get_usage_breakdown",
+      "description": "Return the daily OOMOL account usage breakdown by source and subject.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "The number of trailing days to include.",
+            "default": 30
+          },
+          "utcOffset": {
+            "type": "integer",
+            "minimum": -12,
+            "maximum": 14,
+            "description": "The UTC offset in whole hours used for daily boundaries.",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "description": "The time window used to read the OOMOL account usage breakdown."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "const": "account",
+            "type": "string",
+            "description": "The usage scope represented by this result."
+          },
+          "effectiveRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "number",
+                "description": "The inclusive range start timestamp in milliseconds."
+              },
+              "endTime": {
+                "type": "number",
+                "description": "The exclusive range end timestamp in milliseconds."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The effective time range used by OOMOL Insight."
+          },
+          "dataAsOf": {
+            "type": "number",
+            "description": "The timestamp through which metering data is complete."
+          },
+          "granularity": {
+            "const": "daily",
+            "type": "string",
+            "description": "The time granularity of the returned series."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "description": "The start timestamp of the data point in milliseconds."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "The metering source represented by the data point."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "The metering subject represented by the data point."
+                },
+                "totalUsage": {
+                  "type": "string",
+                  "description": "The total usage reported for the data point."
+                },
+                "eventCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of metering events in the data point."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "time",
+                "eventCount"
+              ],
+              "description": "One daily OOMOL usage data point."
+            },
+            "description": "The daily metering series."
+          },
+          "total": {
+            "type": "object",
+            "properties": {
+              "eventCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of metering events."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The metering total across all returned sources."
+          },
+          "sourceTotals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "eventCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The number of metering events for the source."
+                }
+              },
+              "additionalProperties": false,
+              "description": "The metering total for one source."
+            },
+            "description": "Metering event totals keyed by source."
+          },
+          "subjectTotals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "totalUsage": {
+                    "type": "string",
+                    "description": "The total usage reported for the subject."
+                  },
+                  "eventCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The number of metering events reported for the subject."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The usage total for one metering subject."
+              },
+              "description": "Metering totals keyed by subject."
+            },
+            "description": "Metering totals keyed first by source and then by subject."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The OOMOL Insight metering breakdown for the account."
+      }
+    },
+    {
+      "id": "oomol_console.list_connection_executions",
+      "service": "oomol_console",
+      "name": "list_connection_executions",
+      "description": "List the execution records shown on an OOMOL Console Connection details page.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID shown on the Connection details page.",
+            "pattern": "\\S"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return executions for this action name.",
+            "pattern": "\\S"
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by the previous page.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of execution records to return.",
+            "default": 20
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ],
+            "description": "Only return executions with this result status."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "limit"
+        ],
+        "description": "The filters used to list execution records for one current-team Connection."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "executionId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The execution identifier.",
+                  "pattern": "\\S"
+                },
+                "service": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider service identifier.",
+                  "pattern": "\\S"
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The executed action name.",
+                  "pattern": "\\S"
+                },
+                "actor": {
+                  "type": "string",
+                  "description": "The actor that triggered the execution."
+                },
+                "userId": {
+                  "type": "string",
+                  "description": "The user or service-account identifier that ran the action."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "error"
+                  ],
+                  "description": "The execution result status."
+                },
+                "errorCode": {
+                  "type": "string",
+                  "description": "The normalized execution error code."
+                },
+                "errorMessage": {
+                  "type": "string",
+                  "description": "The execution error message."
+                },
+                "startedAt": {
+                  "type": "string",
+                  "description": "The execution start timestamp."
+                },
+                "finishedAt": {
+                  "type": "string",
+                  "description": "The execution finish timestamp."
+                },
+                "input": {
+                  "description": "The logged action input after configured redaction."
+                },
+                "outputSummary": {
+                  "type": "string",
+                  "description": "The summarized action output after configured redaction."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "executionId",
+                "service",
+                "action",
+                "actor",
+                "status",
+                "errorCode",
+                "errorMessage",
+                "startedAt",
+                "finishedAt",
+                "input",
+                "outputSummary"
+              ],
+              "description": "One action execution record for the requested Connection."
+            },
+            "description": "The execution records visible to the current principal."
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "The cursor for loading the next page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "A paginated page of Connection execution records."
+      }
+    },
+    {
+      "id": "oomol_console.list_connection_permission_groups",
+      "service": "oomol_console",
+      "name": "list_connection_permission_groups",
+      "description": "List the default and custom permission groups for one current-team Connection.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID in the current OOMOL team.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Connection whose permission groups should be returned."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Connector App ID.",
+                "pattern": "\\S"
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provider service identifier.",
+                "pattern": "\\S"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Connection display name."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional team-local Connection alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional team-local Connection alias."
+              },
+              "accountLabel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider account label for the Connection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider account label for the Connection."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "reauth_required",
+                      "error",
+                      "disconnected"
+                    ],
+                    "description": "The current Connection status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Connection status."
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default Connection for its provider."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A manageable Connection in the current OOMOL team."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ETag revision required by subsequent permission-group mutations.",
+            "pattern": "\\S"
+          },
+          "defaultGroup": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "default",
+                "type": "string",
+                "description": "The permission group kind."
+              },
+              "name": {
+                "const": "Default permission group",
+                "type": "string",
+                "description": "The stable default permission group name."
+              },
+              "memberScope": {
+                "const": "all",
+                "type": "string",
+                "description": "The members covered by the default permission group."
+              },
+              "deletable": {
+                "const": false,
+                "type": "boolean",
+                "description": "Whether the default permission group can be deleted."
+              },
+              "actionPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use every provider action and generic execution surface."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission that denies every provider action."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow only selected provider actions."
+                      },
+                      "actionNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A configurable provider action name."
+                        },
+                        "description": "The exact provider action names allowed by the permission group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use only an explicit non-empty action allowlist."
+                  }
+                ],
+                "description": "The action permission assigned by a permission group."
+              },
+              "triggerPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Allow every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Deny every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow selected Triggers."
+                      },
+                      "triggerIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                        },
+                        "description": "The full Trigger IDs allowed by this group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "triggerIds"
+                    ],
+                    "description": "Allow only selected Trigger IDs."
+                  }
+                ],
+                "description": "The independent Trigger permission for this group."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name",
+              "memberScope",
+              "deletable",
+              "actionPermission"
+            ],
+            "description": "The non-deletable default permission group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "custom",
+                  "type": "string",
+                  "description": "The permission group kind."
+                },
+                "groupId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable permission group identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission group display name.",
+                  "pattern": "\\S"
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An assigned OOMOL team member identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The current-team member identifiers assigned to this permission group."
+                },
+                "actionPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use every provider action and generic execution surface."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission that denies every provider action."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow only selected provider actions."
+                        },
+                        "actionNames": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A configurable provider action name."
+                          },
+                          "description": "The exact provider action names allowed by the permission group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use only an explicit non-empty action allowlist."
+                    }
+                  ],
+                  "description": "The action permission assigned by a permission group."
+                },
+                "triggerPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Allow every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Deny every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow selected Triggers."
+                        },
+                        "triggerIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                          },
+                          "description": "The full Trigger IDs allowed by this group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "triggerIds"
+                      ],
+                      "description": "Allow only selected Trigger IDs."
+                    }
+                  ],
+                  "description": "The independent Trigger permission for this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "groupId",
+                "name",
+                "memberIds",
+                "actionPermission"
+              ],
+              "description": "A custom Connection permission group."
+            },
+            "description": "The custom permission groups for the Connection."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The members of the current OOMOL team."
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider action name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The provider action description."
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "destructive"
+                  ],
+                  "description": "The provider action operation type."
+                },
+                "configurable": {
+                  "type": "boolean",
+                  "description": "Whether this action can be selected individually."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A provider action that can be considered for permission-group access."
+            },
+            "description": "The provider actions available when configuring permission groups."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current permission-group configuration for one Connection."
+      }
+    },
+    {
+      "id": "oomol_console.list_members",
+      "service": "oomol_console",
+      "name": "list_members",
+      "description": "List members of the current OOMOL team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing current-team members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The current-team members."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The members of the current OOMOL team."
+      }
+    },
+    {
+      "id": "oomol_console.list_team_connections",
+      "service": "oomol_console",
+      "name": "list_team_connections",
+      "description": "List the Connections manageable by an administrator of the current OOMOL team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing current-team Connections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "appId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Connector App ID.",
+                  "pattern": "\\S"
+                },
+                "service": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider service identifier.",
+                  "pattern": "\\S"
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The Connection display name."
+                },
+                "alias": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional team-local Connection alias."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional team-local Connection alias."
+                },
+                "accountLabel": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The provider account label for the Connection."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The provider account label for the Connection."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "reauth_required",
+                        "error",
+                        "disconnected"
+                      ],
+                      "description": "The current Connection status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The current Connection status."
+                },
+                "isDefault": {
+                  "type": "boolean",
+                  "description": "Whether this is the default Connection for its provider."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A manageable Connection in the current OOMOL team."
+            },
+            "description": "The manageable current-team Connections."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The manageable Connections in the current OOMOL team."
+      }
+    },
+    {
+      "id": "oomol_console.list_teams",
+      "service": "oomol_console",
+      "name": "list_teams",
+      "description": "List the OOMOL teams visible to the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing OOMOL teams."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL team identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The team display name."
+                },
+                "avatar": {
+                  "type": "string",
+                  "description": "The team avatar URL."
+                },
+                "creatorUserId": {
+                  "type": "string",
+                  "description": "The user identifier of the team creator."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "normal",
+                    "paused"
+                  ],
+                  "description": "The current team status."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "writable": {
+                  "type": "boolean",
+                  "description": "Whether the authenticated principal can modify the team."
+                },
+                "systemCreated": {
+                  "type": "boolean",
+                  "description": "Whether OOMOL created the team as the account's default team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "description": "A team visible to the authenticated OOMOL principal."
+            },
+            "description": "The visible teams, with the system-created team first."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The teams visible to the authenticated OOMOL account."
+      }
+    },
+    {
+      "id": "oomol_console.update_connection_default_permission_group",
+      "service": "oomol_console",
+      "name": "update_connection_default_permission_group",
+      "description": "Replace the action permission of a Connection's non-deletable default permission group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID in the current OOMOL team.",
+            "pattern": "\\S"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact revision returned by list_connection_permission_groups.",
+            "pattern": "\\S"
+          },
+          "actionPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use every provider action and generic execution surface."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission that denies every provider action."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow only selected provider actions."
+                  },
+                  "actionNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A configurable provider action name."
+                    },
+                    "description": "The exact provider action names allowed by the permission group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use only an explicit non-empty action allowlist."
+              }
+            ],
+            "description": "The action permission assigned by a permission group."
+          },
+          "triggerPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Allow every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Deny every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow selected Triggers."
+                  },
+                  "triggerIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                    },
+                    "description": "The full Trigger IDs allowed by this group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "triggerIds"
+                ],
+                "description": "Allow only selected Trigger IDs."
+              }
+            ],
+            "description": "The independent Trigger permission for this group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "revision",
+          "actionPermission"
+        ],
+        "description": "The new default permission-group configuration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Connector App ID.",
+                "pattern": "\\S"
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provider service identifier.",
+                "pattern": "\\S"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Connection display name."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional team-local Connection alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional team-local Connection alias."
+              },
+              "accountLabel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider account label for the Connection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider account label for the Connection."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "reauth_required",
+                      "error",
+                      "disconnected"
+                    ],
+                    "description": "The current Connection status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Connection status."
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default Connection for its provider."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A manageable Connection in the current OOMOL team."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ETag revision required by subsequent permission-group mutations.",
+            "pattern": "\\S"
+          },
+          "defaultGroup": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "default",
+                "type": "string",
+                "description": "The permission group kind."
+              },
+              "name": {
+                "const": "Default permission group",
+                "type": "string",
+                "description": "The stable default permission group name."
+              },
+              "memberScope": {
+                "const": "all",
+                "type": "string",
+                "description": "The members covered by the default permission group."
+              },
+              "deletable": {
+                "const": false,
+                "type": "boolean",
+                "description": "Whether the default permission group can be deleted."
+              },
+              "actionPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use every provider action and generic execution surface."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission that denies every provider action."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow only selected provider actions."
+                      },
+                      "actionNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A configurable provider action name."
+                        },
+                        "description": "The exact provider action names allowed by the permission group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use only an explicit non-empty action allowlist."
+                  }
+                ],
+                "description": "The action permission assigned by a permission group."
+              },
+              "triggerPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Allow every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Deny every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow selected Triggers."
+                      },
+                      "triggerIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                        },
+                        "description": "The full Trigger IDs allowed by this group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "triggerIds"
+                    ],
+                    "description": "Allow only selected Trigger IDs."
+                  }
+                ],
+                "description": "The independent Trigger permission for this group."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name",
+              "memberScope",
+              "deletable",
+              "actionPermission"
+            ],
+            "description": "The non-deletable default permission group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "custom",
+                  "type": "string",
+                  "description": "The permission group kind."
+                },
+                "groupId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable permission group identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission group display name.",
+                  "pattern": "\\S"
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An assigned OOMOL team member identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The current-team member identifiers assigned to this permission group."
+                },
+                "actionPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use every provider action and generic execution surface."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission that denies every provider action."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow only selected provider actions."
+                        },
+                        "actionNames": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A configurable provider action name."
+                          },
+                          "description": "The exact provider action names allowed by the permission group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use only an explicit non-empty action allowlist."
+                    }
+                  ],
+                  "description": "The action permission assigned by a permission group."
+                },
+                "triggerPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Allow every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Deny every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow selected Triggers."
+                        },
+                        "triggerIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                          },
+                          "description": "The full Trigger IDs allowed by this group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "triggerIds"
+                      ],
+                      "description": "Allow only selected Trigger IDs."
+                    }
+                  ],
+                  "description": "The independent Trigger permission for this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "groupId",
+                "name",
+                "memberIds",
+                "actionPermission"
+              ],
+              "description": "A custom Connection permission group."
+            },
+            "description": "The custom permission groups for the Connection."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The members of the current OOMOL team."
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider action name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The provider action description."
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "destructive"
+                  ],
+                  "description": "The provider action operation type."
+                },
+                "configurable": {
+                  "type": "boolean",
+                  "description": "Whether this action can be selected individually."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A provider action that can be considered for permission-group access."
+            },
+            "description": "The provider actions available when configuring permission groups."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current permission-group configuration for one Connection."
+      }
+    },
+    {
+      "id": "oomol_console.update_connection_permission_group",
+      "service": "oomol_console",
+      "name": "update_connection_permission_group",
+      "description": "Replace the name, member assignments, and action permission of a custom Connection permission group.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Connector App ID in the current OOMOL team.",
+            "pattern": "\\S"
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact revision returned by list_connection_permission_groups.",
+            "pattern": "\\S"
+          },
+          "groupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The permission group identifier to update.",
+            "pattern": "\\S"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new permission group display name.",
+            "pattern": "\\S"
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An exact current-team member identifier.",
+              "pattern": "\\S"
+            },
+            "description": "The complete member set that should belong to the permission group after this mutation.",
+            "uniqueItems": true
+          },
+          "actionPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use every provider action and generic execution surface."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every provider action."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission that denies every provider action."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow only selected provider actions."
+                  },
+                  "actionNames": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A configurable provider action name."
+                    },
+                    "description": "The exact provider action names allowed by the permission group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Permission to use only an explicit non-empty action allowlist."
+              }
+            ],
+            "description": "The action permission assigned by a permission group."
+          },
+          "triggerPermission": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "all",
+                    "type": "string",
+                    "description": "Allow every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Allow every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "none",
+                    "type": "string",
+                    "description": "Deny every Trigger."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "description": "Deny every Trigger of this provider."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "const": "selected",
+                    "type": "string",
+                    "description": "Allow selected Triggers."
+                  },
+                  "triggerIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                    },
+                    "description": "The full Trigger IDs allowed by this group.",
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "triggerIds"
+                ],
+                "description": "Allow only selected Trigger IDs."
+              }
+            ],
+            "description": "The independent Trigger permission for this group."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "revision",
+          "groupId",
+          "name",
+          "memberIds",
+          "actionPermission"
+        ],
+        "description": "The complete replacement for a custom permission group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connection": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Connector App ID.",
+                "pattern": "\\S"
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provider service identifier.",
+                "pattern": "\\S"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The Connection display name."
+              },
+              "alias": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The optional team-local Connection alias."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The optional team-local Connection alias."
+              },
+              "accountLabel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The provider account label for the Connection."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The provider account label for the Connection."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "reauth_required",
+                      "error",
+                      "disconnected"
+                    ],
+                    "description": "The current Connection status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current Connection status."
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default Connection for its provider."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A manageable Connection in the current OOMOL team."
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ETag revision required by subsequent permission-group mutations.",
+            "pattern": "\\S"
+          },
+          "defaultGroup": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "default",
+                "type": "string",
+                "description": "The permission group kind."
+              },
+              "name": {
+                "const": "Default permission group",
+                "type": "string",
+                "description": "The stable default permission group name."
+              },
+              "memberScope": {
+                "const": "all",
+                "type": "string",
+                "description": "The members covered by the default permission group."
+              },
+              "deletable": {
+                "const": false,
+                "type": "boolean",
+                "description": "Whether the default permission group can be deleted."
+              },
+              "actionPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use every provider action and generic execution surface."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every provider action."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission that denies every provider action."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow only selected provider actions."
+                      },
+                      "actionNames": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A configurable provider action name."
+                        },
+                        "description": "The exact provider action names allowed by the permission group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Permission to use only an explicit non-empty action allowlist."
+                  }
+                ],
+                "description": "The action permission assigned by a permission group."
+              },
+              "triggerPermission": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "all",
+                        "type": "string",
+                        "description": "Allow every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Allow every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "none",
+                        "type": "string",
+                        "description": "Deny every Trigger."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode"
+                    ],
+                    "description": "Deny every Trigger of this provider."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "const": "selected",
+                        "type": "string",
+                        "description": "Allow selected Triggers."
+                      },
+                      "triggerIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                        },
+                        "description": "The full Trigger IDs allowed by this group.",
+                        "minItems": 1,
+                        "uniqueItems": true
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "triggerIds"
+                    ],
+                    "description": "Allow only selected Trigger IDs."
+                  }
+                ],
+                "description": "The independent Trigger permission for this group."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "name",
+              "memberScope",
+              "deletable",
+              "actionPermission"
+            ],
+            "description": "The non-deletable default permission group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "custom",
+                  "type": "string",
+                  "description": "The permission group kind."
+                },
+                "groupId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The stable permission group identifier.",
+                  "pattern": "\\S"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The permission group display name.",
+                  "pattern": "\\S"
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "An assigned OOMOL team member identifier.",
+                    "pattern": "\\S"
+                  },
+                  "description": "The current-team member identifiers assigned to this permission group."
+                },
+                "actionPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use every provider action and generic execution surface."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every provider action."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission that denies every provider action."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow only selected provider actions."
+                        },
+                        "actionNames": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A configurable provider action name."
+                          },
+                          "description": "The exact provider action names allowed by the permission group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Permission to use only an explicit non-empty action allowlist."
+                    }
+                  ],
+                  "description": "The action permission assigned by a permission group."
+                },
+                "triggerPermission": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "all",
+                          "type": "string",
+                          "description": "Allow every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Allow every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "none",
+                          "type": "string",
+                          "description": "Deny every Trigger."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode"
+                      ],
+                      "description": "Deny every Trigger of this provider."
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "selected",
+                          "type": "string",
+                          "description": "Allow selected Triggers."
+                        },
+                        "triggerIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A Trigger ID returned by the provider trigger-permissions endpoint."
+                          },
+                          "description": "The full Trigger IDs allowed by this group.",
+                          "minItems": 1,
+                          "uniqueItems": true
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "triggerIds"
+                      ],
+                      "description": "Allow only selected Trigger IDs."
+                    }
+                  ],
+                  "description": "The independent Trigger permission for this group."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "groupId",
+                "name",
+                "memberIds",
+                "actionPermission"
+              ],
+              "description": "A custom Connection permission group."
+            },
+            "description": "The custom permission groups for the Connection."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OOMOL user or service-account identifier.",
+                  "pattern": "\\S"
+                },
+                "userType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "service_account"
+                  ],
+                  "description": "The type of team member."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The member display name."
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "creator",
+                    "admin",
+                    "member",
+                    "guest"
+                  ],
+                  "description": "The role held by the principal in the team."
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Whether the member is disabled in the team."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "role",
+                "disabled"
+              ],
+              "description": "A member of the current OOMOL team."
+            },
+            "description": "The members of the current OOMOL team."
+          },
+          "availableActions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provider action name.",
+                  "pattern": "\\S"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The provider action description."
+                },
+                "operationType": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "destructive"
+                  ],
+                  "description": "The provider action operation type."
+                },
+                "configurable": {
+                  "type": "boolean",
+                  "description": "Whether this action can be selected individually."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A provider action that can be considered for permission-group access."
+            },
+            "description": "The provider actions available when configuring permission groups."
+          },
+          "updatedGroupId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The canonical permission group identifier after any legacy migration.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated permission groups and canonical updated group identifier.",
+        "required": [
+          "updatedGroupId"
+        ]
+      }
+    }
+  ]
+}

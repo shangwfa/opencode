@@ -1,0 +1,342 @@
+{
+  "service": "consensus",
+  "displayName": "Consensus",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CONSENSUS_API_KEY",
+      "description": "Consensus API key sent with the x-api-key header. Manage API access at https://consensus.app/home/api/."
+    }
+  ],
+  "homepageUrl": "https://consensus.app",
+  "actions": [
+    {
+      "id": "consensus.search_papers",
+      "service": "consensus",
+      "name": "search_papers",
+      "description": "Search Consensus for relevance-ranked academic papers with publication, study, and quality filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The research question or topic to search for.",
+            "pattern": "\\S"
+          },
+          "year_min": {
+            "type": "integer",
+            "description": "Exclude papers published before this year."
+          },
+          "year_max": {
+            "type": "integer",
+            "description": "Exclude papers published after this year."
+          },
+          "month_min": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "A month number used to limit the publication window."
+          },
+          "month_max": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "A month number used to limit the publication window."
+          },
+          "study_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Consensus filter value.",
+              "pattern": "\\S"
+            },
+            "description": "A list of documented Consensus filter values.",
+            "minItems": 1
+          },
+          "human": {
+            "type": "boolean",
+            "description": "Whether to include only studies involving humans."
+          },
+          "controlled": {
+            "type": "boolean",
+            "description": "Whether to include only controlled studies."
+          },
+          "sample_size_min": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Exclude studies with a smaller sample size."
+          },
+          "sjr_min": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "An SJR journal quartile where 1 is the highest-quality quartile and 4 is the lowest."
+          },
+          "sjr_max": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "description": "An SJR journal quartile where 1 is the highest-quality quartile and 4 is the lowest."
+          },
+          "citation_min": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Exclude papers with fewer citations."
+          },
+          "duration_min": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The minimum study duration in days."
+          },
+          "duration_max": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum study duration in days."
+          },
+          "exclude_preprints": {
+            "type": "boolean",
+            "description": "Whether to exclude preprints."
+          },
+          "open_access": {
+            "type": "boolean",
+            "description": "Whether to include only open-access papers."
+          },
+          "publisher_name": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Consensus filter value.",
+              "pattern": "\\S"
+            },
+            "description": "A list of documented Consensus filter values.",
+            "minItems": 1
+          },
+          "domain": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Consensus filter value.",
+              "pattern": "\\S"
+            },
+            "description": "A list of documented Consensus filter values.",
+            "minItems": 1
+          },
+          "country": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One documented Consensus filter value.",
+              "pattern": "\\S"
+            },
+            "description": "A list of documented Consensus filter values.",
+            "minItems": 1
+          },
+          "journal_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A preferred journal name used to rank matching journals higher.",
+            "pattern": "\\S"
+          },
+          "clinical_guideline": {
+            "type": "boolean",
+            "description": "Whether to include only clinical guidelines."
+          },
+          "medical_mode": {
+            "type": "boolean",
+            "description": "Whether to focus the search on top medical journals and clinical guidelines."
+          },
+          "include_semantic_score": {
+            "type": "boolean",
+            "description": "Whether to include Consensus semantic relevance scores in results."
+          },
+          "include_full_text_chunks": {
+            "type": "boolean",
+            "description": "Whether to include query-relevant licensed full-text excerpts when the plan supports them."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 49,
+            "description": "The zero-indexed result page, up to page 49."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The requested number of papers; Consensus caps it to the current plan maximum."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input payload for searching Consensus papers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The paper title."
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One paper author."
+                  },
+                  "description": "The paper authors."
+                },
+                "publish_year": {
+                  "type": "integer",
+                  "description": "The publication year."
+                },
+                "doi": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The paper DOI when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The paper DOI when available."
+                },
+                "journal_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The journal name when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The journal name when available."
+                },
+                "citation_count": {
+                  "type": "integer",
+                  "description": "The number of citations reported by Consensus."
+                },
+                "study_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The detected study design when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The detected study design when available."
+                },
+                "sample_size": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The study sample size when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The study sample size when available."
+                },
+                "sjr_best_quartile": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The best SJR quartile reported for the journal when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The best SJR quartile reported for the journal when available."
+                },
+                "takeaway": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The plain-language key takeaway when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The plain-language key takeaway when available."
+                },
+                "abstract": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The paper abstract when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The paper abstract when available."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The Consensus URL for the paper."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A research paper returned by Consensus."
+            },
+            "description": "The relevance-ranked papers returned for the query."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The zero-indexed page returned by Consensus."
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "The result count limit applied by Consensus."
+          },
+          "is_end": {
+            "type": "boolean",
+            "description": "Whether this is the final page of results."
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The next page number, or null at the end."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next page number, or null at the end."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The paginated paper search response returned by Consensus."
+      }
+    }
+  ]
+}

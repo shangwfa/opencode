@@ -1,0 +1,671 @@
+{
+  "service": "productive",
+  "displayName": "Productive",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "productive_api_token",
+      "description": "Productive API token sent with the X-Auth-Token header. Generate it in Productive under Settings > API integrations > Generate new token.",
+      "extraFields": [
+        {
+          "key": "organizationId",
+          "label": "Organization ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "12345",
+          "description": "Numeric Productive organization ID sent with the X-Organization-Id header."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://productive.io",
+  "actions": [
+    {
+      "id": "productive.create_task",
+      "service": "productive",
+      "name": "create_task",
+      "description": "Create a Productive task using JSON:API attributes and relationships.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive task title."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Productive task description."
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "The optional Productive task due date.",
+            "format": "date"
+          },
+          "relationships": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive relationship resource type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive resource ID."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Productive JSON:API relationship object."
+            },
+            "description": "Productive relationship values keyed by relationship name."
+          },
+          "attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional Productive JSON:API attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "The Productive task creation payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Productive JSON:API resource with upstream fields preserved."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive task output."
+      }
+    },
+    {
+      "id": "productive.create_time_entry",
+      "service": "productive",
+      "name": "create_time_entry",
+      "description": "Create a Productive time entry for a person and service.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The Productive time entry date.",
+            "format": "date"
+          },
+          "time": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Productive time entry duration in minutes."
+          },
+          "personId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          },
+          "serviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Productive time entry note."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the Productive time entry is billable."
+          },
+          "relationships": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive relationship resource type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive resource ID."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Productive JSON:API relationship object."
+            },
+            "description": "Productive relationship values keyed by relationship name."
+          },
+          "attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional Productive JSON:API attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "date",
+          "time",
+          "personId",
+          "serviceId"
+        ],
+        "description": "The Productive time entry creation payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntry": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Productive JSON:API resource with upstream fields preserved."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive time entry output."
+      }
+    },
+    {
+      "id": "productive.delete_time_entry",
+      "service": "productive",
+      "name": "delete_time_entry",
+      "description": "Delete a Productive time entry by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Productive time entry deletion payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Productive operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The generic Productive success output."
+      }
+    },
+    {
+      "id": "productive.get_task",
+      "service": "productive",
+      "name": "get_task",
+      "description": "Retrieve one Productive task by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Productive relationship names to include."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The Productive task lookup payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Productive JSON:API resource with upstream fields preserved."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive task output."
+      }
+    },
+    {
+      "id": "productive.list_tasks",
+      "service": "productive",
+      "name": "list_tasks",
+      "description": "List Productive tasks with optional pagination, sorting, filters, and includes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based Productive page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of Productive records per page. Productive allows up to 200."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive sort expression, such as title or -title."
+          },
+          "filter": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One filter value."
+            },
+            "description": "Productive filter values keyed by official filter field name."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Productive relationship names to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Productive tasks."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "The Productive tasks returned for this page."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by Productive."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Productive."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive task list output."
+      }
+    },
+    {
+      "id": "productive.list_time_entries",
+      "service": "productive",
+      "name": "list_time_entries",
+      "description": "List Productive time entries with optional pagination, sorting, filters, and includes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based Productive page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of Productive records per page. Productive allows up to 200."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive sort expression, such as title or -title."
+          },
+          "filter": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "One filter value."
+            },
+            "description": "Productive filter values keyed by official filter field name."
+          },
+          "include": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Productive relationship names to include."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Productive time entries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "The Productive time entries returned for this page."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          },
+          "links": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination links returned by Productive."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Productive."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive time entry list output."
+      }
+    },
+    {
+      "id": "productive.update_task",
+      "service": "productive",
+      "name": "update_task",
+      "description": "Update a Productive task by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional Productive task title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional Productive task description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional Productive task description."
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional Productive task due date.",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional Productive task due date."
+          },
+          "relationships": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive relationship resource type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive resource ID."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Productive JSON:API relationship object."
+            },
+            "description": "Productive relationship values keyed by relationship name."
+          },
+          "attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional Productive JSON:API attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "taskId"
+        ],
+        "description": "The Productive task update payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Productive JSON:API resource with upstream fields preserved."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive task output."
+      }
+    },
+    {
+      "id": "productive.update_time_entry",
+      "service": "productive",
+      "name": "update_time_entry",
+      "description": "Update a Productive time entry by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Productive resource ID."
+          },
+          "date": {
+            "type": "string",
+            "description": "The optional Productive time entry date.",
+            "format": "date"
+          },
+          "time": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional Productive time entry duration in minutes."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The optional Productive time entry note."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The optional Productive time entry note."
+          },
+          "billable": {
+            "type": "boolean",
+            "description": "Whether the Productive time entry is billable."
+          },
+          "relationships": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive relationship resource type."
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Productive resource ID."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A Productive JSON:API relationship object."
+            },
+            "description": "Productive relationship values keyed by relationship name."
+          },
+          "attributes": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional Productive JSON:API attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timeEntryId"
+        ],
+        "description": "The Productive time entry update payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "timeEntry": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Productive JSON:API resource with upstream fields preserved."
+          },
+          "included": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Productive JSON:API resource with upstream fields preserved."
+            },
+            "description": "Included Productive JSON:API resources."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The normalized Productive time entry output."
+      }
+    }
+  ]
+}

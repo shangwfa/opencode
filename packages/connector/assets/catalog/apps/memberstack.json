@@ -1,0 +1,1329 @@
+{
+  "service": "memberstack",
+  "displayName": "Memberstack",
+  "categories": [
+    "Security",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "MEMBERSTACK_SECRET_KEY",
+      "description": "Memberstack secret key sent with the x-api-key request header. View and manage keys in your Memberstack dashboard under Dev Tools > Keys & IDs: https://app.memberstack.com/."
+    }
+  ],
+  "homepageUrl": "https://www.memberstack.com/",
+  "actions": [
+    {
+      "id": "memberstack.add_free_plan",
+      "service": "memberstack",
+      "name": "add_free_plan",
+      "description": "Add a free Memberstack plan to an existing member.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memberstack member ID."
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The free plan ID. Free plan IDs start with pln_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for adding or removing a free member plan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful empty-body Memberstack response."
+      }
+    },
+    {
+      "id": "memberstack.create_member",
+      "service": "memberstack",
+      "name": "create_member",
+      "description": "Create a Memberstack member with email, optional password, free plans, custom fields, metadata, JSON data, and login redirect.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The member's unique email address.",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The member password. Required unless the app uses passwordless authentication."
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "planId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The free plan ID to assign or remove. Free plan IDs start with pln_."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A free Memberstack plan assignment."
+            },
+            "description": "Free plans to assign during creation."
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom fields to store on the member."
+          },
+          "metaData": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata to store on the member."
+          },
+          "json": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON data to store on the member."
+          },
+          "loginRedirect": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The URL or path where the member is redirected after login."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "The JSON body for creating a Memberstack member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Memberstack member ID."
+              },
+              "auth": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The member's email address."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The member authentication details returned by Memberstack."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the member was created."
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the member last logged in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the member last logged in."
+              },
+              "verified": {
+                "type": "boolean",
+                "description": "Whether the member's email is verified."
+              },
+              "customFields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Custom fields stored on the member."
+              },
+              "metaData": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Metadata stored on the member."
+              },
+              "json": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "JSON data stored on the member."
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One permission value."
+                },
+                "description": "Permissions assigned to the member."
+              },
+              "loginRedirect": {
+                "type": "string",
+                "description": "The URL or path where the member is redirected after login."
+              },
+              "stripeCustomerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Stripe customer ID when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Stripe customer ID when present."
+              },
+              "profileImage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The member profile image URL when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The member profile image URL when present."
+              },
+              "planConnections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The plan connection ID."
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "Whether the plan connection is active."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The plan connection status."
+                    },
+                    "planId": {
+                      "type": "string",
+                      "description": "The connected plan ID."
+                    },
+                    "planName": {
+                      "type": "string",
+                      "description": "The connected plan name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The connected plan type."
+                    },
+                    "payment": {
+                      "description": "Payment details for the plan connection when present."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One plan connection returned on a Memberstack member."
+                },
+                "description": "Plan connections for the member."
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The team ID."
+                    },
+                    "role": {
+                      "type": "string",
+                      "description": "The member's role on the team."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the team was created."
+                    },
+                    "inviteToken": {
+                      "type": "string",
+                      "description": "The team invite token."
+                    },
+                    "currentTeamMemberCount": {
+                      "type": "number",
+                      "description": "The current number of members on the team."
+                    },
+                    "maxTeamMembers": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The maximum number of members allowed on the team."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The maximum number of members allowed on the team."
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "The team owner plan ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The team owner plan name."
+                            },
+                            "teamAccountInviteSignupLink": {
+                              "type": "string",
+                              "description": "The team invite signup link."
+                            },
+                            "teamAccountUpgradeLink": {
+                              "type": "string",
+                              "description": "The team upgrade link."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The owner plan details returned for a team membership."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The owner plan details returned for a team membership."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One team membership embedded on a Memberstack member."
+                },
+                "description": "Team memberships embedded with include=teams."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memberstack member object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Memberstack single-member response."
+      }
+    },
+    {
+      "id": "memberstack.delete_member",
+      "service": "memberstack",
+      "name": "delete_member",
+      "description": "Permanently delete a Memberstack member with optional Stripe customer and subscription cleanup flags.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memberstack member ID to delete."
+          },
+          "deleteStripeCustomer": {
+            "type": "boolean",
+            "description": "Whether to delete the associated Stripe customer."
+          },
+          "cancelStripeSubscriptions": {
+            "type": "boolean",
+            "description": "Whether to cancel associated Stripe subscriptions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input for permanently deleting a Memberstack member."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The deleted Memberstack member ID."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The deleted member identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Memberstack delete member response."
+      }
+    },
+    {
+      "id": "memberstack.get_member",
+      "service": "memberstack",
+      "name": "get_member",
+      "description": "Retrieve one Memberstack member by member ID or email address, optionally embedding team memberships.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "idOrEmail": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memberstack member ID or email address."
+          },
+          "includeTeams": {
+            "type": "boolean",
+            "description": "Whether to request embedded team memberships with include=teams."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "idOrEmail"
+        ],
+        "description": "The input for retrieving a Memberstack member by ID or email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The Memberstack member ID."
+                  },
+                  "auth": {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "description": "The member's email address."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "The member authentication details returned by Memberstack."
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "description": "The ISO timestamp when the member was created."
+                  },
+                  "lastLogin": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The ISO timestamp when the member last logged in."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The ISO timestamp when the member last logged in."
+                  },
+                  "verified": {
+                    "type": "boolean",
+                    "description": "Whether the member's email is verified."
+                  },
+                  "customFields": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Custom fields stored on the member."
+                  },
+                  "metaData": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Metadata stored on the member."
+                  },
+                  "json": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "JSON data stored on the member."
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One permission value."
+                    },
+                    "description": "Permissions assigned to the member."
+                  },
+                  "loginRedirect": {
+                    "type": "string",
+                    "description": "The URL or path where the member is redirected after login."
+                  },
+                  "stripeCustomerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The Stripe customer ID when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The Stripe customer ID when present."
+                  },
+                  "profileImage": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The member profile image URL when present."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The member profile image URL when present."
+                  },
+                  "planConnections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The plan connection ID."
+                        },
+                        "active": {
+                          "type": "boolean",
+                          "description": "Whether the plan connection is active."
+                        },
+                        "status": {
+                          "type": "string",
+                          "description": "The plan connection status."
+                        },
+                        "planId": {
+                          "type": "string",
+                          "description": "The connected plan ID."
+                        },
+                        "planName": {
+                          "type": "string",
+                          "description": "The connected plan name."
+                        },
+                        "type": {
+                          "type": "string",
+                          "description": "The connected plan type."
+                        },
+                        "payment": {
+                          "description": "Payment details for the plan connection when present."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One plan connection returned on a Memberstack member."
+                    },
+                    "description": "Plan connections for the member."
+                  },
+                  "teams": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The team ID."
+                        },
+                        "role": {
+                          "type": "string",
+                          "description": "The member's role on the team."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "description": "The ISO timestamp when the team was created."
+                        },
+                        "inviteToken": {
+                          "type": "string",
+                          "description": "The team invite token."
+                        },
+                        "currentTeamMemberCount": {
+                          "type": "number",
+                          "description": "The current number of members on the team."
+                        },
+                        "maxTeamMembers": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "description": "The maximum number of members allowed on the team."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The maximum number of members allowed on the team."
+                        },
+                        "plan": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "The team owner plan ID."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "The team owner plan name."
+                                },
+                                "teamAccountInviteSignupLink": {
+                                  "type": "string",
+                                  "description": "The team invite signup link."
+                                },
+                                "teamAccountUpgradeLink": {
+                                  "type": "string",
+                                  "description": "The team upgrade link."
+                                }
+                              },
+                              "additionalProperties": true,
+                              "description": "The owner plan details returned for a team membership."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The owner plan details returned for a team membership."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One team membership embedded on a Memberstack member."
+                    },
+                    "description": "Team memberships embedded with include=teams."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Memberstack member object."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Memberstack member object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Memberstack nullable member lookup response."
+      }
+    },
+    {
+      "id": "memberstack.list_members",
+      "service": "memberstack",
+      "name": "list_members",
+      "description": "List Memberstack members with cursor pagination and optional JSON-field inclusion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "after": {
+            "type": "integer",
+            "description": "The endCursor after which listing should start."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The member sort order."
+          },
+          "first": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Alias for limit. If supplied, Memberstack gives it precedence."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of members to return."
+          },
+          "includeJSON": {
+            "type": "boolean",
+            "description": "Whether to include each member's json field in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The query parameters for listing Memberstack members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "integer",
+            "description": "The total number of members."
+          },
+          "endCursor": {
+            "type": "integer",
+            "description": "The cursor to pass as after when fetching the next page."
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether more members are available."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Memberstack member ID."
+                },
+                "auth": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "The member's email address."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The member authentication details returned by Memberstack."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO timestamp when the member was created."
+                },
+                "lastLogin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO timestamp when the member last logged in."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO timestamp when the member last logged in."
+                },
+                "verified": {
+                  "type": "boolean",
+                  "description": "Whether the member's email is verified."
+                },
+                "customFields": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Custom fields stored on the member."
+                },
+                "metaData": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Metadata stored on the member."
+                },
+                "json": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "JSON data stored on the member."
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One permission value."
+                  },
+                  "description": "Permissions assigned to the member."
+                },
+                "loginRedirect": {
+                  "type": "string",
+                  "description": "The URL or path where the member is redirected after login."
+                },
+                "stripeCustomerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Stripe customer ID when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Stripe customer ID when present."
+                },
+                "profileImage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The member profile image URL when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The member profile image URL when present."
+                },
+                "planConnections": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The plan connection ID."
+                      },
+                      "active": {
+                        "type": "boolean",
+                        "description": "Whether the plan connection is active."
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "The plan connection status."
+                      },
+                      "planId": {
+                        "type": "string",
+                        "description": "The connected plan ID."
+                      },
+                      "planName": {
+                        "type": "string",
+                        "description": "The connected plan name."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The connected plan type."
+                      },
+                      "payment": {
+                        "description": "Payment details for the plan connection when present."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One plan connection returned on a Memberstack member."
+                  },
+                  "description": "Plan connections for the member."
+                },
+                "teams": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The team ID."
+                      },
+                      "role": {
+                        "type": "string",
+                        "description": "The member's role on the team."
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "description": "The ISO timestamp when the team was created."
+                      },
+                      "inviteToken": {
+                        "type": "string",
+                        "description": "The team invite token."
+                      },
+                      "currentTeamMemberCount": {
+                        "type": "number",
+                        "description": "The current number of members on the team."
+                      },
+                      "maxTeamMembers": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "description": "The maximum number of members allowed on the team."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The maximum number of members allowed on the team."
+                      },
+                      "plan": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "The team owner plan ID."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "The team owner plan name."
+                              },
+                              "teamAccountInviteSignupLink": {
+                                "type": "string",
+                                "description": "The team invite signup link."
+                              },
+                              "teamAccountUpgradeLink": {
+                                "type": "string",
+                                "description": "The team upgrade link."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "The owner plan details returned for a team membership."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The owner plan details returned for a team membership."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One team membership embedded on a Memberstack member."
+                  },
+                  "description": "Team memberships embedded with include=teams."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Memberstack member object."
+            },
+            "description": "The members returned for this page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A paginated Memberstack member list response."
+      }
+    },
+    {
+      "id": "memberstack.remove_free_plan",
+      "service": "memberstack",
+      "name": "remove_free_plan",
+      "description": "Remove a free Memberstack plan from an existing member.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memberstack member ID."
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The free plan ID. Free plan IDs start with pln_."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for adding or removing a free member plan."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A successful empty-body Memberstack response."
+      }
+    },
+    {
+      "id": "memberstack.update_member",
+      "service": "memberstack",
+      "name": "update_member",
+      "description": "Partially update a Memberstack member's email, custom fields, metadata, JSON data, login redirect, verified status, or profile image.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Memberstack member ID to update."
+          },
+          "email": {
+            "type": "string",
+            "description": "The updated member email address.",
+            "format": "email"
+          },
+          "customFields": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Custom fields to shallow-merge into the member."
+          },
+          "metaData": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata to shallow-merge into the member."
+          },
+          "json": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON data to replace on the member."
+          },
+          "loginRedirect": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated URL or path where the member is redirected after login."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether the member's email should be marked verified."
+          },
+          "profileImage": {
+            "type": "string",
+            "description": "The updated member profile image URL.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The JSON body for partially updating a Memberstack member.",
+        "anyOf": [
+          {
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "required": [
+              "customFields"
+            ]
+          },
+          {
+            "required": [
+              "metaData"
+            ]
+          },
+          {
+            "required": [
+              "json"
+            ]
+          },
+          {
+            "required": [
+              "loginRedirect"
+            ]
+          },
+          {
+            "required": [
+              "verified"
+            ]
+          },
+          {
+            "required": [
+              "profileImage"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Memberstack member ID."
+              },
+              "auth": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "description": "The member's email address."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The member authentication details returned by Memberstack."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "The ISO timestamp when the member was created."
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO timestamp when the member last logged in."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO timestamp when the member last logged in."
+              },
+              "verified": {
+                "type": "boolean",
+                "description": "Whether the member's email is verified."
+              },
+              "customFields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Custom fields stored on the member."
+              },
+              "metaData": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Metadata stored on the member."
+              },
+              "json": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "JSON data stored on the member."
+              },
+              "permissions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One permission value."
+                },
+                "description": "Permissions assigned to the member."
+              },
+              "loginRedirect": {
+                "type": "string",
+                "description": "The URL or path where the member is redirected after login."
+              },
+              "stripeCustomerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Stripe customer ID when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Stripe customer ID when present."
+              },
+              "profileImage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The member profile image URL when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The member profile image URL when present."
+              },
+              "planConnections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The plan connection ID."
+                    },
+                    "active": {
+                      "type": "boolean",
+                      "description": "Whether the plan connection is active."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "The plan connection status."
+                    },
+                    "planId": {
+                      "type": "string",
+                      "description": "The connected plan ID."
+                    },
+                    "planName": {
+                      "type": "string",
+                      "description": "The connected plan name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The connected plan type."
+                    },
+                    "payment": {
+                      "description": "Payment details for the plan connection when present."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One plan connection returned on a Memberstack member."
+                },
+                "description": "Plan connections for the member."
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The team ID."
+                    },
+                    "role": {
+                      "type": "string",
+                      "description": "The member's role on the team."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "The ISO timestamp when the team was created."
+                    },
+                    "inviteToken": {
+                      "type": "string",
+                      "description": "The team invite token."
+                    },
+                    "currentTeamMemberCount": {
+                      "type": "number",
+                      "description": "The current number of members on the team."
+                    },
+                    "maxTeamMembers": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The maximum number of members allowed on the team."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The maximum number of members allowed on the team."
+                    },
+                    "plan": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "The team owner plan ID."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The team owner plan name."
+                            },
+                            "teamAccountInviteSignupLink": {
+                              "type": "string",
+                              "description": "The team invite signup link."
+                            },
+                            "teamAccountUpgradeLink": {
+                              "type": "string",
+                              "description": "The team upgrade link."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The owner plan details returned for a team membership."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The owner plan details returned for a team membership."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One team membership embedded on a Memberstack member."
+                },
+                "description": "Team memberships embedded with include=teams."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Memberstack member object."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Memberstack single-member response."
+      }
+    },
+    {
+      "id": "memberstack.verify_member_token",
+      "service": "memberstack",
+      "name": "verify_member_token",
+      "description": "Verify a Memberstack member JWT and return the decoded token payload.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The JWT token issued to a Memberstack member."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for verifying a Memberstack member JWT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The member ID from the token."
+              },
+              "type": {
+                "type": "string",
+                "description": "The token type."
+              },
+              "iat": {
+                "type": "integer",
+                "description": "The issued-at Unix timestamp."
+              },
+              "exp": {
+                "type": "integer",
+                "description": "The expiration Unix timestamp."
+              },
+              "aud": {
+                "type": "string",
+                "description": "The token audience."
+              },
+              "iss": {
+                "type": "string",
+                "description": "The token issuer."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The decoded token payload returned by Memberstack."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The decoded Memberstack member token response."
+      }
+    }
+  ]
+}

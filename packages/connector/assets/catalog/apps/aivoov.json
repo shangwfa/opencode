@@ -1,0 +1,185 @@
+{
+  "service": "aivoov",
+  "displayName": "AiVOOV",
+  "categories": [
+    "AI",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "aivoov_api_key",
+      "description": "AiVOOV API key sent with the x-api-key header. Get it from your AiVOOV account while setting up the Text-to-Speech API: https://aivoov.com/text-to-speech-api."
+    }
+  ],
+  "homepageUrl": "https://aivoov.com",
+  "actions": [
+    {
+      "id": "aivoov.create_audio",
+      "service": "aivoov",
+      "name": "create_audio",
+      "description": "Generate base64 audio from one or more voice/text segments.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "voiceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The AiVOOV voice identifier."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The text to synthesize."
+                },
+                "pitchRate": {
+                  "anyOf": [
+                    {
+                      "const": "default",
+                      "type": "string",
+                      "description": "Use AiVOOV's default pitch rate."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "description": "Integer pitch rate adjustment from -50 to 50."
+                    }
+                  ],
+                  "description": "The SSML pitch rate control for this segment."
+                },
+                "speakingRate": {
+                  "anyOf": [
+                    {
+                      "const": "default",
+                      "type": "string",
+                      "description": "Use AiVOOV's default speaking rate."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 20,
+                      "maximum": 200,
+                      "description": "Integer speaking rate from 20 to 200."
+                    }
+                  ],
+                  "description": "The SSML speaking rate control for this segment."
+                },
+                "volume": {
+                  "anyOf": [
+                    {
+                      "const": "default",
+                      "type": "string",
+                      "description": "Use AiVOOV's default volume."
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": -40,
+                      "maximum": 40,
+                      "description": "Integer volume adjustment from -40 to 40."
+                    }
+                  ],
+                  "description": "The SSML volume control for this segment."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "voiceId",
+                "text"
+              ],
+              "description": "One AiVOOV voice/text segment."
+            },
+            "description": "Voice/text segments to render into one audio payload.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for generating AiVOOV audio."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "boolean",
+            "description": "Whether AiVOOV generated the audio successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "The status message returned by AiVOOV."
+          },
+          "audio": {
+            "type": "string",
+            "description": "The Base64-encoded audio payload returned by AiVOOV."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status",
+          "message",
+          "audio"
+        ],
+        "description": "The audio generation response returned by AiVOOV."
+      }
+    },
+    {
+      "id": "aivoov.list_voices",
+      "service": "aivoov",
+      "name": "list_voices",
+      "description": "List available AiVOOV voices, optionally filtered by language code.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "languageCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The language code used to filter voices."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing AiVOOV voices."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "voice_id": {
+              "type": "string",
+              "description": "The AiVOOV voice identifier."
+            },
+            "name": {
+              "type": "string",
+              "description": "The voice display name."
+            },
+            "language": {
+              "type": "string",
+              "description": "The voice language code."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "voice_id",
+            "name",
+            "language"
+          ],
+          "description": "One AiVOOV voice returned by the voices endpoint."
+        },
+        "description": "The voices returned by AiVOOV."
+      }
+    }
+  ]
+}

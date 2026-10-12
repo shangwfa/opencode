@@ -1,0 +1,1174 @@
+{
+  "service": "satismeter",
+  "displayName": "SatisMeter",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "satismeter_api_key",
+      "description": "SatisMeter API key used with the Authorization Bearer header. Find it in your SatisMeter project under Settings > Integrations > API.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://satismeter.com",
+  "actions": [
+    {
+      "id": "satismeter.get_project",
+      "service": "satismeter",
+      "name": "get_project",
+      "description": "Retrieve a SatisMeter project by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a SatisMeter project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Project ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Project name."
+              }
+            },
+            "additionalProperties": true,
+            "description": "SatisMeter project."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for retrieving a SatisMeter project."
+      }
+    },
+    {
+      "id": "satismeter.get_survey",
+      "service": "satismeter",
+      "name": "get_survey",
+      "description": "Retrieve a SatisMeter survey by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter survey ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a SatisMeter survey."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "survey": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Survey ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Survey name."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "nps",
+                  "ces",
+                  "csat",
+                  "pmf",
+                  "custom"
+                ],
+                "description": "Survey template type returned by SatisMeter."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "live",
+                  "paused",
+                  "draft"
+                ],
+                "description": "Survey state returned by SatisMeter."
+              }
+            },
+            "additionalProperties": true,
+            "description": "SatisMeter survey."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for retrieving a SatisMeter survey."
+      }
+    },
+    {
+      "id": "satismeter.get_survey_statistics",
+      "service": "satismeter",
+      "name": "get_survey_statistics",
+      "description": "Retrieve aggregated statistics for one SatisMeter survey.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter survey ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "campaignId"
+        ],
+        "description": "The input payload for retrieving SatisMeter survey statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statistics": {
+            "type": "object",
+            "properties": {
+              "statistics": {
+                "type": "object",
+                "properties": {
+                  "responses": {
+                    "type": "integer",
+                    "description": "Total number of responses."
+                  },
+                  "displays": {
+                    "type": "integer",
+                    "description": "Total number of survey displays."
+                  },
+                  "responseRate": {
+                    "type": "number",
+                    "description": "Ratio of responses over displays in the selected time range."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Top-level survey response statistics."
+              },
+              "questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Question ID."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Question label in the survey default language."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "scale",
+                        "smiley",
+                        "long-text",
+                        "single-choice",
+                        "multiple-choice"
+                      ],
+                      "description": "Question type returned by SatisMeter."
+                    },
+                    "statistics": {
+                      "type": "object",
+                      "properties": {
+                        "answers": {
+                          "type": "integer",
+                          "description": "Number of responses that answered this question."
+                        },
+                        "values": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "description": "Possible answer value represented as a string."
+                                      },
+                                      {
+                                        "type": "integer",
+                                        "description": "Possible answer value represented as an integer."
+                                      }
+                                    ],
+                                    "description": "Possible answer value."
+                                  },
+                                  "answers": {
+                                    "type": "integer",
+                                    "description": "Number of answers with this value."
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "Aggregated count for one possible question value."
+                              },
+                              "description": "Per-value answer counts, or null for long-text questions."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Per-value answer counts, or null for long-text questions."
+                        },
+                        "metric": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "nps",
+                                    "ces",
+                                    "csat",
+                                    "pmf"
+                                  ],
+                                  "description": "Metric type returned by SatisMeter."
+                                },
+                                "value": {
+                                  "type": "integer",
+                                  "description": "Calculated metric value."
+                                }
+                              },
+                              "additionalProperties": false,
+                              "description": "Metric statistics associated with a question."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Metric statistics associated with a question."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Aggregated statistics for the question."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Per-question SatisMeter statistics."
+                },
+                "description": "Per-question statistics for the selected survey."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Survey statistics returned by SatisMeter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for retrieving SatisMeter survey statistics."
+      }
+    },
+    {
+      "id": "satismeter.list_project_responses",
+      "service": "satismeter",
+      "name": "list_project_responses",
+      "description": "List responses recorded across all surveys in a SatisMeter project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by a previous SatisMeter response page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return on each page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId"
+        ],
+        "description": "The input payload for listing project-level SatisMeter responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Response ID."
+                },
+                "project": {
+                  "type": "string",
+                  "description": "Project ID associated with the response."
+                },
+                "campaign": {
+                  "type": "string",
+                  "description": "Survey ID associated with the response."
+                },
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Answered question ID."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Question label displayed to the user."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "String answer value."
+                          },
+                          {
+                            "type": "integer",
+                            "description": "Numeric answer value."
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "description": "Selected option value."
+                            },
+                            "description": "Multiple selected values."
+                          }
+                        ],
+                        "description": "Answer value returned by SatisMeter."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "scale",
+                              "smiley",
+                              "long-text",
+                              "single-choice",
+                              "multiple-choice"
+                            ],
+                            "description": "Question type returned by SatisMeter."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Question type returned by SatisMeter."
+                      },
+                      "metric": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "nps",
+                              "ces",
+                              "csat",
+                              "pmf"
+                            ],
+                            "description": "Metric type returned by SatisMeter."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Metric type returned by SatisMeter."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "SatisMeter response answer."
+                  },
+                  "description": "Answers left in the response."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp with timezone information.",
+                  "format": "date-time"
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Internal user ID assigned by SatisMeter."
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "description": "Whether the referenced user has been deleted."
+                    },
+                    "userId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "External user ID stored on the response."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "External user ID stored on the response."
+                    },
+                    "anonymousId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Anonymous ID generated by SatisMeter when userId is unavailable."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Anonymous ID generated by SatisMeter when userId is unavailable."
+                    },
+                    "traits": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "A trait value."
+                      },
+                      "description": "User traits captured when the response was recorded."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Responding user returned by SatisMeter."
+                },
+                "ip": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "IP address of the respondent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "IP address of the respondent."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "ISO 3166 country code."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "ISO 3166 country code."
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Country name."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Country name."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "Country information returned by SatisMeter."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Country information returned by SatisMeter."
+                    },
+                    "region": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "ISO 3166 region code."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "ISO 3166 region code."
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Region name."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Region name."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "Region information returned by SatisMeter."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Region information returned by SatisMeter."
+                    },
+                    "city": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "City derived from the response IP."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "City derived from the response IP."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Location information returned by SatisMeter."
+                },
+                "referrer": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Page URL where the response was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Page URL where the response was created."
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "In-app",
+                    "Form",
+                    "Mobile",
+                    "Reminder",
+                    "Email"
+                  ],
+                  "description": "Delivery method used for the survey."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO 639-1 language code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO 639-1 language code."
+                },
+                "device": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "phone",
+                        "tablet",
+                        "desktop"
+                      ],
+                      "description": "Type of the device used by the respondent."
+                    },
+                    "os": {
+                      "type": "string",
+                      "description": "Operating system used by the respondent."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Device information returned by SatisMeter."
+                }
+              },
+              "additionalProperties": true,
+              "description": "SatisMeter response."
+            },
+            "description": "Responses returned by SatisMeter."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "nextPageCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there are no more pages."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there are no more pages."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether there are more response pages to fetch."
+              },
+              "size": {
+                "type": "integer",
+                "description": "Maximum number of results requested per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor pagination metadata returned by SatisMeter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing project-level SatisMeter responses."
+      }
+    },
+    {
+      "id": "satismeter.list_survey_responses",
+      "service": "satismeter",
+      "name": "list_survey_responses",
+      "description": "List responses recorded for one SatisMeter survey.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "ISO 8601 timestamp with timezone information.",
+            "format": "date-time"
+          },
+          "pageCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by a previous SatisMeter response page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of results to return on each page."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter survey ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectId",
+          "campaignId"
+        ],
+        "description": "The input payload for listing survey-level SatisMeter responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Response ID."
+                },
+                "project": {
+                  "type": "string",
+                  "description": "Project ID associated with the response."
+                },
+                "campaign": {
+                  "type": "string",
+                  "description": "Survey ID associated with the response."
+                },
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Answered question ID."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Question label displayed to the user."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "String answer value."
+                          },
+                          {
+                            "type": "integer",
+                            "description": "Numeric answer value."
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "description": "Selected option value."
+                            },
+                            "description": "Multiple selected values."
+                          }
+                        ],
+                        "description": "Answer value returned by SatisMeter."
+                      },
+                      "type": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "scale",
+                              "smiley",
+                              "long-text",
+                              "single-choice",
+                              "multiple-choice"
+                            ],
+                            "description": "Question type returned by SatisMeter."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Question type returned by SatisMeter."
+                      },
+                      "metric": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "nps",
+                              "ces",
+                              "csat",
+                              "pmf"
+                            ],
+                            "description": "Metric type returned by SatisMeter."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Metric type returned by SatisMeter."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "SatisMeter response answer."
+                  },
+                  "description": "Answers left in the response."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp with timezone information.",
+                  "format": "date-time"
+                },
+                "user": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Internal user ID assigned by SatisMeter."
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "description": "Whether the referenced user has been deleted."
+                    },
+                    "userId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "External user ID stored on the response."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "External user ID stored on the response."
+                    },
+                    "anonymousId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Anonymous ID generated by SatisMeter when userId is unavailable."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Anonymous ID generated by SatisMeter when userId is unavailable."
+                    },
+                    "traits": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "description": "A trait value."
+                      },
+                      "description": "User traits captured when the response was recorded."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Responding user returned by SatisMeter."
+                },
+                "ip": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "IP address of the respondent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "IP address of the respondent."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "ISO 3166 country code."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "ISO 3166 country code."
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Country name."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Country name."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "Country information returned by SatisMeter."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Country information returned by SatisMeter."
+                    },
+                    "region": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "ISO 3166 region code."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "ISO 3166 region code."
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Region name."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Region name."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "Region information returned by SatisMeter."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Region information returned by SatisMeter."
+                    },
+                    "city": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "City derived from the response IP."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "City derived from the response IP."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Location information returned by SatisMeter."
+                },
+                "referrer": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Page URL where the response was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Page URL where the response was created."
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "In-app",
+                    "Form",
+                    "Mobile",
+                    "Reminder",
+                    "Email"
+                  ],
+                  "description": "Delivery method used for the survey."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "ISO 639-1 language code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "ISO 639-1 language code."
+                },
+                "device": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "phone",
+                        "tablet",
+                        "desktop"
+                      ],
+                      "description": "Type of the device used by the respondent."
+                    },
+                    "os": {
+                      "type": "string",
+                      "description": "Operating system used by the respondent."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Device information returned by SatisMeter."
+                }
+              },
+              "additionalProperties": true,
+              "description": "SatisMeter response."
+            },
+            "description": "Responses returned by SatisMeter."
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "nextPageCursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when there are no more pages."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when there are no more pages."
+              },
+              "hasNextPage": {
+                "type": "boolean",
+                "description": "Whether there are more response pages to fetch."
+              },
+              "size": {
+                "type": "integer",
+                "description": "Maximum number of results requested per page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor pagination metadata returned by SatisMeter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing survey-level SatisMeter responses."
+      }
+    },
+    {
+      "id": "satismeter.list_surveys",
+      "service": "satismeter",
+      "name": "list_surveys",
+      "description": "List surveys configured in a SatisMeter project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SatisMeter project ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing SatisMeter surveys."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "surveys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Survey ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Survey name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "nps",
+                    "ces",
+                    "csat",
+                    "pmf",
+                    "custom"
+                  ],
+                  "description": "Survey template type returned by SatisMeter."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "live",
+                    "paused",
+                    "draft"
+                  ],
+                  "description": "Survey state returned by SatisMeter."
+                }
+              },
+              "additionalProperties": true,
+              "description": "SatisMeter survey."
+            },
+            "description": "Surveys returned by SatisMeter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing SatisMeter surveys."
+      }
+    }
+  ]
+}

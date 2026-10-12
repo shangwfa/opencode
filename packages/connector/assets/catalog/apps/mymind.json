@@ -1,0 +1,2088 @@
+{
+  "service": "mymind",
+  "displayName": "mymind",
+  "description": "Search, read, and add to the objects saved in a mymind account, including notes, bookmarks, files, tags, spaces, and links.",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "keyId",
+          "label": "Access Key ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "MYMIND_ACCESS_KEY_ID",
+          "description": "The access key identifier, sent as the kid header of every signed request. Create an access key on the Extensions page at https://access.mymind.com/extensions; the identifier and its secret are shown together once, at creation."
+        },
+        {
+          "key": "keySecret",
+          "label": "Access Key Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "MYMIND_ACCESS_KEY_SECRET",
+          "description": "The base64 secret shown beside that identifier. It signs each request locally and is never sent to mymind."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_tags",
+        "input": {}
+      }
+    }
+  ],
+  "homepageUrl": "https://mymind.com",
+  "actions": [
+    {
+      "id": "mymind.add_object_tags",
+      "service": "mymind",
+      "name": "add_object_tags",
+      "description": "Add tags to a mymind object.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag name."
+            },
+            "description": "Tag names.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for tagging an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The tagged object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The tagging result."
+      }
+    },
+    {
+      "id": "mymind.add_object_to_space",
+      "service": "mymind",
+      "name": "add_object_to_space",
+      "description": "Put a mymind object into a space.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          },
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for adding an object to a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "description": "The space identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of adding the object."
+      }
+    },
+    {
+      "id": "mymind.create_link",
+      "service": "mymind",
+      "name": "create_link",
+      "description": "Link one mymind object to another.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The object the link starts from."
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The object the link points to."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for creating a link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The link identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "How the link was made, either WikiLink or Manual."
+              },
+              "sourceId": {
+                "type": "string",
+                "description": "The object the link starts from."
+              },
+              "targetId": {
+                "type": "string",
+                "description": "The object the link points to."
+              },
+              "flags": {
+                "type": "integer",
+                "description": "Bit flags mymind sets on the link."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A link between two mymind objects."
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Whether a new link was created, or false when the link already existed."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The link mymind created or matched."
+      }
+    },
+    {
+      "id": "mymind.create_note",
+      "service": "mymind",
+      "name": "create_note",
+      "description": "Create a note in a mind from markdown content.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note body as markdown."
+          },
+          "title": {
+            "type": "string",
+            "description": "The note title."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag name."
+            },
+            "description": "Tag names.",
+            "minItems": 1
+          },
+          "spaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A space identifier."
+            },
+            "description": "Identifiers of spaces the object belongs to.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "description": "The input for creating a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The object identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The display title, set by the user or derived from the source or content."
+              },
+              "summary": {
+                "type": "string",
+                "description": "The summary mymind generated for the object."
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "The content media type, either text/markdown or application/prose+json."
+                  },
+                  "body": {
+                    "type": "string",
+                    "description": "The content body in the declared media type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An inline content body."
+              },
+              "source": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Where the object came from, including the original URL."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The tag identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The tag name."
+                    },
+                    "flags": {
+                      "type": "integer",
+                      "description": "Bit flags mymind sets on the tag."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A tag on an object."
+                },
+                "description": "The tags on the object."
+              },
+              "spaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A space reference."
+                },
+                "description": "The spaces the object belongs to."
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A note and its content body."
+                },
+                "description": "The notes attached to the object."
+              },
+              "blob": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The stored media for an uploaded file, when the object has one."
+              },
+              "screenshot": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The screenshot captured when the object was saved."
+              },
+              "mainEntity": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The primary entity the object is about."
+              },
+              "created": {
+                "type": "string",
+                "description": "When the object was created."
+              },
+              "modified": {
+                "type": "string",
+                "description": "When the object was last modified."
+              },
+              "bumped": {
+                "type": "string",
+                "description": "When the object was last bumped."
+              },
+              "deleted": {
+                "type": "string",
+                "description": "When the object was soft-deleted; absent while the object is live."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A mymind object, which is anything saved to a mind: a page, image, file, or note."
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Whether a new object was created, or false when mymind matched an existing duplicate."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The object mymind created or matched."
+      }
+    },
+    {
+      "id": "mymind.create_object_note",
+      "service": "mymind",
+      "name": "create_object_note",
+      "description": "Attach a markdown note to a mymind object.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note body as markdown."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for adding a note to an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The object the note is attached to."
+          },
+          "noteId": {
+            "type": "string",
+            "description": "The new note identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created note."
+      }
+    },
+    {
+      "id": "mymind.create_space",
+      "service": "mymind",
+      "name": "create_space",
+      "description": "Create a mymind space, optionally seeded with objects.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The space name."
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The space colour."
+          },
+          "objectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An object identifier."
+            },
+            "description": "Objects to put in the new space.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input for creating a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The space identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The space name."
+          },
+          "color": {
+            "type": "string",
+            "description": "The space colour."
+          },
+          "created": {
+            "type": "string",
+            "description": "When the space was created."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An object reference."
+            },
+            "description": "The objects in the space, returned when a single space is read."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A mymind space, a named collection of objects."
+      }
+    },
+    {
+      "id": "mymind.delete_link",
+      "service": "mymind",
+      "name": "delete_link",
+      "description": "Delete a manual link. A wiki-style link cannot be deleted directly; remove the reference from the source note instead.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The link identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for deleting a link."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "linkId": {
+            "type": "string",
+            "description": "The deleted link identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "mymind.delete_object",
+      "service": "mymind",
+      "name": "delete_object",
+      "description": "Soft-delete a mymind object. Use restore_object to bring it back.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for deleting an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The deleted object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion result."
+      },
+      "followUpActions": [
+        "mymind.restore_object"
+      ]
+    },
+    {
+      "id": "mymind.delete_object_note",
+      "service": "mymind",
+      "name": "delete_object_note",
+      "description": "Delete a note attached to a mymind object.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for deleting a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "description": "The deleted note identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "mymind.delete_space",
+      "service": "mymind",
+      "name": "delete_space",
+      "description": "Delete a mymind space. The objects it held stay in the mind.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for deleting a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "description": "The deleted space identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The deletion result."
+      }
+    },
+    {
+      "id": "mymind.get_object",
+      "service": "mymind",
+      "name": "get_object",
+      "description": "Get one mymind object with its title, summary, tags, spaces, notes, and source.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The object identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "The display title, set by the user or derived from the source or content."
+          },
+          "summary": {
+            "type": "string",
+            "description": "The summary mymind generated for the object."
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "The content media type, either text/markdown or application/prose+json."
+              },
+              "body": {
+                "type": "string",
+                "description": "The content body in the declared media type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "An inline content body."
+          },
+          "source": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Where the object came from, including the original URL."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The tag identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "flags": {
+                  "type": "integer",
+                  "description": "Bit flags mymind sets on the tag."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A tag on an object."
+            },
+            "description": "The tags on the object."
+          },
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A space reference."
+            },
+            "description": "The spaces the object belongs to."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A note and its content body."
+            },
+            "description": "The notes attached to the object."
+          },
+          "blob": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The stored media for an uploaded file, when the object has one."
+          },
+          "screenshot": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The screenshot captured when the object was saved."
+          },
+          "mainEntity": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The primary entity the object is about."
+          },
+          "created": {
+            "type": "string",
+            "description": "When the object was created."
+          },
+          "modified": {
+            "type": "string",
+            "description": "When the object was last modified."
+          },
+          "bumped": {
+            "type": "string",
+            "description": "When the object was last bumped."
+          },
+          "deleted": {
+            "type": "string",
+            "description": "When the object was soft-deleted; absent while the object is live."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A mymind object, which is anything saved to a mind: a page, image, file, or note."
+      },
+      "followUpActions": [
+        "mymind.get_object_content"
+      ]
+    },
+    {
+      "id": "mymind.get_object_content",
+      "service": "mymind",
+      "name": "get_object_content",
+      "description": "Get the content body of a mymind object as markdown. Many objects are saved without an inline body — a bookmark or an image is the whole object — and those come back empty rather than as an error.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting object content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The object the content belongs to."
+          },
+          "markdown": {
+            "type": "string",
+            "description": "The content body as markdown, empty when the object carries no inline body."
+          },
+          "hasContent": {
+            "type": "boolean",
+            "description": "Whether the object carries an inline content body at all."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The object content."
+      }
+    },
+    {
+      "id": "mymind.get_space",
+      "service": "mymind",
+      "name": "get_space",
+      "description": "Get one mymind space and the objects it holds.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for getting a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The space identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The space name."
+          },
+          "color": {
+            "type": "string",
+            "description": "The space colour."
+          },
+          "created": {
+            "type": "string",
+            "description": "When the space was created."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An object reference."
+            },
+            "description": "The objects in the space, returned when a single space is read."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A mymind space, a named collection of objects."
+      }
+    },
+    {
+      "id": "mymind.list_links",
+      "service": "mymind",
+      "name": "list_links",
+      "description": "List the links between objects in a mind, both wiki-style references and manual links.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for listing links."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The link identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "How the link was made, either WikiLink or Manual."
+                },
+                "sourceId": {
+                  "type": "string",
+                  "description": "The object the link starts from."
+                },
+                "targetId": {
+                  "type": "string",
+                  "description": "The object the link points to."
+                },
+                "flags": {
+                  "type": "integer",
+                  "description": "Bit flags mymind sets on the link."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A link between two mymind objects."
+            },
+            "description": "The links."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The links in the mind."
+      }
+    },
+    {
+      "id": "mymind.list_objects",
+      "service": "mymind",
+      "name": "list_objects",
+      "description": "List objects in a mind, optionally narrowed to a text query, a space, specific identifiers, or objects similar to one you already have.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A text query to narrow the list."
+          },
+          "objectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "An object identifier."
+            },
+            "description": "Specific object identifiers to fetch.",
+            "minItems": 1
+          },
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          },
+          "similarTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An object identifier to rank the results by similarity to."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "How many objects to return.",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing objects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The object identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The display title, set by the user or derived from the source or content."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "The summary mymind generated for the object."
+                },
+                "content": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "The content media type, either text/markdown or application/prose+json."
+                    },
+                    "body": {
+                      "type": "string",
+                      "description": "The content body in the declared media type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "An inline content body."
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Where the object came from, including the original URL."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The tag identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The tag name."
+                      },
+                      "flags": {
+                        "type": "integer",
+                        "description": "Bit flags mymind sets on the tag."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A tag on an object."
+                  },
+                  "description": "The tags on the object."
+                },
+                "spaces": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A space reference."
+                  },
+                  "description": "The spaces the object belongs to."
+                },
+                "notes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A note and its content body."
+                  },
+                  "description": "The notes attached to the object."
+                },
+                "blob": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The stored media for an uploaded file, when the object has one."
+                },
+                "screenshot": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The screenshot captured when the object was saved."
+                },
+                "mainEntity": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The primary entity the object is about."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "When the object was created."
+                },
+                "modified": {
+                  "type": "string",
+                  "description": "When the object was last modified."
+                },
+                "bumped": {
+                  "type": "string",
+                  "description": "When the object was last bumped."
+                },
+                "deleted": {
+                  "type": "string",
+                  "description": "When the object was soft-deleted; absent while the object is live."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A mymind object, which is anything saved to a mind: a page, image, file, or note."
+            },
+            "description": "The objects."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The objects that matched."
+      }
+    },
+    {
+      "id": "mymind.list_spaces",
+      "service": "mymind",
+      "name": "list_spaces",
+      "description": "List the spaces in a mind. The objects in each space are returned by get_space.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input for listing spaces."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The space identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The space name."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "The space colour."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "When the space was created."
+                },
+                "objects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "An object reference."
+                  },
+                  "description": "The objects in the space, returned when a single space is read."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A mymind space, a named collection of objects."
+            },
+            "description": "The spaces."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The spaces in the mind."
+      },
+      "followUpActions": [
+        "mymind.get_space"
+      ]
+    },
+    {
+      "id": "mymind.list_tags",
+      "service": "mymind",
+      "name": "list_tags",
+      "description": "List the tags in a mind, most recently used first.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "How many tags to return.",
+            "default": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for listing tags."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "count": {
+                  "type": "integer",
+                  "description": "How many objects carry the tag."
+                },
+                "flags": {
+                  "type": "integer",
+                  "description": "Bit flags mymind sets on the tag."
+                },
+                "modified": {
+                  "type": "string",
+                  "description": "When the tag was last used."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A tag and how widely it is used."
+            },
+            "description": "The tags, most recently used first."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The tags in the mind."
+      }
+    },
+    {
+      "id": "mymind.pin_object",
+      "service": "mymind",
+      "name": "pin_object",
+      "description": "Pin a mymind object, optionally into a specific slot.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based slot to pin the object into."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectId"
+        ],
+        "description": "The input for pinning an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The pinned object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The pin result."
+      }
+    },
+    {
+      "id": "mymind.remove_object_from_space",
+      "service": "mymind",
+      "name": "remove_object_from_space",
+      "description": "Take a mymind object out of a space. The object stays in the mind.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          },
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for removing an object from a space."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "description": "The space identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of removing the object."
+      }
+    },
+    {
+      "id": "mymind.remove_object_tags",
+      "service": "mymind",
+      "name": "remove_object_tags",
+      "description": "Remove tags from a mymind object.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag name."
+            },
+            "description": "Tag names.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for untagging an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The untagged object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The untagging result."
+      }
+    },
+    {
+      "id": "mymind.restore_object",
+      "service": "mymind",
+      "name": "restore_object",
+      "description": "Restore a soft-deleted mymind object.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for restoring an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The restored object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The restore result."
+      }
+    },
+    {
+      "id": "mymind.save_url",
+      "service": "mymind",
+      "name": "save_url",
+      "description": "Save a URL to a mind. mymind fetches the page itself and fills in the title, summary, tags, and screenshot.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The public http or https URL to save.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "A title to use instead of the one mymind derives from the page."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A tag name."
+            },
+            "description": "Tag names.",
+            "minItems": 1
+          },
+          "spaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A space identifier."
+            },
+            "description": "Identifiers of spaces the object belongs to.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input for saving a URL."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The object identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The display title, set by the user or derived from the source or content."
+              },
+              "summary": {
+                "type": "string",
+                "description": "The summary mymind generated for the object."
+              },
+              "content": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "The content media type, either text/markdown or application/prose+json."
+                  },
+                  "body": {
+                    "type": "string",
+                    "description": "The content body in the declared media type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "An inline content body."
+              },
+              "source": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Where the object came from, including the original URL."
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The tag identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The tag name."
+                    },
+                    "flags": {
+                      "type": "integer",
+                      "description": "Bit flags mymind sets on the tag."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A tag on an object."
+                },
+                "description": "The tags on the object."
+              },
+              "spaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A space reference."
+                },
+                "description": "The spaces the object belongs to."
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A note and its content body."
+                },
+                "description": "The notes attached to the object."
+              },
+              "blob": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The stored media for an uploaded file, when the object has one."
+              },
+              "screenshot": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The screenshot captured when the object was saved."
+              },
+              "mainEntity": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The primary entity the object is about."
+              },
+              "created": {
+                "type": "string",
+                "description": "When the object was created."
+              },
+              "modified": {
+                "type": "string",
+                "description": "When the object was last modified."
+              },
+              "bumped": {
+                "type": "string",
+                "description": "When the object was last bumped."
+              },
+              "deleted": {
+                "type": "string",
+                "description": "When the object was soft-deleted; absent while the object is live."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A mymind object, which is anything saved to a mind: a page, image, file, or note."
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Whether a new object was created, or false when mymind matched an existing duplicate."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The object mymind created or matched."
+      }
+    },
+    {
+      "id": "mymind.search_objects",
+      "service": "mymind",
+      "name": "search_objects",
+      "description": "Search a mind and return the matching objects with their relevance scores. Supports keyword syntax (quoted phrases, && || -, wildcards, and field filters such as tag:, type:, domain:, created:) and, with semantic enabled, matching by meaning rather than exact terms.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_only"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query, for example `tag:reading && action:read && completed:false` or `\"design systems\"`."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many matches to return.",
+            "default": 20
+          },
+          "semantic": {
+            "type": "boolean",
+            "description": "Whether to match by meaning rather than exact terms.",
+            "default": false
+          },
+          "semanticBoost": {
+            "type": "number",
+            "description": "A multiplier applied to semantic relevance when scoring."
+          },
+          "similarTo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An object identifier to find similar content for. Setting it turns on semantic matching."
+          },
+          "rerank": {
+            "type": "boolean",
+            "description": "Whether to re-score matches with a cross-encoder for precision. Turns on semantic matching and caps results at 100.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The input for searching a mind."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The matched object identifier."
+                },
+                "score": {
+                  "type": "number",
+                  "description": "The relevance score mymind assigned."
+                },
+                "semanticScore": {
+                  "type": "number",
+                  "description": "The semantic relevance score, present for a semantic or reranked search."
+                },
+                "object": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The object identifier."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "The display title, set by the user or derived from the source or content."
+                    },
+                    "summary": {
+                      "type": "string",
+                      "description": "The summary mymind generated for the object."
+                    },
+                    "content": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "The content media type, either text/markdown or application/prose+json."
+                        },
+                        "body": {
+                          "type": "string",
+                          "description": "The content body in the declared media type."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "An inline content body."
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Where the object came from, including the original URL."
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The tag identifier."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The tag name."
+                          },
+                          "flags": {
+                            "type": "integer",
+                            "description": "Bit flags mymind sets on the tag."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A tag on an object."
+                      },
+                      "description": "The tags on the object."
+                    },
+                    "spaces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A space reference."
+                      },
+                      "description": "The spaces the object belongs to."
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A note and its content body."
+                      },
+                      "description": "The notes attached to the object."
+                    },
+                    "blob": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The stored media for an uploaded file, when the object has one."
+                    },
+                    "screenshot": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The screenshot captured when the object was saved."
+                    },
+                    "mainEntity": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The primary entity the object is about."
+                    },
+                    "created": {
+                      "type": "string",
+                      "description": "When the object was created."
+                    },
+                    "modified": {
+                      "type": "string",
+                      "description": "When the object was last modified."
+                    },
+                    "bumped": {
+                      "type": "string",
+                      "description": "When the object was last bumped."
+                    },
+                    "deleted": {
+                      "type": "string",
+                      "description": "When the object was soft-deleted; absent while the object is live."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A mymind object, which is anything saved to a mind: a page, image, file, or note."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One search match and the object it refers to."
+            },
+            "description": "The matches, most relevant first."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The search matches in relevance order."
+      },
+      "followUpActions": [
+        "mymind.get_object_content",
+        "mymind.add_object_tags"
+      ]
+    },
+    {
+      "id": "mymind.unpin_object",
+      "service": "mymind",
+      "name": "unpin_object",
+      "description": "Unpin a mymind object.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for unpinning an object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The unpinned object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The unpin result."
+      }
+    },
+    {
+      "id": "mymind.update_object",
+      "service": "mymind",
+      "name": "update_object",
+      "description": "Update the title, summary, or completed state of a mymind object.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "A new title for the object."
+          },
+          "summary": {
+            "type": "string",
+            "description": "A new summary for the object."
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the object is marked completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectId"
+        ],
+        "description": "The input for updating an object.",
+        "anyOf": [
+          {
+            "required": [
+              "title"
+            ]
+          },
+          {
+            "required": [
+              "summary"
+            ]
+          },
+          {
+            "required": [
+              "completed"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The updated object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The update result."
+      }
+    },
+    {
+      "id": "mymind.update_object_content",
+      "service": "mymind",
+      "name": "update_object_content",
+      "description": "Replace the content body of a mymind object with markdown.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new content body as markdown."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for replacing object content."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "description": "The updated object identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The update result."
+      }
+    },
+    {
+      "id": "mymind.update_object_note",
+      "service": "mymind",
+      "name": "update_object_note",
+      "description": "Replace the body of a note attached to a mymind object.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind object identifier."
+          },
+          "noteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The note identifier."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new note body as markdown."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input for updating a note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "description": "The updated note identifier."
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "description": "Whether mymind accepted the change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The update result."
+      }
+    },
+    {
+      "id": "mymind.update_space",
+      "service": "mymind",
+      "name": "update_space",
+      "description": "Rename a mymind space or change its colour.",
+      "operationType": "write",
+      "requiredScopes": [
+        "full_access"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The mymind space identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A new name for the space."
+          },
+          "color": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A new colour for the space."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "spaceId"
+        ],
+        "description": "The input for updating a space.",
+        "anyOf": [
+          {
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "required": [
+              "color"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The space identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The space name."
+          },
+          "color": {
+            "type": "string",
+            "description": "The space colour."
+          },
+          "created": {
+            "type": "string",
+            "description": "When the space was created."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An object reference."
+            },
+            "description": "The objects in the space, returned when a single space is read."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A mymind space, a named collection of objects."
+      }
+    }
+  ]
+}

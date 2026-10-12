@@ -1,0 +1,156 @@
+{
+  "service": "tanium",
+  "displayName": "Tanium",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "token-...",
+      "description": "Tanium API token sent in the session header. Create API tokens in Administration > Permissions > API Tokens, or see https://help.tanium.com/bundle/ug_console_cloud/page/platform_user/console_api_tokens.html.",
+      "extraFields": [
+        {
+          "key": "gatewayUrl",
+          "label": "Gateway GraphQL URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://example.taniumcloud.com/plugin/products/gateway/graphql",
+          "description": "The full Tanium Gateway GraphQL endpoint URL for your Tanium instance, such as https://example.taniumcloud.com/plugin/products/gateway/graphql."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.tanium.com",
+  "actions": [
+    {
+      "id": "tanium.execute_graphql",
+      "service": "tanium",
+      "name": "execute_graphql",
+      "description": "Execute a GraphQL document against the connected Tanium Gateway endpoint.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The GraphQL query or mutation document to execute."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON value passed as a GraphQL variable."
+            },
+            "description": "GraphQL variables keyed by variable name."
+          },
+          "operationName": {
+            "type": "string",
+            "description": "The GraphQL operation name to execute when the document has multiple operations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "The Tanium Gateway GraphQL request payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The GraphQL data payload returned by Tanium Gateway."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The GraphQL data payload returned by Tanium Gateway."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "description": "The GraphQL error message."
+                },
+                "path": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string path segment."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric path segment."
+                      }
+                    ],
+                    "description": "A GraphQL path segment."
+                  },
+                  "description": "The GraphQL response path where the error occurred."
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "type": "integer",
+                        "description": "The source line number."
+                      },
+                      "column": {
+                        "type": "integer",
+                        "description": "The source column number."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A GraphQL error source location."
+                  },
+                  "description": "Source locations related to the GraphQL error."
+                },
+                "extensions": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional GraphQL error metadata."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A GraphQL error returned by Tanium Gateway."
+            },
+            "description": "GraphQL errors returned by Tanium Gateway."
+          },
+          "extensions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "GraphQL response extensions returned by Tanium Gateway."
+          },
+          "message": {
+            "type": "string",
+            "description": "A semicolon-separated summary of GraphQL error messages."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Tanium Gateway GraphQL execution result."
+      }
+    }
+  ]
+}

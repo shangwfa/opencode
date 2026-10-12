@@ -1,0 +1,624 @@
+{
+  "service": "kadoa",
+  "displayName": "Kadoa",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Workspace API Key",
+      "placeholder": "tk-your-api-key",
+      "description": "Kadoa workspace API key sent with the x-api-key header. Generate it from Settings > General: https://docs.kadoa.com/api-reference/introduction.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.kadoa.com",
+  "actions": [
+    {
+      "id": "kadoa.export_workflow_data",
+      "service": "kadoa",
+      "name": "export_workflow_data",
+      "description": "Materialize all matching Kadoa workflow records and return a temporary signed download URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Kadoa workflow."
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional workflow run identifier."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The workflow schema field to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Kadoa comparison operator to apply."
+                },
+                "value": {
+                  "description": "The value to compare with the workflow field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A structured filter that Kadoa applies to workflow data."
+            },
+            "description": "Structured filters to apply to workflow records.",
+            "minItems": 1
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The workflow field used to sort records."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for workflow records.",
+            "default": "asc"
+          },
+          "rowIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A workflow record identifier."
+            },
+            "description": "Specific workflow record identifiers to include.",
+            "minItems": 1
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json",
+              "parquet"
+            ],
+            "description": "The file format for the materialized workflow export.",
+            "default": "csv"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflowId"
+        ],
+        "description": "The input payload for exporting Kadoa workflow data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "description": "The Kadoa workflow identifier."
+          },
+          "runId": {
+            "type": "string",
+            "description": "The workflow run identifier exported by Kadoa."
+          },
+          "executedAt": {
+            "type": "string",
+            "description": "The timestamp when the exported workflow run was executed.",
+            "format": "date-time"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json",
+              "parquet"
+            ],
+            "description": "The generated export format."
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of records in the export."
+          },
+          "url": {
+            "type": "string",
+            "description": "The signed self-authenticating download URL.",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "The timestamp when the signed download URL expires.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflowId",
+          "runId",
+          "format",
+          "rowCount",
+          "url",
+          "expiresAt"
+        ],
+        "description": "Metadata for a materialized Kadoa workflow data export."
+      }
+    },
+    {
+      "id": "kadoa.get_workflow",
+      "service": "kadoa",
+      "name": "get_workflow",
+      "description": "Get the current configuration and execution status of a Kadoa workflow.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Kadoa workflow."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflowId"
+        ],
+        "description": "The input payload for retrieving a Kadoa workflow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique Kadoa workflow identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The workflow name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The workflow description."
+          },
+          "state": {
+            "type": "string",
+            "description": "The persisted workflow lifecycle state."
+          },
+          "displayState": {
+            "type": "string",
+            "description": "The computed workflow state shown to users."
+          },
+          "runState": {
+            "type": "string",
+            "description": "The latest workflow execution state."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The timestamp when the workflow was created.",
+            "format": "date-time"
+          },
+          "totalRecords": {
+            "type": "integer",
+            "description": "The total number of records extracted by the latest run."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "description",
+          "state",
+          "displayState",
+          "runState",
+          "createdAt",
+          "totalRecords"
+        ],
+        "description": "The detailed Kadoa workflow resource."
+      }
+    },
+    {
+      "id": "kadoa.get_workflow_data",
+      "service": "kadoa",
+      "name": "get_workflow_data",
+      "description": "Retrieve a bounded JSON page of extracted records from the latest or a specific Kadoa workflow run.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique identifier of the Kadoa workflow."
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional workflow run identifier."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The workflow schema field to filter."
+                },
+                "operator": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Kadoa comparison operator to apply."
+                },
+                "value": {
+                  "description": "The value to compare with the workflow field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A structured filter that Kadoa applies to workflow data."
+            },
+            "description": "Structured filters to apply to workflow records.",
+            "minItems": 1
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The workflow field used to sort records."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction for workflow records.",
+            "default": "asc"
+          },
+          "rowIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A workflow record identifier."
+            },
+            "description": "Specific workflow record identifiers to include.",
+            "minItems": 1
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page.",
+            "default": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive number of records to return on this page.",
+            "default": 25
+          },
+          "includeAnomalies": {
+            "type": "boolean",
+            "description": "Whether Kadoa should include data-validation anomalies for each record."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflowId"
+        ],
+        "description": "The input payload for retrieving a bounded page of Kadoa workflow data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "description": "The Kadoa workflow identifier."
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The workflow run identifier used for the result."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The workflow run identifier used for the result."
+          },
+          "executedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The timestamp when the selected workflow run was executed.",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the selected workflow run was executed."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "An extracted workflow record."
+            },
+            "description": "The extracted records defined by the workflow schema."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current result page."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of result pages."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The page size used for the request."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalCount",
+              "page",
+              "totalPages",
+              "limit"
+            ],
+            "description": "Pagination metadata returned by Kadoa."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflowId",
+          "data",
+          "pagination"
+        ],
+        "description": "A bounded page of extracted Kadoa workflow records."
+      }
+    },
+    {
+      "id": "kadoa.list_workflows",
+      "service": "kadoa",
+      "name": "list_workflows",
+      "description": "List Kadoa workflows with pagination and optional lifecycle, execution, and scheduling filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A search term matched against workflow names or identifiers."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of workflows to skip.",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of workflows to return.",
+            "default": 25
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DRAFT",
+              "PAUSED",
+              "PREVIEW",
+              "QUEUED",
+              "SETUP",
+              "COMPLIANCE_REVIEW",
+              "COMPLIANCE_REJECTED",
+              "NOT_SUPPORTED",
+              "ERROR",
+              "DELETED"
+            ],
+            "description": "The persisted Kadoa workflow state to match."
+          },
+          "runState": {
+            "type": "string",
+            "enum": [
+              "FAILED",
+              "FINISHED",
+              "RUNNING"
+            ],
+            "description": "The latest Kadoa workflow run state to match."
+          },
+          "displayState": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DRAFT",
+              "PAUSED",
+              "PREVIEW",
+              "FAILED",
+              "RUNNING",
+              "VALIDATING",
+              "PENDING_START",
+              "COMPLIANCE_REVIEW",
+              "COMPLIANCE_REJECTED"
+            ],
+            "description": "The computed Kadoa workflow display state to match."
+          },
+          "monitoring": {
+            "type": "boolean",
+            "description": "Whether to return only monitored or unmonitored workflows."
+          },
+          "updateInterval": {
+            "type": "string",
+            "enum": [
+              "HOURLY",
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY",
+              "REAL_TIME"
+            ],
+            "description": "The workflow update interval to match."
+          },
+          "scheduleType": {
+            "type": "string",
+            "enum": [
+              "RUN_ONCE",
+              "RECURRING"
+            ],
+            "description": "The workflow scheduling mode to match."
+          },
+          "includeDeleted": {
+            "type": "boolean",
+            "description": "Whether deleted workflows should be included."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Kadoa workflows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique Kadoa workflow identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The workflow name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The workflow description."
+                },
+                "state": {
+                  "type": "string",
+                  "description": "The persisted workflow lifecycle state."
+                },
+                "displayState": {
+                  "type": "string",
+                  "description": "The computed workflow state shown to users."
+                },
+                "runState": {
+                  "type": "string",
+                  "description": "The latest workflow execution state."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the workflow was created.",
+                  "format": "date-time"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Tags associated with the workflow."
+                },
+                "totalRecords": {
+                  "type": "integer",
+                  "description": "The total number of records extracted by the latest run."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "state",
+                "displayState",
+                "runState",
+                "createdAt",
+                "tags",
+                "totalRecords"
+              ],
+              "description": "A Kadoa workflow summary."
+            },
+            "description": "The workflows matching the request."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching records."
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current result page."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of result pages."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The page size used for the request."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalCount",
+              "page",
+              "totalPages",
+              "limit"
+            ],
+            "description": "Pagination metadata returned by Kadoa."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "workflows",
+          "pagination"
+        ],
+        "description": "A paginated list of Kadoa workflows."
+      }
+    }
+  ]
+}

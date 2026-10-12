@@ -1,0 +1,559 @@
+{
+  "service": "finage",
+  "displayName": "Finage",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "FINAGE_API_KEY",
+      "description": "Finage API key passed as the apikey query parameter. Register or manage your key in the Finage Moon dashboard: https://moon.finage.co.uk/register."
+    }
+  ],
+  "homepageUrl": "https://finage.co.uk",
+  "actions": [
+    {
+      "id": "finage.get_aggregates",
+      "service": "finage",
+      "name": "get_aggregates",
+      "description": "Get Finage OHLCV aggregate bars for a U.S. stock over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "U.S. stock symbol to aggregate."
+          },
+          "multiplier": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Positive bar multiplier used by the Finage aggregate endpoint."
+          },
+          "timespan": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "hour",
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ],
+            "description": "Aggregation interval unit supported by Finage."
+          },
+          "dateFrom": {
+            "type": "string",
+            "description": "Inclusive start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dateTo": {
+            "type": "string",
+            "description": "Inclusive end date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50000,
+            "description": "Maximum number of aggregate bars to return, up to 50000."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction for aggregate bars ordered by timestamp."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "multiplier",
+          "timespan",
+          "dateFrom",
+          "dateTo"
+        ],
+        "description": "Input parameters for retrieving Finage stock aggregate bars."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stock symbol returned by Finage."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of aggregate bars returned."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "open": {
+                  "type": "number",
+                  "description": "Opening price for the aggregate bar."
+                },
+                "high": {
+                  "type": "number",
+                  "description": "Highest price for the aggregate bar."
+                },
+                "low": {
+                  "type": "number",
+                  "description": "Lowest price for the aggregate bar."
+                },
+                "close": {
+                  "type": "number",
+                  "description": "Closing price for the aggregate bar."
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Traded volume for the aggregate bar."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "Timestamp of the aggregate bar in milliseconds."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "timestamp"
+              ],
+              "description": "One OHLCV aggregate bar returned by Finage."
+            },
+            "description": "Aggregate bars returned by Finage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "totalResults",
+          "results"
+        ],
+        "description": "Finage aggregate bars response."
+      }
+    },
+    {
+      "id": "finage.get_last_quote",
+      "service": "finage",
+      "name": "get_last_quote",
+      "description": "Get the latest Finage quote for a single U.S. stock symbol.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "U.S. stock symbol to request from Finage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Input parameters for retrieving Finage data for one U.S. stock symbol."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stock symbol returned by Finage."
+          },
+          "ask": {
+            "type": "number",
+            "description": "Latest ask price."
+          },
+          "bid": {
+            "type": "number",
+            "description": "Latest bid price."
+          },
+          "askSize": {
+            "type": "integer",
+            "description": "Latest ask size."
+          },
+          "bidSize": {
+            "type": "integer",
+            "description": "Latest bid size."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Timestamp of the latest quote update in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "ask",
+          "bid",
+          "askSize",
+          "bidSize",
+          "timestamp"
+        ],
+        "description": "Latest quote returned by Finage for a single U.S. stock."
+      }
+    },
+    {
+      "id": "finage.get_last_trade",
+      "service": "finage",
+      "name": "get_last_trade",
+      "description": "Get the latest Finage trade for a single U.S. stock symbol.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "U.S. stock symbol to request from Finage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Input parameters for retrieving Finage data for one U.S. stock symbol."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stock symbol returned by Finage."
+          },
+          "price": {
+            "type": "number",
+            "description": "Latest trade price."
+          },
+          "tradeSize": {
+            "type": "integer",
+            "description": "Latest trade size."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Timestamp of the latest trade update in milliseconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "price",
+          "tradeSize",
+          "timestamp"
+        ],
+        "description": "Latest trade returned by Finage for a single U.S. stock."
+      }
+    },
+    {
+      "id": "finage.get_previous_close",
+      "service": "finage",
+      "name": "get_previous_close",
+      "description": "Get the previous close aggregate bar for a single Finage U.S. stock symbol.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "U.S. stock symbol to request from Finage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol"
+        ],
+        "description": "Input parameters for retrieving Finage data for one U.S. stock symbol."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stock symbol returned by Finage."
+          },
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of aggregate bars returned."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "open": {
+                  "type": "number",
+                  "description": "Opening price for the aggregate bar."
+                },
+                "high": {
+                  "type": "number",
+                  "description": "Highest price for the aggregate bar."
+                },
+                "low": {
+                  "type": "number",
+                  "description": "Lowest price for the aggregate bar."
+                },
+                "close": {
+                  "type": "number",
+                  "description": "Closing price for the aggregate bar."
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Traded volume for the aggregate bar."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "Timestamp of the aggregate bar in milliseconds."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "timestamp"
+              ],
+              "description": "One OHLCV aggregate bar returned by Finage."
+            },
+            "description": "Aggregate bars returned by Finage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbol",
+          "totalResults",
+          "results"
+        ],
+        "description": "Finage aggregate bars response."
+      }
+    },
+    {
+      "id": "finage.get_snapshot",
+      "service": "finage",
+      "name": "get_snapshot",
+      "description": "Get a Finage stock snapshot for a bounded list of U.S. stock symbols, including quotes, trades, or both.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "U.S. stock symbol to include in the snapshot request."
+            },
+            "description": "Bounded list of U.S. stock symbols to request from Finage.",
+            "minItems": 1
+          },
+          "includeQuotes": {
+            "type": "boolean",
+            "description": "Whether to include quote rows in the snapshot response. Defaults to true."
+          },
+          "includeTrades": {
+            "type": "boolean",
+            "description": "Whether to include trade rows in the snapshot response. Defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "symbols"
+        ],
+        "description": "Input parameters for retrieving a bounded Finage stock snapshot."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalResults": {
+            "type": "integer",
+            "description": "Total number of symbols included in the snapshot."
+          },
+          "lastQuotes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stock symbol returned by Finage."
+                },
+                "ask": {
+                  "type": "number",
+                  "description": "Latest ask price in the snapshot."
+                },
+                "bid": {
+                  "type": "number",
+                  "description": "Latest bid price in the snapshot."
+                },
+                "askSize": {
+                  "type": "integer",
+                  "description": "Latest ask size in the snapshot."
+                },
+                "bidSize": {
+                  "type": "integer",
+                  "description": "Latest bid size in the snapshot."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "Timestamp returned by Finage for the snapshot quote entry."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "ask",
+                "bid",
+                "askSize",
+                "bidSize",
+                "timestamp"
+              ],
+              "description": "One quote row returned by the Finage stock snapshot endpoint."
+            },
+            "description": "Quote rows returned in the snapshot."
+          },
+          "lastTrades": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stock symbol returned by Finage."
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Latest trade price in the snapshot."
+                },
+                "tradeSize": {
+                  "type": "integer",
+                  "description": "Latest trade size in the snapshot."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "Timestamp returned by Finage for the snapshot trade entry."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "price",
+                "tradeSize",
+                "timestamp"
+              ],
+              "description": "One trade row returned by the Finage stock snapshot endpoint."
+            },
+            "description": "Trade rows returned in the snapshot."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalResults",
+          "lastQuotes",
+          "lastTrades"
+        ],
+        "description": "Finage stock snapshot response for a bounded symbol list."
+      }
+    },
+    {
+      "id": "finage.list_stock_symbols",
+      "service": "finage",
+      "name": "list_stock_symbols",
+      "description": "List Finage U.S. stock symbols with optional page and search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Result page number for the Finage symbol list."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Search text used to filter symbols by ticker or name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Finage U.S. stock symbols."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "Current result page returned by Finage."
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Market symbol returned by Finage."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name associated with the market symbol."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "symbol",
+                "name"
+              ],
+              "description": "One U.S. stock symbol returned by Finage."
+            },
+            "description": "U.S. stock symbols on the current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "symbols"
+        ],
+        "description": "Paginated Finage U.S. stock symbol list."
+      }
+    }
+  ]
+}

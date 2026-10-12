@@ -1,0 +1,1495 @@
+{
+  "service": "roam_scim",
+  "displayName": "Roam SCIM",
+  "categories": [
+    "Security",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "SCIM Bearer Token",
+      "placeholder": "ROAM_SCIM_BEARER_TOKEN",
+      "description": "Roam SCIM bearer token sent in the Authorization header. Enable SCIM in Roam Administration > Technical Setup to generate the token: https://ro.am/s/."
+    }
+  ],
+  "homepageUrl": "https://ro.am",
+  "actions": [
+    {
+      "id": "roam_scim.create_group",
+      "service": "roam_scim",
+      "name": "create_group",
+      "description": "Create a Roam SCIM group with optional initial members.",
+      "operationType": "write",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The Roam SCIM group displayName value."
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Roam Person ID used as members[].value."
+            },
+            "description": "Roam Person IDs to include as SCIM group members."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "displayName"
+        ],
+        "description": "Input payload for creating a Roam SCIM group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Address ID returned as the SCIM group id."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The group displayName returned by Roam SCIM."
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The Roam Person ID for this group member."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM group member object returned by Roam."
+                },
+                "description": "Members returned for the group."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM group resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group"
+        ],
+        "description": "Roam SCIM group creation response."
+      }
+    },
+    {
+      "id": "roam_scim.create_user",
+      "service": "roam_scim",
+      "name": "create_user",
+      "description": "Create a Roam SCIM user from name, email, and optional role metadata.",
+      "operationType": "write",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The user's primary email address. Roam uses this as both userName and emails[0].value.",
+            "format": "email"
+          },
+          "givenName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's SCIM name.givenName value."
+          },
+          "familyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's SCIM name.familyName value."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional external identifier used to correlate this user with an identity provider."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the Roam user should be active. Set false to archive access."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Admin"
+            ],
+            "description": "The Roam Administration role assigned through the SCIM extension."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "givenName",
+          "familyName"
+        ],
+        "description": "Input payload for creating a Roam SCIM user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Person ID returned as the SCIM user id."
+              },
+              "userName": {
+                "type": "string",
+                "description": "The SCIM userName returned by Roam, usually the primary email."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "The externalId returned by Roam SCIM when present."
+              },
+              "name": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string",
+                    "description": "The givenName returned for the user."
+                  },
+                  "familyName": {
+                    "type": "string",
+                    "description": "The familyName returned for the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The SCIM name object returned for a Roam user."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name returned by Roam SCIM."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The email value returned by Roam SCIM."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The email type returned by Roam SCIM."
+                    },
+                    "primary": {
+                      "type": "boolean",
+                      "description": "Whether this email is the primary SCIM email."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM email object returned for a Roam user."
+                },
+                "description": "Email objects returned for the user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the Roam user is active."
+              },
+              "urn:ro.am:params:scim:schemas:extension:roam:2.0:User": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "User",
+                      "Admin"
+                    ],
+                    "description": "The Roam Administration role assigned through the SCIM extension."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Roam SCIM user role extension object."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Roam SCIM user creation response."
+      }
+    },
+    {
+      "id": "roam_scim.delete_group",
+      "service": "roam_scim",
+      "name": "delete_group",
+      "description": "Archive a Roam SCIM group by Roam Address ID.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Roam SCIM resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the resource archive request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "archived"
+        ],
+        "description": "The Roam SCIM archive response."
+      }
+    },
+    {
+      "id": "roam_scim.delete_user",
+      "service": "roam_scim",
+      "name": "delete_user",
+      "description": "Archive a Roam SCIM user by Roam Person ID.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Roam SCIM resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the resource archive request completed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "archived"
+        ],
+        "description": "The Roam SCIM archive response."
+      }
+    },
+    {
+      "id": "roam_scim.get_group",
+      "service": "roam_scim",
+      "name": "get_group",
+      "description": "Get one Roam SCIM group by Roam Address ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user:read",
+        "user:read.email"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Roam SCIM resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Address ID returned as the SCIM group id."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The group displayName returned by Roam SCIM."
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The Roam Person ID for this group member."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM group member object returned by Roam."
+                },
+                "description": "Members returned for the group."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM group resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group"
+        ],
+        "description": "Single Roam SCIM group response."
+      }
+    },
+    {
+      "id": "roam_scim.get_service_provider_config",
+      "service": "roam_scim",
+      "name": "get_service_provider_config",
+      "description": "Get the Roam SCIM service provider configuration.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this Roam SCIM request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SCIM object returned by Roam."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "config"
+        ],
+        "description": "The Roam SCIM service provider configuration response."
+      }
+    },
+    {
+      "id": "roam_scim.get_user",
+      "service": "roam_scim",
+      "name": "get_user",
+      "description": "Get one Roam SCIM user by Roam Person ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user:read",
+        "user:read.email"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Input parameters for retrieving one Roam SCIM resource."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Person ID returned as the SCIM user id."
+              },
+              "userName": {
+                "type": "string",
+                "description": "The SCIM userName returned by Roam, usually the primary email."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "The externalId returned by Roam SCIM when present."
+              },
+              "name": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string",
+                    "description": "The givenName returned for the user."
+                  },
+                  "familyName": {
+                    "type": "string",
+                    "description": "The familyName returned for the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The SCIM name object returned for a Roam user."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name returned by Roam SCIM."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The email value returned by Roam SCIM."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The email type returned by Roam SCIM."
+                    },
+                    "primary": {
+                      "type": "boolean",
+                      "description": "Whether this email is the primary SCIM email."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM email object returned for a Roam user."
+                },
+                "description": "Email objects returned for the user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the Roam user is active."
+              },
+              "urn:ro.am:params:scim:schemas:extension:roam:2.0:User": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "User",
+                      "Admin"
+                    ],
+                    "description": "The Roam Administration role assigned through the SCIM extension."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Roam SCIM user role extension object."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Single Roam SCIM user response."
+      }
+    },
+    {
+      "id": "roam_scim.list_groups",
+      "service": "roam_scim",
+      "name": "list_groups",
+      "description": "List Roam SCIM groups with optional pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user:read",
+        "user:read.email"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A SCIM filter expression accepted by Roam SCIM."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based SCIM startIndex pagination value."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of SCIM resources to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Roam SCIM groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schemas": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One SCIM schema URN."
+                  },
+                  "description": "SCIM schema URNs returned by Roam."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Roam Address ID returned as the SCIM group id."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The group displayName returned by Roam SCIM."
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "The Roam Person ID for this group member."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A SCIM group member object returned by Roam."
+                  },
+                  "description": "Members returned for the group."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "The SCIM resource location URL."
+                    },
+                    "resourceType": {
+                      "type": "string",
+                      "description": "The SCIM resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "SCIM metadata returned for the resource."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Roam SCIM group resource."
+            },
+            "description": "Groups returned in this page."
+          },
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One SCIM schema URN."
+            },
+            "description": "SCIM schema URNs returned by Roam."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching SCIM resources across all pages."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The one-based SCIM startIndex returned for this page."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of SCIM resources returned in this page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SCIM object returned by Roam."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "groups",
+          "schemas",
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "raw"
+        ],
+        "description": "A page of Roam SCIM groups."
+      }
+    },
+    {
+      "id": "roam_scim.list_users",
+      "service": "roam_scim",
+      "name": "list_users",
+      "description": "List Roam SCIM users with optional SCIM filtering and pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "user:read",
+        "user:read.email"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A SCIM filter expression accepted by Roam SCIM."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based SCIM startIndex pagination value."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of SCIM resources to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Roam SCIM users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "schemas": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One SCIM schema URN."
+                  },
+                  "description": "SCIM schema URNs returned by Roam."
+                },
+                "id": {
+                  "type": "string",
+                  "description": "The Roam Person ID returned as the SCIM user id."
+                },
+                "userName": {
+                  "type": "string",
+                  "description": "The SCIM userName returned by Roam, usually the primary email."
+                },
+                "externalId": {
+                  "type": "string",
+                  "description": "The externalId returned by Roam SCIM when present."
+                },
+                "name": {
+                  "type": "object",
+                  "properties": {
+                    "givenName": {
+                      "type": "string",
+                      "description": "The givenName returned for the user."
+                    },
+                    "familyName": {
+                      "type": "string",
+                      "description": "The familyName returned for the user."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The SCIM name object returned for a Roam user."
+                },
+                "displayName": {
+                  "type": "string",
+                  "description": "The display name returned by Roam SCIM."
+                },
+                "emails": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "The email value returned by Roam SCIM."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "The email type returned by Roam SCIM."
+                      },
+                      "primary": {
+                        "type": "boolean",
+                        "description": "Whether this email is the primary SCIM email."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A SCIM email object returned for a Roam user."
+                  },
+                  "description": "Email objects returned for the user."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the Roam user is active."
+                },
+                "urn:ro.am:params:scim:schemas:extension:roam:2.0:User": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "User",
+                        "Admin"
+                      ],
+                      "description": "The Roam Administration role assigned through the SCIM extension."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The Roam SCIM user role extension object."
+                },
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "description": "The SCIM resource location URL."
+                    },
+                    "resourceType": {
+                      "type": "string",
+                      "description": "The SCIM resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "SCIM metadata returned for the resource."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Roam SCIM user resource."
+            },
+            "description": "Users returned in this page."
+          },
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One SCIM schema URN."
+            },
+            "description": "SCIM schema URNs returned by Roam."
+          },
+          "totalResults": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching SCIM resources across all pages."
+          },
+          "startIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The one-based SCIM startIndex returned for this page."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of SCIM resources returned in this page."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SCIM object returned by Roam."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "users",
+          "schemas",
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "raw"
+        ],
+        "description": "A page of Roam SCIM users."
+      }
+    },
+    {
+      "id": "roam_scim.replace_group",
+      "service": "roam_scim",
+      "name": "replace_group",
+      "description": "Fully replace a Roam SCIM group display name and member list.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The Roam SCIM group displayName value."
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Roam Person ID used as members[].value."
+            },
+            "description": "Roam Person IDs to include as SCIM group members."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "displayName"
+        ],
+        "description": "Input payload for fully replacing a Roam SCIM group."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Address ID returned as the SCIM group id."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The group displayName returned by Roam SCIM."
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The Roam Person ID for this group member."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM group member object returned by Roam."
+                },
+                "description": "Members returned for the group."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM group resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group"
+        ],
+        "description": "Roam SCIM group replacement response."
+      }
+    },
+    {
+      "id": "roam_scim.replace_user",
+      "service": "roam_scim",
+      "name": "replace_user",
+      "description": "Fully replace supported attributes for a Roam SCIM user.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "The user's primary email address. Roam uses this as both userName and emails[0].value.",
+            "format": "email"
+          },
+          "givenName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's SCIM name.givenName value."
+          },
+          "familyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's SCIM name.familyName value."
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional external identifier used to correlate this user with an identity provider."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the Roam user should be active. Set false to archive access."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Admin"
+            ],
+            "description": "The Roam Administration role assigned through the SCIM extension."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "email",
+          "givenName",
+          "familyName"
+        ],
+        "description": "Input payload for fully replacing supported Roam SCIM user attributes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Person ID returned as the SCIM user id."
+              },
+              "userName": {
+                "type": "string",
+                "description": "The SCIM userName returned by Roam, usually the primary email."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "The externalId returned by Roam SCIM when present."
+              },
+              "name": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string",
+                    "description": "The givenName returned for the user."
+                  },
+                  "familyName": {
+                    "type": "string",
+                    "description": "The familyName returned for the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The SCIM name object returned for a Roam user."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name returned by Roam SCIM."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The email value returned by Roam SCIM."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The email type returned by Roam SCIM."
+                    },
+                    "primary": {
+                      "type": "boolean",
+                      "description": "Whether this email is the primary SCIM email."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM email object returned for a Roam user."
+                },
+                "description": "Email objects returned for the user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the Roam user is active."
+              },
+              "urn:ro.am:params:scim:schemas:extension:roam:2.0:User": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "User",
+                      "Admin"
+                    ],
+                    "description": "The Roam Administration role assigned through the SCIM extension."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Roam SCIM user role extension object."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Roam SCIM user replacement response."
+      }
+    },
+    {
+      "id": "roam_scim.set_user_active",
+      "service": "roam_scim",
+      "name": "set_user_active",
+      "description": "Archive or reactivate a Roam SCIM user by replacing the active flag.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the Roam user should be active. Set false to archive access."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "active"
+        ],
+        "description": "Input payload for replacing a Roam user's active flag."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Person ID returned as the SCIM user id."
+              },
+              "userName": {
+                "type": "string",
+                "description": "The SCIM userName returned by Roam, usually the primary email."
+              },
+              "externalId": {
+                "type": "string",
+                "description": "The externalId returned by Roam SCIM when present."
+              },
+              "name": {
+                "type": "object",
+                "properties": {
+                  "givenName": {
+                    "type": "string",
+                    "description": "The givenName returned for the user."
+                  },
+                  "familyName": {
+                    "type": "string",
+                    "description": "The familyName returned for the user."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The SCIM name object returned for a Roam user."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The display name returned by Roam SCIM."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The email value returned by Roam SCIM."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "The email type returned by Roam SCIM."
+                    },
+                    "primary": {
+                      "type": "boolean",
+                      "description": "Whether this email is the primary SCIM email."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM email object returned for a Roam user."
+                },
+                "description": "Email objects returned for the user."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the Roam user is active."
+              },
+              "urn:ro.am:params:scim:schemas:extension:roam:2.0:User": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "User",
+                      "Admin"
+                    ],
+                    "description": "The Roam Administration role assigned through the SCIM extension."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Roam SCIM user role extension object."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM user resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Roam SCIM user active-state update response."
+      }
+    },
+    {
+      "id": "roam_scim.update_group_members",
+      "service": "roam_scim",
+      "name": "update_group_members",
+      "description": "Patch Roam SCIM group members with add, remove, or replace semantics.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "user:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Roam SCIM resource ID."
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "add",
+              "remove",
+              "replace"
+            ],
+            "description": "The SCIM PATCH operation to apply to the members attribute."
+          },
+          "memberIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Roam Person ID used as members[].value."
+            },
+            "description": "Roam Person IDs to add, remove, or replace in a SCIM group.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "operation",
+          "memberIds"
+        ],
+        "description": "Input payload for patching Roam SCIM group members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "object",
+            "properties": {
+              "schemas": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One SCIM schema URN."
+                },
+                "description": "SCIM schema URNs returned by Roam."
+              },
+              "id": {
+                "type": "string",
+                "description": "The Roam Address ID returned as the SCIM group id."
+              },
+              "displayName": {
+                "type": "string",
+                "description": "The group displayName returned by Roam SCIM."
+              },
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "The Roam Person ID for this group member."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A SCIM group member object returned by Roam."
+                },
+                "description": "Members returned for the group."
+              },
+              "meta": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "description": "The SCIM resource location URL."
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "description": "The SCIM resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "SCIM metadata returned for the resource."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Roam SCIM group resource."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "group"
+        ],
+        "description": "Roam SCIM group member update response."
+      }
+    }
+  ]
+}

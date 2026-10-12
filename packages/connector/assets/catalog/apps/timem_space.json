@@ -1,0 +1,415 @@
+{
+  "service": "timem_space",
+  "displayName": "TiMEM Space",
+  "homepageUrl": "https://space.timem.cloud",
+  "iconUrl": "https://space.timem.cloud/favicon.ico",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "tmk_...",
+      "description": "TiMEM Space Agent API Key used to connect its hosted MCP service. Sign in at https://space.timem.cloud/console/connections, connect an Agent, and copy the generated API Key."
+    }
+  ],
+  "actions": [
+    {
+      "id": "timem_space.call_tool",
+      "service": "timem_space",
+      "name": "call_tool",
+      "description": "Call any current TiMEM Space MCP tool with JSON arguments after checking its live schema and behavior annotations.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current TiMEM Space MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      },
+      "followUpActions": [
+        "timem_space.list_tools"
+      ]
+    },
+    {
+      "id": "timem_space.classify_memory_scene",
+      "service": "timem_space",
+      "name": "classify_memory_scene",
+      "description": "Classify conversation messages into the general, coding, or writing TiMEM Space memory domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The speaker role for this message."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message text."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "One conversation message to preserve or classify."
+            },
+            "description": "The messages whose memory domain should be classified.",
+            "minItems": 1,
+            "maxItems": 4
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The conversation messages to classify."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      }
+    },
+    {
+      "id": "timem_space.create_memory",
+      "service": "timem_space",
+      "name": "create_memory",
+      "description": "Create durable TiMEM Space memories from one to four user and assistant conversation messages.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The speaker role for this message."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message text."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "content"
+              ],
+              "description": "One conversation message to preserve or classify."
+            },
+            "description": "The conversation messages from which TiMEM Space should create memory.",
+            "minItems": 1,
+            "maxItems": 4
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "general",
+              "coding",
+              "writing"
+            ],
+            "description": "The memory domain for the conversation."
+          },
+          "memory_hint": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A concise hint describing the durable fact, preference, decision, or lesson to preserve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "The conversation messages and optional memory classification hints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      }
+    },
+    {
+      "id": "timem_space.delete_memory",
+      "service": "timem_space",
+      "name": "delete_memory",
+      "description": "Soft-delete one TiMEM Space memory after its identifier has been confirmed through search.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact TiMEM Space memory identifier to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "memory_id"
+        ],
+        "description": "The memory to remove."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      }
+    },
+    {
+      "id": "timem_space.list_tools",
+      "service": "timem_space",
+      "name": "list_tools",
+      "description": "Discover every current TiMEM Space memory, rule-learning, knowledge, conversation, credit, and notification MCP tool with its live schema.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact TiMEM Space MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by TiMEM Space."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive operations."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside TiMEM Space."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP behavior hints supplied by TiMEM Space."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by TiMEM Space."
+                },
+                "outputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool result when TiMEM Space supplies one."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "One tool currently exposed by the connected TiMEM Space account."
+            },
+            "description": "Tools currently exposed to this TiMEM Space connection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tools"
+        ],
+        "description": "The current TiMEM Space MCP tool catalog."
+      },
+      "followUpActions": [
+        "timem_space.call_tool"
+      ]
+    },
+    {
+      "id": "timem_space.ready",
+      "service": "timem_space",
+      "name": "ready",
+      "description": "Check TiMEM Space MCP authentication and service connectivity.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      }
+    },
+    {
+      "id": "timem_space.search_memories",
+      "service": "timem_space",
+      "name": "search_memories",
+      "description": "Search TiMEM Space for memories related to a semantic query, optionally within a memory domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query_text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language query used to recall relevant memories."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "general",
+              "coding",
+              "writing"
+            ],
+            "description": "The memory domain to search."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of memories to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query_text"
+        ],
+        "description": "The memory query and optional domain and result limit."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Structured MCP content when available; otherwise the complete MCP content envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The normalized result returned by TiMEM Space MCP."
+      }
+    }
+  ]
+}

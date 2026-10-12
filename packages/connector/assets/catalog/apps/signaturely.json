@@ -1,0 +1,335 @@
+{
+  "service": "signaturely",
+  "displayName": "Signaturely",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "signaturely_api_key",
+      "description": "Signaturely API key sent with the Authorization header. Create or view API keys in Signaturely settings: https://app.signaturely.com/settings/api"
+    }
+  ],
+  "homepageUrl": "https://signaturely.com/",
+  "actions": [
+    {
+      "id": "signaturely.create_folder",
+      "service": "signaturely",
+      "name": "create_folder",
+      "description": "Create a Signaturely folder at the root or inside another folder.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title for the new folder.",
+            "pattern": "\\S"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "The Signaturely folder UUID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Folder creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The folder UUID returned by Signaturely."
+          },
+          "title": {
+            "type": "string",
+            "description": "The folder title."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent folder UUID, or null for a root folder."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent folder UUID, or null for a root folder."
+          },
+          "documentsCount": {
+            "type": "integer",
+            "description": "The number of documents directly contained in the folder."
+          },
+          "foldersCount": {
+            "type": "integer",
+            "description": "The number of folders directly contained in the folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Signaturely folder."
+      }
+    },
+    {
+      "id": "signaturely.get_folder",
+      "service": "signaturely",
+      "name": "get_folder",
+      "description": "Get one Signaturely folder or the virtual root folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Signaturely folder UUID.",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Signaturely folder UUID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Folder lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The folder UUID returned by Signaturely."
+          },
+          "title": {
+            "type": "string",
+            "description": "The folder title."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent folder UUID, or null for a root folder."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent folder UUID, or null for a root folder."
+          },
+          "documentsCount": {
+            "type": "integer",
+            "description": "The number of documents directly contained in the folder."
+          },
+          "foldersCount": {
+            "type": "integer",
+            "description": "The number of folders directly contained in the folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Signaturely folder."
+      }
+    },
+    {
+      "id": "signaturely.list_folders",
+      "service": "signaturely",
+      "name": "list_folders",
+      "description": "List Signaturely folders from the root or from a selected parent folder.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of folders per page."
+          },
+          "folderId": {
+            "type": "string",
+            "description": "The Signaturely folder UUID.",
+            "format": "uuid"
+          },
+          "orderingKey": {
+            "type": "string",
+            "enum": [
+              "title",
+              "id",
+              "foldersCount",
+              "documentsCount"
+            ],
+            "description": "The folder field used to order results."
+          },
+          "orderingDirection": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The ordering direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "limit"
+        ],
+        "description": "Folder list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The folder UUID returned by Signaturely."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The folder title."
+                },
+                "documentsCount": {
+                  "type": "integer",
+                  "description": "The number of documents."
+                },
+                "foldersCount": {
+                  "type": "integer",
+                  "description": "The number of folders."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A folder list entry."
+            },
+            "description": "The folders on the current page."
+          },
+          "itemCount": {
+            "type": "integer",
+            "description": "The number of folders on this page."
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "The total matching folders."
+          },
+          "itemsPerPage": {
+            "type": "integer",
+            "description": "The requested page size."
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "The total pages."
+          },
+          "currentPage": {
+            "type": "integer",
+            "description": "The current page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "itemCount",
+          "totalItems",
+          "itemsPerPage",
+          "totalPages",
+          "currentPage"
+        ],
+        "description": "The paginated folder list."
+      }
+    },
+    {
+      "id": "signaturely.rename_folder",
+      "service": "signaturely",
+      "name": "rename_folder",
+      "description": "Rename an existing Signaturely folder.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Signaturely folder UUID.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new title.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title"
+        ],
+        "description": "Folder rename input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The folder UUID returned by Signaturely."
+          },
+          "title": {
+            "type": "string",
+            "description": "The folder title."
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The parent folder UUID, or null for a root folder."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The parent folder UUID, or null for a root folder."
+          },
+          "documentsCount": {
+            "type": "integer",
+            "description": "The number of documents directly contained in the folder."
+          },
+          "foldersCount": {
+            "type": "integer",
+            "description": "The number of folders directly contained in the folder."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Signaturely folder."
+      }
+    }
+  ]
+}

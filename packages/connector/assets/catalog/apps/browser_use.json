@@ -1,0 +1,1537 @@
+{
+  "service": "browser_use",
+  "displayName": "Browser Use",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "bu_...",
+      "description": "Browser Use Cloud API key sent with the X-Browser-Use-API-Key header. Create one from https://cloud.browser-use.com/settings?tab=api-keys&new=1."
+    }
+  ],
+  "homepageUrl": "https://browser-use.com",
+  "actions": [
+    {
+      "id": "browser_use.get_billing_account",
+      "service": "browser_use",
+      "name": "get_billing_account",
+      "description": "Get Browser Use Cloud account billing and plan information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving Browser Use account billing information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Browser Use account user name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Browser Use account user name."
+              },
+              "totalCreditsBalanceUsd": {
+                "type": "number",
+                "description": "The total credits balance in USD."
+              },
+              "monthlyCreditsBalanceUsd": {
+                "type": "number",
+                "description": "The monthly subscription credits balance in USD."
+              },
+              "additionalCreditsBalanceUsd": {
+                "type": "number",
+                "description": "The additional top-up credits balance in USD."
+              },
+              "rateLimit": {
+                "type": "integer",
+                "description": "The account rate limit."
+              },
+              "planInfo": {
+                "type": "object",
+                "properties": {
+                  "planName": {
+                    "type": "string",
+                    "description": "The Browser Use plan name."
+                  },
+                  "subscriptionStatus": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The subscription status."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The subscription status."
+                  },
+                  "subscriptionId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The subscription ID."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The subscription ID."
+                  },
+                  "subscriptionCurrentPeriodEnd": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The end of the current subscription period."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The end of the current subscription period."
+                  },
+                  "subscriptionCanceledAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "When the subscription was canceled."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "When the subscription was canceled."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "planName",
+                  "subscriptionStatus",
+                  "subscriptionId",
+                  "subscriptionCurrentPeriodEnd",
+                  "subscriptionCanceledAt"
+                ],
+                "description": "Browser Use account plan information."
+              },
+              "isFreeTier": {
+                "type": "boolean",
+                "description": "Whether the account is on the free tier."
+              },
+              "projectId": {
+                "type": "string",
+                "description": "The Browser Use project ID.",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalCreditsBalanceUsd",
+              "monthlyCreditsBalanceUsd",
+              "additionalCreditsBalanceUsd",
+              "rateLimit",
+              "planInfo",
+              "projectId"
+            ],
+            "description": "The Browser Use account billing response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ],
+        "description": "The Browser Use account billing information."
+      }
+    },
+    {
+      "id": "browser_use.get_session",
+      "service": "browser_use",
+      "name": "get_session",
+      "description": "Get a Browser Use Cloud session and poll for task completion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The Browser Use session ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ],
+        "description": "Input parameters for retrieving a Browser Use session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Browser Use session ID.",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "idle",
+                  "running",
+                  "stopped",
+                  "timed_out",
+                  "error"
+                ],
+                "description": "The Browser Use session lifecycle status."
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "bu-mini",
+                  "bu-max",
+                  "bu-ultra",
+                  "gemini-3-flash",
+                  "claude-sonnet-4.6",
+                  "claude-opus-4.6",
+                  "claude-opus-4.7",
+                  "gpt-5.4-mini"
+                ],
+                "description": "The Browser Use model to run the task with."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The auto-generated session title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The auto-generated session title."
+              },
+              "output": {
+                "description": "The agent final output when the task is complete."
+              },
+              "outputSchema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The requested structured output JSON Schema."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested structured output JSON Schema."
+              },
+              "stepCount": {
+                "type": "integer",
+                "description": "The number of agent steps executed so far."
+              },
+              "lastStepSummary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest human-readable agent step summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest human-readable agent step summary."
+              },
+              "isTaskSuccessful": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the task completed successfully."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the task completed successfully."
+              },
+              "liveUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The live browser preview URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The live browser preview URL."
+              },
+              "recordingUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use recording URL."
+                },
+                "description": "The recording URLs returned for the session."
+              },
+              "profileId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The browser profile ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The browser profile ID attached to this session."
+              },
+              "workspaceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The workspace ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The workspace ID attached to this session."
+              },
+              "proxyCountryCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country code used for the Browser Use proxy."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country code used for the Browser Use proxy."
+              },
+              "maxCostUsd": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The maximum cost limit in USD for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum cost limit in USD for this session."
+              },
+              "totalInputTokens": {
+                "type": "integer",
+                "description": "Total LLM input tokens consumed by this session."
+              },
+              "totalOutputTokens": {
+                "type": "integer",
+                "description": "Total LLM output tokens consumed by this session."
+              },
+              "proxyUsedMb": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Proxy bandwidth used in megabytes.",
+                "pattern": "\\S"
+              },
+              "llmCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of LLM usage in USD.",
+                "pattern": "\\S"
+              },
+              "proxyCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of proxy bandwidth in USD.",
+                "pattern": "\\S"
+              },
+              "browserCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of browser compute time in USD.",
+                "pattern": "\\S"
+              },
+              "totalCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Total session cost in USD.",
+                "pattern": "\\S"
+              },
+              "screenshotUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest expiring browser screenshot URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest expiring browser screenshot URL."
+              },
+              "agentmailEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary AgentMail email address for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary AgentMail email address for this session."
+              },
+              "integrationsUsed": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use integration identifier."
+                },
+                "description": "The Browser Use integrations used by this session."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the session was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Browser Use Cloud session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session"
+        ],
+        "description": "The Browser Use session response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "browser_use.run_task",
+        "statusActionId": "browser_use.get_session"
+      }
+    },
+    {
+      "id": "browser_use.list_session_messages",
+      "service": "browser_use",
+      "name": "list_session_messages",
+      "description": "List Browser Use Cloud messages for one session.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The Browser Use session ID.",
+            "format": "uuid"
+          },
+          "after": {
+            "type": "string",
+            "description": "Return messages after this message ID.",
+            "format": "uuid"
+          },
+          "before": {
+            "type": "string",
+            "description": "Return messages before this message ID.",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of messages to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ],
+        "description": "Input parameters for listing Browser Use session messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Browser Use message ID.",
+                  "format": "uuid"
+                },
+                "sessionId": {
+                  "type": "string",
+                  "description": "The Browser Use session ID.",
+                  "format": "uuid"
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message role returned by Browser Use.",
+                  "pattern": "\\S"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "The raw message content."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The Browser Use message type."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "A short human-readable message summary."
+                },
+                "screenshotUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The screenshot URL captured for this message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The screenshot URL captured for this message."
+                },
+                "hidden": {
+                  "type": "boolean",
+                  "description": "Whether Browser Use marks the message as hidden."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the message was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Browser Use session message."
+            },
+            "description": "The Browser Use messages in chronological order."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether more messages are available through cursor pagination."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "hasMore"
+        ],
+        "description": "The Browser Use session message list."
+      }
+    },
+    {
+      "id": "browser_use.list_sessions",
+      "service": "browser_use",
+      "name": "list_sessions",
+      "description": "List Browser Use Cloud sessions for the authenticated project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of sessions per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Browser Use sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Browser Use session ID.",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "idle",
+                    "running",
+                    "stopped",
+                    "timed_out",
+                    "error"
+                  ],
+                  "description": "The Browser Use session lifecycle status."
+                },
+                "model": {
+                  "type": "string",
+                  "enum": [
+                    "bu-mini",
+                    "bu-max",
+                    "bu-ultra",
+                    "gemini-3-flash",
+                    "claude-sonnet-4.6",
+                    "claude-opus-4.6",
+                    "claude-opus-4.7",
+                    "gpt-5.4-mini"
+                  ],
+                  "description": "The Browser Use model to run the task with."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The auto-generated session title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The auto-generated session title."
+                },
+                "output": {
+                  "description": "The agent final output when the task is complete."
+                },
+                "outputSchema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The requested structured output JSON Schema."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The requested structured output JSON Schema."
+                },
+                "stepCount": {
+                  "type": "integer",
+                  "description": "The number of agent steps executed so far."
+                },
+                "lastStepSummary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The latest human-readable agent step summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The latest human-readable agent step summary."
+                },
+                "isTaskSuccessful": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the task completed successfully."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the task completed successfully."
+                },
+                "liveUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The live browser preview URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The live browser preview URL."
+                },
+                "recordingUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Browser Use recording URL."
+                  },
+                  "description": "The recording URLs returned for the session."
+                },
+                "profileId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The browser profile ID attached to this session.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The browser profile ID attached to this session."
+                },
+                "workspaceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The workspace ID attached to this session.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The workspace ID attached to this session."
+                },
+                "proxyCountryCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The country code used for the Browser Use proxy."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The country code used for the Browser Use proxy."
+                },
+                "maxCostUsd": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The maximum cost limit in USD for this session."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The maximum cost limit in USD for this session."
+                },
+                "totalInputTokens": {
+                  "type": "integer",
+                  "description": "Total LLM input tokens consumed by this session."
+                },
+                "totalOutputTokens": {
+                  "type": "integer",
+                  "description": "Total LLM output tokens consumed by this session."
+                },
+                "proxyUsedMb": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Proxy bandwidth used in megabytes.",
+                  "pattern": "\\S"
+                },
+                "llmCostUsd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cost of LLM usage in USD.",
+                  "pattern": "\\S"
+                },
+                "proxyCostUsd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cost of proxy bandwidth in USD.",
+                  "pattern": "\\S"
+                },
+                "browserCostUsd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cost of browser compute time in USD.",
+                  "pattern": "\\S"
+                },
+                "totalCostUsd": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Total session cost in USD.",
+                  "pattern": "\\S"
+                },
+                "screenshotUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The latest expiring browser screenshot URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The latest expiring browser screenshot URL."
+                },
+                "agentmailEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The temporary AgentMail email address for this session."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The temporary AgentMail email address for this session."
+                },
+                "integrationsUsed": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Browser Use integration identifier."
+                  },
+                  "description": "The Browser Use integrations used by this session."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the session was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "When the session was last updated.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Browser Use Cloud session."
+            },
+            "description": "The Browser Use sessions on this page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "The total number of matching sessions."
+          },
+          "page": {
+            "type": "integer",
+            "description": "The current one-based page number."
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "The number of sessions per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessions",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "description": "The Browser Use session list response."
+      }
+    },
+    {
+      "id": "browser_use.run_task",
+      "service": "browser_use",
+      "name": "run_task",
+      "description": "Create or reuse a Browser Use Cloud session and dispatch an agent task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language instruction for the Browser Use agent.",
+            "pattern": "\\S"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "bu-mini",
+              "bu-max",
+              "bu-ultra",
+              "gemini-3-flash",
+              "claude-sonnet-4.6",
+              "claude-opus-4.6",
+              "claude-opus-4.7",
+              "gpt-5.4-mini"
+            ],
+            "description": "The Browser Use model to run the task with."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The Browser Use session ID.",
+            "format": "uuid"
+          },
+          "keepAlive": {
+            "type": "boolean",
+            "description": "Whether to keep the session alive after the task completes."
+          },
+          "maxCostUsd": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Maximum total cost in USD allowed for this session."
+          },
+          "profileId": {
+            "type": "string",
+            "description": "The browser profile ID to load into the session.",
+            "format": "uuid"
+          },
+          "workspaceId": {
+            "type": "string",
+            "description": "The workspace ID to attach to the session.",
+            "format": "uuid"
+          },
+          "proxyCountryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The proxy country code, such as us, de, or jp. Use null through the proxy API to disable it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The proxy country code, such as us, de, or jp. Use null through the proxy API to disable it."
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON Schema that the agent final output must conform to."
+          },
+          "enableScheduledTasks": {
+            "type": "boolean",
+            "description": "Whether the agent can create scheduled tasks."
+          },
+          "sensitiveData": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A sensitive value that Browser Use should keep hidden from the model."
+            },
+            "description": "Sensitive values exposed to the agent through secure placeholders."
+          },
+          "enableRecording": {
+            "type": "boolean",
+            "description": "Whether Browser Use should record the browser session."
+          },
+          "skills": {
+            "type": "boolean",
+            "description": "Whether built-in Browser Use agent skills are enabled."
+          },
+          "agentmail": {
+            "type": "boolean",
+            "description": "Whether Browser Use should provision a temporary email inbox."
+          },
+          "codeMode": {
+            "type": "boolean",
+            "description": "Whether the agent should return structured text and Python code."
+          },
+          "cacheScript": {
+            "type": "boolean",
+            "description": "Whether deterministic script caching should be forced on or off."
+          },
+          "useOwnKey": {
+            "type": "boolean",
+            "description": "Whether Browser Use should use the user's configured LLM API key."
+          },
+          "autoHeal": {
+            "type": "boolean",
+            "description": "Whether cached script runs should auto-heal on bad output."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task"
+        ],
+        "description": "Input parameters for creating or dispatching a Browser Use Cloud agent task."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Browser Use session ID.",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "idle",
+                  "running",
+                  "stopped",
+                  "timed_out",
+                  "error"
+                ],
+                "description": "The Browser Use session lifecycle status."
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "bu-mini",
+                  "bu-max",
+                  "bu-ultra",
+                  "gemini-3-flash",
+                  "claude-sonnet-4.6",
+                  "claude-opus-4.6",
+                  "claude-opus-4.7",
+                  "gpt-5.4-mini"
+                ],
+                "description": "The Browser Use model to run the task with."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The auto-generated session title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The auto-generated session title."
+              },
+              "output": {
+                "description": "The agent final output when the task is complete."
+              },
+              "outputSchema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The requested structured output JSON Schema."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested structured output JSON Schema."
+              },
+              "stepCount": {
+                "type": "integer",
+                "description": "The number of agent steps executed so far."
+              },
+              "lastStepSummary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest human-readable agent step summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest human-readable agent step summary."
+              },
+              "isTaskSuccessful": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the task completed successfully."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the task completed successfully."
+              },
+              "liveUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The live browser preview URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The live browser preview URL."
+              },
+              "recordingUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use recording URL."
+                },
+                "description": "The recording URLs returned for the session."
+              },
+              "profileId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The browser profile ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The browser profile ID attached to this session."
+              },
+              "workspaceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The workspace ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The workspace ID attached to this session."
+              },
+              "proxyCountryCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country code used for the Browser Use proxy."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country code used for the Browser Use proxy."
+              },
+              "maxCostUsd": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The maximum cost limit in USD for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum cost limit in USD for this session."
+              },
+              "totalInputTokens": {
+                "type": "integer",
+                "description": "Total LLM input tokens consumed by this session."
+              },
+              "totalOutputTokens": {
+                "type": "integer",
+                "description": "Total LLM output tokens consumed by this session."
+              },
+              "proxyUsedMb": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Proxy bandwidth used in megabytes.",
+                "pattern": "\\S"
+              },
+              "llmCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of LLM usage in USD.",
+                "pattern": "\\S"
+              },
+              "proxyCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of proxy bandwidth in USD.",
+                "pattern": "\\S"
+              },
+              "browserCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of browser compute time in USD.",
+                "pattern": "\\S"
+              },
+              "totalCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Total session cost in USD.",
+                "pattern": "\\S"
+              },
+              "screenshotUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest expiring browser screenshot URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest expiring browser screenshot URL."
+              },
+              "agentmailEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary AgentMail email address for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary AgentMail email address for this session."
+              },
+              "integrationsUsed": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use integration identifier."
+                },
+                "description": "The Browser Use integrations used by this session."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the session was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Browser Use Cloud session."
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "The Browser Use session ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session",
+          "sessionId"
+        ],
+        "description": "The Browser Use session returned after dispatching a task."
+      },
+      "asyncLifecycle": {
+        "startActionId": "browser_use.run_task",
+        "statusActionId": "browser_use.get_session"
+      }
+    },
+    {
+      "id": "browser_use.stop_session",
+      "service": "browser_use",
+      "name": "stop_session",
+      "description": "Stop a Browser Use Cloud session or the current task in that session.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The Browser Use session ID.",
+            "format": "uuid"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "task",
+              "session"
+            ],
+            "description": "How Browser Use should stop the session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ],
+        "description": "Input parameters for stopping a Browser Use session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Browser Use session ID.",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "idle",
+                  "running",
+                  "stopped",
+                  "timed_out",
+                  "error"
+                ],
+                "description": "The Browser Use session lifecycle status."
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "bu-mini",
+                  "bu-max",
+                  "bu-ultra",
+                  "gemini-3-flash",
+                  "claude-sonnet-4.6",
+                  "claude-opus-4.6",
+                  "claude-opus-4.7",
+                  "gpt-5.4-mini"
+                ],
+                "description": "The Browser Use model to run the task with."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The auto-generated session title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The auto-generated session title."
+              },
+              "output": {
+                "description": "The agent final output when the task is complete."
+              },
+              "outputSchema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The requested structured output JSON Schema."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The requested structured output JSON Schema."
+              },
+              "stepCount": {
+                "type": "integer",
+                "description": "The number of agent steps executed so far."
+              },
+              "lastStepSummary": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest human-readable agent step summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest human-readable agent step summary."
+              },
+              "isTaskSuccessful": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the task completed successfully."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the task completed successfully."
+              },
+              "liveUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The live browser preview URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The live browser preview URL."
+              },
+              "recordingUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use recording URL."
+                },
+                "description": "The recording URLs returned for the session."
+              },
+              "profileId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The browser profile ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The browser profile ID attached to this session."
+              },
+              "workspaceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The workspace ID attached to this session.",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The workspace ID attached to this session."
+              },
+              "proxyCountryCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The country code used for the Browser Use proxy."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The country code used for the Browser Use proxy."
+              },
+              "maxCostUsd": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The maximum cost limit in USD for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The maximum cost limit in USD for this session."
+              },
+              "totalInputTokens": {
+                "type": "integer",
+                "description": "Total LLM input tokens consumed by this session."
+              },
+              "totalOutputTokens": {
+                "type": "integer",
+                "description": "Total LLM output tokens consumed by this session."
+              },
+              "proxyUsedMb": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Proxy bandwidth used in megabytes.",
+                "pattern": "\\S"
+              },
+              "llmCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of LLM usage in USD.",
+                "pattern": "\\S"
+              },
+              "proxyCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of proxy bandwidth in USD.",
+                "pattern": "\\S"
+              },
+              "browserCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Cost of browser compute time in USD.",
+                "pattern": "\\S"
+              },
+              "totalCostUsd": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Total session cost in USD.",
+                "pattern": "\\S"
+              },
+              "screenshotUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest expiring browser screenshot URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest expiring browser screenshot URL."
+              },
+              "agentmailEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The temporary AgentMail email address for this session."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The temporary AgentMail email address for this session."
+              },
+              "integrationsUsed": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A Browser Use integration identifier."
+                },
+                "description": "The Browser Use integrations used by this session."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the session was last updated.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Browser Use Cloud session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session"
+        ],
+        "description": "The Browser Use session response after stopping."
+      }
+    }
+  ]
+}

@@ -1,0 +1,354 @@
+{
+  "service": "bark",
+  "displayName": "Bark",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Device Key",
+      "placeholder": "device key or https://api.day.app/{device_key}",
+      "description": "Bark device key used as the device_key field for push requests. Open the Bark iOS app and copy the push URL shown in the tutorial, then paste either the key or full URL: https://bark.day.app/#/tutorial.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Server Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.day.app",
+          "description": "Optional Bark server base URL. Leave empty to use https://api.day.app, or enter your self-hosted Bark server URL from the Bark Server API docs: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://bark.day.app",
+  "actions": [
+    {
+      "id": "bark.get_server_info",
+      "service": "bark",
+      "name": "get_server_info",
+      "description": "Fetch raw server information from the connected Bark server.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for fetching Bark server information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "raw": {
+            "description": "The raw payload returned by the Bark server info endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The wrapped Bark server information response."
+      }
+    },
+    {
+      "id": "bark.send_batch_notifications",
+      "service": "bark",
+      "name": "send_batch_notifications",
+      "description": "Send the same notification to multiple explicit Bark device keys through the REST push endpoint.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "device_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Bark device key. This value is sensitive."
+            },
+            "description": "The Bark device keys that should receive this notification.",
+            "minItems": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification title shown above the body."
+          },
+          "subtitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification subtitle."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notification body text to send to the Bark device."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "active",
+              "timeSensitive",
+              "passive"
+            ],
+            "description": "Optional iOS interruption level for the notification."
+          },
+          "volume": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional ringtone volume for critical alert notifications."
+          },
+          "badge": {
+            "type": "integer",
+            "description": "Optional badge number displayed next to the Bark app icon."
+          },
+          "call": {
+            "type": "boolean",
+            "description": "Whether the ringtone should continue to play for 30 seconds."
+          },
+          "autoCopy": {
+            "type": "boolean",
+            "description": "Whether Bark should automatically copy the notification content."
+          },
+          "copy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional text value Bark should copy."
+          },
+          "sound": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Bark sound name or custom ringtone name."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Optional icon URL shown with the notification on supported iOS versions.",
+            "format": "uri"
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification group name."
+          },
+          "isArchive": {
+            "type": "boolean",
+            "description": "Whether Bark should archive the notification in the app."
+          },
+          "url": {
+            "type": "string",
+            "description": "Optional URL opened when the user taps the notification.",
+            "format": "uri"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "none",
+              "alert"
+            ],
+            "description": "Optional tap behavior for the notification."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "device_keys",
+          "body"
+        ],
+        "description": "The input payload for sending one Bark notification to multiple device keys."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The Bark response code. Successful requests usually return 200."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Bark response message."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Bark server timestamp for the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "The normalized Bark response returned after a push request."
+      }
+    },
+    {
+      "id": "bark.send_encrypted_notification",
+      "service": "bark",
+      "name": "send_encrypted_notification",
+      "description": "Send a pre-encrypted Bark notification ciphertext to the connected Bark device.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ciphertext": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The already-encrypted Bark ciphertext payload to forward."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for sending one encrypted Bark notification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The Bark response code. Successful requests usually return 200."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Bark response message."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Bark server timestamp for the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "The normalized Bark response returned after a push request."
+      }
+    },
+    {
+      "id": "bark.send_notification",
+      "service": "bark",
+      "name": "send_notification",
+      "description": "Send a notification to the connected Bark device through the REST push endpoint.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification title shown above the body."
+          },
+          "subtitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification subtitle."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notification body text to send to the Bark device."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "active",
+              "timeSensitive",
+              "passive"
+            ],
+            "description": "Optional iOS interruption level for the notification."
+          },
+          "volume": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional ringtone volume for critical alert notifications."
+          },
+          "badge": {
+            "type": "integer",
+            "description": "Optional badge number displayed next to the Bark app icon."
+          },
+          "call": {
+            "type": "boolean",
+            "description": "Whether the ringtone should continue to play for 30 seconds."
+          },
+          "autoCopy": {
+            "type": "boolean",
+            "description": "Whether Bark should automatically copy the notification content."
+          },
+          "copy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional text value Bark should copy."
+          },
+          "sound": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Bark sound name or custom ringtone name."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Optional icon URL shown with the notification on supported iOS versions.",
+            "format": "uri"
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional notification group name."
+          },
+          "isArchive": {
+            "type": "boolean",
+            "description": "Whether Bark should archive the notification in the app."
+          },
+          "url": {
+            "type": "string",
+            "description": "Optional URL opened when the user taps the notification.",
+            "format": "uri"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "none",
+              "alert"
+            ],
+            "description": "Optional tap behavior for the notification."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "body"
+        ],
+        "description": "The input payload for sending one Bark notification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The Bark response code. Successful requests usually return 200."
+          },
+          "message": {
+            "type": "string",
+            "description": "The Bark response message."
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "The Bark server timestamp for the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "description": "The normalized Bark response returned after a push request."
+      }
+    }
+  ]
+}

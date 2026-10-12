@@ -1,0 +1,859 @@
+{
+  "service": "configcat",
+  "displayName": "ConfigCat",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Public API Username",
+      "placeholder": "CONFIGCAT_PUBLIC_API_USERNAME",
+      "description": "ConfigCat Public API username used for HTTP Basic Authentication. Create or view Public API credentials in your ConfigCat account: https://app.configcat.com/my-account/public-api-credentials.",
+      "extraFields": [
+        {
+          "key": "password",
+          "label": "Public API Password",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "CONFIGCAT_PUBLIC_API_PASSWORD",
+          "description": "ConfigCat Public API password paired with the username for HTTP Basic Authentication. Create or view Public API credentials in your ConfigCat account: https://app.configcat.com/my-account/public-api-credentials."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://configcat.com/",
+  "actions": [
+    {
+      "id": "configcat.get_me",
+      "service": "configcat",
+      "name": "get_me",
+      "description": "Get the ConfigCat user authenticated by the Public API credentials.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the authenticated ConfigCat user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "The authenticated user's email address."
+              },
+              "fullName": {
+                "type": "string",
+                "description": "The authenticated user's full name."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The authenticated ConfigCat user."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting the authenticated ConfigCat user."
+      }
+    },
+    {
+      "id": "configcat.get_setting_value",
+      "service": "configcat",
+      "name": "get_setting_value",
+      "description": "Get a ConfigCat Feature Flag or Setting value for an Environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "environmentId": {
+            "type": "string",
+            "description": "The ConfigCat Environment identifier.",
+            "format": "uuid"
+          },
+          "settingId": {
+            "type": "integer",
+            "description": "The ConfigCat Feature Flag or Setting identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for getting a ConfigCat Setting value."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settingValue": {
+            "type": "object",
+            "properties": {
+              "settingId": {
+                "type": "integer",
+                "description": "The ConfigCat Feature Flag or Setting identifier."
+              },
+              "settingKey": {
+                "type": "string",
+                "description": "The Feature Flag or Setting key."
+              },
+              "settingName": {
+                "type": "string",
+                "description": "The Feature Flag or Setting name."
+              },
+              "settingType": {
+                "type": "string",
+                "enum": [
+                  "boolean",
+                  "string",
+                  "int",
+                  "double"
+                ],
+                "description": "The ConfigCat Feature Flag or Setting type."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "A boolean Feature Flag value."
+                      },
+                      {
+                        "type": "string",
+                        "description": "A text Setting value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric Setting value."
+                      }
+                    ],
+                    "description": "The served non-null value returned by ConfigCat."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The served non-null value returned by ConfigCat."
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The last update timestamp when returned.",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The last update timestamp when returned."
+              },
+              "lastUpdaterUserEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The email of the last updater when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The email of the last updater when returned."
+              },
+              "lastUpdaterUserFullName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The name of the last updater when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The name of the last updater when returned."
+              },
+              "readOnly": {
+                "type": "boolean",
+                "description": "Whether the Setting value is read-only for the current credentials."
+              },
+              "configId": {
+                "type": "string",
+                "description": "The ConfigCat Config identifier.",
+                "format": "uuid"
+              },
+              "configName": {
+                "type": "string",
+                "description": "The Config name."
+              },
+              "environmentId": {
+                "type": "string",
+                "description": "The ConfigCat Environment identifier.",
+                "format": "uuid"
+              },
+              "environmentName": {
+                "type": "string",
+                "description": "The Environment name."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Setting value object returned by ConfigCat."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ConfigCat Setting value response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when getting a ConfigCat Setting value."
+      }
+    },
+    {
+      "id": "configcat.list_configs",
+      "service": "configcat",
+      "name": "list_configs",
+      "description": "List ConfigCat Configs in a Product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "The ConfigCat Product identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ConfigCat Configs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "configs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "configId": {
+                  "type": "string",
+                  "description": "The ConfigCat Config identifier.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Config name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Config description when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Config description when configured."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The Config order on the ConfigCat Dashboard."
+                },
+                "productId": {
+                  "type": "string",
+                  "description": "The ConfigCat Product identifier.",
+                  "format": "uuid"
+                },
+                "productName": {
+                  "type": "string",
+                  "description": "The parent Product name."
+                },
+                "evaluationVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Config evaluation version when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Config evaluation version when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Config object returned by ConfigCat."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ConfigCat Config."
+            },
+            "description": "The Configs returned by ConfigCat."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ConfigCat Configs."
+      }
+    },
+    {
+      "id": "configcat.list_environments",
+      "service": "configcat",
+      "name": "list_environments",
+      "description": "List ConfigCat Environments in a Product.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "The ConfigCat Product identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ConfigCat Environments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "environmentId": {
+                  "type": "string",
+                  "description": "The ConfigCat Environment identifier.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Environment name."
+                },
+                "color": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Environment color when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Environment color when configured."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Environment description when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Environment description when configured."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The Environment order on the ConfigCat Dashboard."
+                },
+                "reasonRequired": {
+                  "type": "boolean",
+                  "description": "Whether change reasons are required in this Environment."
+                },
+                "approveRequired": {
+                  "type": "boolean",
+                  "description": "Whether changes require approval in this Environment."
+                },
+                "productId": {
+                  "type": "string",
+                  "description": "The ConfigCat Product identifier.",
+                  "format": "uuid"
+                },
+                "productName": {
+                  "type": "string",
+                  "description": "The parent Product name."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Environment object returned by ConfigCat."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ConfigCat Environment."
+            },
+            "description": "The Environments returned by ConfigCat."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ConfigCat Environments."
+      }
+    },
+    {
+      "id": "configcat.list_products",
+      "service": "configcat",
+      "name": "list_products",
+      "description": "List ConfigCat Products available to the authenticated Public API credentials.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing ConfigCat Products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "description": "The ConfigCat Product identifier.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Product name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Product description when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Product description when configured."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The Product order on the ConfigCat Dashboard."
+                },
+                "reasonRequired": {
+                  "type": "boolean",
+                  "description": "Whether change reasons are required in this Product."
+                },
+                "approveRequired": {
+                  "type": "boolean",
+                  "description": "Whether changes require approval in this Product."
+                },
+                "organization": {
+                  "type": "object",
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "description": "The ConfigCat UUID identifier.",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The organization name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The ConfigCat organization summary."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Product object returned by ConfigCat."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ConfigCat Product."
+            },
+            "description": "The Products returned by ConfigCat."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ConfigCat Products."
+      }
+    },
+    {
+      "id": "configcat.list_setting_values",
+      "service": "configcat",
+      "name": "list_setting_values",
+      "description": "List ConfigCat Feature Flag and Setting values for a Config and Environment.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "configId": {
+            "type": "string",
+            "description": "The ConfigCat Config identifier.",
+            "format": "uuid"
+          },
+          "environmentId": {
+            "type": "string",
+            "description": "The ConfigCat Environment identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ConfigCat Setting values."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "properties": {
+              "configId": {
+                "type": "string",
+                "description": "The ConfigCat Config identifier.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The Config name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Config description when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Config description when configured."
+              },
+              "order": {
+                "type": "integer",
+                "description": "The Config order on the ConfigCat Dashboard."
+              },
+              "productId": {
+                "type": "string",
+                "description": "The ConfigCat Product identifier.",
+                "format": "uuid"
+              },
+              "productName": {
+                "type": "string",
+                "description": "The parent Product name."
+              },
+              "evaluationVersion": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Config evaluation version when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Config evaluation version when returned."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Config object returned by ConfigCat."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ConfigCat Config."
+          },
+          "environment": {
+            "type": "object",
+            "properties": {
+              "environmentId": {
+                "type": "string",
+                "description": "The ConfigCat Environment identifier.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "The Environment name."
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Environment color when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Environment color when configured."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Environment description when configured."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Environment description when configured."
+              },
+              "order": {
+                "type": "integer",
+                "description": "The Environment order on the ConfigCat Dashboard."
+              },
+              "reasonRequired": {
+                "type": "boolean",
+                "description": "Whether change reasons are required in this Environment."
+              },
+              "approveRequired": {
+                "type": "boolean",
+                "description": "Whether changes require approval in this Environment."
+              },
+              "productId": {
+                "type": "string",
+                "description": "The ConfigCat Product identifier.",
+                "format": "uuid"
+              },
+              "productName": {
+                "type": "string",
+                "description": "The parent Product name."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Environment object returned by ConfigCat."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized ConfigCat Environment."
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Whether the returned Setting values are read-only."
+          },
+          "settingValues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "settingId": {
+                  "type": "integer",
+                  "description": "The ConfigCat Feature Flag or Setting identifier."
+                },
+                "settingKey": {
+                  "type": "string",
+                  "description": "The Feature Flag or Setting key."
+                },
+                "settingName": {
+                  "type": "string",
+                  "description": "The Feature Flag or Setting name."
+                },
+                "settingType": {
+                  "type": "string",
+                  "enum": [
+                    "boolean",
+                    "string",
+                    "int",
+                    "double"
+                  ],
+                  "description": "The ConfigCat Feature Flag or Setting type."
+                },
+                "defaultValue": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The ConfigCat default value object for this Setting."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The last update timestamp when returned.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The last update timestamp when returned."
+                },
+                "lastUpdaterUserEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The email of the last updater when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The email of the last updater when returned."
+                },
+                "lastUpdaterUserFullName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The name of the last updater when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The name of the last updater when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw bulk Setting value item returned by ConfigCat."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ConfigCat bulk Setting value item."
+            },
+            "description": "The Setting value descriptors returned by ConfigCat."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw bulk Setting values response returned by ConfigCat."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ConfigCat Setting values."
+      }
+    },
+    {
+      "id": "configcat.list_settings",
+      "service": "configcat",
+      "name": "list_settings",
+      "description": "List ConfigCat Feature Flags and Settings in a Config.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "configId": {
+            "type": "string",
+            "description": "The ConfigCat Config identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing ConfigCat Feature Flags and Settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "settingId": {
+                  "type": "integer",
+                  "description": "The ConfigCat Feature Flag or Setting identifier."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The Feature Flag or Setting key."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Feature Flag or Setting name."
+                },
+                "hint": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Feature Flag or Setting description when configured."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Feature Flag or Setting description when configured."
+                },
+                "order": {
+                  "type": "integer",
+                  "description": "The Feature Flag or Setting order on the ConfigCat Dashboard."
+                },
+                "settingType": {
+                  "type": "string",
+                  "enum": [
+                    "boolean",
+                    "string",
+                    "int",
+                    "double"
+                  ],
+                  "description": "The ConfigCat Feature Flag or Setting type."
+                },
+                "isJson": {
+                  "type": "boolean",
+                  "description": "Whether string values are validated as JSON values."
+                },
+                "configId": {
+                  "type": "string",
+                  "description": "The ConfigCat Config identifier.",
+                  "format": "uuid"
+                },
+                "configName": {
+                  "type": "string",
+                  "description": "The parent Config name."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Feature Flag or Setting creation timestamp.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Feature Flag or Setting creation timestamp."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Feature Flag or Setting object returned by ConfigCat."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized ConfigCat Feature Flag or Setting."
+            },
+            "description": "The Feature Flags and Settings returned by ConfigCat."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing ConfigCat Feature Flags and Settings."
+      }
+    }
+  ]
+}

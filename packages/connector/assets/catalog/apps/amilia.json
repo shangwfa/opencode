@@ -1,0 +1,310 @@
+{
+  "service": "amilia",
+  "displayName": "Amilia",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "JWT Token",
+      "placeholder": "AMILIA_JWT_TOKEN",
+      "description": "One-year Amilia JWT sent as a Bearer token. Obtain it by calling POST https://app.amilia.com/api/V3/authenticate with Basic authentication for a dedicated Amilia API user: https://app.amilia.com/apidocs/Index.html#authentication",
+      "extraFields": [
+        {
+          "key": "organization",
+          "label": "Organization Identifier",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "forest-explorers",
+          "description": "Amilia organization number or URL identifier shown in the Amilia store URL and under the organization's account options."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.amilia.com/",
+  "actions": [
+    {
+      "id": "amilia.get_activity",
+      "service": "amilia",
+      "name": "get_activity",
+      "description": "Retrieve one activity from the connected Amilia organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Amilia activity identifier."
+          },
+          "showTaxes": {
+            "type": "boolean",
+            "description": "Whether activity tax details should be included."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "The Amilia activity to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "An Amilia activity object using the fields returned by the organization API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activity"
+        ],
+        "description": "The Amilia activity response."
+      }
+    },
+    {
+      "id": "amilia.get_program",
+      "service": "amilia",
+      "name": "get_program",
+      "description": "Retrieve one program from the connected Amilia organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "programId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Amilia program identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "programId"
+        ],
+        "description": "The Amilia program to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "program": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "An Amilia program object using the fields returned by the organization API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "program"
+        ],
+        "description": "The Amilia program response."
+      }
+    },
+    {
+      "id": "amilia.list_program_activities",
+      "service": "amilia",
+      "name": "list_program_activities",
+      "description": "List activities in one Amilia program with visibility, cancellation, occurrence, tax, and pagination options.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "programId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Amilia program identifier."
+          },
+          "showHidden": {
+            "type": "boolean",
+            "description": "Whether hidden activities should be included."
+          },
+          "showCancelled": {
+            "type": "boolean",
+            "description": "Whether cancelled activities should be included."
+          },
+          "showOccurrences": {
+            "type": "boolean",
+            "description": "Whether each activity should include its full occurrence list."
+          },
+          "showTaxes": {
+            "type": "boolean",
+            "description": "Whether activity tax details should be included."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Amilia result page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of Amilia records to request per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "programId"
+        ],
+        "description": "Program identifier, filters, and pagination for listing Amilia activities."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "An Amilia activity object using the fields returned by the organization API."
+            },
+            "description": "Activities returned by Amilia."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total number of available records when Amilia returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of available records when Amilia returns it."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL for the next page when Amilia returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL for the next page when Amilia returns one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalCount",
+              "next"
+            ],
+            "description": "Normalized Amilia v3 pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activities",
+          "paging"
+        ],
+        "description": "The normalized Amilia program activity list response."
+      }
+    },
+    {
+      "id": "amilia.list_programs",
+      "service": "amilia",
+      "name": "list_programs",
+      "description": "List programs for the connected Amilia organization with visibility, archive, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "showHidden": {
+            "type": "boolean",
+            "description": "Whether hidden programs should be included."
+          },
+          "showArchived": {
+            "type": "boolean",
+            "description": "Whether archived programs should be included."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Amilia result page number to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of Amilia records to request per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Amilia programs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "programs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "An Amilia program object using the fields returned by the organization API."
+            },
+            "description": "Programs returned by Amilia."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The total number of available records when Amilia returns it."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of available records when Amilia returns it."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL for the next page when Amilia returns one."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL for the next page when Amilia returns one."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "totalCount",
+              "next"
+            ],
+            "description": "Normalized Amilia v3 pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "programs",
+          "paging"
+        ],
+        "description": "The normalized Amilia program list response."
+      }
+    }
+  ]
+}

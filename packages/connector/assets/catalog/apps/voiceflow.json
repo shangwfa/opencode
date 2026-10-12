@@ -1,0 +1,366 @@
+{
+  "service": "voiceflow",
+  "displayName": "Voiceflow",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Voiceflow API Key",
+      "placeholder": "VF.DM.xxx",
+      "description": "Voiceflow project API key sent in the authorization header. Create or view it in Settings > API keys, or see https://docs.voiceflow.com/api-reference/authentication.",
+      "extraFields": [
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "project-id",
+          "description": "Voiceflow project ID used to target the agent. Find it in Settings > General > Metadata, or see https://docs.voiceflow.com/api-reference/authentication."
+        },
+        {
+          "key": "environmentAlias",
+          "label": "Environment Alias",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "main",
+          "description": "Default Voiceflow environment alias used when an action input does not override it. Find aliases in Settings > Environments, or see https://docs.voiceflow.com/api-reference/authentication."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.voiceflow.com",
+  "actions": [
+    {
+      "id": "voiceflow.interact",
+      "service": "voiceflow",
+      "name": "interact",
+      "description": "Send one non-streaming action to a Voiceflow conversation session.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "runtime:interact"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The session key returned by start_session."
+          },
+          "action": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Voiceflow action payload, such as a text action or launch action."
+          },
+          "variables": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Variables to merge into the session before processing this turn."
+          },
+          "state": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional runtime state to send with this turn."
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "userTimezone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The user's IANA timezone string."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional settings for this turn."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionKey",
+          "action"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "traces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Voiceflow trace."
+            },
+            "description": "The traces emitted by the Voiceflow agent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "traces"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "voiceflow.list_environments",
+      "service": "voiceflow",
+      "name": "list_environments",
+      "description": "List environments for the connected Voiceflow project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "environment:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Voiceflow environment ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The environment display name."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "The stable environment alias."
+                },
+                "isMain": {
+                  "type": "boolean",
+                  "description": "Whether this is the project's main environment."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The environment creation timestamp."
+                },
+                "draftVersionID": {
+                  "type": "string",
+                  "description": "The draft version ID for this environment."
+                },
+                "publishedVersionID": {
+                  "type": "string",
+                  "description": "The published version ID for this environment."
+                },
+                "trafficPercentage": {
+                  "type": "number",
+                  "description": "The percentage of traffic routed to this environment."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Voiceflow environment payload."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Voiceflow project environment."
+            },
+            "description": "The Voiceflow project environments."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "environments"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "voiceflow.query_knowledge_base",
+      "service": "voiceflow",
+      "name": "query_knowledge_base",
+      "description": "Query the Voiceflow knowledge base and return the synthesized answer and chunks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "knowledge_base:query"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The question to ask the knowledge base."
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional instruction for answer synthesis."
+          },
+          "chunkLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The maximum number of chunks to retrieve."
+          },
+          "synthesis": {
+            "type": "boolean",
+            "description": "Whether Voiceflow should synthesize an answer."
+          },
+          "environmentAlias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Voiceflow environment alias to target, such as main."
+          },
+          "versionVariant": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ],
+            "description": "Whether to query the draft or published environment version."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata filters to apply to the knowledge base query."
+          },
+          "settings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Model settings for answer synthesis."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "question"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The Voiceflow response type."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used to answer the query."
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The synthesized answer, when synthesis is enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The synthesized answer, when synthesis is enabled."
+          },
+          "duration": {
+            "type": "number",
+            "description": "The query duration reported by Voiceflow."
+          },
+          "tokens": {
+            "type": "number",
+            "description": "The total tokens consumed by the query."
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A retrieved chunk."
+            },
+            "description": "The retrieved knowledge base chunks."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Voiceflow query response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "model",
+          "output",
+          "duration",
+          "tokens",
+          "chunks",
+          "raw"
+        ],
+        "description": "Action output."
+      }
+    },
+    {
+      "id": "voiceflow.start_session",
+      "service": "voiceflow",
+      "name": "start_session",
+      "description": "Start a Voiceflow conversation session for one user and return the session key used by non-streaming interact calls.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "runtime:session"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The stable user ID for the conversation session."
+          },
+          "environmentAlias": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Voiceflow environment alias to target, such as main."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "The session-scoped key used as the authorization header for interact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionKey"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

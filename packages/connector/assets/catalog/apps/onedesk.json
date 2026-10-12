@@ -1,0 +1,838 @@
+{
+  "service": "onedesk",
+  "displayName": "OneDesk",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Public API Key",
+      "placeholder": "OD_PUBLIC_API_KEY",
+      "description": "OneDesk public API key sent with the OD-Public-API-Key header. See OneDesk's public API documentation: https://onedesk.com/dev/"
+    }
+  ],
+  "homepageUrl": "https://www.onedesk.com",
+  "actions": [
+    {
+      "id": "onedesk.filter_items",
+      "service": "onedesk",
+      "name": "filter_items",
+      "description": "Filter OneDesk work items by item type and return matching external IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A OneDesk item type."
+            },
+            "description": "The OneDesk item types to include, such as ticket or task.",
+            "minItems": 1
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OneDesk property name to filter, such as name or creationTime."
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "EQ",
+                    "NE",
+                    "CONTAINS",
+                    "NOT_CONTAINS",
+                    "LE",
+                    "LT",
+                    "GT",
+                    "GE"
+                  ],
+                  "description": "The OneDesk filter comparison operation to apply."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string filter value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric filter value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean filter value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value for empty or unset custom fields."
+                        }
+                      ],
+                      "description": "A scalar OneDesk filter value."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string filter value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric filter value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean filter value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null filter value for empty or unset custom fields."
+                          }
+                        ],
+                        "description": "A scalar OneDesk filter value."
+                      },
+                      "description": "A list of filter values.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "The value OneDesk should use in the filtering operation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "property",
+                "operation",
+                "value"
+              ],
+              "description": "A OneDesk property filter."
+            },
+            "description": "The OneDesk property filters to apply.",
+            "minItems": 1
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OneDesk custom field name to filter."
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "EQ",
+                    "NE",
+                    "CONTAINS",
+                    "NOT_CONTAINS",
+                    "LE",
+                    "LT",
+                    "GT",
+                    "GE"
+                  ],
+                  "description": "The OneDesk filter comparison operation to apply."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string filter value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric filter value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean filter value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value for empty or unset custom fields."
+                        }
+                      ],
+                      "description": "A scalar OneDesk filter value."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string filter value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric filter value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean filter value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null filter value for empty or unset custom fields."
+                          }
+                        ],
+                        "description": "A scalar OneDesk filter value."
+                      },
+                      "description": "A list of filter values.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "The value OneDesk should use in the filtering operation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "operation",
+                "value"
+              ],
+              "description": "A OneDesk custom field filter."
+            },
+            "description": "The OneDesk custom field filters to apply.",
+            "minItems": 1
+          },
+          "isAsc": {
+            "type": "boolean",
+            "description": "Whether OneDesk should return results in ascending creation order. Defaults to descending when omitted."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of external IDs to return. OneDesk allows up to 200 on external ID filter endpoints."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset to start from."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "itemTypes"
+        ],
+        "description": "Input parameters for filtering OneDesk work items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OneDesk API result code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OneDesk API result code."
+          },
+          "externalIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A matching external ID."
+            },
+            "description": "The matching OneDesk external IDs."
+          },
+          "totalNum": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of resources matching the filter."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of resources matching the filter."
+          },
+          "appliedPropertyFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One applied property filter returned by OneDesk."
+            },
+            "description": "The property filters OneDesk applied."
+          },
+          "appliedCustomFieldFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One applied custom field filter returned by OneDesk."
+            },
+            "description": "The custom field filters OneDesk applied."
+          },
+          "notAppliedPropertyFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A not-applied property filter reason."
+            },
+            "description": "Property filters OneDesk could not apply."
+          },
+          "notAppliedCustomFieldFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A not-applied custom field filter reason."
+            },
+            "description": "Custom field filters OneDesk could not apply."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw OneDesk filter response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "externalIds",
+          "totalNum",
+          "appliedPropertyFilters",
+          "appliedCustomFieldFilters",
+          "notAppliedPropertyFilters",
+          "notAppliedCustomFieldFilters",
+          "raw"
+        ],
+        "description": "The normalized OneDesk item filter result."
+      }
+    },
+    {
+      "id": "onedesk.filter_projects",
+      "service": "onedesk",
+      "name": "filter_projects",
+      "description": "Filter OneDesk projects and return matching project external IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OneDesk property name to filter, such as name or creationTime."
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "EQ",
+                    "NE",
+                    "CONTAINS",
+                    "NOT_CONTAINS",
+                    "LE",
+                    "LT",
+                    "GT",
+                    "GE"
+                  ],
+                  "description": "The OneDesk filter comparison operation to apply."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string filter value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric filter value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean filter value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value for empty or unset custom fields."
+                        }
+                      ],
+                      "description": "A scalar OneDesk filter value."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string filter value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric filter value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean filter value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null filter value for empty or unset custom fields."
+                          }
+                        ],
+                        "description": "A scalar OneDesk filter value."
+                      },
+                      "description": "A list of filter values.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "The value OneDesk should use in the filtering operation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "property",
+                "operation",
+                "value"
+              ],
+              "description": "A OneDesk property filter."
+            },
+            "description": "The OneDesk property filters to apply.",
+            "minItems": 1
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The OneDesk custom field name to filter."
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "EQ",
+                    "NE",
+                    "CONTAINS",
+                    "NOT_CONTAINS",
+                    "LE",
+                    "LT",
+                    "GT",
+                    "GE"
+                  ],
+                  "description": "The OneDesk filter comparison operation to apply."
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string filter value."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric filter value."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean filter value."
+                        },
+                        {
+                          "type": "null",
+                          "description": "A null filter value for empty or unset custom fields."
+                        }
+                      ],
+                      "description": "A scalar OneDesk filter value."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "A string filter value."
+                          },
+                          {
+                            "type": "number",
+                            "description": "A numeric filter value."
+                          },
+                          {
+                            "type": "boolean",
+                            "description": "A boolean filter value."
+                          },
+                          {
+                            "type": "null",
+                            "description": "A null filter value for empty or unset custom fields."
+                          }
+                        ],
+                        "description": "A scalar OneDesk filter value."
+                      },
+                      "description": "A list of filter values.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "The value OneDesk should use in the filtering operation."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "operation",
+                "value"
+              ],
+              "description": "A OneDesk custom field filter."
+            },
+            "description": "The OneDesk custom field filters to apply.",
+            "minItems": 1
+          },
+          "isAsc": {
+            "type": "boolean",
+            "description": "Whether OneDesk should return results in ascending creation order. Defaults to descending when omitted."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum number of external IDs to return. OneDesk allows up to 200 on external ID filter endpoints."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based result offset to start from."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for filtering OneDesk projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OneDesk API result code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OneDesk API result code."
+          },
+          "externalIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A matching external ID."
+            },
+            "description": "The matching OneDesk external IDs."
+          },
+          "totalNum": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of resources matching the filter."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of resources matching the filter."
+          },
+          "appliedPropertyFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One applied property filter returned by OneDesk."
+            },
+            "description": "The property filters OneDesk applied."
+          },
+          "appliedCustomFieldFilters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One applied custom field filter returned by OneDesk."
+            },
+            "description": "The custom field filters OneDesk applied."
+          },
+          "notAppliedPropertyFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A not-applied property filter reason."
+            },
+            "description": "Property filters OneDesk could not apply."
+          },
+          "notAppliedCustomFieldFilters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A not-applied custom field filter reason."
+            },
+            "description": "Custom field filters OneDesk could not apply."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw OneDesk filter response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "externalIds",
+          "totalNum",
+          "appliedPropertyFilters",
+          "appliedCustomFieldFilters",
+          "notAppliedPropertyFilters",
+          "notAppliedCustomFieldFilters",
+          "raw"
+        ],
+        "description": "The normalized OneDesk project filter result."
+      }
+    },
+    {
+      "id": "onedesk.get_item",
+      "service": "onedesk",
+      "name": "get_item",
+      "description": "Get OneDesk work item details by external ID or numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The OneDesk external ID of the resource."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "externalId"
+            ],
+            "description": "Look up a OneDesk resource by external ID."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric OneDesk ID of the resource."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "Look up a OneDesk resource by numeric ID."
+          }
+        ],
+        "description": "The OneDesk detail lookup input. Provide either externalId or id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OneDesk API result code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OneDesk API result code."
+          },
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The OneDesk work item details."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw OneDesk item response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "item",
+          "raw"
+        ],
+        "description": "The normalized OneDesk work item details response."
+      }
+    },
+    {
+      "id": "onedesk.get_organization_profile",
+      "service": "onedesk",
+      "name": "get_organization_profile",
+      "description": "Get the OneDesk organization profile and policy for the connected API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the OneDesk organization profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OneDesk API result code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OneDesk API result code."
+          },
+          "data": {
+            "description": "The OneDesk response data."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw OneDesk response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "data",
+          "raw"
+        ],
+        "description": "The OneDesk organization profile and policy returned by the public API."
+      }
+    },
+    {
+      "id": "onedesk.get_project",
+      "service": "onedesk",
+      "name": "get_project",
+      "description": "Get OneDesk project details by external ID or numeric ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The OneDesk external ID of the resource."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "externalId"
+            ],
+            "description": "Look up a OneDesk resource by external ID."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The numeric OneDesk ID of the resource."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "Look up a OneDesk resource by numeric ID."
+          }
+        ],
+        "description": "The OneDesk detail lookup input. Provide either externalId or id."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OneDesk API result code."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OneDesk API result code."
+          },
+          "project": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The OneDesk project details."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw OneDesk project response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "project",
+          "raw"
+        ],
+        "description": "The normalized OneDesk project details response."
+      }
+    }
+  ]
+}

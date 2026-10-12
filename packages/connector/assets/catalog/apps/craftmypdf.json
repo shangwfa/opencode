@@ -1,0 +1,401 @@
+{
+  "service": "craftmypdf",
+  "displayName": "CraftMyPDF",
+  "categories": [
+    "Design & Media",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "craftmypdf_api_key",
+      "description": "CraftMyPDF API key sent with the X-API-KEY header. Get or reset it from the CraftMyPDF web console under API Integration, as described in the official docs: https://craftmypdf.com/docs/index.html.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "Regional API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api-us.craftmypdf.com",
+          "description": "Optional CraftMyPDF regional endpoint root or full /v1 base URL. Official regional endpoints are listed at https://craftmypdf.com/docs/index.html."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://craftmypdf.com",
+  "actions": [
+    {
+      "id": "craftmypdf.create_pdf",
+      "service": "craftmypdf",
+      "name": "create_pdf",
+      "description": "Generate a PDF from a CraftMyPDF template and return the hosted file URL plus transaction metadata.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CraftMyPDF template_id value."
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "A stringified JSON payload passed directly to CraftMyPDF."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A JSON object payload passed directly to CraftMyPDF."
+              }
+            ],
+            "description": "The template data payload. CraftMyPDF accepts a JSON string or JSON object."
+          },
+          "loadDataFrom": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional external URL for loading template data."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional template version string. Omit it to use the latest version."
+          },
+          "expiration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080,
+            "description": "The file URL expiration time in minutes."
+          },
+          "outputFile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The output PDF filename."
+          },
+          "imageResampleResolution": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "An optional DPI value for CraftMyPDF image downsampling."
+          },
+          "directDownload": {
+            "type": "boolean",
+            "description": "Whether the generated PDF should be marked for direct download."
+          },
+          "cloudStorage": {
+            "type": "boolean",
+            "description": "Whether CraftMyPDF should keep the generated PDF in its CDN-backed storage."
+          },
+          "paging": {
+            "type": "string",
+            "enum": [
+              "continuous",
+              "reset"
+            ],
+            "description": "The paging mode used when templateId contains multiple template IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "data"
+        ],
+        "description": "Input parameters for generating a PDF with CraftMyPDF."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The hosted PDF URL returned by CraftMyPDF."
+          },
+          "transactionRef": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The CraftMyPDF transaction reference for this generation request."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "description": "The 1-based page number of the anchor."
+                },
+                "text": {
+                  "type": "string",
+                  "description": "The anchor text when present."
+                },
+                "level": {
+                  "type": "string",
+                  "description": "The hierarchical level reported by CraftMyPDF."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The optional anchor description."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An anchor entry returned by CraftMyPDF for table-of-contents style output."
+            },
+            "description": "The anchor metadata returned by CraftMyPDF when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl",
+          "transactionRef",
+          "anchors"
+        ]
+      }
+    },
+    {
+      "id": "craftmypdf.get_account_info",
+      "service": "craftmypdf",
+      "name": "get_account_info",
+      "description": "Get the current CraftMyPDF account details resolved by the provided API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input parameters are required for this action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The CraftMyPDF account username associated with the API key."
+              },
+              "quotaCounter": {
+                "type": "number",
+                "description": "The amount of quota already consumed by the account."
+              },
+              "quotaMax": {
+                "type": "number",
+                "description": "The maximum quota allocated to the account."
+              },
+              "templateCounter": {
+                "type": "integer",
+                "description": "The number of templates currently stored in the account."
+              },
+              "templateMax": {
+                "type": "integer",
+                "description": "The maximum number of templates allowed for the account."
+              },
+              "createdAt": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO 8601 timestamp when the account was created."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "username",
+              "quotaCounter",
+              "quotaMax",
+              "templateCounter",
+              "templateMax",
+              "createdAt"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account"
+        ]
+      }
+    },
+    {
+      "id": "craftmypdf.get_template",
+      "service": "craftmypdf",
+      "name": "get_template",
+      "description": "Get the raw CraftMyPDF template body and sample JSON for one template ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The template identifier to retrieve."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional template version string. Omit it to retrieve the latest version."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId"
+        ],
+        "description": "Input parameters for retrieving one CraftMyPDF template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "template": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The template display name."
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The raw CraftMyPDF template body string."
+              },
+              "sampleDataJson": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The sample JSON string stored with the template."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The sample JSON string stored with the template."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "body",
+              "sampleDataJson"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "template"
+        ]
+      }
+    },
+    {
+      "id": "craftmypdf.list_templates",
+      "service": "craftmypdf",
+      "name": "list_templates",
+      "description": "List CraftMyPDF templates with optional pagination and group-name filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of templates to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of templates to skip before returning results."
+          },
+          "groupName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter templates by CraftMyPDF group_name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing CraftMyPDF templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "templateId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The template identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The template display name."
+                },
+                "status": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The current upstream template status."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The ISO 8601 timestamp when the template was created."
+                },
+                "updatedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the template was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the template was last updated."
+                },
+                "groupName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The optional CraftMyPDF template group name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The optional CraftMyPDF template group name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "templateId",
+                "name",
+                "status",
+                "createdAt",
+                "updatedAt",
+                "groupName"
+              ]
+            },
+            "description": "The CraftMyPDF templates returned for the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ]
+      }
+    }
+  ]
+}

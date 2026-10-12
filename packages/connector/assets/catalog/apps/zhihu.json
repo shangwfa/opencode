@@ -1,0 +1,1619 @@
+{
+  "service": "zhihu",
+  "displayName": "Zhihu",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Secret",
+      "placeholder": "zhihu_access_secret",
+      "description": "Zhihu Open Platform Access Secret sent with the Authorization: Bearer header. View it in the Zhihu Open Platform profile page: https://developer.zhihu.com/profile."
+    }
+  ],
+  "homepageUrl": "https://www.zhihu.com",
+  "actions": [
+    {
+      "id": "zhihu.favlist_contents",
+      "service": "zhihu",
+      "name": "favlist_contents",
+      "description": "List public content in one collection owned by the current Access Secret account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "favlistUrlToken": {
+            "type": "integer",
+            "description": "The collection URL token."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The pagination offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of items to return, up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "favlistUrlToken"
+        ],
+        "description": "The collection identifier and pagination."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "FavTime": {
+                      "type": "integer",
+                      "description": "The favorite Unix timestamp in seconds."
+                    },
+                    "Favlists": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A collection reference."
+                      },
+                      "description": "The collections containing this item."
+                    },
+                    "Author": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The content author when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu collection content item."
+                },
+                "description": "Collection content items."
+              },
+              "Paging": {
+                "type": "object",
+                "properties": {
+                  "IsEnd": {
+                    "type": "boolean",
+                    "description": "Whether this is the last page."
+                  },
+                  "NextOffset": {
+                    "type": "string",
+                    "description": "The opaque offset for the next page."
+                  },
+                  "Totals": {
+                    "type": "integer",
+                    "description": "The total number of records."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination information returned by Zhihu."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A collection contents response."
+      }
+    },
+    {
+      "id": "zhihu.get_pdf_parse",
+      "service": "zhihu",
+      "name": "get_pdf_parse",
+      "description": "Get the status and temporary result URL for a Zhihu PDF parsing task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PDF parsing task identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The PDF parsing task to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The task identifier."
+              },
+              "task_status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "running",
+                  "succeeded",
+                  "failed"
+                ],
+                "description": "The task status."
+              },
+              "progress": {
+                "type": "number",
+                "description": "The task progress from zero to one."
+              },
+              "result": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The completed task result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The completed task result."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The task error when failed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task error when failed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The current asynchronous task state."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A PDF parsing task response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "zhihu.submit_pdf_parse",
+        "statusActionId": "zhihu.get_pdf_parse"
+      }
+    },
+    {
+      "id": "zhihu.get_ppt_generation",
+      "service": "zhihu",
+      "name": "get_ppt_generation",
+      "description": "Get the status and temporary PPTX download URL for a PPT generation task.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PPT generation task identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The PPT generation task to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The task identifier."
+              },
+              "task_status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "running",
+                  "succeeded",
+                  "failed"
+                ],
+                "description": "The task status."
+              },
+              "progress": {
+                "type": "number",
+                "description": "The task progress from zero to one."
+              },
+              "result": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The completed task result."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The completed task result."
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The task error when failed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The task error when failed."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The current asynchronous task state."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A PPT generation task response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "zhihu.submit_ppt_generation",
+        "statusActionId": "zhihu.get_ppt_generation"
+      }
+    },
+    {
+      "id": "zhihu.global_search",
+      "service": "zhihu",
+      "name": "global_search",
+      "description": "Search the global web index exposed by Zhihu Open Platform.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query keyword."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of global search results to return, up to 20."
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Advanced filter expression for host or publish_time constraints."
+          },
+          "searchDB": {
+            "type": "string",
+            "enum": [
+              "all",
+              "realtime",
+              "static"
+            ],
+            "description": "The search index database to query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for a Zhihu global search request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "HasMore": {
+                "type": "boolean",
+                "description": "Whether more results are available."
+              },
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "Title": {
+                      "type": "string",
+                      "description": "The content title."
+                    },
+                    "ContentType": {
+                      "type": "string",
+                      "description": "The content type, such as Answer or Article."
+                    },
+                    "ContentID": {
+                      "type": "string",
+                      "description": "The content identifier."
+                    },
+                    "ContentText": {
+                      "type": "string",
+                      "description": "The content excerpt. Highlighted fragments may include em tags."
+                    },
+                    "Url": {
+                      "type": "string",
+                      "description": "The source URL with Zhihu Open Platform attribution parameters.",
+                      "format": "uri"
+                    },
+                    "CommentCount": {
+                      "type": "integer",
+                      "description": "The number of comments."
+                    },
+                    "VoteUpCount": {
+                      "type": "integer",
+                      "description": "The number of upvotes."
+                    },
+                    "AuthorName": {
+                      "type": "string",
+                      "description": "The author display name."
+                    },
+                    "AuthorAvatar": {
+                      "type": "string",
+                      "description": "The author avatar URL."
+                    },
+                    "AuthorBadge": {
+                      "type": "string",
+                      "description": "The author certification badge image URL."
+                    },
+                    "AuthorBadgeText": {
+                      "type": "string",
+                      "description": "The author certification badge text."
+                    },
+                    "EditTime": {
+                      "type": "integer",
+                      "description": "The published or last edited Unix timestamp in seconds."
+                    },
+                    "CommentInfoList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "Content": {
+                            "type": "string",
+                            "description": "The comment content."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A selected comment returned with a content item."
+                      },
+                      "description": "Selected comments returned for this content item."
+                    },
+                    "AuthorityLevel": {
+                      "type": "string",
+                      "description": "The content authority level from 1 to 4."
+                    },
+                    "RankingScore": {
+                      "type": "number",
+                      "description": "The ranking score returned by Zhihu Search."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu content search result item."
+                },
+                "description": "Search result items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Zhihu global search response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zhihu global search response."
+      }
+    },
+    {
+      "id": "zhihu.hot_list",
+      "service": "zhihu",
+      "name": "hot_list",
+      "description": "Get the current Zhihu hot list with titles, links, thumbnails, and summaries.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The number of hot list items to return, up to 30."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a Zhihu hot list request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Total": {
+                "type": "integer",
+                "description": "The number of returned hot list items."
+              },
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "Title": {
+                      "type": "string",
+                      "description": "The hot list title."
+                    },
+                    "Url": {
+                      "type": "string",
+                      "description": "The Zhihu URL for the hot list item.",
+                      "format": "uri"
+                    },
+                    "ThumbnailUrl": {
+                      "type": "string",
+                      "description": "The thumbnail image URL, or an empty string when no image is available."
+                    },
+                    "Summary": {
+                      "type": "string",
+                      "description": "The item summary, or an empty string when no summary is available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu hot list item."
+                },
+                "description": "Hot list items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Zhihu hot list response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zhihu hot list response."
+      }
+    },
+    {
+      "id": "zhihu.knowledge_base_items",
+      "service": "zhihu",
+      "name": "knowledge_base_items",
+      "description": "List content in a Zhida knowledge base using cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "knowledgeBaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The knowledge base identifier."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The opaque cursor returned by the previous page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "The number of items to return, up to 20."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "knowledgeBaseId"
+        ],
+        "description": "The knowledge base and page to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A knowledge base content item."
+                },
+                "description": "Knowledge base content items."
+              },
+              "Total": {
+                "type": "integer",
+                "description": "The total number of content items."
+              },
+              "HasMore": {
+                "type": "boolean",
+                "description": "Whether another page is available."
+              },
+              "NextCursor": {
+                "type": "string",
+                "description": "The opaque cursor for the next page."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A knowledge base contents response."
+      }
+    },
+    {
+      "id": "zhihu.knowledge_bases",
+      "service": "zhihu",
+      "name": "knowledge_bases",
+      "description": "List Zhida knowledge bases created by or subscribed to by the current account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "created",
+              "subscribed"
+            ],
+            "description": "The relationship used to filter knowledge bases."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Knowledge base list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Zhida knowledge base."
+                },
+                "description": "Knowledge bases."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A knowledge base list response."
+      }
+    },
+    {
+      "id": "zhihu.knowledge_file_upload",
+      "service": "zhihu",
+      "name": "knowledge_file_upload",
+      "description": "Download a file from an HTTP URL and upload it into a Zhida knowledge base.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "The HTTP or HTTPS URL whose file should be uploaded.",
+            "format": "uri"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file name, including a supported extension."
+          },
+          "knowledgeBaseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target knowledge base identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl",
+          "fileName"
+        ],
+        "description": "The source file and optional target knowledge base."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "KnowledgeBaseID": {
+                "type": "string",
+                "description": "The knowledge base that received the file."
+              },
+              "RecallContentID": {
+                "type": "string",
+                "description": "The uploaded content identifier."
+              },
+              "FileName": {
+                "type": "string",
+                "description": "The normalized uploaded file name."
+              },
+              "FileSize": {
+                "type": "integer",
+                "description": "The uploaded file size in bytes."
+              },
+              "Title": {
+                "type": "string",
+                "description": "The parsed content title when available."
+              },
+              "Abstract": {
+                "type": "string",
+                "description": "The parsed content summary when available."
+              },
+              "OriginUrl": {
+                "type": "string",
+                "description": "The source file URL returned by Zhihu when available."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A knowledge file upload response."
+      }
+    },
+    {
+      "id": "zhihu.knowledge_search",
+      "service": "zhihu",
+      "name": "knowledge_search",
+      "description": "Retrieve relevant document fragments from Zhida knowledge bases with RAG search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "description": "The query and knowledge recall ranges. Provide at least one non-empty knowledgeBaseIds or recallScopes array.",
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The retrieval question."
+              },
+              "knowledgeBaseIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A knowledge base identifier."
+                },
+                "description": "Knowledge base identifiers to search. Required when recallScopes is omitted.",
+                "minItems": 1
+              },
+              "recallScopes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "personal",
+                    "subscription",
+                    "public"
+                  ],
+                  "description": "A recall scope."
+                },
+                "description": "Built-in recall scopes to search. Required when knowledgeBaseIds is omitted.",
+                "minItems": 1
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "The number of documents to return, up to 10."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "query"
+            ],
+            "description": "The knowledge retrieval query and optional recall ranges."
+          },
+          {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "knowledgeBaseIds"
+                ],
+                "description": "A request that searches explicit knowledge bases."
+              },
+              {
+                "type": "object",
+                "required": [
+                  "recallScopes"
+                ],
+                "description": "A request that searches built-in recall scopes."
+              }
+            ],
+            "description": "At least one knowledge retrieval range is required."
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A knowledge retrieval result."
+                },
+                "description": "Relevant documents and fragments."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A knowledge retrieval response."
+      }
+    },
+    {
+      "id": "zhihu.submit_pdf_parse",
+      "service": "zhihu",
+      "name": "submit_pdf_parse",
+      "description": "Download a PDF from an HTTP URL, upload it to Zhihu, and submit an asynchronous parse task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "The HTTP or HTTPS URL of a PDF file up to 100 MB.",
+            "format": "uri"
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The PDF file name, ending in .pdf."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "A key that makes repeated identical task submissions idempotent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl",
+          "fileName"
+        ],
+        "description": "The source PDF and optional idempotency key."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The PDF parsing task identifier."
+              },
+              "task_status": {
+                "type": "string",
+                "description": "The initial task status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A queued PDF parsing response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "zhihu.submit_pdf_parse",
+        "statusActionId": "zhihu.get_pdf_parse"
+      }
+    },
+    {
+      "id": "zhihu.submit_ppt_generation",
+      "service": "zhihu",
+      "name": "submit_ppt_generation",
+      "description": "Submit a Zhihu answer or article URL for asynchronous PPTX generation.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceUrl": {
+            "type": "string",
+            "description": "A supported Zhihu answer or article URL.",
+            "format": "uri"
+          },
+          "numPages": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 21,
+            "description": "The requested number of slides, from 6 to 21."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "A key that makes repeated identical submissions idempotent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "resourceUrl",
+          "numPages"
+        ],
+        "description": "The source content and requested slide count."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "task_id": {
+                "type": "string",
+                "description": "The PPT generation task identifier."
+              },
+              "task_status": {
+                "type": "string",
+                "description": "The initial task status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A queued PPT generation response."
+      },
+      "asyncLifecycle": {
+        "startActionId": "zhihu.submit_ppt_generation",
+        "statusActionId": "zhihu.get_ppt_generation"
+      }
+    },
+    {
+      "id": "zhihu.user_collections",
+      "service": "zhihu",
+      "name": "user_collections",
+      "description": "List the current Access Secret owner's recently favorited public content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of recent favorites to return, up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for recent favorites."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "FavTime": {
+                      "type": "integer",
+                      "description": "The favorite Unix timestamp in seconds."
+                    },
+                    "Favlists": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A collection reference."
+                      },
+                      "description": "The collections containing this item."
+                    },
+                    "Author": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The content author when available."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu collection content item."
+                },
+                "description": "Recently favorited content."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A recent favorites response."
+      }
+    },
+    {
+      "id": "zhihu.user_contents",
+      "service": "zhihu",
+      "name": "user_contents",
+      "description": "List the current Access Secret owner's public Zhihu creations.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "all",
+              "answer",
+              "article",
+              "zvideo",
+              "pin",
+              "question"
+            ],
+            "description": "The content type to include."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The pagination offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of items to return, up to 50."
+          },
+          "sortField": {
+            "type": "string",
+            "enum": [
+              "like_count",
+              "ts"
+            ],
+            "description": "The field used to sort results."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The result sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contentType"
+        ],
+        "description": "Filters and pagination for user creations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ContentType": {
+                      "type": "string",
+                      "description": "The content type."
+                    },
+                    "Url": {
+                      "type": "string",
+                      "description": "The content URL.",
+                      "format": "uri"
+                    },
+                    "CreatedAt": {
+                      "type": "integer",
+                      "description": "The creation Unix timestamp in seconds."
+                    },
+                    "LikeCount": {
+                      "type": "integer",
+                      "description": "The number of likes."
+                    },
+                    "CommentCount": {
+                      "type": "integer",
+                      "description": "The number of comments."
+                    },
+                    "FavoriteCount": {
+                      "type": "integer",
+                      "description": "The number of favorites."
+                    },
+                    "Title": {
+                      "type": "string",
+                      "description": "The content title."
+                    },
+                    "Summary": {
+                      "type": "string",
+                      "description": "The content summary."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu user content item."
+                },
+                "description": "User creation items."
+              },
+              "Paging": {
+                "type": "object",
+                "properties": {
+                  "IsEnd": {
+                    "type": "boolean",
+                    "description": "Whether this is the last page."
+                  },
+                  "NextOffset": {
+                    "type": "string",
+                    "description": "The opaque offset for the next page."
+                  },
+                  "Totals": {
+                    "type": "integer",
+                    "description": "The total number of records."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination information returned by Zhihu."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A user creations response."
+      }
+    },
+    {
+      "id": "zhihu.user_favlists",
+      "service": "zhihu",
+      "name": "user_favlists",
+      "description": "List the current Access Secret owner's public Zhihu collections.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of collections to return, up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for listing collections."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Zhihu collection."
+                },
+                "description": "Zhihu collections."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A collections response."
+      }
+    },
+    {
+      "id": "zhihu.user_followees",
+      "service": "zhihu",
+      "name": "user_followees",
+      "description": "List the current Access Secret owner's public Zhihu followees.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The pagination offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The number of followees to return, up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination for the followee list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A followed Zhihu user."
+                },
+                "description": "Followed users."
+              },
+              "Paging": {
+                "type": "object",
+                "properties": {
+                  "IsEnd": {
+                    "type": "boolean",
+                    "description": "Whether this is the last page."
+                  },
+                  "NextOffset": {
+                    "type": "string",
+                    "description": "The opaque offset for the next page."
+                  },
+                  "Totals": {
+                    "type": "integer",
+                    "description": "The total number of records."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pagination information returned by Zhihu."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A user followees response."
+      }
+    },
+    {
+      "id": "zhihu.zhida",
+      "service": "zhihu",
+      "name": "zhida",
+      "description": "Create a non-streaming Zhihu Zhida chat completion.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "zhida-fast-1p5",
+              "zhida-thinking-1p5",
+              "zhida-agent"
+            ],
+            "description": "The Zhida model tier."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The message role."
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The message content."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A message in a Zhida chat completion request."
+            },
+            "description": "Conversation messages to send to Zhida.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for a non-streaming Zhida chat completion request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The completion identifier."
+          },
+          "object": {
+            "type": "string",
+            "description": "The response object type."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The creation Unix timestamp in seconds."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that produced the response."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The choice index."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "string",
+                      "description": "The returned message role."
+                    },
+                    "reasoning_content": {
+                      "type": "string",
+                      "description": "The model reasoning content when returned."
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The final answer content."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The assistant message returned by Zhida."
+                },
+                "finish_reason": {
+                  "type": "string",
+                  "description": "The reason the choice finished."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Zhida completion choice."
+            },
+            "description": "Completion choices."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A non-streaming Zhida chat completion response."
+      }
+    },
+    {
+      "id": "zhihu.zhihu_search",
+      "service": "zhihu",
+      "name": "zhihu_search",
+      "description": "Search Zhihu content and return matching questions, answers, and articles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query keyword."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "The number of Zhihu search results to return, up to 10."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for a Zhihu site search request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "Code": {
+            "type": "integer",
+            "description": "The upstream response code."
+          },
+          "Message": {
+            "type": "string",
+            "description": "The upstream response message."
+          },
+          "Data": {
+            "type": "object",
+            "properties": {
+              "HasMore": {
+                "type": "boolean",
+                "description": "Whether more results are available. Zhihu currently returns false."
+              },
+              "SearchHashId": {
+                "type": "string",
+                "description": "The search request identifier."
+              },
+              "Items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "Title": {
+                      "type": "string",
+                      "description": "The content title."
+                    },
+                    "ContentType": {
+                      "type": "string",
+                      "description": "The content type, such as Answer or Article."
+                    },
+                    "ContentID": {
+                      "type": "string",
+                      "description": "The content identifier."
+                    },
+                    "ContentText": {
+                      "type": "string",
+                      "description": "The content excerpt. Highlighted fragments may include em tags."
+                    },
+                    "Url": {
+                      "type": "string",
+                      "description": "The source URL with Zhihu Open Platform attribution parameters.",
+                      "format": "uri"
+                    },
+                    "CommentCount": {
+                      "type": "integer",
+                      "description": "The number of comments."
+                    },
+                    "VoteUpCount": {
+                      "type": "integer",
+                      "description": "The number of upvotes."
+                    },
+                    "AuthorName": {
+                      "type": "string",
+                      "description": "The author display name."
+                    },
+                    "AuthorAvatar": {
+                      "type": "string",
+                      "description": "The author avatar URL."
+                    },
+                    "AuthorBadge": {
+                      "type": "string",
+                      "description": "The author certification badge image URL."
+                    },
+                    "AuthorBadgeText": {
+                      "type": "string",
+                      "description": "The author certification badge text."
+                    },
+                    "EditTime": {
+                      "type": "integer",
+                      "description": "The published or last edited Unix timestamp in seconds."
+                    },
+                    "CommentInfoList": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "Content": {
+                            "type": "string",
+                            "description": "The comment content."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "A selected comment returned with a content item."
+                      },
+                      "description": "Selected comments returned for this content item."
+                    },
+                    "AuthorityLevel": {
+                      "type": "string",
+                      "description": "The content authority level from 1 to 4."
+                    },
+                    "RankingScore": {
+                      "type": "number",
+                      "description": "The ranking score returned by Zhihu Search."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Zhihu content search result item."
+                },
+                "description": "Search result items."
+              },
+              "EmptyReason": {
+                "type": "string",
+                "description": "The reason returned when the result set is empty."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The Zhihu site search response data."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Zhihu site search response."
+      }
+    }
+  ]
+}

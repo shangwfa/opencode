@@ -1,0 +1,638 @@
+{
+  "service": "chat_api_for_whatsapp",
+  "displayName": "Chat API for WhatsApp",
+  "categories": [
+    "Communication",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Token",
+      "placeholder": "CHAT_API_TOKEN",
+      "description": "Chat API token sent as the token query parameter. Sign in to Chat API and copy the token for your instance from the API access dashboard: https://chat-api.com/en/get-api.html#login.",
+      "extraFields": [
+        {
+          "key": "instanceId",
+          "label": "Instance ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "123",
+          "description": "Your Chat API instance number used in API URLs such as https://api.chat-api.com/instance123/status."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://chat-api.com/en/",
+  "actions": [
+    {
+      "id": "chat_api_for_whatsapp.get_settings",
+      "service": "chat_api_for_whatsapp",
+      "name": "get_settings",
+      "description": "Get the current webhook, notification, video upload, and proxy settings.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve Chat API settings."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "webhookUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Configured webhook URL, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configured webhook URL, or null when none is configured."
+          },
+          "ackNotificationsOn": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether message acknowledgement webhooks are enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether message acknowledgement webhooks are enabled."
+          },
+          "chatUpdateOn": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether chat update webhooks are enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether chat update webhooks are enabled."
+          },
+          "videoUploadOn": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether incoming video upload handling is enabled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether incoming video upload handling is enabled."
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Configured SOCKS5 proxy, or null when none is configured."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configured SOCKS5 proxy, or null when none is configured."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw Chat API settings response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhookUrl",
+          "ackNotificationsOn",
+          "chatUpdateOn",
+          "videoUploadOn",
+          "proxy",
+          "raw"
+        ],
+        "description": "Chat API instance settings."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.get_status",
+      "service": "chat_api_for_whatsapp",
+      "name": "get_status",
+      "description": "Get the current Chat API WhatsApp instance status and QR code payload when authorization is pending.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve Chat API status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "got qr code",
+              "authenticated",
+              "loading",
+              "init",
+              "not_paid"
+            ],
+            "description": "Current Chat API instance status."
+          },
+          "qrCode": {
+            "type": "string",
+            "description": "Base64-encoded QR code image contents, when Chat API returns one."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw Chat API status response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountStatus",
+          "raw"
+        ],
+        "description": "Chat API instance status response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.list_chats",
+      "service": "chat_api_for_whatsapp",
+      "name": "list_chats",
+      "description": "List chats known to the connected Chat API WhatsApp instance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list Chat API chats."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Chat API chat ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Chat name returned by Chat API."
+                },
+                "image": {
+                  "type": "string",
+                  "description": "Avatar or group image URL returned by Chat API."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Raw Chat API chat object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "raw"
+              ],
+              "description": "One Chat API chat."
+            },
+            "description": "Chats returned by Chat API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chats"
+        ],
+        "description": "Chat API chat listing response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.list_messages",
+      "service": "chat_api_for_whatsapp",
+      "name": "list_messages",
+      "description": "List incoming and outgoing messages, optionally filtered by chat ID or paged from a previous response.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lastMessageNumber": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The lastMessageNumber value from a previous list_messages response."
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Whether to request the last 100 messages and ignore lastMessageNumber."
+          },
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Chat API chat ID to filter messages by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for listing Chat API messages."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique Chat API message ID."
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Message body or media URL returned by Chat API."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Message type returned by Chat API."
+                },
+                "senderName": {
+                  "type": "string",
+                  "description": "Sender name returned by Chat API."
+                },
+                "fromMe": {
+                  "type": "boolean",
+                  "description": "Whether this message was sent by the connected account."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "Author ID for group messages."
+                },
+                "time": {
+                  "type": "integer",
+                  "description": "Unix timestamp when the message was sent."
+                },
+                "chatId": {
+                  "type": "string",
+                  "description": "Chat API chat ID containing the message."
+                },
+                "messageNumber": {
+                  "type": "integer",
+                  "description": "Sequence number of the message in Chat API storage."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Raw Chat API message object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "body",
+                "type",
+                "fromMe",
+                "time",
+                "chatId",
+                "messageNumber",
+                "raw"
+              ],
+              "description": "One Chat API message."
+            },
+            "description": "Messages returned by Chat API."
+          },
+          "lastMessageNumber": {
+            "type": "integer",
+            "description": "The value to pass as lastMessageNumber on the next request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages"
+        ],
+        "description": "Chat API message listing response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.list_messages_queue",
+      "service": "chat_api_for_whatsapp",
+      "name": "list_messages_queue",
+      "description": "List outbound messages currently waiting in the Chat API send queue.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to list the Chat API message queue."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalMessages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of outbound messages in the queue."
+          },
+          "first100": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Chat API queue item ID."
+                },
+                "body": {
+                  "type": "string",
+                  "description": "Queued message body."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Queued message type."
+                },
+                "lastTry": {
+                  "type": "integer",
+                  "description": "Unix timestamp in milliseconds of the last send attempt."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional queued message metadata returned by Chat API."
+                },
+                "raw": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Raw Chat API queued message object."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "body",
+                "type",
+                "metadata",
+                "raw"
+              ],
+              "description": "One queued outbound Chat API message."
+            },
+            "description": "The first 100 queued outbound messages returned by Chat API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalMessages",
+          "first100"
+        ],
+        "description": "Chat API outbound message queue response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.send_file_by_url",
+      "service": "chat_api_for_whatsapp",
+      "name": "send_file_by_url",
+      "description": "Send a file using a public URL to an existing Chat API chat ID or to a phone number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Chat API chat ID, such as 17633123456@c.us for a private chat or 17680561234-1479621234@g.us for a group."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number starting with the country code, without plus sign or separators."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "Public HTTP or HTTPS URL of the file Chat API should send.",
+            "format": "uri"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "description": "File name to show in WhatsApp, such as invoice.pdf."
+          },
+          "caption": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional text caption to show under the file."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl",
+          "filename"
+        ],
+        "description": "Parameters for sending a file by URL with Chat API.",
+        "oneOf": [
+          {
+            "required": [
+              "chatId"
+            ],
+            "not": {
+              "required": [
+                "phone"
+              ]
+            }
+          },
+          {
+            "required": [
+              "phone"
+            ],
+            "not": {
+              "required": [
+                "chatId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether Chat API accepted the message for sending."
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique Chat API message ID when one is returned."
+          },
+          "message": {
+            "type": "string",
+            "description": "Posting status message returned by Chat API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw Chat API send response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sent",
+          "raw"
+        ],
+        "description": "Chat API send message response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.send_text_message",
+      "service": "chat_api_for_whatsapp",
+      "name": "send_text_message",
+      "description": "Send a text message to an existing Chat API chat ID or to a phone number.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Chat API chat ID, such as 17633123456@c.us for a private chat or 17680561234-1479621234@g.us for a group."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient phone number starting with the country code, without plus sign or separators."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message text to send."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Parameters for sending a text message with Chat API.",
+        "oneOf": [
+          {
+            "required": [
+              "chatId"
+            ],
+            "not": {
+              "required": [
+                "phone"
+              ]
+            }
+          },
+          {
+            "required": [
+              "phone"
+            ],
+            "not": {
+              "required": [
+                "chatId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether Chat API accepted the message for sending."
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique Chat API message ID when one is returned."
+          },
+          "message": {
+            "type": "string",
+            "description": "Posting status message returned by Chat API."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw Chat API send response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sent",
+          "raw"
+        ],
+        "description": "Chat API send message response."
+      }
+    },
+    {
+      "id": "chat_api_for_whatsapp.test_api_key",
+      "service": "chat_api_for_whatsapp",
+      "name": "test_api_key",
+      "description": "Validate the connected Chat API token and instance ID, returning the current instance status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to validate Chat API credentials."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "got qr code",
+              "authenticated",
+              "loading",
+              "init",
+              "not_paid"
+            ],
+            "description": "Current Chat API instance status."
+          },
+          "qrCode": {
+            "type": "string",
+            "description": "Base64-encoded QR code image contents, when Chat API returns one."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Raw Chat API status response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accountStatus",
+          "raw"
+        ],
+        "description": "Chat API instance status response."
+      }
+    }
+  ]
+}

@@ -1,0 +1,432 @@
+{
+  "service": "sslmate_cert_spotter_api",
+  "displayName": "Cert Spotter",
+  "categories": [
+    "Security",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sslmate_api_key",
+      "description": "SSLMate API key used with the Authorization Bearer header for Cert Spotter. Find it on your SSLMate API keys page: https://sslmate.com/account/api_keys",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://sslmate.com/certspotter/",
+  "actions": [
+    {
+      "id": "sslmate_cert_spotter_api.delete_monitored_domain",
+      "service": "sslmate_cert_spotter_api",
+      "name": "delete_monitored_domain",
+      "description": "Delete one monitored domain configuration from the connected Cert Spotter account.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+            "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for deleting one monitored domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the monitored domain was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The output payload for deleting one monitored domain."
+      }
+    },
+    {
+      "id": "sslmate_cert_spotter_api.get_monitored_domain",
+      "service": "sslmate_cert_spotter_api",
+      "name": "get_monitored_domain",
+      "description": "Get one monitored domain configuration from the connected Cert Spotter account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+            "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for retrieving one monitored domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+                "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether Cert Spotter monitoring is enabled for this domain."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "enabled"
+            ],
+            "description": "A monitored domain object returned by the Cert Spotter monitoring API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The output payload for retrieving one monitored domain."
+      }
+    },
+    {
+      "id": "sslmate_cert_spotter_api.list_certificate_issuances",
+      "service": "sslmate_cert_spotter_api",
+      "name": "list_certificate_issuances",
+      "description": "List certificate issuances for one domain from the Cert Spotter CT Search API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The registered domain or subdomain to search in the CT Search API.",
+            "pattern": "^(?!.*://)(?!.*\\/)(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+          },
+          "after": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return issuances discovered after the issuance with this Cert Spotter ID."
+          },
+          "include_subdomains": {
+            "type": "boolean",
+            "description": "Whether to include issuances for subdomains of the requested domain."
+          },
+          "match_wildcards": {
+            "type": "boolean",
+            "description": "Whether to include wildcard certificates that match the requested domain."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Cert Spotter expand field such as dns_names or issuer.caa_domains."
+            },
+            "description": "Repeatable Cert Spotter expand fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The input payload for listing certificate issuances from Cert Spotter."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "issuances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The opaque Cert Spotter issuance identifier."
+                },
+                "tbs_sha256": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SHA-256 digest of the CT TBSCertificate."
+                },
+                "cert_sha256": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SHA-256 digest of the certificate or precertificate."
+                },
+                "dns_names": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One DNS name covered by the certificate issuance."
+                  },
+                  "description": "Expanded DNS names covered by the certificate issuance."
+                },
+                "pubkey_sha256": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The SHA-256 digest of the certificate public key."
+                },
+                "pubkey_der": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The base64 DER-encoded certificate public key when expanded."
+                },
+                "pubkey": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Expanded metadata about the certificate public key."
+                },
+                "issuer": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Expanded metadata about the issuer."
+                },
+                "not_before": {
+                  "type": "string",
+                  "description": "The certificate not-before timestamp in RFC 3339 format.",
+                  "format": "date-time"
+                },
+                "not_after": {
+                  "type": "string",
+                  "description": "The certificate not-after timestamp in RFC 3339 format.",
+                  "format": "date-time"
+                },
+                "revoked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the certificate is revoked."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the certificate is revoked."
+                },
+                "revocation": {
+                  "type": "object",
+                  "properties": {
+                    "time": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The RFC 3339 revocation time, or null when not revoked.",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The RFC 3339 revocation time, or null when not revoked."
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The RFC 5280 revocation reason code."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The RFC 5280 revocation reason code."
+                    },
+                    "checked_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The RFC 3339 timestamp when Cert Spotter last checked revocation status.",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The RFC 3339 timestamp when Cert Spotter last checked revocation status."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Expanded revocation metadata returned by Cert Spotter."
+                },
+                "problem_reporting": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Instructions for reporting certificate problems, or null when unavailable."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Instructions for reporting certificate problems, or null when unavailable."
+                },
+                "cert_der": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The base64 DER-encoded certificate or precertificate when expanded."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A certificate issuance object returned by the Cert Spotter CT Search API."
+            },
+            "description": "Certificate issuances returned by the Cert Spotter CT Search API."
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Retry-After header in seconds when Cert Spotter suggests how long to wait before polling again."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "issuances"
+        ],
+        "description": "The output payload for listing certificate issuances from Cert Spotter."
+      }
+    },
+    {
+      "id": "sslmate_cert_spotter_api.list_monitored_domains",
+      "service": "sslmate_cert_spotter_api",
+      "name": "list_monitored_domains",
+      "description": "List monitored domains configured in the connected Cert Spotter account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing monitored domains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+                  "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether Cert Spotter monitoring is enabled for this domain."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "enabled"
+              ],
+              "description": "A monitored domain object returned by the Cert Spotter monitoring API."
+            },
+            "description": "Monitored domains returned by the Cert Spotter monitoring API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domains"
+        ],
+        "description": "The output payload for listing monitored domains."
+      }
+    },
+    {
+      "id": "sslmate_cert_spotter_api.upsert_monitored_domain",
+      "service": "sslmate_cert_spotter_api",
+      "name": "upsert_monitored_domain",
+      "description": "Create or update one monitored domain configuration in the connected Cert Spotter account.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+            "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether monitoring should be enabled for this domain."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The input payload for creating or updating one monitored domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The monitored domain name. Prefix with a leading dot to cover the entire subdomain tree.",
+                "pattern": "^(?!.*://)(?!.*\\/)(?:\\\\.)?(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether Cert Spotter monitoring is enabled for this domain."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "enabled"
+            ],
+            "description": "A monitored domain object returned by the Cert Spotter monitoring API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "The output payload for creating or updating one monitored domain."
+      }
+    }
+  ]
+}

@@ -1,0 +1,509 @@
+{
+  "service": "blocknative",
+  "displayName": "Blocknative",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "BLOCKNATIVE_API_KEY",
+      "description": "Blocknative API key sent with the Authorization header. Request or manage it from the official Blocknative API key page: https://www.blocknative.com/request-api-key"
+    }
+  ],
+  "homepageUrl": "https://www.blocknative.com",
+  "actions": [
+    {
+      "id": "blocknative.get_gas_price_distribution",
+      "service": "blocknative",
+      "name": "get_gas_price_distribution",
+      "description": "Get the current Blocknative gas-price distribution for Ethereum mainnet.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "const": 1,
+            "type": "number",
+            "description": "The supported chain ID for gas distribution. Only Ethereum mainnet (`1`) works."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for requesting the Blocknative gas-price distribution."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The chain ecosystem returned by Blocknative."
+          },
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network name returned by Blocknative."
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The gas-price unit returned by Blocknative."
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "The highest priced transaction returned by Blocknative."
+          },
+          "currentBlockNumber": {
+            "type": "integer",
+            "description": "The current block number used for the distribution snapshot."
+          },
+          "msSinceLastBlock": {
+            "type": "integer",
+            "description": "Milliseconds since the last block at the distribution snapshot."
+          },
+          "topNDistribution": {
+            "type": "object",
+            "properties": {
+              "distribution": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "description": "One gas price bucket."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "The number of transactions in this price bucket."
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "description": "One `[price, count]` pair returned by Blocknative."
+                },
+                "description": "The ordered gas-price distribution buckets returned by Blocknative."
+              },
+              "n": {
+                "type": "integer",
+                "description": "The top-N pending transactions covered by the distribution."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "distribution",
+              "n"
+            ],
+            "description": "The normalized top-N gas-price distribution returned by Blocknative."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "network",
+          "unit",
+          "maxPrice",
+          "currentBlockNumber",
+          "msSinceLastBlock",
+          "topNDistribution"
+        ],
+        "description": "The normalized output payload for the Blocknative gas-price distribution."
+      }
+    },
+    {
+      "id": "blocknative.get_gas_prices",
+      "service": "blocknative",
+      "name": "get_gas_prices",
+      "description": "Get Blocknative gas-price estimates for the default chain or a selected network.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The chain ID to query. Use `0` for Bitcoin when querying the Gas Price API."
+          },
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The chain ecosystem used by Blocknative, for example `ethereum` or `story`.",
+            "pattern": "\\S"
+          },
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network name used by Blocknative, for example `main` or `mainnet`.",
+            "pattern": "\\S"
+          },
+          "confidenceLevels": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99,
+              "description": "One requested confidence level for gas-price prediction."
+            },
+            "description": "Up to five confidence levels used to override the default prediction buckets.",
+            "minItems": 1,
+            "maxItems": 5
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for requesting Blocknative gas-price estimates.",
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "chainId"
+                  ]
+                },
+                {
+                  "required": [
+                    "system"
+                  ]
+                },
+                {
+                  "required": [
+                    "network"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "chainId"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "system"
+                  ]
+                },
+                {
+                  "required": [
+                    "network"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "system",
+              "network"
+            ],
+            "not": {
+              "required": [
+                "chainId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The chain ecosystem returned by Blocknative."
+          },
+          "network": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The network name returned by Blocknative."
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The gas-price unit returned by Blocknative."
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "The highest priced transaction returned by Blocknative."
+          },
+          "currentBlockNumber": {
+            "type": "integer",
+            "description": "The current block number used for the prediction snapshot."
+          },
+          "msSinceLastBlock": {
+            "type": "integer",
+            "description": "Milliseconds since the last block at the prediction snapshot."
+          },
+          "blockPrices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "blockNumber": {
+                  "type": "integer",
+                  "description": "The block number this prediction targets."
+                },
+                "estimatedTransactionCount": {
+                  "type": "integer",
+                  "description": "The estimated number of transactions in the predicted block."
+                },
+                "baseFeePerGas": {
+                  "type": "number",
+                  "description": "The base fee per gas returned by Blocknative."
+                },
+                "blobBaseFeePerGas": {
+                  "type": "number",
+                  "description": "The blob base fee per gas returned by Blocknative when present."
+                },
+                "estimatedPrices": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "confidence": {
+                        "type": "integer",
+                        "description": "The inclusion confidence for this gas-price bucket."
+                      },
+                      "price": {
+                        "type": "number",
+                        "description": "The gas price returned for this confidence bucket."
+                      },
+                      "maxPriorityFeePerGas": {
+                        "type": "number",
+                        "description": "The max priority fee per gas returned for this confidence bucket."
+                      },
+                      "maxFeePerGas": {
+                        "type": "number",
+                        "description": "The max fee per gas returned for this confidence bucket."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "confidence",
+                      "price"
+                    ],
+                    "description": "One Blocknative gas-price estimate."
+                  },
+                  "description": "The ordered gas-price estimates returned for the block."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "blockNumber",
+                "estimatedTransactionCount",
+                "baseFeePerGas",
+                "estimatedPrices"
+              ],
+              "description": "One predicted block-price object returned by Blocknative."
+            },
+            "description": "The predicted block-price payloads returned by Blocknative."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "system",
+          "network",
+          "unit",
+          "maxPrice",
+          "currentBlockNumber",
+          "msSinceLastBlock",
+          "blockPrices"
+        ],
+        "description": "The normalized output payload for Blocknative gas-price estimates."
+      }
+    },
+    {
+      "id": "blocknative.list_gas_oracles",
+      "service": "blocknative",
+      "name": "list_gas_oracles",
+      "description": "List the gas-oracle metadata exposed by Blocknative across supported chains.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Blocknative gas oracles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "oracles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "arch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The blockchain architecture returned by Blocknative."
+                },
+                "chainId": {
+                  "type": "integer",
+                  "description": "The unique chain ID returned by Blocknative."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable chain label returned by Blocknative."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The internal chain name returned by Blocknative."
+                },
+                "network": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The network name returned by Blocknative."
+                },
+                "system": {
+                  "type": "string",
+                  "description": "The chain ecosystem returned by Blocknative."
+                },
+                "addressByVersion": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "A gas-oracle contract address."
+                  },
+                  "description": "The gas-oracle contract addresses keyed by Blocknative oracle version."
+                },
+                "rpcUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The public RPC URL returned by Blocknative."
+                },
+                "blockExplorerUrl": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The public block-explorer URL returned by Blocknative."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The chain icon URL returned by Blocknative."
+                },
+                "testnet": {
+                  "type": "boolean",
+                  "description": "Whether the returned oracle belongs to a testnet."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "arch",
+                "chainId",
+                "label",
+                "name",
+                "network",
+                "addressByVersion",
+                "rpcUrl",
+                "blockExplorerUrl",
+                "testnet"
+              ],
+              "description": "One gas-oracle metadata object returned by Blocknative."
+            },
+            "description": "The gas oracles returned by Blocknative."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "oracles"
+        ],
+        "description": "The output payload for listing Blocknative gas oracles."
+      }
+    },
+    {
+      "id": "blocknative.list_supported_chains",
+      "service": "blocknative",
+      "name": "list_supported_chains",
+      "description": "List the chains currently supported by the Blocknative Gas Platform.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Blocknative supported chains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "arch": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The blockchain architecture returned by Blocknative."
+                },
+                "chainId": {
+                  "type": "integer",
+                  "description": "The unique chain ID returned by Blocknative."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable chain label returned by Blocknative."
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One feature flag supported on the chain."
+                  },
+                  "description": "The Blocknative features supported for the returned chain."
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "The chain icon URL returned by Blocknative."
+                },
+                "system": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The chain ecosystem returned by Blocknative."
+                },
+                "network": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The network name returned by Blocknative."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "arch",
+                "chainId",
+                "label",
+                "features",
+                "system",
+                "network"
+              ],
+              "description": "One supported chain returned by Blocknative."
+            },
+            "description": "The supported chains returned by Blocknative."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chains"
+        ],
+        "description": "The output payload for listing Blocknative supported chains."
+      }
+    }
+  ]
+}

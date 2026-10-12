@@ -1,0 +1,333 @@
+{
+  "service": "formcarry",
+  "displayName": "Formcarry",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "formcarry_api_key",
+      "description": "Formcarry API key passed with the api_key request header. Copy it from the Integrations page in your Formcarry dashboard: https://app.formcarry.com/integrations."
+    }
+  ],
+  "homepageUrl": "https://formcarry.com",
+  "actions": [
+    {
+      "id": "formcarry.create_form",
+      "service": "formcarry",
+      "name": "create_form",
+      "description": "Create a new Formcarry form with basic notification, redirect, and storage settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the form."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated email addresses that should receive submission notifications."
+          },
+          "returnUrl": {
+            "type": "string",
+            "description": "URL to redirect users to after a successful submission when not using the built-in thank-you page.",
+            "format": "uri"
+          },
+          "failUrl": {
+            "type": "string",
+            "description": "URL to redirect users to after a failed submission when returnUrl is configured.",
+            "format": "uri"
+          },
+          "returnParams": {
+            "type": "boolean",
+            "description": "Whether Formcarry should append submission data to the returnUrl query string."
+          },
+          "googleRecaptcha": {
+            "type": "string",
+            "description": "Google reCAPTCHA secret key used to enable spam protection for the form."
+          },
+          "webhook": {
+            "type": "string",
+            "description": "Webhook URL that Formcarry should call with a POST request for each submission.",
+            "format": "uri"
+          },
+          "retention": {
+            "type": "boolean",
+            "description": "Whether Formcarry should save incoming submissions to its database."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "email"
+        ],
+        "description": "Basic Formcarry form settings supported by the first provider pass."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Numeric status code returned by Formcarry."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title message returned by Formcarry."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message returned by Formcarry."
+          },
+          "type": {
+            "type": "string",
+            "description": "Result type returned by Formcarry."
+          },
+          "formUrl": {
+            "type": "string",
+            "description": "Hosted Formcarry form URL created for the new form."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "title",
+          "message",
+          "type",
+          "formUrl"
+        ],
+        "description": "Successful response returned after creating a Formcarry form."
+      }
+    },
+    {
+      "id": "formcarry.delete_form",
+      "service": "formcarry",
+      "name": "delete_form",
+      "description": "Delete an existing Formcarry form by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Formcarry form ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_id"
+        ],
+        "description": "Path parameters for deleting a Formcarry form."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "Numeric status code returned by Formcarry."
+          },
+          "title": {
+            "type": "string",
+            "description": "Title message returned by Formcarry."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable message returned by Formcarry."
+          },
+          "type": {
+            "type": "string",
+            "description": "Result type returned by Formcarry."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "code",
+          "title",
+          "message",
+          "type"
+        ],
+        "description": "Base success payload returned by Formcarry form mutation endpoints."
+      }
+    },
+    {
+      "id": "formcarry.list_submissions",
+      "service": "formcarry",
+      "name": "list_submissions",
+      "description": "List submissions for a Formcarry form with the documented pagination, sorting, and filtering query parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Formcarry form ID whose submissions should be retrieved."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of submissions to return. Formcarry documents a maximum of 50."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sorting criteria in the format field:order, such as createdAt:-1 or createdAt:1."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Comma-separated filter expressions in the format key:value, including documented filters like date:7, attachments:true, or spam:false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "form_id"
+        ],
+        "description": "Path and query parameters accepted by the Formcarry submissions endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "form": {
+            "type": "string",
+            "description": "Form ID whose submissions were requested."
+          },
+          "results": {
+            "type": "integer",
+            "description": "Number of submissions returned in the current response."
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "Unique identifier of the submission."
+                },
+                "form": {
+                  "type": "string",
+                  "description": "Form ID associated with the submission."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "Timestamp when the submission was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "Timestamp when the submission was last updated."
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "description": "Field key returned by Formcarry."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Field label returned by Formcarry."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "Field type returned by Formcarry."
+                      },
+                      "value": {
+                        "description": "Field value returned by Formcarry."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Submission field entry returned by Formcarry."
+                  },
+                  "description": "Field values captured in the submission."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Submission object returned by Formcarry."
+            },
+            "description": "Submissions returned by Formcarry."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "current_page": {
+                "type": "integer",
+                "description": "Current page number."
+              },
+              "previous_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Previous page number, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Previous page number, or null when unavailable."
+              },
+              "next_page": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Next page number, or null when unavailable."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Next page number, or null when unavailable."
+              },
+              "total_page": {
+                "type": "integer",
+                "description": "Total number of available pages."
+              },
+              "total_submissions": {
+                "type": "integer",
+                "description": "Total number of submissions available for the form."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "current_page",
+              "previous_page",
+              "next_page",
+              "total_page",
+              "total_submissions"
+            ],
+            "description": "Pagination metadata returned by Formcarry."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "form",
+          "results",
+          "submissions",
+          "pagination"
+        ],
+        "description": "Submission list response returned by Formcarry."
+      }
+    }
+  ]
+}

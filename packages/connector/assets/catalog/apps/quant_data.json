@@ -1,0 +1,1928 @@
+{
+  "service": "quant_data",
+  "displayName": "Quant Data",
+  "description": "Query Quant Data options, market, flow, and analytics data.",
+  "categories": [
+    "Finance",
+    "Data & Analytics"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "qd_...",
+      "description": "Quant Data API key sent as a Bearer credential. Create and manage keys in the Quant Data dashboard: https://v3.quantdata.us."
+    }
+  ],
+  "homepageUrl": "https://quantdata.us/",
+  "actions": [
+    {
+      "id": "quant_data.get_dark_flow",
+      "service": "quant_data",
+      "name": "get_dark_flow",
+      "description": "Get time-bucketed off-exchange notional value, share count, trade count, and stock price.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "aggregationPeriod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented Quant Data aggregation period, such as 1m, 5m, 15m, 1h, or 1d.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Dark-flow filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter"
+        ],
+        "description": "Input parameters for Quant Data dark flow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Dark-flow metrics keyed by epoch-millisecond bucket start time."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data dark-flow response."
+      }
+    },
+    {
+      "id": "quant_data.get_dark_pool_levels",
+      "service": "quant_data",
+      "name": "get_dark_pool_levels",
+      "description": "Get off-exchange print activity aggregated by price level for one ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Dark-pool-level filters."
+          },
+          "sessionDateRange": {
+            "type": "object",
+            "properties": {
+              "startDate": {
+                "type": "string",
+                "description": "The inclusive first trading-session date.",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "description": "The inclusive last trading-session date.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "startDate"
+            ],
+            "description": "The trading-session date range to aggregate."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data dark-pool levels."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-ticker latest stock price and off-exchange activity keyed by price level."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data dark-pool-levels response."
+      }
+    },
+    {
+      "id": "quant_data.get_equity_prints",
+      "service": "quant_data",
+      "name": "get_equity_prints",
+      "description": "List individual lit and dark US equity prints with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "printTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented print type such as LIT or DARK."
+                },
+                "description": "Equity-print types to include.",
+                "minItems": 1
+              },
+              "tradeSides": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented equity trade-side value."
+                },
+                "description": "Trade-side values to include.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "Documented Quant Data equity-print convenience filters."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of rows to return on this page."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented filterable field used for sorting.",
+                "pattern": "\\S"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "ASCENDING",
+                  "DESCENDING"
+                ],
+                "description": "The sort direction."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor-page sort settings."
+          },
+          "searchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor returned as nextSearchAfter by the previous page.",
+            "minItems": 1
+          },
+          "includes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          },
+          "excludes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data equity prints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One lit or dark equity print with provider-defined fields."
+            },
+            "description": "The rows returned by Quant Data."
+          },
+          "nextSearchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor for the next page, omitted when the result walk is complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Paginated Quant Data equity-print response."
+      }
+    },
+    {
+      "id": "quant_data.get_exposure_by_expiration",
+      "service": "quant_data",
+      "name": "get_exposure_by_expiration",
+      "description": "Get dealer Greek exposure aggregated by strike and expiration for one ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "snapshotTime": {
+            "type": "string",
+            "description": "The exact market snapshot instant in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "greekMode": {
+            "type": "string",
+            "enum": [
+              "CHARM",
+              "DELTA",
+              "GAMMA",
+              "VANNA"
+            ],
+            "description": "The Greek used to calculate exposure."
+          },
+          "representationMode": {
+            "type": "string",
+            "enum": [
+              "PER_ONE_DOLLAR_MOVE",
+              "PER_ONE_PERCENT_MOVE",
+              "RAW"
+            ],
+            "description": "The scale used for exposure values."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ticker"
+            ],
+            "description": "Exposure-by-expiration filters."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "greekMode",
+          "representationMode",
+          "filter"
+        ],
+        "description": "Input parameters for Quant Data exposure by expiration."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-ticker stock price and exposure map keyed by expiration date and strike."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data exposure-by-expiration response."
+      }
+    },
+    {
+      "id": "quant_data.get_exposure_by_strike",
+      "service": "quant_data",
+      "name": "get_exposure_by_strike",
+      "description": "Get dealer Greek exposure aggregated by expiration and strike for one ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "snapshotTime": {
+            "type": "string",
+            "description": "The exact market snapshot instant in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "greekMode": {
+            "type": "string",
+            "enum": [
+              "CHARM",
+              "DELTA",
+              "GAMMA",
+              "VANNA"
+            ],
+            "description": "The Greek used to calculate exposure."
+          },
+          "representationMode": {
+            "type": "string",
+            "enum": [
+              "PER_ONE_DOLLAR_MOVE",
+              "PER_ONE_PERCENT_MOVE",
+              "RAW"
+            ],
+            "description": "The scale used for exposure values."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              },
+              "expirationDate": {
+                "type": "string",
+                "description": "The option expiration date to include.",
+                "format": "date"
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date to include.",
+                  "format": "date"
+                },
+                "description": "The option expiration dates to include.",
+                "minItems": 1
+              },
+              "moneyTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented moneyness category."
+                },
+                "description": "Moneyness categories to include.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ticker"
+            ],
+            "description": "Exposure-by-strike filters."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "greekMode",
+          "representationMode",
+          "filter"
+        ],
+        "description": "Input parameters for Quant Data exposure by strike."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-ticker stock price and exposure map keyed by expiration date and strike."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data exposure-by-strike response."
+      }
+    },
+    {
+      "id": "quant_data.get_gainers_losers",
+      "service": "quant_data",
+      "name": "get_gainers_losers",
+      "description": "Rank optionable tickers by bullish and bearish premium, volume, and trade activity.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "sectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sector to include."
+                },
+                "description": "GICS sectors to include.",
+                "minItems": 1
+              },
+              "industries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An industry to include."
+                },
+                "description": "GICS industries to include.",
+                "minItems": 1
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "description": "Option expiration dates to include.",
+                "minItems": 1
+              },
+              "moneyTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented moneyness value such as ATM, ITM, or OTM."
+                },
+                "description": "Moneyness categories to include.",
+                "minItems": 1
+              },
+              "tradeSideCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-side value such as ABOVE_ASK or BID."
+                },
+                "description": "Trade-side values to include.",
+                "minItems": 1
+              },
+              "sentimentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-sentiment value."
+                },
+                "description": "Trade-sentiment values to include.",
+                "minItems": 1
+              },
+              "isUnusual": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as unusual."
+              },
+              "isGoldenSweep": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as golden sweeps."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Documented Quant Data option-trade convenience filters. Additional documented upstream filters may also be supplied."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data gainers and losers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-ticker bullish and bearish premium, volume, trade-count, and premium-ratio metrics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data gainers and losers response."
+      }
+    },
+    {
+      "id": "quant_data.get_iv_rank",
+      "service": "quant_data",
+      "name": "get_iv_rank",
+      "description": "Get historical implied-volatility rank for one ticker and maturity window.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "lookBackPeriod": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "The historical IV lookback in days."
+          },
+          "maturity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "The option maturity in days."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ticker"
+            ],
+            "description": "Implied-volatility-rank filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lookBackPeriod",
+          "maturity",
+          "filter"
+        ],
+        "description": "Input parameters for Quant Data implied-volatility rank."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-session and per-contract-type implied-volatility rank metrics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data implied-volatility-rank response."
+      }
+    },
+    {
+      "id": "quant_data.get_net_drift",
+      "service": "quant_data",
+      "name": "get_net_drift",
+      "description": "Get time-bucketed net call and put premium and volume with the underlying stock price.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "aggregationPeriod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented Quant Data aggregation period, such as 1m, 5m, 15m, 1h, or 1d.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "sectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sector to include."
+                },
+                "description": "GICS sectors to include.",
+                "minItems": 1
+              },
+              "industries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An industry to include."
+                },
+                "description": "GICS industries to include.",
+                "minItems": 1
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "description": "Option expiration dates to include.",
+                "minItems": 1
+              },
+              "moneyTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented moneyness value such as ATM, ITM, or OTM."
+                },
+                "description": "Moneyness categories to include.",
+                "minItems": 1
+              },
+              "tradeSideCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-side value such as ABOVE_ASK or BID."
+                },
+                "description": "Trade-side values to include.",
+                "minItems": 1
+              },
+              "sentimentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-sentiment value."
+                },
+                "description": "Trade-sentiment values to include.",
+                "minItems": 1
+              },
+              "isUnusual": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as unusual."
+              },
+              "isGoldenSweep": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as golden sweeps."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Documented Quant Data option-trade convenience filters. Additional documented upstream filters may also be supplied."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data net drift."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Net call and put premium and volume buckets keyed by epoch-millisecond start time."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data net-drift response."
+      }
+    },
+    {
+      "id": "quant_data.get_net_flow",
+      "service": "quant_data",
+      "name": "get_net_flow",
+      "description": "Get total call and put premium or volume over time.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "aggregationPeriod": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The documented Quant Data aggregation period, such as 1m, 5m, 15m, 1h, or 1d.",
+            "pattern": "\\S"
+          },
+          "dataMode": {
+            "type": "string",
+            "enum": [
+              "NET_PREMIUM",
+              "NET_VOLUME"
+            ],
+            "description": "The metric aggregated by net flow."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "sectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sector to include."
+                },
+                "description": "GICS sectors to include.",
+                "minItems": 1
+              },
+              "industries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An industry to include."
+                },
+                "description": "GICS industries to include.",
+                "minItems": 1
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "description": "Option expiration dates to include.",
+                "minItems": 1
+              },
+              "moneyTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented moneyness value such as ATM, ITM, or OTM."
+                },
+                "description": "Moneyness categories to include.",
+                "minItems": 1
+              },
+              "tradeSideCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-side value such as ABOVE_ASK or BID."
+                },
+                "description": "Trade-side values to include.",
+                "minItems": 1
+              },
+              "sentimentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-sentiment value."
+                },
+                "description": "Trade-sentiment values to include.",
+                "minItems": 1
+              },
+              "isUnusual": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as unusual."
+              },
+              "isGoldenSweep": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as golden sweeps."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Documented Quant Data option-trade convenience filters. Additional documented upstream filters may also be supplied."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataMode"
+        ],
+        "description": "Input parameters for Quant Data net flow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Call and put flow buckets keyed by epoch-millisecond start time."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data net-flow response."
+      }
+    },
+    {
+      "id": "quant_data.get_news_articles",
+      "service": "quant_data",
+      "name": "get_news_articles",
+      "description": "List ticker-tagged market news with topics and per-ticker sentiment using cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented Quant Data news topic."
+                },
+                "description": "News topic tags to include.",
+                "minItems": 1
+              },
+              "sentiments": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented Quant Data news sentiment value."
+                },
+                "description": "Per-ticker sentiment values to include.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "Market-news filters."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of rows to return on this page."
+          },
+          "searchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor returned as nextSearchAfter by the previous page.",
+            "minItems": 1
+          },
+          "includes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          },
+          "excludes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          },
+          "includeBody": {
+            "type": "boolean",
+            "description": "Whether to populate the article body on every returned row."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data market news."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One market-news article with ticker tags, topics, and per-ticker sentiment."
+            },
+            "description": "The rows returned by Quant Data."
+          },
+          "nextSearchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor for the next page, omitted when the result walk is complete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Paginated Quant Data market-news response."
+      }
+    },
+    {
+      "id": "quant_data.get_order_flow_consolidated",
+      "service": "quant_data",
+      "name": "get_order_flow_consolidated",
+      "description": "List consolidated option blocks, splits, sweeps, and multi-leg trades with cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "startTime": {
+                "type": "string",
+                "description": "The inclusive start instant in ISO 8601 format.",
+                "format": "date-time"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "The exclusive end instant in ISO 8601 format.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "An inclusive-start, exclusive-end UTC time range."
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "tickers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A ticker symbol to include."
+                },
+                "description": "Ticker symbols to include.",
+                "minItems": 1
+              },
+              "sectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A sector to include."
+                },
+                "description": "GICS sectors to include.",
+                "minItems": 1
+              },
+              "industries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An industry to include."
+                },
+                "description": "GICS industries to include.",
+                "minItems": 1
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date in YYYY-MM-DD format.",
+                  "format": "date"
+                },
+                "description": "Option expiration dates to include.",
+                "minItems": 1
+              },
+              "moneyTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented moneyness value such as ATM, ITM, or OTM."
+                },
+                "description": "Moneyness categories to include.",
+                "minItems": 1
+              },
+              "tradeSideCodes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-side value such as ABOVE_ASK or BID."
+                },
+                "description": "Trade-side values to include.",
+                "minItems": 1
+              },
+              "sentimentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A documented trade-sentiment value."
+                },
+                "description": "Trade-sentiment values to include.",
+                "minItems": 1
+              },
+              "isUnusual": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as unusual."
+              },
+              "isGoldenSweep": {
+                "type": "boolean",
+                "description": "Whether to include only trades flagged as golden sweeps."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Documented Quant Data option-trade convenience filters. Additional documented upstream filters may also be supplied."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of rows to return on this page."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented filterable field used for sorting.",
+                "pattern": "\\S"
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "ASCENDING",
+                  "DESCENDING"
+                ],
+                "description": "The sort direction."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor-page sort settings."
+          },
+          "searchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor returned as nextSearchAfter by the previous page.",
+            "minItems": 1
+          },
+          "includes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          },
+          "excludes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A documented projectable field name."
+            },
+            "description": "Documented response fields to project.",
+            "minItems": 1
+          },
+          "includeStatistics": {
+            "type": "boolean",
+            "description": "Whether to include first-page statistics grouped by contract type and trade side."
+          },
+          "includeComprisingTrades": {
+            "type": "boolean",
+            "description": "Whether to include the individual trades comprising each consolidated trade."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for Quant Data consolidated option order flow."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One consolidated option trade with provider-defined fields and optional nested comprising trades."
+            },
+            "description": "The rows returned by Quant Data."
+          },
+          "nextSearchAfter": {
+            "type": "array",
+            "items": {
+              "description": "One opaque cursor component."
+            },
+            "description": "The opaque cursor for the next page, omitted when the result walk is complete."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "First-page statistics returned when includeStatistics is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Paginated Quant Data consolidated option order-flow response."
+      }
+    },
+    {
+      "id": "quant_data.get_volatility_skew",
+      "service": "quant_data",
+      "name": "get_volatility_skew",
+      "description": "Get the implied-volatility surface across expirations and strikes for one ticker.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionDate": {
+            "type": "string",
+            "description": "The trading session date in YYYY-MM-DD format. Omit it to use the latest session.",
+            "format": "date"
+          },
+          "snapshotTime": {
+            "type": "string",
+            "description": "The exact market snapshot instant in ISO 8601 format.",
+            "format": "date-time"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "ticker": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The US equity or option-underlying ticker symbol, for example AAPL or SPY.",
+                "pattern": "\\S"
+              },
+              "contractTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "CALL",
+                    "PUT"
+                  ],
+                  "description": "An option contract type."
+                },
+                "description": "Option contract types to include.",
+                "minItems": 1
+              },
+              "expirationDates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "An option expiration date to include.",
+                  "format": "date"
+                },
+                "description": "Option expiration dates to include.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "ticker"
+            ],
+            "description": "Volatility-skew filters."
+          },
+          "filterExpression": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The documented canonical or aliased Quant Data field name.",
+                "pattern": "\\S"
+              },
+              "operation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A documented comparison operation such as =, !=, >, >=, <, or <=.",
+                "pattern": "\\S"
+              },
+              "value": {
+                "description": "The single comparison value for a terminal filter."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "description": "One comparison value."
+                },
+                "description": "The comparison values for a terminal filter, combined with OR semantics."
+              },
+              "conjunction": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "The boolean conjunction for a compound filter node."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A nested Quant Data filter-expression node."
+                },
+                "description": "The nested terminal or compound filter nodes.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Quant Data boolean filter-expression node. Use a terminal with field, operation, and value or values, or a compound node with conjunction and filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filter"
+        ],
+        "description": "Input parameters for Quant Data volatility skew."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Per-ticker stock price and implied-volatility surface keyed by expiration and strike."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quant Data volatility-skew response."
+      }
+    }
+  ]
+}

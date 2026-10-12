@@ -1,0 +1,2057 @@
+{
+  "service": "datalust",
+  "displayName": "Datalust Seq",
+  "description": "Search, query, ingest, and manage structured log data in a Datalust Seq instance.",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Seq API Key",
+      "placeholder": "SEQ_API_KEY",
+      "description": "Seq API key sent with the X-Seq-ApiKey header. The connection validator requires Read permission; add Ingest for event ingestion, Write for signals and saved queries, and Project when modifying protected entities. Create or copy a key from Data > Ingestion in your Seq instance: https://docs.datalust.co/docs/api-keys",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "Seq URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://seq.example.com",
+          "description": "The HTTPS root URL of your Seq instance. Public addresses work by default; private-network targets require the self-hosted runtime to enable OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK. Loopback, reserved, and cloud-metadata targets remain blocked."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://datalust.co/seq",
+  "actions": [
+    {
+      "id": "datalust.create_saved_query",
+      "service": "datalust",
+      "name": "create_saved_query",
+      "description": "Create a saved Seq SQL query while preserving server-provided template defaults.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable saved query title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The saved query description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The saved query description, or null to clear it."
+          },
+          "sql": {
+            "type": "string",
+            "description": "The Seq SQL query text, which may be empty for a placeholder query."
+          },
+          "isProtected": {
+            "type": "boolean",
+            "description": "Whether modifying the saved query requires Project permission."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The owning Seq user identifier, or null to make the query shared."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owning Seq user identifier, or null to make the query shared."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "sql"
+        ],
+        "description": "Input parameters for creating a Seq saved query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedQuery": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Seq saved query identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The human-readable saved query title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The saved query description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The saved query description when present."
+              },
+              "sql": {
+                "type": "string",
+                "description": "The Seq SQL query text."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether modifying the saved query requires Project permission."
+              },
+              "ownerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The owning Seq user identifier, or null for a shared query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owning Seq user identifier, or null for a shared query."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Seq saved query payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "description",
+              "sql",
+              "isProtected",
+              "ownerId",
+              "raw"
+            ],
+            "description": "A normalized Seq saved query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedQuery"
+        ],
+        "description": "A Seq saved query detail response."
+      }
+    },
+    {
+      "id": "datalust.create_signal",
+      "service": "datalust",
+      "name": "create_signal",
+      "description": "Create a Seq signal while preserving server-provided template defaults.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable signal title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The signal description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signal description, or null to clear it."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filter": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The strict Seq filter expression."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The human-readable filter description, or null to clear it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The human-readable filter description, or null to clear it."
+                },
+                "descriptionIsExcluded": {
+                  "type": "boolean",
+                  "description": "Whether the description represents events excluded by the filter."
+                },
+                "filterNonStrict": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original non-strict filter text shown for editing, or null to clear it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original non-strict filter text shown for editing, or null to clear it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filter"
+              ],
+              "description": "A filter included in a Seq signal."
+            },
+            "description": "The filters combined by the signal."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "expression": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Seq expression displayed in the column."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "expression"
+              ],
+              "description": "A column displayed when a Seq signal is selected."
+            },
+            "description": "The columns displayed for the signal."
+          },
+          "isProtected": {
+            "type": "boolean",
+            "description": "Whether modifying the signal requires Project permission."
+          },
+          "isIndexSuppressed": {
+            "type": "boolean",
+            "description": "Whether the signal should have no backing index."
+          },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "Inferred",
+              "Explicit",
+              "None"
+            ],
+            "description": "How the signal is grouped in the Seq user interface."
+          },
+          "explicitGroupName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The explicit signal group name, or null when explicit grouping is not used."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The explicit signal group name, or null when explicit grouping is not used."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The owning Seq user identifier, or null to make the signal shared."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owning Seq user identifier, or null to make the signal shared."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Input parameters for creating a Seq signal."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signal": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Seq signal identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The human-readable signal title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The signal description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The signal description when present."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Seq signal filter."
+                },
+                "description": "The filters combined by the signal."
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Seq signal column."
+                },
+                "description": "The columns displayed for the signal."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether modifying the signal requires Project permission."
+              },
+              "isIndexSuppressed": {
+                "type": "boolean",
+                "description": "Whether the signal has no backing index."
+              },
+              "grouping": {
+                "description": "The grouping mode returned by Seq."
+              },
+              "explicitGroupName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The explicit signal group name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The explicit signal group name when present."
+              },
+              "ownerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The owning Seq user identifier, or null for a shared signal."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owning Seq user identifier, or null for a shared signal."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Seq signal payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "description",
+              "filters",
+              "columns",
+              "isProtected",
+              "isIndexSuppressed",
+              "grouping",
+              "explicitGroupName",
+              "ownerId",
+              "raw"
+            ],
+            "description": "A normalized Seq signal."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signal"
+        ],
+        "description": "A Seq signal detail response."
+      }
+    },
+    {
+      "id": "datalust.delete_saved_query",
+      "service": "datalust",
+      "name": "delete_saved_query",
+      "description": "Delete a saved Seq SQL query; protected queries also require Project permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq saved query identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Input parameters for deleting a Seq saved query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the saved query deletion request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "status"
+        ],
+        "description": "The result of deleting a Seq saved query."
+      }
+    },
+    {
+      "id": "datalust.delete_signal",
+      "service": "datalust",
+      "name": "delete_signal",
+      "description": "Delete a Seq signal by its identifier; protected signals also require Project permission.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq signal identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalId"
+        ],
+        "description": "Input parameters for deleting a Seq signal."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the signal deletion request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "status"
+        ],
+        "description": "The result of deleting a Seq signal."
+      }
+    },
+    {
+      "id": "datalust.execute_query",
+      "service": "datalust",
+      "name": "execute_query",
+      "description": "Execute a Seq SQL-style query and return its structured JSON result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq SQL-style query to execute."
+          },
+          "rangeStartUtc": {
+            "type": "string",
+            "description": "The earliest inclusive timestamp for the query.",
+            "format": "date-time"
+          },
+          "rangeEndUtc": {
+            "type": "string",
+            "description": "The latest exclusive timestamp for the query.",
+            "format": "date-time"
+          },
+          "signal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Seq signal identifier or signal expression."
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The server-side query timeout in milliseconds."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A variable value."
+            },
+            "description": "Values for free variables used by the query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input parameters for executing a Seq SQL-style query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A result column name."
+            },
+            "description": "The result column names."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "description": "A result cell value."
+              },
+              "description": "A result row."
+            },
+            "description": "The flat result rows when returned by Seq."
+          },
+          "slices": {
+            "type": "array",
+            "items": {
+              "description": "A time slice."
+            },
+            "description": "The hierarchical time slices when returned by Seq."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "description": "A time series."
+            },
+            "description": "The time series when returned by Seq."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A variable value."
+            },
+            "description": "Variables returned with the query result."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The query error when Seq returns a non-throwing query failure."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The query error when Seq returns a non-throwing query failure."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A query error reason."
+            },
+            "description": "Detailed query error reasons."
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A corrected query suggested by Seq when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A corrected query suggested by Seq when available."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Seq query execution statistics."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Seq query payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "columns",
+          "rows",
+          "slices",
+          "series",
+          "variables",
+          "error",
+          "reasons",
+          "suggestion",
+          "statistics",
+          "raw"
+        ],
+        "description": "A structured Seq query result."
+      }
+    },
+    {
+      "id": "datalust.get_event",
+      "service": "datalust",
+      "name": "get_event",
+      "description": "Read one Seq event by its event identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq event identifier."
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Seq should include the rendered event message."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Input parameters for reading one Seq event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Seq event identifier."
+              },
+              "timestamp": {
+                "type": "string",
+                "description": "The ISO 8601 timestamp at which the event occurred."
+              },
+              "start": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 span start timestamp when the event is a span."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 span start timestamp when the event is a span."
+              },
+              "properties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The event property name."
+                    },
+                    "value": {
+                      "description": "The event property value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "A property attached to a Seq event."
+                },
+                "description": "The properties attached to the event."
+              },
+              "eventType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The Seq event type identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The Seq event type identifier when present."
+              },
+              "level": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The event level when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The event level when present."
+              },
+              "exception": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The exception or stack trace when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The exception or stack trace when present."
+              },
+              "renderedMessage": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The rendered event message when requested and available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The rendered event message when requested and available."
+              },
+              "traceId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The trace identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The trace identifier when present."
+              },
+              "spanId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The span identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The span identifier when present."
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The parent span identifier when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The parent span identifier when present."
+              },
+              "spanKind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The span kind when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The span kind when present."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Seq event payload."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized Seq event."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event"
+        ],
+        "description": "A Seq event detail response."
+      }
+    },
+    {
+      "id": "datalust.get_saved_query",
+      "service": "datalust",
+      "name": "get_saved_query",
+      "description": "Read one saved Seq SQL query by its identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq saved query identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Input parameters for reading one Seq saved query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedQuery": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Seq saved query identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The human-readable saved query title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The saved query description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The saved query description when present."
+              },
+              "sql": {
+                "type": "string",
+                "description": "The Seq SQL query text."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether modifying the saved query requires Project permission."
+              },
+              "ownerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The owning Seq user identifier, or null for a shared query."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owning Seq user identifier, or null for a shared query."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Seq saved query payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "description",
+              "sql",
+              "isProtected",
+              "ownerId",
+              "raw"
+            ],
+            "description": "A normalized Seq saved query."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedQuery"
+        ],
+        "description": "A Seq saved query detail response."
+      }
+    },
+    {
+      "id": "datalust.get_signal",
+      "service": "datalust",
+      "name": "get_signal",
+      "description": "Read one saved Seq signal by its identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq signal identifier."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether Seq should return partial signal details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalId"
+        ],
+        "description": "Input parameters for reading one Seq signal."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signal": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Seq signal identifier."
+              },
+              "title": {
+                "type": "string",
+                "description": "The human-readable signal title."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The signal description when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The signal description when present."
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Seq signal filter."
+                },
+                "description": "The filters combined by the signal."
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A Seq signal column."
+                },
+                "description": "The columns displayed for the signal."
+              },
+              "isProtected": {
+                "type": "boolean",
+                "description": "Whether modifying the signal requires Project permission."
+              },
+              "isIndexSuppressed": {
+                "type": "boolean",
+                "description": "Whether the signal has no backing index."
+              },
+              "grouping": {
+                "description": "The grouping mode returned by Seq."
+              },
+              "explicitGroupName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The explicit signal group name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The explicit signal group name when present."
+              },
+              "ownerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The owning Seq user identifier, or null for a shared signal."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The owning Seq user identifier, or null for a shared signal."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Seq signal payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "description",
+              "filters",
+              "columns",
+              "isProtected",
+              "isIndexSuppressed",
+              "grouping",
+              "explicitGroupName",
+              "ownerId",
+              "raw"
+            ],
+            "description": "A normalized Seq signal."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signal"
+        ],
+        "description": "A Seq signal detail response."
+      }
+    },
+    {
+      "id": "datalust.ingest_event",
+      "service": "datalust",
+      "name": "ingest_event",
+      "description": "Ingest one structured log event into Seq using compact log event format.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Ingest"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp at which the event occurred.",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string",
+            "description": "A fully rendered event message."
+          },
+          "messageTemplate": {
+            "type": "string",
+            "description": "A message template rendered with event properties."
+          },
+          "level": {
+            "type": "string",
+            "description": "The event level, such as Information, Warning, or Error."
+          },
+          "exception": {
+            "type": "string",
+            "description": "An exception or stack trace attached to the event."
+          },
+          "eventType": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A string or hexadecimal CLEF event type."
+              },
+              {
+                "type": "number",
+                "description": "A numeric CLEF event type."
+              }
+            ],
+            "description": "An implementation-specific CLEF event type."
+          },
+          "properties": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional top-level CLEF event properties; double an initial @ to escape it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "timestamp"
+        ],
+        "description": "Input parameters for ingesting one event into Seq using CLEF."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the event request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "status"
+        ],
+        "description": "The result of ingesting one event into Seq."
+      }
+    },
+    {
+      "id": "datalust.ingest_events",
+      "service": "datalust",
+      "name": "ingest_events",
+      "description": "Ingest a JSON array of structured log events as one newline-delimited CLEF batch.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Ingest"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp at which the event occurred.",
+                  "format": "date-time"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "A fully rendered event message."
+                },
+                "messageTemplate": {
+                  "type": "string",
+                  "description": "A message template rendered with event properties."
+                },
+                "level": {
+                  "type": "string",
+                  "description": "The event level, such as Information, Warning, or Error."
+                },
+                "exception": {
+                  "type": "string",
+                  "description": "An exception or stack trace attached to the event."
+                },
+                "eventType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "A string or hexadecimal CLEF event type."
+                    },
+                    {
+                      "type": "number",
+                      "description": "A numeric CLEF event type."
+                    }
+                  ],
+                  "description": "An implementation-specific CLEF event type."
+                },
+                "properties": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Additional top-level CLEF event properties; double an initial @ to escape it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "timestamp"
+              ],
+              "description": "Input parameters for ingesting one event into Seq using CLEF."
+            },
+            "description": "The events to ingest as one newline-delimited CLEF batch.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events"
+        ],
+        "description": "Input parameters for ingesting a batch of CLEF events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the event batch request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          },
+          "eventCount": {
+            "type": "integer",
+            "description": "The number of events submitted in the accepted batch."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "status",
+          "eventCount"
+        ],
+        "description": "The result of ingesting a batch of events into Seq."
+      }
+    },
+    {
+      "id": "datalust.list_saved_queries",
+      "service": "datalust",
+      "name": "list_saved_queries",
+      "description": "List saved Seq SQL queries visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return saved queries owned by this Seq user identifier."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether to include shared saved queries."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Seq saved queries."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "savedQueries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Seq saved query identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The human-readable saved query title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The saved query description when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The saved query description when present."
+                },
+                "sql": {
+                  "type": "string",
+                  "description": "The Seq SQL query text."
+                },
+                "isProtected": {
+                  "type": "boolean",
+                  "description": "Whether modifying the saved query requires Project permission."
+                },
+                "ownerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The owning Seq user identifier, or null for a shared query."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The owning Seq user identifier, or null for a shared query."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Seq saved query payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "description",
+                "sql",
+                "isProtected",
+                "ownerId",
+                "raw"
+              ],
+              "description": "A normalized Seq saved query."
+            },
+            "description": "The matching Seq saved queries."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Seq saved query."
+            },
+            "description": "The raw Seq saved query list payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "savedQueries",
+          "raw"
+        ],
+        "description": "A Seq saved query list response."
+      },
+      "followUpActions": [
+        "datalust.get_saved_query"
+      ]
+    },
+    {
+      "id": "datalust.list_signals",
+      "service": "datalust",
+      "name": "list_signals",
+      "description": "List saved Seq signals visible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return signals owned by this Seq user identifier."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether to include shared signals."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Whether Seq should return partial signal details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Seq signals."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Seq signal identifier."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The human-readable signal title."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The signal description when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The signal description when present."
+                },
+                "filters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Seq signal filter."
+                  },
+                  "description": "The filters combined by the signal."
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A Seq signal column."
+                  },
+                  "description": "The columns displayed for the signal."
+                },
+                "isProtected": {
+                  "type": "boolean",
+                  "description": "Whether modifying the signal requires Project permission."
+                },
+                "isIndexSuppressed": {
+                  "type": "boolean",
+                  "description": "Whether the signal has no backing index."
+                },
+                "grouping": {
+                  "description": "The grouping mode returned by Seq."
+                },
+                "explicitGroupName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The explicit signal group name when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The explicit signal group name when present."
+                },
+                "ownerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The owning Seq user identifier, or null for a shared signal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The owning Seq user identifier, or null for a shared signal."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Seq signal payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "description",
+                "filters",
+                "columns",
+                "isProtected",
+                "isIndexSuppressed",
+                "grouping",
+                "explicitGroupName",
+                "ownerId",
+                "raw"
+              ],
+              "description": "A normalized Seq signal."
+            },
+            "description": "The matching Seq signals."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw Seq signal."
+            },
+            "description": "The raw Seq signal list payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signals",
+          "raw"
+        ],
+        "description": "A Seq signal list response."
+      },
+      "followUpActions": [
+        "datalust.get_signal"
+      ]
+    },
+    {
+      "id": "datalust.search_events",
+      "service": "datalust",
+      "name": "search_events",
+      "description": "Search a page of Seq events using a filter, signal, time range, or cursor.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A strict Seq filter expression."
+          },
+          "signal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Seq signal identifier or signal expression."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of events to return."
+          },
+          "startAtId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An event identifier at which to start searching inclusively."
+          },
+          "afterId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An event identifier after which to continue searching exclusively."
+          },
+          "render": {
+            "type": "boolean",
+            "description": "Whether Seq should include rendered event messages."
+          },
+          "fromDateUtc": {
+            "type": "string",
+            "description": "The earliest inclusive event timestamp.",
+            "format": "date-time"
+          },
+          "toDateUtc": {
+            "type": "string",
+            "description": "The latest exclusive event timestamp.",
+            "format": "date-time"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A variable value."
+            },
+            "description": "Values for free variables used by the filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching a page of Seq events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Seq event identifier."
+                },
+                "timestamp": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp at which the event occurred."
+                },
+                "start": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 span start timestamp when the event is a span."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 span start timestamp when the event is a span."
+                },
+                "properties": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The event property name."
+                      },
+                      "value": {
+                        "description": "The event property value."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A property attached to a Seq event."
+                  },
+                  "description": "The properties attached to the event."
+                },
+                "eventType": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Seq event type identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Seq event type identifier when present."
+                },
+                "level": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The event level when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The event level when present."
+                },
+                "exception": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The exception or stack trace when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The exception or stack trace when present."
+                },
+                "renderedMessage": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The rendered event message when requested and available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The rendered event message when requested and available."
+                },
+                "traceId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The trace identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The trace identifier when present."
+                },
+                "spanId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The span identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The span identifier when present."
+                },
+                "parentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent span identifier when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The parent span identifier when present."
+                },
+                "spanKind": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The span kind when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The span kind when present."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Seq event payload."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized Seq event."
+            },
+            "description": "The matching Seq events."
+          },
+          "statistics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Seq statistics for the event search."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Seq event search payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "statistics",
+          "raw"
+        ],
+        "description": "A page of Seq event search results."
+      },
+      "followUpActions": [
+        "datalust.get_event"
+      ]
+    },
+    {
+      "id": "datalust.update_saved_query",
+      "service": "datalust",
+      "name": "update_saved_query",
+      "description": "Update selected fields on a saved Seq SQL query while preserving unspecified fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "queryId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq saved query identifier."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable saved query title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The saved query description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The saved query description, or null to clear it."
+          },
+          "sql": {
+            "type": "string",
+            "description": "The Seq SQL query text, which may be empty for a placeholder query."
+          },
+          "isProtected": {
+            "type": "boolean",
+            "description": "Whether modifying the saved query requires Project permission."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The owning Seq user identifier, or null to make the query shared."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owning Seq user identifier, or null to make the query shared."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "queryId"
+        ],
+        "description": "Input parameters for updating a Seq saved query while preserving unspecified fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the saved query update request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated",
+          "status"
+        ],
+        "description": "The result of updating a Seq saved query."
+      }
+    },
+    {
+      "id": "datalust.update_signal",
+      "service": "datalust",
+      "name": "update_signal",
+      "description": "Update selected fields on a Seq signal while preserving unspecified fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Read",
+        "Write"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Seq signal identifier."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The human-readable signal title."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The signal description, or null to clear it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The signal description, or null to clear it."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filter": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The strict Seq filter expression."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The human-readable filter description, or null to clear it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The human-readable filter description, or null to clear it."
+                },
+                "descriptionIsExcluded": {
+                  "type": "boolean",
+                  "description": "Whether the description represents events excluded by the filter."
+                },
+                "filterNonStrict": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The original non-strict filter text shown for editing, or null to clear it."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The original non-strict filter text shown for editing, or null to clear it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "filter"
+              ],
+              "description": "A filter included in a Seq signal."
+            },
+            "description": "The filters combined by the signal."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "expression": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Seq expression displayed in the column."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "expression"
+              ],
+              "description": "A column displayed when a Seq signal is selected."
+            },
+            "description": "The columns displayed for the signal."
+          },
+          "isProtected": {
+            "type": "boolean",
+            "description": "Whether modifying the signal requires Project permission."
+          },
+          "isIndexSuppressed": {
+            "type": "boolean",
+            "description": "Whether the signal should have no backing index."
+          },
+          "grouping": {
+            "type": "string",
+            "enum": [
+              "Inferred",
+              "Explicit",
+              "None"
+            ],
+            "description": "How the signal is grouped in the Seq user interface."
+          },
+          "explicitGroupName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The explicit signal group name, or null when explicit grouping is not used."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The explicit signal group name, or null when explicit grouping is not used."
+          },
+          "ownerId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The owning Seq user identifier, or null to make the signal shared."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owning Seq user identifier, or null to make the signal shared."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signalId"
+        ],
+        "description": "Input parameters for updating a Seq signal while preserving unspecified fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Seq accepted the signal update request."
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status returned by Seq."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated",
+          "status"
+        ],
+        "description": "The result of updating a Seq signal."
+      }
+    }
+  ]
+}

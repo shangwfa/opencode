@@ -1,0 +1,379 @@
+{
+  "service": "upstash_redis",
+  "displayName": "Upstash Redis",
+  "description": "Read and manage string keys in an Upstash Redis database through its REST API.",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "restUrl",
+          "label": "REST URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://your-database.upstash.io",
+          "description": "The HTTPS REST URL shown for an Upstash Redis database in the Upstash console. Only official upstash.io endpoints are supported."
+        },
+        {
+          "key": "restToken",
+          "label": "REST Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "Your Upstash REST token",
+          "description": "The Upstash Redis REST token sent as a Bearer token. A read-only token can run get, exists, and ttl, but Upstash also blocks scan for read-only tokens, so the standard token is required for scan and for every write action."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://upstash.com/redis",
+  "actions": [
+    {
+      "id": "upstash_redis.delete",
+      "service": "upstash_redis",
+      "name": "delete",
+      "description": "Delete one Redis key.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "The Redis key to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Redis deleted an existing key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted"
+        ],
+        "description": "The result of the Redis DEL command."
+      }
+    },
+    {
+      "id": "upstash_redis.exists",
+      "service": "upstash_redis",
+      "name": "exists",
+      "description": "Check whether one Redis key exists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "The Redis key to check."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "exists": {
+            "type": "boolean",
+            "description": "Whether the Redis key exists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "exists"
+        ],
+        "description": "The result of the Redis EXISTS command."
+      },
+      "followUpActions": [
+        "upstash_redis.get",
+        "upstash_redis.ttl"
+      ]
+    },
+    {
+      "id": "upstash_redis.expire",
+      "service": "upstash_redis",
+      "name": "expire",
+      "description": "Set or replace the expiration time for one Redis key.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          },
+          "expirationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Expiration time in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "expirationSeconds"
+        ],
+        "description": "The Redis key and its new expiration time."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Redis updated the expiration for an existing key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "updated"
+        ],
+        "description": "The result of the Redis EXPIRE command."
+      },
+      "followUpActions": [
+        "upstash_redis.ttl"
+      ]
+    },
+    {
+      "id": "upstash_redis.get",
+      "service": "upstash_redis",
+      "name": "get",
+      "description": "Get the string value stored for one Redis key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "The Redis key to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The stored string value, or null when the key does not exist. Upstash replaces bytes that are not valid UTF-8 with U+FFFD, so only text values round-trip exactly."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stored string value, or null when the key does not exist. Upstash replaces bytes that are not valid UTF-8 with U+FFFD, so only text values round-trip exactly."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "value"
+        ],
+        "description": "The value returned for the Redis key."
+      },
+      "followUpActions": [
+        "upstash_redis.set",
+        "upstash_redis.delete",
+        "upstash_redis.expire",
+        "upstash_redis.ttl"
+      ]
+    },
+    {
+      "id": "upstash_redis.scan",
+      "service": "upstash_redis",
+      "name": "scan",
+      "description": "Scan one page of Redis keys without reading the full keyspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by a previous scan. Omit it to start at cursor 0."
+          },
+          "match": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Redis glob pattern used to filter keys."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Optional scan work hint from 1 to 1000."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Cursor pagination and optional filters for Redis SCAN."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "nextCursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor to pass to the next scan request. A value of 0 means scanning is complete."
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Keys returned in this scan page."
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Whether this scan reached cursor 0."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nextCursor",
+          "keys",
+          "complete"
+        ],
+        "description": "One page returned by Redis SCAN."
+      }
+    },
+    {
+      "id": "upstash_redis.set",
+      "service": "upstash_redis",
+      "name": "set",
+      "description": "Store a string value for one Redis key, optionally with an expiration or conditional write.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The string value stored for the Redis key."
+          },
+          "expirationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Expiration time in seconds."
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NX",
+              "XX"
+            ],
+            "description": "Optional Redis write condition: NX stores only a new key; XX stores only an existing key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "value"
+        ],
+        "description": "The Redis string value to store."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stored": {
+            "type": "boolean",
+            "description": "Whether Redis stored the value. False means the requested condition was not met."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "stored"
+        ],
+        "description": "The result of the Redis SET command."
+      },
+      "followUpActions": [
+        "upstash_redis.get",
+        "upstash_redis.ttl"
+      ]
+    },
+    {
+      "id": "upstash_redis.ttl",
+      "service": "upstash_redis",
+      "name": "ttl",
+      "description": "Get the remaining expiration time for one Redis key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Redis key."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "The Redis key whose expiration to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ttlSeconds": {
+            "type": "integer",
+            "description": "Remaining expiration in seconds. -2 means the key does not exist; -1 means the key has no expiration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ttlSeconds"
+        ],
+        "description": "The result of the Redis TTL command."
+      }
+    }
+  ]
+}

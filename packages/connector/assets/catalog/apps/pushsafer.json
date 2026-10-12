@@ -1,0 +1,237 @@
+{
+  "service": "pushsafer",
+  "displayName": "Pushsafer",
+  "categories": [
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Private Key",
+      "placeholder": "YOUR_PRIVATE_KEY",
+      "description": "Pushsafer Private Key used to authenticate API requests. Find it in your Pushsafer dashboard: https://www.pushsafer.com/.",
+      "extraFields": [
+        {
+          "key": "username",
+          "label": "Username or Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "you@example.com",
+          "description": "Pushsafer username or email address paired with the Private Key for key validation and device or group discovery."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.pushsafer.com/",
+  "actions": [
+    {
+      "id": "pushsafer.list_devices",
+      "service": "pushsafer",
+      "name": "list_devices",
+      "description": "List devices and device groups registered to the connected Pushsafer account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Pushsafer devices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Pushsafer device or group identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The human-readable device or group name."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Pushsafer delivery target."
+            },
+            "description": "The registered Pushsafer delivery targets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Pushsafer device list."
+      }
+    },
+    {
+      "id": "pushsafer.list_groups",
+      "service": "pushsafer",
+      "name": "list_groups",
+      "description": "List delivery groups registered to the connected Pushsafer account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Pushsafer groups."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Pushsafer group identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The human-readable group name."
+                },
+                "deviceIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One Pushsafer device identifier."
+                  },
+                  "description": "The device identifiers assigned to the group."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Pushsafer delivery group."
+            },
+            "description": "The registered Pushsafer delivery groups."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Pushsafer group list."
+      }
+    },
+    {
+      "id": "pushsafer.send_message",
+      "service": "pushsafer",
+      "name": "send_message",
+      "description": "Send a push notification to one Pushsafer device, group, or all devices.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "The notification message text, limited to 5000 characters."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The optional notification title, limited to 255 characters."
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional device or group id. Use a for all devices, a numeric device id, or a gs-prefixed group id."
+          },
+          "sound": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 62,
+            "description": "The optional Pushsafer sound number from 0 through 62."
+          },
+          "vibration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The optional vibration count from 1 through 3."
+          },
+          "icon": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 181,
+            "description": "The optional Pushsafer icon number from 1 through 181."
+          },
+          "iconColor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional hexadecimal icon color, such as #FF0000."
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional URL or application URL scheme opened from the notification."
+          },
+          "urlTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional display title for the notification URL."
+          },
+          "timeToLive": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 43200,
+            "description": "The optional number of minutes to retain the message, from 0 through 43200."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -2,
+            "maximum": 2,
+            "description": "The optional notification priority from -2 through 2."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "description": "The input payload for sending a Pushsafer notification."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "string",
+            "description": "The success message returned by Pushsafer."
+          },
+          "availableCalls": {
+            "type": "integer",
+            "description": "The number of API calls remaining on the account."
+          },
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "messageId": {
+                  "type": "string",
+                  "description": "The Pushsafer message identifier."
+                },
+                "deviceId": {
+                  "type": "string",
+                  "description": "The target Pushsafer device identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Pushsafer message delivery."
+            },
+            "description": "The message and device identifiers returned for each delivery."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Pushsafer message delivery result."
+      }
+    }
+  ]
+}

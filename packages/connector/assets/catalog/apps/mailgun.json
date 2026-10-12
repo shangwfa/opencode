@@ -1,0 +1,1581 @@
+{
+  "service": "mailgun",
+  "displayName": "Mailgun",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Private API Key",
+      "placeholder": "key-...",
+      "description": "Mailgun private API key used with HTTP Basic auth as api:YOUR_API_KEY. Create or view API keys in Mailgun security settings.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.mailgun.net",
+          "description": "Optional official Mailgun API base URL. Use https://api.eu.mailgun.net for EU accounts; otherwise leave the default https://api.mailgun.net URL."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.mailgun.com",
+  "actions": [
+    {
+      "id": "mailgun.add_suppression",
+      "service": "mailgun",
+      "name": "add_suppression",
+      "description": "Add one Mailgun suppression or allowlist record.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "complaint",
+              "unsubscribe",
+              "allowlist"
+            ],
+            "description": "Suppression table to operate on."
+          },
+          "address": {
+            "type": "string",
+            "description": "Suppressed email address.",
+            "format": "email"
+          },
+          "allowlistDomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Domain value to add to the Mailgun allowlist."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounce error code. Defaults to Mailgun's value when omitted."
+          },
+          "error": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bounce error description."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unsubscribe tag, or * for all domain correspondence."
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event timestamp in RFC 2822 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "kind"
+        ],
+        "description": "Input parameters for adding one Mailgun suppression or allowlist record.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "allowlist"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "address"
+                  ]
+                },
+                {
+                  "required": [
+                    "allowlistDomain"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "bounce",
+                    "complaint",
+                    "unsubscribe"
+                  ]
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "required": [
+                "address"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic mutation response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.create_template",
+      "service": "mailgun",
+      "name": "create_template",
+      "description": "Create a Mailgun template and optionally its initial active version.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template name."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Template description."
+          },
+          "createdBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional creator metadata stored by Mailgun."
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Initial template content."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Initial version tag. Mailgun defaults to initial when omitted."
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Initial version comment."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Map value."
+            },
+            "description": "String map forwarded to Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "name"
+        ],
+        "description": "Input parameters for creating a Mailgun template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic mutation response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.create_template_version",
+      "service": "mailgun",
+      "name": "create_template_version",
+      "description": "Create a new version for a Mailgun template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template name."
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Template version content."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique tag for the new template version."
+          },
+          "comment": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comment for the new template version."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the new version should become active."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Map value."
+            },
+            "description": "String map forwarded to Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "templateName",
+          "template",
+          "tag"
+        ],
+        "description": "Input parameters for creating a Mailgun template version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic mutation response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.delete_suppression",
+      "service": "mailgun",
+      "name": "delete_suppression",
+      "description": "Remove one Mailgun suppression or allowlist record.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "complaint",
+              "unsubscribe",
+              "allowlist"
+            ],
+            "description": "Suppression table to operate on."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Suppressed email address or allowlist entry value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for looking up or removing one Mailgun suppression record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic mutation response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.get_domain",
+      "service": "mailgun",
+      "name": "get_domain",
+      "description": "Get Mailgun domain details including DNS records and sending state.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a Mailgun domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.get_domain_tracking_settings",
+      "service": "mailgun",
+      "name": "get_domain_tracking_settings",
+      "description": "Get open, click, unsubscribe, and web scheme tracking settings for a domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a Mailgun domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tracking": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Mailgun domain tracking settings response."
+      }
+    },
+    {
+      "id": "mailgun.get_suppression",
+      "service": "mailgun",
+      "name": "get_suppression",
+      "description": "Get one Mailgun suppression or allowlist record.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "complaint",
+              "unsubscribe",
+              "allowlist"
+            ],
+            "description": "Suppression table to operate on."
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Suppressed email address or allowlist entry value."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for looking up or removing one Mailgun suppression record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.get_template",
+      "service": "mailgun",
+      "name": "get_template",
+      "description": "Get metadata for one Mailgun template and optionally its active version.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template name."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether to include the active template version content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "templateName"
+        ],
+        "description": "Path parameters for fetching one Mailgun template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.get_template_version",
+      "service": "mailgun",
+      "name": "get_template_version",
+      "description": "Get content and metadata for one Mailgun template version.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template name."
+          },
+          "versionName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template version tag."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for fetching one Mailgun template version."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.list_domains",
+      "service": "mailgun",
+      "name": "list_domains",
+      "description": "List Mailgun domains available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of domains to return. Mailgun allows up to 1000."
+          },
+          "skip": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of domains to skip before returning results."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "unverified",
+              "disabled"
+            ],
+            "description": "Domain state filter."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sort option such as name, name:asc, or name:desc."
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Authority filter for domains."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partial or complete domain name to search for."
+          },
+          "includeSubaccounts": {
+            "type": "boolean",
+            "description": "Whether to include domains from subaccounts."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing Mailgun domains."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.list_events",
+      "service": "mailgun",
+      "name": "list_events",
+      "description": "List delivery, engagement, and failure events for a Mailgun domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "begin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Beginning of the event search range in epoch seconds."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "End of the event search range in epoch seconds."
+          },
+          "ascending": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "description": "Mailgun yes/no option value."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "description": "Maximum number of events to return. Mailgun allows up to 300."
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "delivered",
+              "failed",
+              "rejected",
+              "clicked",
+              "opened",
+              "unsubscribed",
+              "stored",
+              "complained",
+              "email_validation",
+              "list_member_uploaded",
+              "list_member_upload_error",
+              "list_uploaded"
+            ],
+            "description": "Mailgun event type filter."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "temporary",
+              "permanent"
+            ],
+            "description": "Failure severity filter for failed events."
+          },
+          "recipient": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by recipient email address."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by From header email address."
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by To header email address."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by subject line."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by Mailgun message id."
+          },
+          "tags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter by user-defined tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Query parameters for listing Mailgun events for a domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Object returned by Mailgun."
+            },
+            "description": "Items returned by Mailgun."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paging links returned by Mailgun."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "raw"
+        ],
+        "description": "Paginated response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.list_suppressions",
+      "service": "mailgun",
+      "name": "list_suppressions",
+      "description": "List records from a Mailgun suppression or allowlist table.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bounce",
+              "complaint",
+              "unsubscribe",
+              "allowlist"
+            ],
+            "description": "Suppression table to operate on."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum number of suppression records to return."
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "next",
+              "previous",
+              "last"
+            ],
+            "description": "Suppression page direction."
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Address divider for paginated suppression responses."
+          },
+          "term": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Prefix used to filter suppression records."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "kind"
+        ],
+        "description": "Query parameters for listing a Mailgun suppression table."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Object returned by Mailgun."
+            },
+            "description": "Items returned by Mailgun."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paging links returned by Mailgun."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "raw"
+        ],
+        "description": "Paginated response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.list_template_versions",
+      "service": "mailgun",
+      "name": "list_template_versions",
+      "description": "List versions for a Mailgun template.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "templateName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun template name."
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "first",
+              "last",
+              "next",
+              "previous"
+            ],
+            "description": "Mailgun page direction."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of template versions to retrieve. Mailgun allows up to 100."
+          },
+          "pivot": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pivot value used by Mailgun for next or previous pages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "templateName"
+        ],
+        "description": "Query parameters for listing Mailgun template versions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Object returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.list_templates",
+      "service": "mailgun",
+      "name": "list_templates",
+      "description": "List templates stored for a Mailgun domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "first",
+              "last",
+              "next",
+              "previous"
+            ],
+            "description": "Mailgun page direction."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of templates or versions to retrieve. Mailgun allows up to 100."
+          },
+          "pivot": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pivot value used by Mailgun for next or previous pages."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Query parameters for listing Mailgun templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Object returned by Mailgun."
+            },
+            "description": "Items returned by Mailgun."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Paging links returned by Mailgun."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "raw"
+        ],
+        "description": "Paginated response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.send_email",
+      "service": "mailgun",
+      "name": "send_email",
+      "description": "Send an email through Mailgun using a stored domain.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email address for the From header. Friendly name format is supported."
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Recipient email address or friendly name string."
+            },
+            "description": "Primary recipients. Mailgun accepts email addresses or friendly name strings.",
+            "minItems": 1
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Carbon copy recipient email address or friendly name string."
+            },
+            "description": "Carbon copy recipients."
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Blind carbon copy recipient email address or friendly name string."
+            },
+            "description": "Blind carbon copy recipients."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message subject line."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plain text message body."
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "HTML message body."
+          },
+          "ampHtml": {
+            "type": "string",
+            "minLength": 1,
+            "description": "AMP HTML message body."
+          },
+          "template": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stored Mailgun template name to render for this email."
+          },
+          "templateVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Template version tag to render."
+          },
+          "templateText": {
+            "type": "boolean",
+            "description": "Whether Mailgun should generate a text part from the template."
+          },
+          "templateVariables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Template variable value."
+            },
+            "description": "Template variables encoded into Mailgun t:variables."
+          },
+          "recipientVariables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Variables for one recipient."
+            },
+            "description": "Recipient variables for Mailgun batch sending."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Mailgun tag."
+            },
+            "description": "Mailgun tags attached to the message."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Map value."
+            },
+            "description": "String map forwarded to Mailgun."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Custom variable value."
+            },
+            "description": "Custom Mailgun user variables stored with events and webhooks."
+          },
+          "deliveryTime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Scheduled delivery time in RFC 2822 format."
+          },
+          "deliverWithin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Maximum delivery window such as 1h30m or 24h."
+          },
+          "testMode": {
+            "type": "boolean",
+            "description": "Whether to send in Mailgun test mode."
+          },
+          "dkim": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "true",
+              "false"
+            ],
+            "description": "Mailgun yes/no or boolean string option value."
+          },
+          "tracking": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "true",
+              "false",
+              "htmlonly"
+            ],
+            "description": "Mailgun tracking option value."
+          },
+          "trackingClicks": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "true",
+              "false",
+              "htmlonly"
+            ],
+            "description": "Mailgun tracking option value."
+          },
+          "trackingOpens": {
+            "type": "string",
+            "enum": [
+              "yes",
+              "no",
+              "true",
+              "false"
+            ],
+            "description": "Mailgun yes/no or boolean string option value."
+          },
+          "requireTls": {
+            "type": "boolean",
+            "description": "Whether Mailgun must deliver only over TLS."
+          },
+          "skipVerification": {
+            "type": "boolean",
+            "description": "Whether Mailgun should skip MX TLS certificate verification."
+          },
+          "sendingIp": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dedicated sending IP address to use."
+          },
+          "sendingIpPool": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Dedicated IP pool ID to use."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "to"
+        ],
+        "description": "Input parameters for sending an email through Mailgun.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "text"
+                ]
+              },
+              {
+                "required": [
+                  "html"
+                ]
+              },
+              {
+                "required": [
+                  "ampHtml"
+                ]
+              },
+              {
+                "required": [
+                  "template"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "template"
+                ]
+              },
+              {
+                "required": [
+                  "from"
+                ]
+              }
+            ]
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "template"
+                ]
+              },
+              {
+                "required": [
+                  "subject"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun message identifier."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun message identifier."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Message response returned by Mailgun."
+      }
+    },
+    {
+      "id": "mailgun.update_domain_tracking_settings",
+      "service": "mailgun",
+      "name": "update_domain_tracking_settings",
+      "description": "Update open, click, or unsubscribe tracking settings for a Mailgun domain.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          },
+          "open": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean",
+                "description": "Whether open tracking should be active."
+              },
+              "placeAtTheTop": {
+                "type": "boolean",
+                "description": "Whether to place the open tracking pixel at the top."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Open tracking settings to update."
+          },
+          "click": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false",
+                  "htmlonly"
+                ],
+                "description": "Click tracking state."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Click tracking settings to update."
+          },
+          "unsubscribe": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "boolean",
+                "description": "Whether unsubscribe tracking should be active."
+              },
+              "htmlFooter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "HTML unsubscribe footer content."
+              },
+              "textFooter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plain text unsubscribe footer content."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Unsubscribe tracking settings to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "domain"
+        ],
+        "description": "Input parameters for updating Mailgun domain tracking settings.",
+        "anyOf": [
+          {
+            "required": [
+              "open"
+            ],
+            "properties": {
+              "open": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "active"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "placeAtTheTop"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "required": [
+              "click"
+            ],
+            "properties": {
+              "click": {
+                "required": [
+                  "active"
+                ]
+              }
+            }
+          },
+          {
+            "required": [
+              "unsubscribe"
+            ],
+            "properties": {
+              "unsubscribe": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "active"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "htmlFooter"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "textFooter"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Mailgun status message."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Mailgun status message."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Object returned by Mailgun."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailgun domain tracking mutation response."
+          },
+          "click": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Mailgun status message."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Mailgun status message."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Object returned by Mailgun."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailgun domain tracking mutation response."
+          },
+          "unsubscribe": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Mailgun status message."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Mailgun status message."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Object returned by Mailgun."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Mailgun domain tracking mutation response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Responses from updated Mailgun domain tracking settings."
+      }
+    },
+    {
+      "id": "mailgun.verify_domain",
+      "service": "mailgun",
+      "name": "verify_domain",
+      "description": "Ask Mailgun to verify DNS records for a sending domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mailgun sending domain name."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for a Mailgun domain."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Mailgun status message."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mailgun status message."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Object returned by Mailgun."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Generic mutation response returned by Mailgun."
+      }
+    }
+  ]
+}

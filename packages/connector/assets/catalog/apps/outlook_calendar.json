@@ -1,0 +1,2906 @@
+{
+  "service": "outlook_calendar",
+  "displayName": "Outlook Calendar",
+  "description": "Read and manage Microsoft 365 calendars, events, availability, and meeting responses.",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "scopes": [
+        "User.Read",
+        "Calendars.ReadWrite",
+        "Calendars.ReadWrite.Shared",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "response_mode": "query"
+      },
+      "clientConfigFields": [
+        {
+          "key": "tenant",
+          "label": "Tenant",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "defaultValue": "common",
+          "placeholder": "common",
+          "description": "The Microsoft identity platform tenant segment, such as common, organizations, consumers, or a tenant ID."
+        }
+      ],
+      "clientSetup": {
+        "docsUrl": "https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
+        "steps": [
+          "Register a web application in Microsoft Entra ID and add the callback URL shown by this runtime.",
+          "Add the Microsoft Graph delegated permissions User.Read, Calendars.ReadWrite, Calendars.ReadWrite.Shared, and offline_access; the Shared permission enables delegated and shared calendars, and tenant policy may require administrator consent.",
+          "Create a client secret and save its value with the application client ID in this runtime."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://www.microsoft.com/microsoft-365/outlook/outlook-calendar",
+  "actions": [
+    {
+      "id": "outlook_calendar.accept_event",
+      "service": "outlook_calendar",
+      "name": "accept_event",
+      "description": "Accept an event invitation for the connected account.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional response message sent to the organizer."
+          },
+          "sendResponse": {
+            "type": "boolean",
+            "description": "Whether to send the response to the organizer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Operation acknowledgement."
+      }
+    },
+    {
+      "id": "outlook_calendar.cancel_event",
+      "service": "outlook_calendar",
+      "name": "cancel_event",
+      "description": "Cancel an organized event and notify its attendees.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Cancellation message sent to attendees."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Operation acknowledgement."
+      }
+    },
+    {
+      "id": "outlook_calendar.create_event",
+      "service": "outlook_calendar",
+      "name": "create_event",
+      "description": "Create an event in the default calendar or a selected calendar.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook calendar ID."
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "subject": {
+                "type": "string",
+                "description": "Event subject."
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "html"
+                    ],
+                    "description": "Body content type."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Body content."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "contentType",
+                  "content"
+                ],
+                "description": "Event body."
+              },
+              "start": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "end": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "description": "Location display name."
+                  },
+                  "locationEmailAddress": {
+                    "type": "string",
+                    "description": "Location email address."
+                  },
+                  "locationType": {
+                    "type": "string",
+                    "description": "Microsoft Graph location type."
+                  },
+                  "uniqueId": {
+                    "type": "string",
+                    "description": "Provider location identifier."
+                  },
+                  "uniqueIdType": {
+                    "type": "string",
+                    "description": "Provider location identifier type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Event location."
+              },
+              "locations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "Location display name."
+                    },
+                    "locationEmailAddress": {
+                      "type": "string",
+                      "description": "Location email address."
+                    },
+                    "locationType": {
+                      "type": "string",
+                      "description": "Microsoft Graph location type."
+                    },
+                    "uniqueId": {
+                      "type": "string",
+                      "description": "Provider location identifier."
+                    },
+                    "uniqueIdType": {
+                      "type": "string",
+                      "description": "Provider location identifier type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Event location."
+                },
+                "description": "Event locations."
+              },
+              "attendees": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emailAddress": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "description": "Email address.",
+                          "format": "email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Display name."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "address"
+                      ],
+                      "description": "Email address and optional display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "required",
+                        "optional",
+                        "resource"
+                      ],
+                      "description": "Attendee type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "emailAddress",
+                    "type"
+                  ],
+                  "description": "Meeting attendee."
+                },
+                "description": "Event attendees."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Outlook categories assigned to the event.",
+                "minItems": 1
+              },
+              "importance": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high"
+                ],
+                "description": "Event importance."
+              },
+              "sensitivity": {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "personal",
+                  "private",
+                  "confidential"
+                ],
+                "description": "Event sensitivity."
+              },
+              "showAs": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "tentative",
+                  "busy",
+                  "oof",
+                  "workingElsewhere",
+                  "unknown"
+                ],
+                "description": "Free/busy status shown for the event."
+              },
+              "isAllDay": {
+                "type": "boolean",
+                "description": "Whether the event lasts all day."
+              },
+              "isOnlineMeeting": {
+                "type": "boolean",
+                "description": "Whether to create an online meeting."
+              },
+              "onlineMeetingProvider": {
+                "type": "string",
+                "enum": [
+                  "unknown",
+                  "skypeForBusiness",
+                  "skypeForConsumer",
+                  "teamsForBusiness"
+                ],
+                "description": "Online meeting provider."
+              },
+              "recurrence": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A Microsoft Graph object."
+              },
+              "responseRequested": {
+                "type": "boolean",
+                "description": "Whether attendee responses are requested."
+              },
+              "allowNewTimeProposals": {
+                "type": "boolean",
+                "description": "Whether attendees may propose a new time."
+              },
+              "transactionId": {
+                "type": "string",
+                "description": "Client-generated identifier used to avoid duplicate creates."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "subject",
+              "start",
+              "end"
+            ],
+            "description": "Event creation payload."
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event ID."
+          },
+          "iCalUId": {
+            "type": "string",
+            "description": "iCalendar UID."
+          },
+          "seriesMasterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Recurring series master ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recurring series master ID."
+          },
+          "type": {
+            "type": "string",
+            "description": "Event type."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Event subject."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "bodyPreview": {
+            "type": "string",
+            "description": "Plain-text body preview."
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "description": "Location display name."
+              },
+              "locationEmailAddress": {
+                "type": "string",
+                "description": "Location email address."
+              },
+              "locationType": {
+                "type": "string",
+                "description": "Microsoft Graph location type."
+              },
+              "uniqueId": {
+                "type": "string",
+                "description": "Provider location identifier."
+              },
+              "uniqueIdType": {
+                "type": "string",
+                "description": "Provider location identifier type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Event location."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Location display name."
+                },
+                "locationEmailAddress": {
+                  "type": "string",
+                  "description": "Location email address."
+                },
+                "locationType": {
+                  "type": "string",
+                  "description": "Microsoft Graph location type."
+                },
+                "uniqueId": {
+                  "type": "string",
+                  "description": "Provider location identifier."
+                },
+                "uniqueIdType": {
+                  "type": "string",
+                  "description": "Provider location identifier type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Event location."
+            },
+            "description": "Event locations."
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Attendees and their response status."
+          },
+          "organizer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "recurrence": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "responseStatus": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeeting": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeetingUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Legacy online meeting URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Legacy online meeting URL."
+          },
+          "webLink": {
+            "type": "string",
+            "description": "Outlook web URL for the event."
+          },
+          "isCancelled": {
+            "type": "boolean",
+            "description": "Whether the event is cancelled."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Outlook event resource."
+      }
+    },
+    {
+      "id": "outlook_calendar.decline_event",
+      "service": "outlook_calendar",
+      "name": "decline_event",
+      "description": "Decline an event invitation for the connected account.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional response message sent to the organizer."
+          },
+          "sendResponse": {
+            "type": "boolean",
+            "description": "Whether to send the response to the organizer."
+          },
+          "proposedNewTime": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "end": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end"
+            ],
+            "description": "Alternative meeting time; sendResponse must be true when this is provided."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input.",
+        "if": {
+          "required": [
+            "proposedNewTime"
+          ]
+        },
+        "then": {
+          "properties": {
+            "sendResponse": {
+              "const": true
+            }
+          },
+          "required": [
+            "sendResponse"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Operation acknowledgement."
+      }
+    },
+    {
+      "id": "outlook_calendar.delete_event",
+      "service": "outlook_calendar",
+      "name": "delete_event",
+      "description": "Delete an Outlook event; deleting an organized meeting sends a cancellation to attendees.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Operation acknowledgement."
+      }
+    },
+    {
+      "id": "outlook_calendar.find_meeting_times",
+      "service": "outlook_calendar",
+      "name": "find_meeting_times",
+      "description": "Suggest meeting times that satisfy attendee, location, and time constraints.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite.Shared"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite.Shared"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "emailAddress": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "description": "Email address.",
+                      "format": "email"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Display name."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "address"
+                  ],
+                  "description": "Email address and optional display name."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "required",
+                    "optional",
+                    "resource"
+                  ],
+                  "description": "Attendee type."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "emailAddress",
+                "type"
+              ],
+              "description": "Meeting attendee."
+            },
+            "description": "People or resources invited to the meeting; an empty array checks only the organizer."
+          },
+          "locationConstraint": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "timeConstraint": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "meetingDuration": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 duration, such as PT1H."
+          },
+          "maxCandidates": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum suggestions to return."
+          },
+          "isOrganizerOptional": {
+            "type": "boolean",
+            "description": "Whether the organizer may be unavailable."
+          },
+          "returnSuggestionReasons": {
+            "type": "boolean",
+            "description": "Whether each suggestion includes an explanation."
+          },
+          "minimumAttendeePercentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Minimum attendee availability percentage."
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "emptySuggestionsReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Reason no meeting time could be suggested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason no meeting time could be suggested."
+          },
+          "meetingTimeSuggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "meetingTimeSlot": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "object",
+                      "properties": {
+                        "dateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Local date and time, such as 2026-09-16T10:00:00."
+                        },
+                        "timeZone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "dateTime",
+                        "timeZone"
+                      ],
+                      "description": "Microsoft Graph dateTimeTimeZone value."
+                    },
+                    "end": {
+                      "type": "object",
+                      "properties": {
+                        "dateTime": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Local date and time, such as 2026-09-16T10:00:00."
+                        },
+                        "timeZone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "dateTime",
+                        "timeZone"
+                      ],
+                      "description": "Microsoft Graph dateTimeTimeZone value."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "start",
+                    "end"
+                  ],
+                  "description": "Suggested meeting interval."
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Suggestion confidence percentage."
+                },
+                "organizerAvailability": {
+                  "type": "string",
+                  "description": "Organizer availability for the suggestion."
+                },
+                "attendeeAvailability": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Availability of each attendee."
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Suggested meeting locations."
+                },
+                "suggestionReason": {
+                  "type": "string",
+                  "description": "Explanation for the suggestion."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One suggested meeting time."
+            },
+            "description": "Meeting time suggestions returned by Microsoft Graph."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Result of finding candidate meeting times."
+      }
+    },
+    {
+      "id": "outlook_calendar.get_calendar",
+      "service": "outlook_calendar",
+      "name": "get_calendar",
+      "description": "Get one Outlook calendar by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook calendar ID."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendarId"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Calendar ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Calendar name."
+          },
+          "color": {
+            "type": "string",
+            "description": "Calendar color."
+          },
+          "hexColor": {
+            "type": "string",
+            "description": "Calendar hexadecimal color."
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "Whether the current user may edit this calendar."
+          },
+          "canShare": {
+            "type": "boolean",
+            "description": "Whether the current user may share this calendar."
+          },
+          "canViewPrivateItems": {
+            "type": "boolean",
+            "description": "Whether private event details are visible."
+          },
+          "isDefaultCalendar": {
+            "type": "boolean",
+            "description": "Whether this is the default calendar."
+          },
+          "owner": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Outlook calendar resource."
+      }
+    },
+    {
+      "id": "outlook_calendar.get_current_user",
+      "service": "outlook_calendar",
+      "name": "get_current_user",
+      "description": "Get the profile for the connected Microsoft account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "User.Read"
+      ],
+      "providerPermissions": [
+        "User.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft account ID."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Account display name."
+          },
+          "mail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Primary email address."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Primary email address."
+          },
+          "userPrincipalName": {
+            "type": "string",
+            "description": "User principal name."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Current Microsoft account profile."
+      }
+    },
+    {
+      "id": "outlook_calendar.get_event",
+      "service": "outlook_calendar",
+      "name": "get_event",
+      "description": "Get one Outlook event by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event ID."
+          },
+          "iCalUId": {
+            "type": "string",
+            "description": "iCalendar UID."
+          },
+          "seriesMasterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Recurring series master ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recurring series master ID."
+          },
+          "type": {
+            "type": "string",
+            "description": "Event type."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Event subject."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "bodyPreview": {
+            "type": "string",
+            "description": "Plain-text body preview."
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "description": "Location display name."
+              },
+              "locationEmailAddress": {
+                "type": "string",
+                "description": "Location email address."
+              },
+              "locationType": {
+                "type": "string",
+                "description": "Microsoft Graph location type."
+              },
+              "uniqueId": {
+                "type": "string",
+                "description": "Provider location identifier."
+              },
+              "uniqueIdType": {
+                "type": "string",
+                "description": "Provider location identifier type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Event location."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Location display name."
+                },
+                "locationEmailAddress": {
+                  "type": "string",
+                  "description": "Location email address."
+                },
+                "locationType": {
+                  "type": "string",
+                  "description": "Microsoft Graph location type."
+                },
+                "uniqueId": {
+                  "type": "string",
+                  "description": "Provider location identifier."
+                },
+                "uniqueIdType": {
+                  "type": "string",
+                  "description": "Provider location identifier type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Event location."
+            },
+            "description": "Event locations."
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Attendees and their response status."
+          },
+          "organizer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "recurrence": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "responseStatus": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeeting": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeetingUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Legacy online meeting URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Legacy online meeting URL."
+          },
+          "webLink": {
+            "type": "string",
+            "description": "Outlook web URL for the event."
+          },
+          "isCancelled": {
+            "type": "boolean",
+            "description": "Whether the event is cancelled."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Outlook event resource."
+      }
+    },
+    {
+      "id": "outlook_calendar.get_schedule",
+      "service": "outlook_calendar",
+      "name": "get_schedule",
+      "description": "Get free and busy availability for users, rooms, or resources.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "SMTP addresses whose availability should be returned.",
+            "minItems": 1
+          },
+          "startTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "endTime": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "availabilityViewInterval": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 1440,
+            "description": "Availability interval in minutes."
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schedules",
+          "startTime",
+          "endTime"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scheduleId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "SMTP address represented by this availability result."
+                },
+                "availabilityView": {
+                  "type": "string",
+                  "description": "Merged availability view for the requested interval."
+                },
+                "scheduleItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "description": "Free/busy status."
+                      },
+                      "subject": {
+                        "type": "string",
+                        "description": "Schedule item subject when visible."
+                      },
+                      "location": {
+                        "type": "string",
+                        "description": "Schedule item location when visible."
+                      },
+                      "start": {
+                        "type": "object",
+                        "properties": {
+                          "dateTime": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Local date and time, such as 2026-09-16T10:00:00."
+                          },
+                          "timeZone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "dateTime",
+                          "timeZone"
+                        ],
+                        "description": "Microsoft Graph dateTimeTimeZone value."
+                      },
+                      "end": {
+                        "type": "object",
+                        "properties": {
+                          "dateTime": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Local date and time, such as 2026-09-16T10:00:00."
+                          },
+                          "timeZone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "dateTime",
+                          "timeZone"
+                        ],
+                        "description": "Microsoft Graph dateTimeTimeZone value."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One busy interval in the schedule."
+                  },
+                  "description": "Busy intervals returned for the schedule."
+                },
+                "workingHours": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "error": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Availability information for one requested schedule."
+            },
+            "description": "Availability results by schedule."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schedules"
+        ]
+      }
+    },
+    {
+      "id": "outlook_calendar.list_calendar_view",
+      "service": "outlook_calendar",
+      "name": "list_calendar_view",
+      "description": "List event occurrences and exceptions within a date-time range.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook calendar ID."
+          },
+          "startDateTime": {
+            "type": "string",
+            "description": "Inclusive range start as an ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "endDateTime": {
+            "type": "string",
+            "description": "Exclusive range end as an ISO 8601 timestamp.",
+            "format": "date-time"
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum resources to return."
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData filter expression."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "OData orderby expression."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          },
+          "expand": {
+            "type": "string",
+            "description": "OData expand expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          },
+          "delta": {
+            "type": "boolean",
+            "description": "Track changes with a Microsoft Graph delta query (calendarView/delta) instead of listing: the first round returns every occurrence in the range, later rounds (started with deltaLink) return only additions, updates and removals (rows carrying @removed). Graph does not support select, filter, orderby or expand on calendar view delta queries."
+          },
+          "deltaLink": {
+            "type": "string",
+            "description": "Opaque delta URL (deltaLink) returned by a previous calendar view delta round; starts the next round of changes for the same range. Ignored when nextLink is set.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDateTime",
+          "endDateTime"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Event ID."
+                },
+                "iCalUId": {
+                  "type": "string",
+                  "description": "iCalendar UID."
+                },
+                "seriesMasterId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Recurring series master ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recurring series master ID."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Event type."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "Event subject."
+                },
+                "body": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "bodyPreview": {
+                  "type": "string",
+                  "description": "Plain-text body preview."
+                },
+                "start": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Local date and time, such as 2026-09-16T10:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime",
+                    "timeZone"
+                  ],
+                  "description": "Microsoft Graph dateTimeTimeZone value."
+                },
+                "end": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Local date and time, such as 2026-09-16T10:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime",
+                    "timeZone"
+                  ],
+                  "description": "Microsoft Graph dateTimeTimeZone value."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "Location display name."
+                    },
+                    "locationEmailAddress": {
+                      "type": "string",
+                      "description": "Location email address."
+                    },
+                    "locationType": {
+                      "type": "string",
+                      "description": "Microsoft Graph location type."
+                    },
+                    "uniqueId": {
+                      "type": "string",
+                      "description": "Provider location identifier."
+                    },
+                    "uniqueIdType": {
+                      "type": "string",
+                      "description": "Provider location identifier type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Event location."
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "description": "Location display name."
+                      },
+                      "locationEmailAddress": {
+                        "type": "string",
+                        "description": "Location email address."
+                      },
+                      "locationType": {
+                        "type": "string",
+                        "description": "Microsoft Graph location type."
+                      },
+                      "uniqueId": {
+                        "type": "string",
+                        "description": "Provider location identifier."
+                      },
+                      "uniqueIdType": {
+                        "type": "string",
+                        "description": "Provider location identifier type."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Event location."
+                  },
+                  "description": "Event locations."
+                },
+                "attendees": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Attendees and their response status."
+                },
+                "organizer": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "recurrence": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "responseStatus": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "onlineMeeting": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "onlineMeetingUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Legacy online meeting URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Legacy online meeting URL."
+                },
+                "webLink": {
+                  "type": "string",
+                  "description": "Outlook web URL for the event."
+                },
+                "isCancelled": {
+                  "type": "boolean",
+                  "description": "Whether the event is cancelled."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Outlook event resource."
+            },
+            "description": "Events returned by Microsoft Graph."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          },
+          "deltaLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Delta URL for the next round of changes once a calendar view delta round is complete, or null (always null for plain listings)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Delta URL for the next round of changes once a calendar view delta round is complete, or null (always null for plain listings)."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "nextLink",
+          "deltaLink"
+        ],
+        "description": "Paginated Outlook calendar view response."
+      }
+    },
+    {
+      "id": "outlook_calendar.list_calendars",
+      "service": "outlook_calendar",
+      "name": "list_calendars",
+      "description": "List calendars belonging to the connected Microsoft account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum resources to return."
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData filter expression."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "OData orderby expression."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          },
+          "expand": {
+            "type": "string",
+            "description": "OData expand expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calendars": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Calendar ID."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Calendar name."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "Calendar color."
+                },
+                "hexColor": {
+                  "type": "string",
+                  "description": "Calendar hexadecimal color."
+                },
+                "canEdit": {
+                  "type": "boolean",
+                  "description": "Whether the current user may edit this calendar."
+                },
+                "canShare": {
+                  "type": "boolean",
+                  "description": "Whether the current user may share this calendar."
+                },
+                "canViewPrivateItems": {
+                  "type": "boolean",
+                  "description": "Whether private event details are visible."
+                },
+                "isDefaultCalendar": {
+                  "type": "boolean",
+                  "description": "Whether this is the default calendar."
+                },
+                "owner": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Outlook calendar resource."
+            },
+            "description": "Calendars returned by Microsoft Graph."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "calendars",
+          "nextLink"
+        ]
+      }
+    },
+    {
+      "id": "outlook_calendar.list_events",
+      "service": "outlook_calendar",
+      "name": "list_events",
+      "description": "List events from the default calendar or a selected calendar.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "calendarId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook calendar ID."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum resources to return."
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData filter expression."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "OData orderby expression."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          },
+          "expand": {
+            "type": "string",
+            "description": "OData expand expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Event ID."
+                },
+                "iCalUId": {
+                  "type": "string",
+                  "description": "iCalendar UID."
+                },
+                "seriesMasterId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Recurring series master ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Recurring series master ID."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Event type."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "Event subject."
+                },
+                "body": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "bodyPreview": {
+                  "type": "string",
+                  "description": "Plain-text body preview."
+                },
+                "start": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Local date and time, such as 2026-09-16T10:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime",
+                    "timeZone"
+                  ],
+                  "description": "Microsoft Graph dateTimeTimeZone value."
+                },
+                "end": {
+                  "type": "object",
+                  "properties": {
+                    "dateTime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Local date and time, such as 2026-09-16T10:00:00."
+                    },
+                    "timeZone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "dateTime",
+                    "timeZone"
+                  ],
+                  "description": "Microsoft Graph dateTimeTimeZone value."
+                },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "Location display name."
+                    },
+                    "locationEmailAddress": {
+                      "type": "string",
+                      "description": "Location email address."
+                    },
+                    "locationType": {
+                      "type": "string",
+                      "description": "Microsoft Graph location type."
+                    },
+                    "uniqueId": {
+                      "type": "string",
+                      "description": "Provider location identifier."
+                    },
+                    "uniqueIdType": {
+                      "type": "string",
+                      "description": "Provider location identifier type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Event location."
+                },
+                "locations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "displayName": {
+                        "type": "string",
+                        "description": "Location display name."
+                      },
+                      "locationEmailAddress": {
+                        "type": "string",
+                        "description": "Location email address."
+                      },
+                      "locationType": {
+                        "type": "string",
+                        "description": "Microsoft Graph location type."
+                      },
+                      "uniqueId": {
+                        "type": "string",
+                        "description": "Provider location identifier."
+                      },
+                      "uniqueIdType": {
+                        "type": "string",
+                        "description": "Provider location identifier type."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Event location."
+                  },
+                  "description": "Event locations."
+                },
+                "attendees": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Attendees and their response status."
+                },
+                "organizer": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "recurrence": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "responseStatus": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "onlineMeeting": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "onlineMeetingUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Legacy online meeting URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Legacy online meeting URL."
+                },
+                "webLink": {
+                  "type": "string",
+                  "description": "Outlook web URL for the event."
+                },
+                "isCancelled": {
+                  "type": "boolean",
+                  "description": "Whether the event is cancelled."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Outlook event resource."
+            },
+            "description": "Events returned by Microsoft Graph."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events",
+          "nextLink"
+        ],
+        "description": "Paginated Outlook event response."
+      }
+    },
+    {
+      "id": "outlook_calendar.tentatively_accept_event",
+      "service": "outlook_calendar",
+      "name": "tentatively_accept_event",
+      "description": "Tentatively accept an event invitation for the connected account.",
+      "operationType": "write",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional response message sent to the organizer."
+          },
+          "sendResponse": {
+            "type": "boolean",
+            "description": "Whether to send the response to the organizer."
+          },
+          "proposedNewTime": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "end": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end"
+            ],
+            "description": "Alternative meeting time; sendResponse must be true when this is provided."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId"
+        ],
+        "description": "Outlook Calendar action input.",
+        "if": {
+          "required": [
+            "proposedNewTime"
+          ]
+        },
+        "then": {
+          "properties": {
+            "sendResponse": {
+              "const": true
+            }
+          },
+          "required": [
+            "sendResponse"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the operation completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Operation acknowledgement."
+      }
+    },
+    {
+      "id": "outlook_calendar.update_event",
+      "service": "outlook_calendar",
+      "name": "update_event",
+      "description": "Update writable fields on an Outlook event.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "Calendars.ReadWrite"
+      ],
+      "providerPermissions": [
+        "Calendars.ReadWrite"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Outlook event ID."
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "subject": {
+                "type": "string",
+                "description": "Event subject."
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "html"
+                    ],
+                    "description": "Body content type."
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Body content."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "contentType",
+                  "content"
+                ],
+                "description": "Event body."
+              },
+              "start": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "end": {
+                "type": "object",
+                "properties": {
+                  "dateTime": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Local date and time, such as 2026-09-16T10:00:00."
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "dateTime",
+                  "timeZone"
+                ],
+                "description": "Microsoft Graph dateTimeTimeZone value."
+              },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "description": "Location display name."
+                  },
+                  "locationEmailAddress": {
+                    "type": "string",
+                    "description": "Location email address."
+                  },
+                  "locationType": {
+                    "type": "string",
+                    "description": "Microsoft Graph location type."
+                  },
+                  "uniqueId": {
+                    "type": "string",
+                    "description": "Provider location identifier."
+                  },
+                  "uniqueIdType": {
+                    "type": "string",
+                    "description": "Provider location identifier type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Event location."
+              },
+              "locations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "description": "Location display name."
+                    },
+                    "locationEmailAddress": {
+                      "type": "string",
+                      "description": "Location email address."
+                    },
+                    "locationType": {
+                      "type": "string",
+                      "description": "Microsoft Graph location type."
+                    },
+                    "uniqueId": {
+                      "type": "string",
+                      "description": "Provider location identifier."
+                    },
+                    "uniqueIdType": {
+                      "type": "string",
+                      "description": "Provider location identifier type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Event location."
+                },
+                "description": "Event locations."
+              },
+              "attendees": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emailAddress": {
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string",
+                          "description": "Email address.",
+                          "format": "email"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Display name."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "address"
+                      ],
+                      "description": "Email address and optional display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "required",
+                        "optional",
+                        "resource"
+                      ],
+                      "description": "Attendee type."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "emailAddress",
+                    "type"
+                  ],
+                  "description": "Meeting attendee."
+                },
+                "description": "Event attendees."
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Outlook categories assigned to the event.",
+                "minItems": 1
+              },
+              "importance": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "normal",
+                  "high"
+                ],
+                "description": "Event importance."
+              },
+              "sensitivity": {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "personal",
+                  "private",
+                  "confidential"
+                ],
+                "description": "Event sensitivity."
+              },
+              "showAs": {
+                "type": "string",
+                "enum": [
+                  "free",
+                  "tentative",
+                  "busy",
+                  "oof",
+                  "workingElsewhere",
+                  "unknown"
+                ],
+                "description": "Free/busy status shown for the event."
+              },
+              "isAllDay": {
+                "type": "boolean",
+                "description": "Whether the event lasts all day."
+              },
+              "isOnlineMeeting": {
+                "type": "boolean",
+                "description": "Whether to create an online meeting."
+              },
+              "onlineMeetingProvider": {
+                "type": "string",
+                "enum": [
+                  "unknown",
+                  "skypeForBusiness",
+                  "skypeForConsumer",
+                  "teamsForBusiness"
+                ],
+                "description": "Online meeting provider."
+              },
+              "recurrence": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "A Microsoft Graph object."
+              },
+              "responseRequested": {
+                "type": "boolean",
+                "description": "Whether attendee responses are requested."
+              },
+              "allowNewTimeProposals": {
+                "type": "boolean",
+                "description": "Whether attendees may propose a new time."
+              },
+              "transactionId": {
+                "type": "string",
+                "description": "Client-generated identifier used to avoid duplicate creates."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Writable event fields."
+          },
+          "preferTimeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Windows time zone name used for returned date-time values."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "event"
+        ],
+        "description": "Outlook Calendar action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event ID."
+          },
+          "iCalUId": {
+            "type": "string",
+            "description": "iCalendar UID."
+          },
+          "seriesMasterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Recurring series master ID."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Recurring series master ID."
+          },
+          "type": {
+            "type": "string",
+            "description": "Event type."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Event subject."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "bodyPreview": {
+            "type": "string",
+            "description": "Plain-text body preview."
+          },
+          "start": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "end": {
+            "type": "object",
+            "properties": {
+              "dateTime": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Local date and time, such as 2026-09-16T10:00:00."
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Windows time zone name, such as UTC or Pacific Standard Time."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "dateTime",
+              "timeZone"
+            ],
+            "description": "Microsoft Graph dateTimeTimeZone value."
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "description": "Location display name."
+              },
+              "locationEmailAddress": {
+                "type": "string",
+                "description": "Location email address."
+              },
+              "locationType": {
+                "type": "string",
+                "description": "Microsoft Graph location type."
+              },
+              "uniqueId": {
+                "type": "string",
+                "description": "Provider location identifier."
+              },
+              "uniqueIdType": {
+                "type": "string",
+                "description": "Provider location identifier type."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Event location."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Location display name."
+                },
+                "locationEmailAddress": {
+                  "type": "string",
+                  "description": "Location email address."
+                },
+                "locationType": {
+                  "type": "string",
+                  "description": "Microsoft Graph location type."
+                },
+                "uniqueId": {
+                  "type": "string",
+                  "description": "Provider location identifier."
+                },
+                "uniqueIdType": {
+                  "type": "string",
+                  "description": "Provider location identifier type."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Event location."
+            },
+            "description": "Event locations."
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Attendees and their response status."
+          },
+          "organizer": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "recurrence": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "responseStatus": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeeting": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "onlineMeetingUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Legacy online meeting URL."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Legacy online meeting URL."
+          },
+          "webLink": {
+            "type": "string",
+            "description": "Outlook web URL for the event."
+          },
+          "isCancelled": {
+            "type": "boolean",
+            "description": "Whether the event is cancelled."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Outlook event resource."
+      }
+    }
+  ]
+}

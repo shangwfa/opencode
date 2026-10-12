@@ -1,0 +1,1814 @@
+{
+  "service": "quentn",
+  "displayName": "Quentn",
+  "categories": [
+    "Marketing",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "QUENTN_API_KEY",
+      "description": "Quentn API key sent with the Authorization: Bearer header. Create or copy an API key from Settings > API Info in your Quentn system: https://help.quentn.com/hc/en-150/articles/4517564565649-Requests",
+      "extraFields": [
+        {
+          "key": "systemId",
+          "label": "System ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "my-system",
+          "description": "Quentn system ID from your API endpoint hostname, for example the first label in https://my-system.server.quentn.com/public/api/V1."
+        },
+        {
+          "key": "serverId",
+          "label": "Server ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "server",
+          "description": "Quentn server ID from your API endpoint hostname, for example the second label in https://my-system.server.quentn.com/public/api/V1."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://quentn.com",
+  "actions": [
+    {
+      "id": "quentn.create_contact",
+      "service": "quentn",
+      "name": "create_contact",
+      "description": "Create one Quentn contact with optional duplicate handling.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "first_name": {
+                "type": "string",
+                "description": "Contact first name."
+              },
+              "family_name": {
+                "type": "string",
+                "description": "Contact family name."
+              },
+              "mail": {
+                "type": "string",
+                "description": "Contact email address.",
+                "format": "email"
+              },
+              "request_ip": {
+                "type": "string",
+                "description": "IPv4 address associated with this contact submission."
+              },
+              "ba_street": {
+                "type": "string",
+                "description": "Billing address street, required when mail is omitted."
+              },
+              "ba_city": {
+                "type": "string",
+                "description": "Billing address city, required when mail is omitted."
+              },
+              "ba_postal_code": {
+                "type": "string",
+                "description": "Billing address postal code, required when mail is omitted."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Quentn contact fields, including custom fields."
+          },
+          "duplicate_check_method": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "email",
+              "none"
+            ],
+            "description": "Method Quentn uses to search for duplicate contacts."
+          },
+          "duplicate_merge_method": {
+            "type": "string",
+            "enum": [
+              "update_add",
+              "update",
+              "add"
+            ],
+            "description": "Method Quentn uses to merge a contact when a duplicate is found."
+          },
+          "return_fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field name.",
+              "pattern": "\\S"
+            },
+            "description": "Additional contact fields Quentn should return."
+          },
+          "flood_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum contacts allowed from the same request_ip within an hour; 0 disables the check."
+          },
+          "spam_protection": {
+            "type": "boolean",
+            "description": "Whether Quentn should check request_ip for spam protection."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "Input fields for creating a Quentn contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn contact ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn contact ID."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact first name."
+              },
+              "family_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact family name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact family name."
+              },
+              "mail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "mail_status": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn contact mail status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn contact mail status."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Quentn contact payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "first_name",
+              "family_name",
+              "mail",
+              "mail_status",
+              "raw"
+            ],
+            "description": "A Quentn contact response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "Quentn create contact response."
+      }
+    },
+    {
+      "id": "quentn.create_term",
+      "service": "quentn",
+      "name": "create_term",
+      "description": "Create one Quentn term.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Term name.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Term description."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input fields for creating a Quentn term."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "ID returned by Quentn."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ID returned by Quentn."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "raw"
+        ],
+        "description": "Quentn create term response."
+      }
+    },
+    {
+      "id": "quentn.delete_contact",
+      "service": "quentn",
+      "name": "delete_contact",
+      "description": "Delete one Quentn contact by contact ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id"
+        ],
+        "description": "Input fields for selecting a Quentn contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported the operation as successful."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "Quentn success response."
+      }
+    },
+    {
+      "id": "quentn.delete_term",
+      "service": "quentn",
+      "name": "delete_term",
+      "description": "Delete one Quentn term by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "term_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn term ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "term_id"
+        ],
+        "description": "Input fields for selecting a Quentn term."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported the operation as successful."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "Quentn success response."
+      }
+    },
+    {
+      "id": "quentn.find_contacts_by_email",
+      "service": "quentn",
+      "name": "find_contacts_by_email",
+      "description": "Find Quentn contacts by email address.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Contact email address.",
+            "format": "email"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field name.",
+              "pattern": "\\S"
+            },
+            "description": "Optional contact field names to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input fields for finding Quentn contacts by email."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Quentn contact ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn contact ID."
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact first name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact first name."
+                },
+                "family_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact family name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact family name."
+                },
+                "mail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Contact email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Contact email address."
+                },
+                "mail_status": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Quentn contact mail status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn contact mail status."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Quentn contact payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "first_name",
+                "family_name",
+                "mail",
+                "mail_status",
+                "raw"
+              ],
+              "description": "A Quentn contact response."
+            },
+            "description": "Contacts returned by Quentn."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Quentn contact payload."
+            },
+            "description": "Raw Quentn contact payloads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contacts",
+          "raw"
+        ],
+        "description": "Quentn contact list response."
+      }
+    },
+    {
+      "id": "quentn.get_contact_by_id",
+      "service": "quentn",
+      "name": "get_contact_by_id",
+      "description": "Get one Quentn contact by contact ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field name.",
+              "pattern": "\\S"
+            },
+            "description": "Optional contact field names to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id"
+        ],
+        "description": "Input fields for fetching a Quentn contact with optional returned fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn contact ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn contact ID."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact first name."
+              },
+              "family_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact family name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact family name."
+              },
+              "mail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Contact email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact email address."
+              },
+              "mail_status": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn contact mail status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn contact mail status."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Quentn contact payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "first_name",
+              "family_name",
+              "mail",
+              "mail_status",
+              "raw"
+            ],
+            "description": "A Quentn contact response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "Quentn contact response."
+      }
+    },
+    {
+      "id": "quentn.get_term",
+      "service": "quentn",
+      "name": "get_term",
+      "description": "Get one Quentn term by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "term_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn term ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "term_id"
+        ],
+        "description": "Input fields for selecting a Quentn term."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn term ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn term ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Quentn term name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn term name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Quentn term description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn term description."
+              },
+              "deletion_blocked": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether Quentn blocks deletion for this term."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether Quentn blocks deletion for this term."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Quentn term payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "description",
+              "deletion_blocked",
+              "raw"
+            ],
+            "description": "A Quentn term."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "term"
+        ],
+        "description": "Quentn term response."
+      }
+    },
+    {
+      "id": "quentn.get_user",
+      "service": "quentn",
+      "name": "get_user",
+      "description": "Get one Quentn user by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn user ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user_id"
+        ],
+        "description": "Input fields for fetching a Quentn user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "uid": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "Quentn user ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Quentn user ID."
+              },
+              "mail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User email address."
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User first name."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User last name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User last name."
+              },
+              "timezone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User timezone."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User timezone."
+              },
+              "language": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "User language code."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User language code."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "UNIX timestamp when the user was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "UNIX timestamp when the user was created."
+              },
+              "changed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "UNIX timestamp when the user was changed."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "UNIX timestamp when the user was changed."
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rid": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Quentn role ID."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quentn role ID."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Quentn role name."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quentn role name."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "Raw Quentn role payload."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "rid",
+                    "name",
+                    "raw"
+                  ],
+                  "description": "A Quentn user role."
+                },
+                "description": "Roles assigned to the user."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw Quentn user payload."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "uid",
+              "mail",
+              "first_name",
+              "last_name",
+              "timezone",
+              "language",
+              "created",
+              "changed",
+              "roles",
+              "raw"
+            ],
+            "description": "A Quentn user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "Quentn user response."
+      }
+    },
+    {
+      "id": "quentn.list_contact_terms",
+      "service": "quentn",
+      "name": "list_contact_terms",
+      "description": "List all Quentn terms assigned to one contact.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id"
+        ],
+        "description": "Input fields for listing terms assigned to a contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Quentn term ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Quentn term name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Quentn term description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term description."
+                },
+                "deletion_blocked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Quentn blocks deletion for this term."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Quentn blocks deletion for this term."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Quentn term payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "deletion_blocked",
+                "raw"
+              ],
+              "description": "A Quentn term."
+            },
+            "description": "Terms assigned to the contact."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Quentn term payload."
+            },
+            "description": "Raw Quentn contact term payloads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "terms",
+          "raw"
+        ],
+        "description": "Quentn contact terms response."
+      }
+    },
+    {
+      "id": "quentn.list_terms",
+      "service": "quentn",
+      "name": "list_terms",
+      "description": "List Quentn terms.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of terms to skip."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum number of terms to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Quentn terms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Quentn term ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Quentn term name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Quentn term description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn term description."
+                },
+                "deletion_blocked": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether Quentn blocks deletion for this term."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether Quentn blocks deletion for this term."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Quentn term payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "description",
+                "deletion_blocked",
+                "raw"
+              ],
+              "description": "A Quentn term."
+            },
+            "description": "Terms returned by Quentn."
+          },
+          "raw": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Quentn term payload."
+            },
+            "description": "Raw Quentn term payloads."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "terms",
+          "raw"
+        ],
+        "description": "Quentn term list response."
+      }
+    },
+    {
+      "id": "quentn.list_users",
+      "service": "quentn",
+      "name": "list_users",
+      "description": "List Quentn users visible to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Result range index, starting from 0."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "description": "Maximum number of users to return, between 1 and 20."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The order of Quentn list results."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination options for listing Quentn users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "number_users": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Total number of users."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total number of users."
+          },
+          "range": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Returned result range."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Returned result range."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Returned result limit."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Returned result limit."
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Returned sort order."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Returned sort order."
+          },
+          "number_ranges": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Total number of result ranges."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Total number of result ranges."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "Quentn user ID."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quentn user ID."
+                },
+                "mail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User email address."
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User first name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User first name."
+                },
+                "last_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User last name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User last name."
+                },
+                "timezone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User timezone."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User timezone."
+                },
+                "language": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "User language code."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "User language code."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "UNIX timestamp when the user was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "UNIX timestamp when the user was created."
+                },
+                "changed": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "UNIX timestamp when the user was changed."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "UNIX timestamp when the user was changed."
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "rid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "Quentn role ID."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Quentn role ID."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "Quentn role name."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Quentn role name."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Raw Quentn role payload."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "rid",
+                      "name",
+                      "raw"
+                    ],
+                    "description": "A Quentn user role."
+                  },
+                  "description": "Roles assigned to the user."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Raw Quentn user payload."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "uid",
+                "mail",
+                "first_name",
+                "last_name",
+                "timezone",
+                "language",
+                "created",
+                "changed",
+                "roles",
+                "raw"
+              ],
+              "description": "A Quentn user."
+            },
+            "description": "Users returned by Quentn."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "number_users",
+          "range",
+          "limit",
+          "sort",
+          "number_ranges",
+          "users",
+          "raw"
+        ],
+        "description": "Quentn user list response."
+      }
+    },
+    {
+      "id": "quentn.remove_contact_terms",
+      "service": "quentn",
+      "name": "remove_contact_terms",
+      "description": "Remove selected Quentn terms from one contact.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          },
+          "term_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Term ID."
+            },
+            "description": "Quentn term IDs to remove from the contact.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id",
+          "term_ids"
+        ],
+        "description": "Input fields for removing contact terms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported the operation as successful."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "Quentn success response."
+      }
+    },
+    {
+      "id": "quentn.set_contact_terms",
+      "service": "quentn",
+      "name": "set_contact_terms",
+      "description": "Set the complete Quentn term ID list assigned to one contact.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          },
+          "term_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Term ID."
+            },
+            "description": "Quentn term IDs to assign to the contact.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id",
+          "term_ids"
+        ],
+        "description": "Input fields for setting contact terms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported the operation as successful."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "Quentn success response."
+      }
+    },
+    {
+      "id": "quentn.update_contact",
+      "service": "quentn",
+      "name": "update_contact",
+      "description": "Update one Quentn contact by contact ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contact_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn contact ID."
+          },
+          "updates": {
+            "type": "object",
+            "properties": {
+              "first_name": {
+                "type": "string",
+                "description": "Contact first name."
+              },
+              "family_name": {
+                "type": "string",
+                "description": "Contact family name."
+              },
+              "mail": {
+                "type": "string",
+                "description": "Contact email address.",
+                "format": "email"
+              },
+              "request_ip": {
+                "type": "string",
+                "description": "IPv4 address associated with this contact submission."
+              },
+              "ba_street": {
+                "type": "string",
+                "description": "Billing address street, required when mail is omitted."
+              },
+              "ba_city": {
+                "type": "string",
+                "description": "Billing address city, required when mail is omitted."
+              },
+              "ba_postal_code": {
+                "type": "string",
+                "description": "Billing address postal code, required when mail is omitted."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Quentn contact fields, including custom fields."
+          },
+          "return_fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field name.",
+              "pattern": "\\S"
+            },
+            "description": "Additional contact fields Quentn should return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id",
+          "updates"
+        ],
+        "description": "Input fields for updating a Quentn contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported a successful update."
+          },
+          "contact": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Quentn contact ID."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Quentn contact ID."
+                  },
+                  "first_name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Contact first name."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Contact first name."
+                  },
+                  "family_name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Contact family name."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Contact family name."
+                  },
+                  "mail": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Contact email address."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Contact email address."
+                  },
+                  "mail_status": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "description": "Quentn contact mail status."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Quentn contact mail status."
+                  },
+                  "raw": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Raw Quentn contact payload."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "first_name",
+                  "family_name",
+                  "mail",
+                  "mail_status",
+                  "raw"
+                ],
+                "description": "A Quentn contact response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A Quentn contact response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "contact",
+          "raw"
+        ],
+        "description": "Quentn update contact response."
+      }
+    },
+    {
+      "id": "quentn.update_term",
+      "service": "quentn",
+      "name": "update_term",
+      "description": "Update one Quentn term by ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "term_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quentn term ID."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Updated term name.",
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated term description."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "term_id"
+        ],
+        "description": "Input fields for updating a Quentn term."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Quentn reported the operation as successful."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw Quentn response payload."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "Quentn success response."
+      }
+    }
+  ]
+}

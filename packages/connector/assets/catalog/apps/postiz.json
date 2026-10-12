@@ -1,0 +1,334 @@
+{
+  "service": "postiz",
+  "displayName": "Postiz",
+  "description": "List connected social channels and create, schedule, or publish posts through Postiz.",
+  "categories": [
+    "Social",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "POSTIZ_API_KEY",
+      "description": "Copy the API key from Settings > Developers > Public API at https://platform.postiz.com/."
+    }
+  ],
+  "homepageUrl": "https://postiz.com",
+  "actions": [
+    {
+      "id": "postiz.create_post",
+      "service": "postiz",
+      "name": "create_post",
+      "description": "Create a draft, publish immediately, or schedule content on connected Postiz channels.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "now",
+              "schedule"
+            ],
+            "description": "Publication mode."
+          },
+          "date": {
+            "type": "string",
+            "description": "Publish date in UTC ISO format; ignored for immediate publishing.",
+            "format": "date-time"
+          },
+          "shortLink": {
+            "type": "boolean",
+            "description": "Whether Postiz should shorten links."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Tag value."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Tag label."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "label"
+              ],
+              "description": "A Postiz tag."
+            },
+            "description": "Post tags."
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "integration": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Postiz integration ID."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id"
+                  ],
+                  "description": "Destination channel."
+                },
+                "value": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "content": {
+                        "type": "string",
+                        "description": "Text content to publish."
+                      },
+                      "image": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "Uploaded media ID."
+                            },
+                            "path": {
+                              "type": "string",
+                              "description": "Hosted media URL."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "Uploaded Postiz media reference."
+                        },
+                        "description": "Previously uploaded media references."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "content"
+                    ],
+                    "description": "One content item for a social post."
+                  },
+                  "description": "Content items for this channel.",
+                  "minItems": 1
+                },
+                "settings": {
+                  "type": "object",
+                  "properties": {
+                    "__type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Postiz platform identifier matching the destination channel."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Platform-specific settings, including the required __type platform identifier."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Group ID for related posts."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "integration",
+                "value"
+              ],
+              "description": "Content and settings for one connected channel."
+            },
+            "description": "Destination channel posts.",
+            "minItems": 1
+          },
+          "order": {
+            "type": "string",
+            "description": "Post ordering strategy accepted by Postiz."
+          },
+          "inter": {
+            "type": "number",
+            "description": "Interval between posts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "date",
+          "shortLink",
+          "tags"
+        ],
+        "description": "Postiz create-post payload."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string",
+              "description": "Created Postiz post ID."
+            },
+            "integration": {
+              "type": "string",
+              "description": "Destination integration ID."
+            }
+          },
+          "additionalProperties": true,
+          "description": "Created post reference."
+        },
+        "description": "Created posts returned by Postiz."
+      }
+    },
+    {
+      "id": "postiz.list_integrations",
+      "service": "postiz",
+      "name": "list_integrations",
+      "description": "List connected Postiz social channels, optionally filtered by customer group.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer group ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filter for connected channels."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Postiz integration ID."
+            },
+            "name": {
+              "type": "string",
+              "description": "Channel display name."
+            },
+            "identifier": {
+              "type": "string",
+              "description": "Social platform identifier."
+            }
+          },
+          "additionalProperties": true,
+          "description": "A connected Postiz social channel."
+        },
+        "description": "Connected Postiz social channels."
+      }
+    },
+    {
+      "id": "postiz.list_posts",
+      "service": "postiz",
+      "name": "list_posts",
+      "description": "List Postiz posts in a UTC date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "startDate": {
+            "type": "string",
+            "description": "Inclusive start time in UTC ISO format.",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "End time in UTC ISO format.",
+            "format": "date-time"
+          },
+          "customer": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional customer ID filter."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "description": "Date range for finding posts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Postiz post record."
+            },
+            "description": "Posts in the selected date range."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Postiz posts response."
+      }
+    },
+    {
+      "id": "postiz.upload_from_url",
+      "service": "postiz",
+      "name": "upload_from_url",
+      "description": "Ask Postiz to import a publicly reachable media file from a URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Public HTTPS media URL reachable by Postiz without authentication.",
+            "format": "uri",
+            "pattern": "^https://"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "Media URL to import."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Uploaded media ID."
+          },
+          "path": {
+            "type": "string",
+            "description": "Hosted media URL to include in a post."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Uploaded media record returned by Postiz."
+      }
+    }
+  ]
+}

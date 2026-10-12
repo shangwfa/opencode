@@ -1,0 +1,751 @@
+{
+  "service": "google_address_validation",
+  "displayName": "Google Address Validation",
+  "categories": [
+    "Location",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GOOGLE_MAPS_API_KEY",
+      "description": "Google Maps Platform API key used with the Address Validation API. Create or manage it in the Google Cloud Console: https://developers.google.com/maps/documentation/address-validation/use-address-validation-api",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://developers.google.com/maps/documentation/address-validation",
+  "actions": [
+    {
+      "id": "google_address_validation.provide_validation_feedback",
+      "service": "google_address_validation",
+      "name": "provide_validation_feedback",
+      "description": "Send the final outcome of a completed Google address validation sequence using the first responseId from that sequence.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "responseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first responseId from the validation sequence."
+          },
+          "conclusion": {
+            "type": "string",
+            "enum": [
+              "VALIDATED_VERSION_USED",
+              "USER_VERSION_USED",
+              "UNVALIDATED_VERSION_USED",
+              "UNUSED"
+            ],
+            "description": "Outcome of the completed address validation sequence."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for sending address validation feedback."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Empty response returned after Google accepts the feedback."
+      }
+    },
+    {
+      "id": "google_address_validation.validate_address",
+      "service": "google_address_validation",
+      "name": "validate_address",
+      "description": "Validate and standardize a postal address with Google Address Validation and return verdict, parsed address, and geocode details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "object",
+            "properties": {
+              "regionCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CLDR region code of the country or region, such as US."
+              },
+              "addressLines": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One unstructured address line in envelope order."
+                },
+                "description": "Unstructured address lines describing the lower levels of the address.",
+                "minItems": 1
+              },
+              "administrativeArea": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Highest administrative subdivision, such as a state or province."
+              },
+              "locality": {
+                "type": "string",
+                "minLength": 1,
+                "description": "City or town portion of the address."
+              },
+              "postalCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Postal or ZIP code."
+              },
+              "sublocality": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Neighborhood, borough, or district."
+              },
+              "sortingCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Country-specific sorting code when applicable."
+              },
+              "languageCode": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional BCP-47 language code of the address contents."
+              },
+              "organization": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional organization name included in the input address."
+              },
+              "recipients": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "One recipient line value."
+                },
+                "description": "Optional recipient lines included in the input address.",
+                "minItems": 1
+              },
+              "revision": {
+                "const": 0,
+                "type": "number",
+                "description": "PostalAddress schema revision. Only 0 is valid."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "regionCode",
+              "addressLines"
+            ],
+            "description": "Structured postal address input accepted by Google Address Validation."
+          },
+          "previousResponseId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The first responseId from the validation sequence for follow-up requests."
+          },
+          "sessionToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36,
+            "description": "Optional Places Autocomplete session token for billing and workflow linking."
+          },
+          "enableUspsCass": {
+            "type": "boolean",
+            "description": "Whether to enable USPS CASS mode for US and PR addresses."
+          },
+          "languageOptions": {
+            "type": "object",
+            "properties": {
+              "returnEnglishLatinAddress": {
+                "type": "boolean",
+                "description": "Whether to request the preview englishLatinAddress output field."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Optional Google Address Validation language options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "address"
+        ],
+        "description": "The input payload for validating a postal address."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responseId": {
+            "type": "string",
+            "description": "Response ID that identifies the validation sequence for future follow-up requests."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "object",
+                "properties": {
+                  "inputGranularity": {
+                    "type": "string",
+                    "enum": [
+                      "GRANULARITY_UNSPECIFIED",
+                      "SUB_PREMISE",
+                      "PREMISE",
+                      "PREMISE_PROXIMITY",
+                      "BLOCK",
+                      "ROUTE",
+                      "OTHER"
+                    ],
+                    "description": "Google Address Validation granularity enum value."
+                  },
+                  "validationGranularity": {
+                    "type": "string",
+                    "enum": [
+                      "GRANULARITY_UNSPECIFIED",
+                      "SUB_PREMISE",
+                      "PREMISE",
+                      "PREMISE_PROXIMITY",
+                      "BLOCK",
+                      "ROUTE",
+                      "OTHER"
+                    ],
+                    "description": "Google Address Validation granularity enum value."
+                  },
+                  "geocodeGranularity": {
+                    "type": "string",
+                    "enum": [
+                      "GRANULARITY_UNSPECIFIED",
+                      "SUB_PREMISE",
+                      "PREMISE",
+                      "PREMISE_PROXIMITY",
+                      "BLOCK",
+                      "ROUTE",
+                      "OTHER"
+                    ],
+                    "description": "Google Address Validation granularity enum value."
+                  },
+                  "addressComplete": {
+                    "type": "boolean",
+                    "description": "Whether the post-processed address is considered complete."
+                  },
+                  "hasInferredComponents": {
+                    "type": "boolean",
+                    "description": "Whether Google inferred one or more address components."
+                  },
+                  "hasReplacedComponents": {
+                    "type": "boolean",
+                    "description": "Whether Google replaced one or more address components."
+                  },
+                  "hasSpellCorrectedComponents": {
+                    "type": "boolean",
+                    "description": "Whether Google spell-corrected one or more address components."
+                  },
+                  "hasUnconfirmedComponents": {
+                    "type": "boolean",
+                    "description": "Whether Google could not fully confirm one or more components."
+                  },
+                  "possibleNextAction": {
+                    "type": "string",
+                    "enum": [
+                      "POSSIBLE_NEXT_ACTION_UNSPECIFIED",
+                      "FIX",
+                      "CONFIRM_ADD_SUBPREMISES",
+                      "CONFIRM",
+                      "ACCEPT"
+                    ],
+                    "description": "Google Address Validation possible next action enum value."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "High-level validation verdict returned by Google."
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "formattedAddress": {
+                    "type": "string",
+                    "description": "The post-processed address formatted as a single-line address."
+                  },
+                  "postalAddress": {
+                    "type": "object",
+                    "properties": {
+                      "regionCode": {
+                        "type": "string",
+                        "description": "CLDR region code of the country or region."
+                      },
+                      "addressLines": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "One unstructured address line in envelope order."
+                        },
+                        "description": "Unstructured address lines in envelope order."
+                      },
+                      "administrativeArea": {
+                        "type": "string",
+                        "description": "Highest administrative subdivision, such as a state or province."
+                      },
+                      "locality": {
+                        "type": "string",
+                        "description": "City or town portion of the address."
+                      },
+                      "postalCode": {
+                        "type": "string",
+                        "description": "Postal or ZIP code."
+                      },
+                      "sublocality": {
+                        "type": "string",
+                        "description": "Neighborhood, borough, or district."
+                      },
+                      "sortingCode": {
+                        "type": "string",
+                        "description": "Country-specific sorting code when applicable."
+                      },
+                      "languageCode": {
+                        "type": "string",
+                        "description": "BCP-47 language code of the address contents."
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "description": "PostalAddress schema revision."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Google postal address payload."
+                  },
+                  "addressComponents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "componentName": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "description": "The display text for the address component."
+                            },
+                            "languageCode": {
+                              "type": "string",
+                              "description": "BCP-47 language code for the component text when Google returns one."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The name payload for one validated address component."
+                        },
+                        "componentType": {
+                          "type": "string",
+                          "description": "The address component type returned by Google."
+                        },
+                        "confirmationLevel": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRMATION_LEVEL_UNSPECIFIED",
+                            "CONFIRMED",
+                            "UNCONFIRMED_BUT_PLAUSIBLE",
+                            "UNCONFIRMED_AND_SUSPICIOUS"
+                          ],
+                          "description": "Google Address Validation confirmation level enum value."
+                        },
+                        "inferred": {
+                          "type": "boolean",
+                          "description": "Whether Google inferred the component instead of receiving it in the input."
+                        },
+                        "replaced": {
+                          "type": "boolean",
+                          "description": "Whether Google replaced the input component with a different value."
+                        },
+                        "spellCorrected": {
+                          "type": "boolean",
+                          "description": "Whether Google spell-corrected the component."
+                        },
+                        "unexpected": {
+                          "type": "boolean",
+                          "description": "Whether the component is unexpected in a postal address for the region."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One validated address component with confirmation signals."
+                    },
+                    "description": "Validated address components returned by Google."
+                  },
+                  "missingComponentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One missing component type."
+                    },
+                    "description": "Address component types that were expected but missing."
+                  },
+                  "unresolvedTokens": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One unresolved input token."
+                    },
+                    "description": "Input tokens that Google could not resolve."
+                  },
+                  "unconfirmedComponentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One unconfirmed component type."
+                    },
+                    "description": "Component types that Google could not fully confirm."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Google validated address payload."
+              },
+              "englishLatinAddress": {
+                "type": "object",
+                "properties": {
+                  "formattedAddress": {
+                    "type": "string",
+                    "description": "The post-processed address formatted as a single-line address."
+                  },
+                  "postalAddress": {
+                    "type": "object",
+                    "properties": {
+                      "regionCode": {
+                        "type": "string",
+                        "description": "CLDR region code of the country or region."
+                      },
+                      "addressLines": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "One unstructured address line in envelope order."
+                        },
+                        "description": "Unstructured address lines in envelope order."
+                      },
+                      "administrativeArea": {
+                        "type": "string",
+                        "description": "Highest administrative subdivision, such as a state or province."
+                      },
+                      "locality": {
+                        "type": "string",
+                        "description": "City or town portion of the address."
+                      },
+                      "postalCode": {
+                        "type": "string",
+                        "description": "Postal or ZIP code."
+                      },
+                      "sublocality": {
+                        "type": "string",
+                        "description": "Neighborhood, borough, or district."
+                      },
+                      "sortingCode": {
+                        "type": "string",
+                        "description": "Country-specific sorting code when applicable."
+                      },
+                      "languageCode": {
+                        "type": "string",
+                        "description": "BCP-47 language code of the address contents."
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "description": "PostalAddress schema revision."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Google postal address payload."
+                  },
+                  "addressComponents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "componentName": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "description": "The display text for the address component."
+                            },
+                            "languageCode": {
+                              "type": "string",
+                              "description": "BCP-47 language code for the component text when Google returns one."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "The name payload for one validated address component."
+                        },
+                        "componentType": {
+                          "type": "string",
+                          "description": "The address component type returned by Google."
+                        },
+                        "confirmationLevel": {
+                          "type": "string",
+                          "enum": [
+                            "CONFIRMATION_LEVEL_UNSPECIFIED",
+                            "CONFIRMED",
+                            "UNCONFIRMED_BUT_PLAUSIBLE",
+                            "UNCONFIRMED_AND_SUSPICIOUS"
+                          ],
+                          "description": "Google Address Validation confirmation level enum value."
+                        },
+                        "inferred": {
+                          "type": "boolean",
+                          "description": "Whether Google inferred the component instead of receiving it in the input."
+                        },
+                        "replaced": {
+                          "type": "boolean",
+                          "description": "Whether Google replaced the input component with a different value."
+                        },
+                        "spellCorrected": {
+                          "type": "boolean",
+                          "description": "Whether Google spell-corrected the component."
+                        },
+                        "unexpected": {
+                          "type": "boolean",
+                          "description": "Whether the component is unexpected in a postal address for the region."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One validated address component with confirmation signals."
+                    },
+                    "description": "Validated address components returned by Google."
+                  },
+                  "missingComponentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One missing component type."
+                    },
+                    "description": "Address component types that were expected but missing."
+                  },
+                  "unresolvedTokens": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One unresolved input token."
+                    },
+                    "description": "Input tokens that Google could not resolve."
+                  },
+                  "unconfirmedComponentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One unconfirmed component type."
+                    },
+                    "description": "Component types that Google could not fully confirm."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Google validated address payload."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "boolean",
+                    "description": "Whether the address is known to be a business."
+                  },
+                  "residential": {
+                    "type": "boolean",
+                    "description": "Whether the address is known to be a residence."
+                  },
+                  "poBox": {
+                    "type": "boolean",
+                    "description": "Whether the address is a PO box."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Deliverability metadata returned by Google."
+              },
+              "geocode": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "latitude": {
+                        "type": "number",
+                        "description": "Latitude in degrees."
+                      },
+                      "longitude": {
+                        "type": "number",
+                        "description": "Longitude in degrees."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A latitude and longitude pair."
+                  },
+                  "bounds": {
+                    "type": "object",
+                    "properties": {
+                      "low": {
+                        "type": "object",
+                        "properties": {
+                          "latitude": {
+                            "type": "number",
+                            "description": "Latitude in degrees."
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "description": "Longitude in degrees."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A latitude and longitude pair."
+                      },
+                      "high": {
+                        "type": "object",
+                        "properties": {
+                          "latitude": {
+                            "type": "number",
+                            "description": "Latitude in degrees."
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "description": "Longitude in degrees."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "A latitude and longitude pair."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Bounding viewport around the geocoded place."
+                  },
+                  "placeId": {
+                    "type": "string",
+                    "description": "Place ID of the geocoded place."
+                  },
+                  "featureSizeMeters": {
+                    "type": "number",
+                    "description": "Approximate size of the feature in meters."
+                  },
+                  "placeTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One Google place type."
+                    },
+                    "description": "Place types associated with the geocoded place."
+                  },
+                  "plusCode": {
+                    "type": "object",
+                    "properties": {
+                      "globalCode": {
+                        "type": "string",
+                        "description": "Global plus code for the place."
+                      },
+                      "compoundCode": {
+                        "type": "string",
+                        "description": "Compound plus code for the place."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "Plus code information returned by Google."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Geocoding information returned by Google."
+              },
+              "uspsData": {
+                "type": "object",
+                "properties": {
+                  "cassProcessed": {
+                    "type": "boolean",
+                    "description": "Whether Google processed the request with USPS CASS."
+                  },
+                  "standardizedAddress": {
+                    "type": "object",
+                    "properties": {
+                      "city": {
+                        "type": "string",
+                        "description": "USPS city name."
+                      },
+                      "state": {
+                        "type": "string",
+                        "description": "USPS state abbreviation."
+                      },
+                      "firstAddressLine": {
+                        "type": "string",
+                        "description": "USPS first address line."
+                      },
+                      "secondAddressLine": {
+                        "type": "string",
+                        "description": "USPS second address line."
+                      },
+                      "urbanization": {
+                        "type": "string",
+                        "description": "USPS urbanization for Puerto Rico when present."
+                      },
+                      "zipCode": {
+                        "type": "string",
+                        "description": "USPS ZIP code."
+                      },
+                      "zipCodeExtension": {
+                        "type": "string",
+                        "description": "USPS ZIP+4 extension."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "USPS standardized address payload."
+                  },
+                  "deliveryPointCode": {
+                    "type": "string",
+                    "description": "USPS delivery point code."
+                  },
+                  "deliveryPointCheckDigit": {
+                    "type": "string",
+                    "description": "USPS delivery point check digit."
+                  },
+                  "carrierRoute": {
+                    "type": "string",
+                    "description": "USPS carrier route code."
+                  },
+                  "dpvConfirmation": {
+                    "type": "string",
+                    "description": "Delivery Point Validation confirmation result."
+                  },
+                  "dpvFootnote": {
+                    "type": "string",
+                    "description": "Delivery Point Validation footnotes."
+                  },
+                  "dpvCmra": {
+                    "type": "string",
+                    "description": "Whether the address is a CMRA according to USPS."
+                  },
+                  "dpvVacant": {
+                    "type": "string",
+                    "description": "Whether USPS reports the address as vacant."
+                  },
+                  "errorMessage": {
+                    "type": "string",
+                    "description": "USPS processing error message when Google exposes one."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "USPS-specific deliverability data returned by Google."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Result payload returned by Google Address Validation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response payload returned by validate_address."
+      },
+      "followUpActions": [
+        "google_address_validation.provide_validation_feedback"
+      ]
+    }
+  ]
+}

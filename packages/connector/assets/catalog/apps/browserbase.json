@@ -1,0 +1,1084 @@
+{
+  "service": "browserbase",
+  "displayName": "Browserbase",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "bb_live_xxx",
+      "description": "Browserbase API key used with the X-BB-API-Key header. Find it in Browserbase Dashboard Settings: https://docs.browserbase.com/introduction/getting-started.",
+      "extraFields": [
+        {
+          "key": "projectId",
+          "label": "Project ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "proj_xxx",
+          "description": "Browserbase project ID used as the default project scope for this connection. Copy it from Browserbase Dashboard Settings."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.browserbase.com",
+  "actions": [
+    {
+      "id": "browserbase.create_context",
+      "service": "browserbase",
+      "name": "create_context",
+      "description": "Create a Browserbase context and return the upload credentials for an encrypted user-data directory.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase project identifier. When omitted, the connected project is used."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Browserbase context."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier."
+          },
+          "uploadUrl": {
+            "type": "string",
+            "description": "The upload URL for the encrypted user-data directory archive.",
+            "format": "uri"
+          },
+          "publicKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public key used to encrypt the context archive."
+          },
+          "cipherAlgorithm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cipher algorithm required by Browserbase."
+          },
+          "initializationVectorSize": {
+            "type": "integer",
+            "description": "The initialization vector size required by Browserbase."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Browserbase context upload credentials."
+      }
+    },
+    {
+      "id": "browserbase.create_session",
+      "service": "browserbase",
+      "name": "create_session",
+      "description": "Create a Browserbase session using the connected project by default, with optional context reuse and persistence.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase project identifier. When omitted, the connected project is used."
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 21600,
+            "description": "The session timeout in seconds."
+          },
+          "keepAlive": {
+            "type": "boolean",
+            "description": "Whether the Browserbase session stays alive after disconnections."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "us-west-2",
+              "us-east-1",
+              "eu-central-1",
+              "ap-southeast-1"
+            ],
+            "description": "The Browserbase region where the session runs."
+          },
+          "userMetadata": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A JSON-compatible metadata value."
+            },
+            "description": "Arbitrary user metadata attached to the Browserbase session."
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier to attach to the session."
+          },
+          "persist": {
+            "type": "boolean",
+            "description": "Whether Browserbase should persist updates back into the attached context."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for creating a Browserbase session.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "persist": {
+                  "const": true
+                }
+              },
+              "required": [
+                "persist"
+              ]
+            },
+            "then": {
+              "required": [
+                "contextId"
+              ]
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase session identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the Browserbase session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the Browserbase session was last updated.",
+                "format": "date-time"
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase project identifier linked to the session."
+              },
+              "startedAt": {
+                "type": "string",
+                "description": "When the Browserbase session started.",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "When the Browserbase session expires.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "RUNNING",
+                  "ERROR",
+                  "TIMED_OUT",
+                  "COMPLETED"
+                ],
+                "description": "The current Browserbase session status."
+              },
+              "proxyBytes": {
+                "type": "integer",
+                "description": "The proxy bytes consumed by the Browserbase session."
+              },
+              "keepAlive": {
+                "type": "boolean",
+                "description": "Whether the Browserbase session stays alive after disconnections."
+              },
+              "region": {
+                "type": "string",
+                "enum": [
+                  "us-west-2",
+                  "us-east-1",
+                  "eu-central-1",
+                  "ap-southeast-1"
+                ],
+                "description": "The Browserbase region where the session runs."
+              },
+              "endedAt": {
+                "type": "string",
+                "description": "When the Browserbase session ended.",
+                "format": "date-time"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The linked Browserbase context identifier."
+              },
+              "connectUrl": {
+                "type": "string",
+                "description": "The WebSocket URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "seleniumRemoteUrl": {
+                "type": "string",
+                "description": "The Selenium Remote URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "signingKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The signing key required for Browserbase HTTP connections."
+              },
+              "userMetadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A JSON-compatible metadata value."
+                },
+                "description": "Arbitrary user metadata attached to the Browserbase session."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "createdAt",
+              "updatedAt",
+              "projectId",
+              "startedAt",
+              "expiresAt",
+              "status",
+              "proxyBytes",
+              "keepAlive",
+              "region"
+            ],
+            "description": "A Browserbase session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session"
+        ],
+        "description": "The Browserbase session creation payload."
+      },
+      "followUpActions": [
+        "browserbase.get_session",
+        "browserbase.request_session_release"
+      ]
+    },
+    {
+      "id": "browserbase.delete_context",
+      "service": "browserbase",
+      "name": "delete_context",
+      "description": "Delete one Browserbase context by context identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for a Browserbase context identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Browserbase confirmed the context deletion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The Browserbase context deletion result."
+      }
+    },
+    {
+      "id": "browserbase.get_context",
+      "service": "browserbase",
+      "name": "get_context",
+      "description": "Get one Browserbase context by context identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for a Browserbase context identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase context identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the Browserbase context was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the Browserbase context was last updated.",
+                "format": "date-time"
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase project identifier linked to the context."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A Browserbase context."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "context"
+        ],
+        "description": "The Browserbase context payload."
+      }
+    },
+    {
+      "id": "browserbase.get_project",
+      "service": "browserbase",
+      "name": "get_project",
+      "description": "Get one Browserbase project by project identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase project identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for reading one Browserbase project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase project identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the Browserbase project was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the Browserbase project was last updated.",
+                "format": "date-time"
+              },
+              "name": {
+                "type": "string",
+                "description": "The Browserbase project name."
+              },
+              "ownerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The owner identifier of the Browserbase project."
+              },
+              "defaultTimeout": {
+                "type": "integer",
+                "description": "The default session timeout in seconds for the Browserbase project."
+              },
+              "concurrency": {
+                "type": "integer",
+                "description": "The concurrent session limit configured for the Browserbase project."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "createdAt",
+              "updatedAt",
+              "name",
+              "ownerId",
+              "defaultTimeout"
+            ],
+            "description": "A Browserbase project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "The Browserbase project payload."
+      }
+    },
+    {
+      "id": "browserbase.get_project_usage",
+      "service": "browserbase",
+      "name": "get_project_usage",
+      "description": "Get Browserbase browser minute and proxy byte usage for one project, defaulting to the connected project.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase project identifier. When omitted, the connected project is used."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for project-scoped Browserbase actions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "browserMinutes": {
+            "type": "integer",
+            "description": "The browser minutes consumed by the Browserbase project."
+          },
+          "proxyBytes": {
+            "type": "integer",
+            "description": "The proxy bytes consumed by the Browserbase project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "browserMinutes",
+          "proxyBytes"
+        ],
+        "description": "Browserbase project usage statistics."
+      }
+    },
+    {
+      "id": "browserbase.get_session",
+      "service": "browserbase",
+      "name": "get_session",
+      "description": "Get one Browserbase session by session identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase session identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for reading one Browserbase session."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase session identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the Browserbase session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the Browserbase session was last updated.",
+                "format": "date-time"
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase project identifier linked to the session."
+              },
+              "startedAt": {
+                "type": "string",
+                "description": "When the Browserbase session started.",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "When the Browserbase session expires.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "RUNNING",
+                  "ERROR",
+                  "TIMED_OUT",
+                  "COMPLETED"
+                ],
+                "description": "The current Browserbase session status."
+              },
+              "proxyBytes": {
+                "type": "integer",
+                "description": "The proxy bytes consumed by the Browserbase session."
+              },
+              "keepAlive": {
+                "type": "boolean",
+                "description": "Whether the Browserbase session stays alive after disconnections."
+              },
+              "region": {
+                "type": "string",
+                "enum": [
+                  "us-west-2",
+                  "us-east-1",
+                  "eu-central-1",
+                  "ap-southeast-1"
+                ],
+                "description": "The Browserbase region where the session runs."
+              },
+              "endedAt": {
+                "type": "string",
+                "description": "When the Browserbase session ended.",
+                "format": "date-time"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The linked Browserbase context identifier."
+              },
+              "connectUrl": {
+                "type": "string",
+                "description": "The WebSocket URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "seleniumRemoteUrl": {
+                "type": "string",
+                "description": "The Selenium Remote URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "signingKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The signing key required for Browserbase HTTP connections."
+              },
+              "userMetadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A JSON-compatible metadata value."
+                },
+                "description": "Arbitrary user metadata attached to the Browserbase session."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "createdAt",
+              "updatedAt",
+              "projectId",
+              "startedAt",
+              "expiresAt",
+              "status",
+              "proxyBytes",
+              "keepAlive",
+              "region"
+            ],
+            "description": "A Browserbase session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session"
+        ],
+        "description": "The Browserbase session payload."
+      }
+    },
+    {
+      "id": "browserbase.list_projects",
+      "service": "browserbase",
+      "name": "list_projects",
+      "description": "List the Browserbase projects visible to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require any input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Browserbase project identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the Browserbase project was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "When the Browserbase project was last updated.",
+                  "format": "date-time"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The Browserbase project name."
+                },
+                "ownerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The owner identifier of the Browserbase project."
+                },
+                "defaultTimeout": {
+                  "type": "integer",
+                  "description": "The default session timeout in seconds for the Browserbase project."
+                },
+                "concurrency": {
+                  "type": "integer",
+                  "description": "The concurrent session limit configured for the Browserbase project."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "createdAt",
+                "updatedAt",
+                "name",
+                "ownerId",
+                "defaultTimeout"
+              ],
+              "description": "A Browserbase project."
+            },
+            "description": "The Browserbase projects returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projects"
+        ],
+        "description": "The Browserbase projects returned by the API."
+      }
+    },
+    {
+      "id": "browserbase.list_sessions",
+      "service": "browserbase",
+      "name": "list_sessions",
+      "description": "List Browserbase sessions with optional status or metadata query filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "ERROR",
+              "TIMED_OUT",
+              "COMPLETED"
+            ],
+            "description": "The current Browserbase session status."
+          },
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase metadata query string used to filter sessions."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Browserbase sessions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Browserbase session identifier."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the Browserbase session was created.",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "When the Browserbase session was last updated.",
+                  "format": "date-time"
+                },
+                "projectId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Browserbase project identifier linked to the session."
+                },
+                "startedAt": {
+                  "type": "string",
+                  "description": "When the Browserbase session started.",
+                  "format": "date-time"
+                },
+                "expiresAt": {
+                  "type": "string",
+                  "description": "When the Browserbase session expires.",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "PENDING",
+                    "RUNNING",
+                    "ERROR",
+                    "TIMED_OUT",
+                    "COMPLETED"
+                  ],
+                  "description": "The current Browserbase session status."
+                },
+                "proxyBytes": {
+                  "type": "integer",
+                  "description": "The proxy bytes consumed by the Browserbase session."
+                },
+                "keepAlive": {
+                  "type": "boolean",
+                  "description": "Whether the Browserbase session stays alive after disconnections."
+                },
+                "region": {
+                  "type": "string",
+                  "enum": [
+                    "us-west-2",
+                    "us-east-1",
+                    "eu-central-1",
+                    "ap-southeast-1"
+                  ],
+                  "description": "The Browserbase region where the session runs."
+                },
+                "endedAt": {
+                  "type": "string",
+                  "description": "When the Browserbase session ended.",
+                  "format": "date-time"
+                },
+                "contextId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The linked Browserbase context identifier."
+                },
+                "connectUrl": {
+                  "type": "string",
+                  "description": "The WebSocket URL used to connect to the Browserbase session.",
+                  "format": "uri"
+                },
+                "seleniumRemoteUrl": {
+                  "type": "string",
+                  "description": "The Selenium Remote URL used to connect to the Browserbase session.",
+                  "format": "uri"
+                },
+                "signingKey": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signing key required for Browserbase HTTP connections."
+                },
+                "userMetadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A JSON-compatible metadata value."
+                  },
+                  "description": "Arbitrary user metadata attached to the Browserbase session."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "createdAt",
+                "updatedAt",
+                "projectId",
+                "startedAt",
+                "expiresAt",
+                "status",
+                "proxyBytes",
+                "keepAlive",
+                "region"
+              ],
+              "description": "A Browserbase session."
+            },
+            "description": "The Browserbase sessions returned."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessions"
+        ],
+        "description": "The Browserbase sessions returned by the API."
+      }
+    },
+    {
+      "id": "browserbase.refresh_context_upload_credentials",
+      "service": "browserbase",
+      "name": "refresh_context_upload_credentials",
+      "description": "Refresh the Browserbase upload credentials for an existing context so a new encrypted archive can be uploaded.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for a Browserbase context identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase context identifier."
+          },
+          "uploadUrl": {
+            "type": "string",
+            "description": "The upload URL for the encrypted user-data directory archive.",
+            "format": "uri"
+          },
+          "publicKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The public key used to encrypt the context archive."
+          },
+          "cipherAlgorithm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cipher algorithm required by Browserbase."
+          },
+          "initializationVectorSize": {
+            "type": "integer",
+            "description": "The initialization vector size required by Browserbase."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The Browserbase context upload credentials."
+      }
+    },
+    {
+      "id": "browserbase.request_session_release",
+      "service": "browserbase",
+      "name": "request_session_release",
+      "description": "Request that Browserbase releases a session before timeout by sending status REQUEST_RELEASE.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase session identifier."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Browserbase project identifier. When omitted, the connected project is used."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "The input payload for requesting Browserbase session release."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase session identifier."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the Browserbase session was created.",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "When the Browserbase session was last updated.",
+                "format": "date-time"
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Browserbase project identifier linked to the session."
+              },
+              "startedAt": {
+                "type": "string",
+                "description": "When the Browserbase session started.",
+                "format": "date-time"
+              },
+              "expiresAt": {
+                "type": "string",
+                "description": "When the Browserbase session expires.",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "RUNNING",
+                  "ERROR",
+                  "TIMED_OUT",
+                  "COMPLETED"
+                ],
+                "description": "The current Browserbase session status."
+              },
+              "proxyBytes": {
+                "type": "integer",
+                "description": "The proxy bytes consumed by the Browserbase session."
+              },
+              "keepAlive": {
+                "type": "boolean",
+                "description": "Whether the Browserbase session stays alive after disconnections."
+              },
+              "region": {
+                "type": "string",
+                "enum": [
+                  "us-west-2",
+                  "us-east-1",
+                  "eu-central-1",
+                  "ap-southeast-1"
+                ],
+                "description": "The Browserbase region where the session runs."
+              },
+              "endedAt": {
+                "type": "string",
+                "description": "When the Browserbase session ended.",
+                "format": "date-time"
+              },
+              "contextId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The linked Browserbase context identifier."
+              },
+              "connectUrl": {
+                "type": "string",
+                "description": "The WebSocket URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "seleniumRemoteUrl": {
+                "type": "string",
+                "description": "The Selenium Remote URL used to connect to the Browserbase session.",
+                "format": "uri"
+              },
+              "signingKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The signing key required for Browserbase HTTP connections."
+              },
+              "userMetadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A JSON-compatible metadata value."
+                },
+                "description": "Arbitrary user metadata attached to the Browserbase session."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "createdAt",
+              "updatedAt",
+              "projectId",
+              "startedAt",
+              "expiresAt",
+              "status",
+              "proxyBytes",
+              "keepAlive",
+              "region"
+            ],
+            "description": "A Browserbase session."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session"
+        ],
+        "description": "The Browserbase session release payload."
+      }
+    }
+  ]
+}

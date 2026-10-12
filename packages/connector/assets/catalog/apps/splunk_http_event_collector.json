@@ -1,0 +1,205 @@
+{
+  "service": "splunk_http_event_collector",
+  "displayName": "Splunk HTTP Event Collector",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "HEC Token",
+      "placeholder": "SPLUNK_HEC_TOKEN",
+      "description": "Splunk HTTP Event Collector token sent with the Authorization header. Configure it in Splunk Web under Settings > Data Inputs > HTTP Event Collector.",
+      "extraFields": [
+        {
+          "key": "baseUrl",
+          "label": "HEC Base URL",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "placeholder": "https://http-inputs-example.splunkcloud.com:8088",
+          "description": "The HTTPS origin of your Splunk HTTP Event Collector, including its configured port."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.splunk.com",
+  "actions": [
+    {
+      "id": "splunk_http_event_collector.send_event",
+      "service": "splunk_http_event_collector",
+      "name": "send_event",
+      "description": "Send one structured event to the connected Splunk HTTP Event Collector.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "description": "The event payload as any JSON value accepted by Splunk HEC."
+          },
+          "time": {
+            "type": "number",
+            "description": "The optional event timestamp in Unix epoch format."
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional host value assigned to the event."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional source value assigned to the event."
+          },
+          "sourcetype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional source type assigned to the event."
+          },
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional destination Splunk index."
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string indexed field value."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "A string array indexed field value."
+                }
+              ],
+              "description": "A string or string array indexed field value."
+            },
+            "description": "Optional flat indexed fields attached to the event."
+          },
+          "channel": {
+            "type": "string",
+            "description": "An optional request channel UUID, required when the HEC token has indexer acknowledgement enabled.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event"
+        ],
+        "description": "Input parameters for sending one structured Splunk HEC event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The Splunk HEC response message."
+          },
+          "code": {
+            "type": "integer",
+            "description": "The Splunk HEC response code."
+          },
+          "ackID": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The indexer acknowledgement identifier returned when acknowledgement is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "code"
+        ],
+        "description": "The response returned by Splunk HTTP Event Collector."
+      }
+    },
+    {
+      "id": "splunk_http_event_collector.send_raw_event",
+      "service": "splunk_http_event_collector",
+      "name": "send_raw_event",
+      "description": "Send one raw text event to the connected Splunk HTTP Event Collector.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "description": "The raw text event payload."
+          },
+          "time": {
+            "type": "number",
+            "description": "The optional event timestamp in Unix epoch format."
+          },
+          "host": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional host value assigned to the event."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional source value assigned to the event."
+          },
+          "sourcetype": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional source type assigned to the event."
+          },
+          "index": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional destination Splunk index."
+          },
+          "channel": {
+            "type": "string",
+            "description": "An optional request channel UUID. The connector generates a UUID v7 when omitted.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "event"
+        ],
+        "description": "Input parameters for sending one raw Splunk HEC event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The Splunk HEC response message."
+          },
+          "code": {
+            "type": "integer",
+            "description": "The Splunk HEC response code."
+          },
+          "ackID": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The indexer acknowledgement identifier returned when acknowledgement is enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "code"
+        ],
+        "description": "The response returned by Splunk HTTP Event Collector."
+      }
+    }
+  ]
+}

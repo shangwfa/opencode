@@ -1,0 +1,2160 @@
+{
+  "service": "eversign",
+  "displayName": "Xodo Sign",
+  "categories": [
+    "Productivity",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Access Key",
+      "placeholder": "XODO_SIGN_ACCESS_KEY",
+      "description": "Xodo Sign API access key sent as the access_key query parameter. In your Xodo Sign account, open the top-left menu and select Developer to view or reset it: https://support.apryse.com/support/solutions/articles/35000297407-api-frequently-asked-questions"
+    }
+  ],
+  "homepageUrl": "https://eversign.com/",
+  "actions": [
+    {
+      "id": "eversign.create_document",
+      "service": "eversign",
+      "name": "create_document",
+      "description": "Create an Xodo Sign document from public file URLs or existing Xodo Sign file IDs.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The file name shown in Xodo Sign."
+                    },
+                    "fileUrl": {
+                      "type": "string",
+                      "description": "A publicly accessible file URL that Xodo Sign should fetch.",
+                      "format": "uri"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "fileUrl"
+                  ],
+                  "description": "A file Xodo Sign should fetch from a public URL."
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The file name shown in Xodo Sign."
+                    },
+                    "fileId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "An existing Xodo Sign file ID."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "fileId"
+                  ],
+                  "description": "A file already uploaded to Xodo Sign."
+                }
+              ],
+              "description": "One file Xodo Sign should include in a new document."
+            },
+            "description": "Files to include in the document.",
+            "minItems": 1
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "A unique signer ID within this document."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer's full name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer's email address.",
+                  "format": "email"
+                },
+                "order": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The one-based signing order when signer ordering is enabled."
+                },
+                "pin": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An optional PIN the signer must enter."
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A custom delivery message for this signer."
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter language code for signing emails and pages."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "email"
+              ],
+              "description": "One signer for a new Xodo Sign document."
+            },
+            "description": "People required to sign the document.",
+            "minItems": 1
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient's full name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The recipient's email address.",
+                  "format": "email"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter language code for recipient emails and status pages."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "email"
+              ],
+              "description": "One non-signing recipient who receives document notifications."
+            },
+            "description": "Non-signing recipients who receive document notifications."
+          },
+          "isDraft": {
+            "type": "boolean",
+            "description": "Whether to save the document as a draft without sending it."
+          },
+          "useSignerOrder": {
+            "type": "boolean",
+            "description": "Whether signers must sign in the provided order."
+          },
+          "reminders": {
+            "type": "boolean",
+            "description": "Whether Xodo Sign should send automatic reminders."
+          },
+          "requireAllSigners": {
+            "type": "boolean",
+            "description": "Whether every signer must sign before the document is complete."
+          },
+          "flexibleSigning": {
+            "type": "boolean",
+            "description": "Whether signers may place their own fields during signing."
+          },
+          "useHiddenTags": {
+            "type": "boolean",
+            "description": "Whether Xodo Sign should parse hidden tags already present in the files."
+          },
+          "sandbox": {
+            "type": "boolean",
+            "description": "Whether to create a non-binding sandbox document."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document title."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The general message sent with the document."
+          },
+          "customRequesterName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A verified custom requester name shown in document communication."
+          },
+          "customRequesterEmail": {
+            "type": "string",
+            "description": "A verified custom requester email shown in document communication.",
+            "format": "email"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "The URL used after a signer completes signing.",
+            "format": "uri"
+          },
+          "declineRedirectUrl": {
+            "type": "string",
+            "description": "The URL used after a signer declines signing.",
+            "format": "uri"
+          },
+          "client": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An internal application reference for this document."
+          },
+          "expires": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The document expiration time as a Unix timestamp."
+          },
+          "embeddedSigningEnabled": {
+            "type": "boolean",
+            "description": "Whether signing should be available through an embedded iframe."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "files",
+          "signers"
+        ],
+        "description": "Input for creating a Xodo Sign document from files."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "documentHash": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Xodo Sign document or template hash."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "requesterEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "templateId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "isDraft": {
+                "type": "boolean",
+                "description": "Whether the document is a draft."
+              },
+              "isTemplate": {
+                "type": "boolean",
+                "description": "Whether the object is a template."
+              },
+              "isCompleted": {
+                "type": "boolean",
+                "description": "Whether all required signing is complete."
+              },
+              "isArchived": {
+                "type": "boolean",
+                "description": "Whether the document is archived."
+              },
+              "isDeleted": {
+                "type": "boolean",
+                "description": "Whether the document is deleted."
+              },
+              "isTrashed": {
+                "type": "boolean",
+                "description": "Whether the document is in trash."
+              },
+              "isCancelled": {
+                "type": "boolean",
+                "description": "Whether the document is cancelled."
+              },
+              "signers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "signerId": {
+                      "type": "integer",
+                      "description": "The signer ID within the document."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "role": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "order": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The integer value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    "signed": {
+                      "type": "boolean",
+                      "description": "Whether this signer has signed the document."
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw object returned by the Xodo Sign API."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "signerId",
+                    "name",
+                    "email",
+                    "role",
+                    "order",
+                    "signed",
+                    "status",
+                    "raw"
+                  ],
+                  "description": "One signer returned by Xodo Sign."
+                },
+                "description": "The signers attached to the document."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the Xodo Sign API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "documentHash",
+              "title",
+              "message",
+              "requesterEmail",
+              "templateId",
+              "created",
+              "completed",
+              "expires",
+              "isDraft",
+              "isTemplate",
+              "isCompleted",
+              "isArchived",
+              "isDeleted",
+              "isTrashed",
+              "isCancelled",
+              "signers",
+              "raw"
+            ],
+            "description": "A normalized Xodo Sign document or template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The newly created Xodo Sign document."
+      }
+    },
+    {
+      "id": "eversign.create_document_from_template",
+      "service": "eversign",
+      "name": "create_document_from_template",
+      "description": "Create an Xodo Sign document from an existing template, role assignments, and merge fields.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document hash of the Xodo Sign template to use."
+          },
+          "signers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer role name defined by the template."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The signer's full name when the template role does not prefill one."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The signer's email address when the template role does not prefill one.",
+                  "format": "email"
+                },
+                "pin": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An optional PIN the signer must enter."
+                },
+                "message": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A custom delivery message for this signer."
+                },
+                "deliverEmail": {
+                  "type": "boolean",
+                  "description": "Whether Xodo Sign should email this signer for an embedded document."
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter language code for signing emails and pages."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role"
+              ],
+              "description": "One signer assigned to a role in an existing Xodo Sign template."
+            },
+            "description": "Signer assignments for required template roles.",
+            "minItems": 1
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient role name defined by the template."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The recipient's full name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The recipient's email address.",
+                  "format": "email"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The two-letter language code for recipient emails and status pages."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "name",
+                "email"
+              ],
+              "description": "One non-signing recipient assigned to a template role."
+            },
+            "description": "Recipient assignments for template CC roles."
+          },
+          "mergeFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "identifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The merge field identifier defined by the template."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value Xodo Sign should place in the merge field."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "identifier",
+                "value"
+              ],
+              "description": "One merge field value for a template."
+            },
+            "description": "Values for merge fields defined by the template."
+          },
+          "sandbox": {
+            "type": "boolean",
+            "description": "Whether to create a non-binding sandbox document."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The document title."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The general message sent with the document."
+          },
+          "customRequesterName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A verified custom requester name shown in document communication."
+          },
+          "customRequesterEmail": {
+            "type": "string",
+            "description": "A verified custom requester email shown in document communication.",
+            "format": "email"
+          },
+          "redirectUrl": {
+            "type": "string",
+            "description": "The URL used after a signer completes signing.",
+            "format": "uri"
+          },
+          "declineRedirectUrl": {
+            "type": "string",
+            "description": "The URL used after a signer declines signing.",
+            "format": "uri"
+          },
+          "client": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An internal application reference for this document."
+          },
+          "expires": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The document expiration time as a Unix timestamp."
+          },
+          "embeddedSigningEnabled": {
+            "type": "boolean",
+            "description": "Whether signing should be available through an embedded iframe."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "templateId",
+          "signers"
+        ],
+        "description": "Input for creating a document from a Xodo Sign template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "documentHash": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Xodo Sign document or template hash."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "requesterEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "templateId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "isDraft": {
+                "type": "boolean",
+                "description": "Whether the document is a draft."
+              },
+              "isTemplate": {
+                "type": "boolean",
+                "description": "Whether the object is a template."
+              },
+              "isCompleted": {
+                "type": "boolean",
+                "description": "Whether all required signing is complete."
+              },
+              "isArchived": {
+                "type": "boolean",
+                "description": "Whether the document is archived."
+              },
+              "isDeleted": {
+                "type": "boolean",
+                "description": "Whether the document is deleted."
+              },
+              "isTrashed": {
+                "type": "boolean",
+                "description": "Whether the document is in trash."
+              },
+              "isCancelled": {
+                "type": "boolean",
+                "description": "Whether the document is cancelled."
+              },
+              "signers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "signerId": {
+                      "type": "integer",
+                      "description": "The signer ID within the document."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "role": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "order": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The integer value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    "signed": {
+                      "type": "boolean",
+                      "description": "Whether this signer has signed the document."
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw object returned by the Xodo Sign API."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "signerId",
+                    "name",
+                    "email",
+                    "role",
+                    "order",
+                    "signed",
+                    "status",
+                    "raw"
+                  ],
+                  "description": "One signer returned by Xodo Sign."
+                },
+                "description": "The signers attached to the document."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the Xodo Sign API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "documentHash",
+              "title",
+              "message",
+              "requesterEmail",
+              "templateId",
+              "created",
+              "completed",
+              "expires",
+              "isDraft",
+              "isTemplate",
+              "isCompleted",
+              "isArchived",
+              "isDeleted",
+              "isTrashed",
+              "isCancelled",
+              "signers",
+              "raw"
+            ],
+            "description": "A normalized Xodo Sign document or template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The Xodo Sign document created from the template."
+      }
+    },
+    {
+      "id": "eversign.get_audit_log",
+      "service": "eversign",
+      "name": "get_audit_log",
+      "description": "Retrieve the complete audit event history for a Xodo Sign document.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "documentHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xodo Sign document or template hash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "documentHash"
+        ],
+        "description": "Input for selecting one Xodo Sign document or template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entryId": {
+                  "type": "integer",
+                  "description": "The audit log entry ID."
+                },
+                "eventType": {
+                  "type": "string",
+                  "description": "The audit event type."
+                },
+                "signerId": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "signerName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "signerEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "description": "The event time as a Unix timestamp."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Xodo Sign API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "entryId",
+                "eventType",
+                "signerId",
+                "signerName",
+                "signerEmail",
+                "timestamp",
+                "raw"
+              ],
+              "description": "One Xodo Sign audit event."
+            },
+            "description": "Audit events in the order returned by Xodo Sign."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "events"
+        ],
+        "description": "The Xodo Sign document audit log."
+      }
+    },
+    {
+      "id": "eversign.get_document",
+      "service": "eversign",
+      "name": "get_document",
+      "description": "Retrieve an Xodo Sign document or template by its document hash.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "documentHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xodo Sign document or template hash."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "documentHash"
+        ],
+        "description": "Input for selecting one Xodo Sign document or template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "object",
+            "properties": {
+              "documentHash": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Xodo Sign document or template hash."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "requesterEmail": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "templateId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The string value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The string value returned by Xodo Sign when available."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "completed": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "expires": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The integer value returned by Xodo Sign when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The integer value returned by Xodo Sign when available."
+              },
+              "isDraft": {
+                "type": "boolean",
+                "description": "Whether the document is a draft."
+              },
+              "isTemplate": {
+                "type": "boolean",
+                "description": "Whether the object is a template."
+              },
+              "isCompleted": {
+                "type": "boolean",
+                "description": "Whether all required signing is complete."
+              },
+              "isArchived": {
+                "type": "boolean",
+                "description": "Whether the document is archived."
+              },
+              "isDeleted": {
+                "type": "boolean",
+                "description": "Whether the document is deleted."
+              },
+              "isTrashed": {
+                "type": "boolean",
+                "description": "Whether the document is in trash."
+              },
+              "isCancelled": {
+                "type": "boolean",
+                "description": "Whether the document is cancelled."
+              },
+              "signers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "signerId": {
+                      "type": "integer",
+                      "description": "The signer ID within the document."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "role": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "order": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The integer value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    "signed": {
+                      "type": "boolean",
+                      "description": "Whether this signer has signed the document."
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The string value returned by Xodo Sign when available."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw object returned by the Xodo Sign API."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "signerId",
+                    "name",
+                    "email",
+                    "role",
+                    "order",
+                    "signed",
+                    "status",
+                    "raw"
+                  ],
+                  "description": "One signer returned by Xodo Sign."
+                },
+                "description": "The signers attached to the document."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw object returned by the Xodo Sign API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "documentHash",
+              "title",
+              "message",
+              "requesterEmail",
+              "templateId",
+              "created",
+              "completed",
+              "expires",
+              "isDraft",
+              "isTemplate",
+              "isCompleted",
+              "isArchived",
+              "isDeleted",
+              "isTrashed",
+              "isCancelled",
+              "signers",
+              "raw"
+            ],
+            "description": "A normalized Xodo Sign document or template."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "document"
+        ],
+        "description": "The requested Xodo Sign document or template."
+      }
+    },
+    {
+      "id": "eversign.list_businesses",
+      "service": "eversign",
+      "name": "list_businesses",
+      "description": "List businesses available to the connected Xodo Sign API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing Xodo Sign businesses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "businesses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "businessId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Xodo Sign business ID."
+                },
+                "businessStatus": {
+                  "type": "integer",
+                  "description": "The business status, where 1 is active and 2 is inactive or deleted."
+                },
+                "businessIdentifier": {
+                  "type": "string",
+                  "description": "The workspace URL subdomain for the business."
+                },
+                "businessName": {
+                  "type": "string",
+                  "description": "The display name of the business."
+                },
+                "creationTimestamp": {
+                  "type": "integer",
+                  "description": "The business creation time as a Unix timestamp."
+                },
+                "isPrimary": {
+                  "type": "boolean",
+                  "description": "Whether this is the account's primary business."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Xodo Sign API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "businessId",
+                "businessStatus",
+                "businessIdentifier",
+                "businessName",
+                "creationTimestamp",
+                "isPrimary",
+                "raw"
+              ],
+              "description": "One Xodo Sign business."
+            },
+            "description": "The Xodo Sign businesses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businesses"
+        ],
+        "description": "Businesses available to the connected account."
+      }
+    },
+    {
+      "id": "eversign.list_documents",
+      "service": "eversign",
+      "name": "list_documents",
+      "description": "List Xodo Sign documents for a business, optionally filtering by documented status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "all",
+              "my_action_required",
+              "waiting_for_others",
+              "completed",
+              "drafts",
+              "cancelled"
+            ],
+            "description": "The document status filter."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of documents to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId"
+        ],
+        "description": "Input for listing Xodo Sign documents."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentHash": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Xodo Sign document or template hash."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "requesterEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "completed": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "expires": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "isDraft": {
+                  "type": "boolean",
+                  "description": "Whether the document is a draft."
+                },
+                "isTemplate": {
+                  "type": "boolean",
+                  "description": "Whether the object is a template."
+                },
+                "isCompleted": {
+                  "type": "boolean",
+                  "description": "Whether all required signing is complete."
+                },
+                "isArchived": {
+                  "type": "boolean",
+                  "description": "Whether the document is archived."
+                },
+                "isDeleted": {
+                  "type": "boolean",
+                  "description": "Whether the document is deleted."
+                },
+                "isTrashed": {
+                  "type": "boolean",
+                  "description": "Whether the document is in trash."
+                },
+                "isCancelled": {
+                  "type": "boolean",
+                  "description": "Whether the document is cancelled."
+                },
+                "signers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "signerId": {
+                        "type": "integer",
+                        "description": "The signer ID within the document."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "role": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "order": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The integer value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The integer value returned by Xodo Sign when available."
+                      },
+                      "signed": {
+                        "type": "boolean",
+                        "description": "Whether this signer has signed the document."
+                      },
+                      "status": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw object returned by the Xodo Sign API."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "signerId",
+                      "name",
+                      "email",
+                      "role",
+                      "order",
+                      "signed",
+                      "status",
+                      "raw"
+                    ],
+                    "description": "One signer returned by Xodo Sign."
+                  },
+                  "description": "The signers attached to the document."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Xodo Sign API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "documentHash",
+                "title",
+                "message",
+                "requesterEmail",
+                "templateId",
+                "created",
+                "completed",
+                "expires",
+                "isDraft",
+                "isTemplate",
+                "isCompleted",
+                "isArchived",
+                "isDeleted",
+                "isTrashed",
+                "isCancelled",
+                "signers",
+                "raw"
+              ],
+              "description": "A normalized Xodo Sign document or template."
+            },
+            "description": "The Xodo Sign documents."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "documents"
+        ],
+        "description": "A page of Xodo Sign documents."
+      }
+    },
+    {
+      "id": "eversign.list_templates",
+      "service": "eversign",
+      "name": "list_templates",
+      "description": "List active, archived, or draft Xodo Sign templates for a business.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "templates",
+              "templates_archived",
+              "template_drafts"
+            ],
+            "description": "The template status filter."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of templates to return."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId"
+        ],
+        "description": "Input for listing Xodo Sign templates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentHash": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Xodo Sign document or template hash."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "message": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "requesterEmail": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "templateId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The string value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The string value returned by Xodo Sign when available."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "completed": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "expires": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The integer value returned by Xodo Sign when available."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The integer value returned by Xodo Sign when available."
+                },
+                "isDraft": {
+                  "type": "boolean",
+                  "description": "Whether the document is a draft."
+                },
+                "isTemplate": {
+                  "type": "boolean",
+                  "description": "Whether the object is a template."
+                },
+                "isCompleted": {
+                  "type": "boolean",
+                  "description": "Whether all required signing is complete."
+                },
+                "isArchived": {
+                  "type": "boolean",
+                  "description": "Whether the document is archived."
+                },
+                "isDeleted": {
+                  "type": "boolean",
+                  "description": "Whether the document is deleted."
+                },
+                "isTrashed": {
+                  "type": "boolean",
+                  "description": "Whether the document is in trash."
+                },
+                "isCancelled": {
+                  "type": "boolean",
+                  "description": "Whether the document is cancelled."
+                },
+                "signers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "signerId": {
+                        "type": "integer",
+                        "description": "The signer ID within the document."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "email": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "role": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "order": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The integer value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The integer value returned by Xodo Sign when available."
+                      },
+                      "signed": {
+                        "type": "boolean",
+                        "description": "Whether this signer has signed the document."
+                      },
+                      "status": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The string value returned by Xodo Sign when available."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The string value returned by Xodo Sign when available."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw object returned by the Xodo Sign API."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "signerId",
+                      "name",
+                      "email",
+                      "role",
+                      "order",
+                      "signed",
+                      "status",
+                      "raw"
+                    ],
+                    "description": "One signer returned by Xodo Sign."
+                  },
+                  "description": "The signers attached to the document."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw object returned by the Xodo Sign API."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "documentHash",
+                "title",
+                "message",
+                "requesterEmail",
+                "templateId",
+                "created",
+                "completed",
+                "expires",
+                "isDraft",
+                "isTemplate",
+                "isCompleted",
+                "isArchived",
+                "isDeleted",
+                "isTrashed",
+                "isCancelled",
+                "signers",
+                "raw"
+              ],
+              "description": "A normalized Xodo Sign document or template."
+            },
+            "description": "The Xodo Sign templates."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templates"
+        ],
+        "description": "A page of Xodo Sign templates."
+      }
+    },
+    {
+      "id": "eversign.reassign_signer",
+      "service": "eversign",
+      "name": "reassign_signer",
+      "description": "Replace a signer on a Xodo Sign document and notify the affected participants.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "documentHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xodo Sign document or template hash."
+          },
+          "signerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The signer ID to replace."
+          },
+          "newSignerName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement signer's full name."
+          },
+          "newSignerEmail": {
+            "type": "string",
+            "description": "The replacement signer's email address.",
+            "format": "email"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The reason for the signer reassignment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "documentHash",
+          "signerId",
+          "newSignerName",
+          "newSignerEmail"
+        ],
+        "description": "Input for reassigning a Xodo Sign signer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xodo Sign reassigned the signer successfully."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Xodo Sign API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "The signer reassignment result."
+      }
+    },
+    {
+      "id": "eversign.send_reminder",
+      "service": "eversign",
+      "name": "send_reminder",
+      "description": "Send a reminder to one signer of a Xodo Sign document.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Xodo Sign business ID."
+          },
+          "documentHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Xodo Sign document or template hash."
+          },
+          "signerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The signer ID to remind."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId",
+          "documentHash",
+          "signerId"
+        ],
+        "description": "Input for sending a Xodo Sign reminder."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Xodo Sign sent the reminder successfully."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw object returned by the Xodo Sign API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "raw"
+        ],
+        "description": "The reminder operation result."
+      }
+    }
+  ]
+}

@@ -82,6 +82,9 @@ import { Tool } from "../tool.js"
 import { ToolOutput } from "../tool-output.js"
 import { WebFetchTool } from "../tool/plugin/webfetch.js"
 import { WebSearchTool } from "../tool/plugin/websearch.js"
+import { ConnectorTool } from "../tool/plugin/connector.js"
+import { ConnectorNode } from "../connector/node.js"
+import { Connector } from "@opencode/connector/adapter"
 import { WellKnown } from "../wellknown.js"
 import { WriteTool } from "../tool/plugin/write.js"
 import { AgentPlugin } from "./agent.js"
@@ -109,6 +112,7 @@ const services = [
   Command.Service,
   Config.Service,
   Credential.Service,
+  Connector.Service,
   Bus.Service,
   Environment.Service,
   FileAccess.Service,
@@ -163,6 +167,7 @@ export const requirements = LayerNode.group([
   Command.node,
   Config.node,
   Credential.node,
+  ConnectorNode.node,
   Bus.node,
   Environment.node,
   FileAccess.node,
@@ -239,6 +244,7 @@ const pre = [
   SubagentTool.Plugin,
   WebFetchTool.Plugin,
   WebSearchTool.Plugin,
+  ConnectorTool.Plugin,
   WriteTool.Plugin,
   WarmingPlugin.Plugin,
   CcrPlugin.Plugin,

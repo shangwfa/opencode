@@ -1,0 +1,692 @@
+{
+  "service": "recruitee",
+  "displayName": "Recruitee",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "recruitee_api_token",
+      "description": "Recruitee personal API token used with the Authorization Bearer header. Create it in Settings > Apps and plugins > Personal API Tokens: https://app.recruitee.com/#/settings/api_tokens.",
+      "extraFields": [
+        {
+          "key": "companyId",
+          "label": "Company ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "1111",
+          "description": "Recruitee company ID or company subdomain used in /c/{company_id}/... API paths. Find it on the Personal API Tokens settings page."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://recruitee.com",
+  "actions": [
+    {
+      "id": "recruitee.create_candidate",
+      "service": "recruitee",
+      "name": "create_candidate",
+      "description": "Manually create a Recruitee candidate with JSON fields and optional remote CV URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Candidate name."
+          },
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One candidate email address.",
+              "format": "email"
+            },
+            "description": "Candidate email addresses."
+          },
+          "phones": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One candidate phone number."
+            },
+            "description": "Candidate phone numbers."
+          },
+          "socialLinks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One social profile URL.",
+              "format": "uri"
+            },
+            "description": "Candidate social profile URLs."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One candidate link.",
+              "format": "uri"
+            },
+            "description": "Candidate links."
+          },
+          "coverLetter": {
+            "type": "string",
+            "description": "Candidate cover letter text."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One source tag."
+            },
+            "description": "Candidate source tags."
+          },
+          "remoteCvUrl": {
+            "type": "string",
+            "description": "URL to a CV or resume file hosted outside Recruitee. Use this instead of multipart file upload.",
+            "format": "uri"
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One offer ID."
+            },
+            "description": "Offer IDs to assign the candidate to."
+          },
+          "offerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Single offer ID to assign the candidate to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Request body for manually creating a Recruitee candidate."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candidate": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Recruitee candidate ID."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate name."
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One email."
+                },
+                "description": "Candidate email addresses returned by Recruitee."
+              },
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One phone number."
+                },
+                "description": "Candidate phone numbers returned by Recruitee."
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The candidate source."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The candidate source."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the candidate was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the candidate was created."
+              },
+              "updated_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the candidate was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the candidate was last updated."
+              },
+              "deleted": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether the candidate is deleted, or null when absent."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether the candidate is deleted, or null when absent."
+              },
+              "placements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One Recruitee placement object."
+                },
+                "description": "Candidate placement objects returned by Recruitee."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Recruitee candidate object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Recruitee candidate summary."
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Recruitee reference object."
+            },
+            "description": "Reference objects included by Recruitee, such as related offers, stages, and admins."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Recruitee create candidate response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Recruitee create candidate response."
+      }
+    },
+    {
+      "id": "recruitee.get_offer",
+      "service": "recruitee",
+      "name": "get_offer",
+      "description": "Fetch one Recruitee offer by ID using the official ATS API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Recruitee offer ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Path parameters for fetching a Recruitee offer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "offer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The Recruitee offer ID."
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The offer title."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The offer title."
+              },
+              "slug": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL-friendly offer slug."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL-friendly offer slug."
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The offer type returned by Recruitee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The offer type returned by Recruitee."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The offer status returned by Recruitee."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The offer status returned by Recruitee."
+              },
+              "location": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The offer location text."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The offer location text."
+              },
+              "created_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the offer was created."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the offer was created."
+              },
+              "updated_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The ISO 8601 timestamp when the offer was last updated."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The ISO 8601 timestamp when the offer was last updated."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Recruitee offer object."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A normalized Recruitee offer summary."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Recruitee get offer response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Recruitee offer detail response."
+      }
+    },
+    {
+      "id": "recruitee.list_offers",
+      "service": "recruitee",
+      "name": "list_offers",
+      "description": "List Recruitee company offers using the official ATS API, optionally filtered by scope and view mode.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No parameters are required to list Recruitee offers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "offers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Recruitee offer ID."
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The offer title."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The offer title."
+                },
+                "slug": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The URL-friendly offer slug."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The URL-friendly offer slug."
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The offer type returned by Recruitee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The offer type returned by Recruitee."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The offer status returned by Recruitee."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The offer status returned by Recruitee."
+                },
+                "location": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The offer location text."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The offer location text."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the offer was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the offer was created."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the offer was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the offer was last updated."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Recruitee offer object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Recruitee offer summary."
+            },
+            "description": "The normalized offers returned by Recruitee."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Recruitee list offers response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A list of Recruitee offers."
+      }
+    },
+    {
+      "id": "recruitee.search_candidates",
+      "service": "recruitee",
+      "name": "search_candidates",
+      "description": "Search Recruitee candidates with pagination, sorting, and official filters_json filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Number of candidates to return. Recruitee defaults to 60 and documents 10000 as the maximum single-call limit."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based page number for Recruitee candidate search."
+          },
+          "sortBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sort key accepted by Recruitee, such as created_at_desc or candidate_name_asc."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One Recruitee candidate search filter object."
+            },
+            "description": "Candidate search filters that will be serialized as filters_json."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for searching Recruitee candidates."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Recruitee candidate ID."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The candidate name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The candidate name."
+                },
+                "emails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One email."
+                  },
+                  "description": "Candidate email addresses returned by Recruitee."
+                },
+                "phones": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One phone number."
+                  },
+                  "description": "Candidate phone numbers returned by Recruitee."
+                },
+                "source": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The candidate source."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The candidate source."
+                },
+                "created_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the candidate was created."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the candidate was created."
+                },
+                "updated_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 timestamp when the candidate was last updated."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 timestamp when the candidate was last updated."
+                },
+                "deleted": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether the candidate is deleted, or null when absent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether the candidate is deleted, or null when absent."
+                },
+                "placements": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "One Recruitee placement object."
+                  },
+                  "description": "Candidate placement objects returned by Recruitee."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw Recruitee candidate object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A normalized Recruitee candidate summary."
+            },
+            "description": "The normalized candidates returned by Recruitee."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of candidates matching the search."
+          },
+          "aggregations": {
+            "description": "The Recruitee aggregations payload, or null when absent."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Recruitee candidate search response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Recruitee candidate search response."
+      }
+    }
+  ]
+}

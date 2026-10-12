@@ -1,0 +1,344 @@
+{
+  "service": "checkout_com",
+  "displayName": "Checkout.com",
+  "categories": [
+    "Finance"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret API Key",
+      "placeholder": "sk_sbox_... or sk_...",
+      "description": "Checkout.com Secret API Key from Developers > Keys.",
+      "extraFields": [
+        {
+          "key": "environment",
+          "label": "Environment",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "sandbox or production",
+          "description": "Checkout.com environment: sandbox or production."
+        },
+        {
+          "key": "prefix",
+          "label": "Endpoint Prefix",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "vkuhvk4v",
+          "description": "The 8-character prefix from the unique Checkout.com API base URL."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.checkout.com",
+  "actions": [
+    {
+      "id": "checkout_com.create_customer",
+      "service": "checkout_com",
+      "name": "create_customer",
+      "description": "Create a Checkout.com customer for storing reusable customer details.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "The customer's email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The customer's name."
+          },
+          "phone": {
+            "type": "object",
+            "properties": {
+              "country_code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 7,
+                "description": "The international country calling code."
+              },
+              "number": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 25,
+                "description": "The phone number."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The customer's phone number."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "A customer metadata string value."
+                },
+                {
+                  "type": "number",
+                  "description": "A customer metadata number value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A customer metadata boolean value."
+                }
+              ],
+              "description": "A primitive customer metadata value."
+            },
+            "description": "Customer metadata with up to 10 key-value pairs.",
+            "maxProperties": 10,
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "A customer metadata key with at most 100 characters."
+            }
+          },
+          "default": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The payment instrument ID to set as the customer's default instrument."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Input parameters for creating a Checkout.com customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "The unique ID of the created customer."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Checkout.com customer reference."
+      }
+    },
+    {
+      "id": "checkout_com.delete_customer",
+      "service": "checkout_com",
+      "name": "delete_customer",
+      "description": "Delete a Checkout.com customer and all linked payment instruments.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Checkout.com customer ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for deleting a Checkout.com customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether Checkout.com accepted the customer deletion."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that the Checkout.com customer was deleted."
+      }
+    },
+    {
+      "id": "checkout_com.get_customer",
+      "service": "checkout_com",
+      "name": "get_customer",
+      "description": "Get a Checkout.com customer and their linked payment instruments by ID or email.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The Checkout.com customer ID or email address."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving a Checkout.com customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The unique Checkout.com customer ID."
+              },
+              "email": {
+                "type": "string",
+                "description": "The customer's email address."
+              },
+              "default": {
+                "type": "string",
+                "description": "The customer's default payment instrument ID."
+              },
+              "name": {
+                "type": "string",
+                "description": "The customer's name."
+              },
+              "phone": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The customer's phone number."
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The metadata attached to the customer."
+              },
+              "instruments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A linked payment instrument returned by Checkout.com."
+                },
+                "description": "The payment instruments linked to the customer."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "email"
+            ],
+            "description": "Customer details returned by Checkout.com."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The retrieved Checkout.com customer."
+      }
+    },
+    {
+      "id": "checkout_com.update_customer",
+      "service": "checkout_com",
+      "name": "update_customer",
+      "description": "Update stored details for a Checkout.com customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Checkout.com customer ID."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "The customer's email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The customer's name."
+          },
+          "phone": {
+            "type": "object",
+            "properties": {
+              "country_code": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 7,
+                "description": "The international country calling code."
+              },
+              "number": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 25,
+                "description": "The phone number."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The customer's phone number."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "A customer metadata string value."
+                },
+                {
+                  "type": "number",
+                  "description": "A customer metadata number value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A customer metadata boolean value."
+                }
+              ],
+              "description": "A primitive customer metadata value."
+            },
+            "description": "Customer metadata with up to 10 key-value pairs.",
+            "maxProperties": 10,
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 100,
+              "description": "A customer metadata key with at most 100 characters."
+            }
+          },
+          "default": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The payment instrument ID to set as the customer's default instrument."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id"
+        ],
+        "description": "Input parameters for updating a Checkout.com customer."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "description": "Whether Checkout.com accepted the customer update."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation that the Checkout.com customer was updated."
+      }
+    }
+  ]
+}

@@ -1,0 +1,596 @@
+{
+  "service": "bitrise",
+  "displayName": "Bitrise",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "bitrise_api_token",
+      "description": "Bitrise API token sent as the Authorization header. Create or view Personal Access Tokens and Workspace API tokens from Bitrise API settings at https://app.bitrise.io/me/profile#/security."
+    }
+  ],
+  "homepageUrl": "https://bitrise.io",
+  "actions": [
+    {
+      "id": "bitrise.get_build",
+      "service": "bitrise",
+      "name": "get_build",
+      "description": "Retrieve one Bitrise build by app slug and build slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise app slug."
+          },
+          "buildSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise build slug."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one Bitrise build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string",
+                "description": "Bitrise build slug."
+              },
+              "build_number": {
+                "type": "integer",
+                "description": "Bitrise build number."
+              },
+              "branch": {
+                "type": "string",
+                "description": "Git branch for the build."
+              },
+              "tag": {
+                "type": "string",
+                "description": "Git tag for the build."
+              },
+              "commit_hash": {
+                "type": "string",
+                "description": "Git commit hash for the build."
+              },
+              "commit_message": {
+                "type": "string",
+                "description": "Git commit message for the build."
+              },
+              "status": {
+                "type": "integer",
+                "description": "Numeric Bitrise build status."
+              },
+              "status_text": {
+                "type": "string",
+                "description": "Human-readable Bitrise build status."
+              },
+              "triggered_workflow": {
+                "type": "string",
+                "description": "Workflow triggered for the build."
+              },
+              "triggered_at": {
+                "type": "string",
+                "description": "Timestamp when Bitrise triggered the build."
+              },
+              "finished_at": {
+                "type": "string",
+                "description": "Timestamp when Bitrise finished the build."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Bitrise build returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single Bitrise build."
+      }
+    },
+    {
+      "id": "bitrise.list_apps",
+      "service": "bitrise",
+      "name": "list_apps",
+      "description": "List Bitrise apps available to the authenticated account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "last_build_at",
+              "created_at"
+            ],
+            "description": "Application sort order."
+          },
+          "next": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Bitrise in paging.next."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of items to return. Bitrise allows up to 50."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter apps by title."
+          },
+          "projectType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter apps by project type, such as ios or android."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing Bitrise apps."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "description": "Bitrise app slug."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Bitrise app title."
+                },
+                "project_type": {
+                  "type": "string",
+                  "description": "Bitrise project type."
+                },
+                "repo_owner": {
+                  "type": "string",
+                  "description": "Repository owner name."
+                },
+                "repo_slug": {
+                  "type": "string",
+                  "description": "Repository slug."
+                },
+                "repo_url": {
+                  "type": "string",
+                  "description": "Repository URL."
+                },
+                "provider": {
+                  "type": "string",
+                  "description": "Git provider connected to the app."
+                },
+                "is_disabled": {
+                  "type": "boolean",
+                  "description": "Whether the app is disabled."
+                },
+                "is_public": {
+                  "type": "boolean",
+                  "description": "Whether the app is public."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Bitrise app returned by the API."
+            },
+            "description": "Apps returned by Bitrise."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "Cursor to pass as the next input parameter when another page exists."
+              },
+              "page_item_limit": {
+                "type": "integer",
+                "description": "Maximum number of items in this page."
+              },
+              "total_item_count": {
+                "type": "integer",
+                "description": "Total number of items across all pages."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Bitrise pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "apps"
+        ],
+        "description": "Bitrise apps list."
+      }
+    },
+    {
+      "id": "bitrise.list_builds",
+      "service": "bitrise",
+      "name": "list_builds",
+      "description": "List builds for a Bitrise app with optional filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise app slug."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "running_first",
+              "created_at"
+            ],
+            "description": "Build sort order."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter builds by branch."
+          },
+          "workflow": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter builds by workflow name."
+          },
+          "commitMessage": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter builds by commit message."
+          },
+          "triggerEventType": {
+            "type": "string",
+            "enum": [
+              "push",
+              "pull-request",
+              "tag"
+            ],
+            "description": "Build trigger event type filter."
+          },
+          "pullRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter builds by pull request ID."
+          },
+          "buildNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter builds by build number."
+          },
+          "after": {
+            "type": "integer",
+            "description": "Return builds triggered after this Unix timestamp."
+          },
+          "before": {
+            "type": "integer",
+            "description": "Return builds triggered before this Unix timestamp."
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "Filter builds by status: 0 not finished, 1 successful, 2 failed, 3 aborted with failure, 4 aborted with success."
+          },
+          "isPipelineBuild": {
+            "type": "boolean",
+            "description": "Whether to return pipeline builds."
+          },
+          "next": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Bitrise in paging.next."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of items to return. Bitrise allows up to 50."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appSlug"
+        ],
+        "description": "Input parameters for listing Bitrise builds."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "description": "Bitrise build slug."
+                },
+                "build_number": {
+                  "type": "integer",
+                  "description": "Bitrise build number."
+                },
+                "branch": {
+                  "type": "string",
+                  "description": "Git branch for the build."
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Git tag for the build."
+                },
+                "commit_hash": {
+                  "type": "string",
+                  "description": "Git commit hash for the build."
+                },
+                "commit_message": {
+                  "type": "string",
+                  "description": "Git commit message for the build."
+                },
+                "status": {
+                  "type": "integer",
+                  "description": "Numeric Bitrise build status."
+                },
+                "status_text": {
+                  "type": "string",
+                  "description": "Human-readable Bitrise build status."
+                },
+                "triggered_workflow": {
+                  "type": "string",
+                  "description": "Workflow triggered for the build."
+                },
+                "triggered_at": {
+                  "type": "string",
+                  "description": "Timestamp when Bitrise triggered the build."
+                },
+                "finished_at": {
+                  "type": "string",
+                  "description": "Timestamp when Bitrise finished the build."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Bitrise build returned by the API."
+            },
+            "description": "Builds returned by Bitrise."
+          },
+          "paging": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "string",
+                "description": "Cursor to pass as the next input parameter when another page exists."
+              },
+              "page_item_limit": {
+                "type": "integer",
+                "description": "Maximum number of items in this page."
+              },
+              "total_item_count": {
+                "type": "integer",
+                "description": "Total number of items across all pages."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Bitrise pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "builds"
+        ],
+        "description": "Bitrise builds list."
+      }
+    },
+    {
+      "id": "bitrise.trigger_build",
+      "service": "bitrise",
+      "name": "trigger_build",
+      "description": "Trigger a Bitrise build or pipeline for an app.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise app slug."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Git branch to build."
+          },
+          "workflowId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise workflow ID to trigger."
+          },
+          "pipelineId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bitrise pipeline ID to trigger."
+          },
+          "commitHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Git commit hash to build."
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Git tag to build."
+          },
+          "branchDest": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination branch for pull request builds."
+          },
+          "pullRequestId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pull request ID for pull request builds."
+          },
+          "skipGitStatusReport": {
+            "type": "boolean",
+            "description": "Whether Bitrise should skip posting Git status updates."
+          },
+          "machineTypeId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Machine type ID to run the build on."
+          },
+          "stack": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stack identifier to run the build on."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Build priority."
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Environment variable name."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Environment variable value."
+                },
+                "isExpand": {
+                  "type": "boolean",
+                  "description": "Whether Bitrise should expand this environment variable."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "value"
+              ],
+              "description": "Environment variable to pass to the triggered Bitrise build."
+            },
+            "description": "Environment variables for the triggered build.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appSlug"
+        ],
+        "description": "Input parameters for triggering a Bitrise build or pipeline."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "trigger": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Bitrise trigger response message."
+              },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "build_number": {
+                      "type": "integer",
+                      "description": "Build number created by Bitrise."
+                    },
+                    "build_slug": {
+                      "type": "string",
+                      "description": "Build slug created by Bitrise."
+                    },
+                    "build_url": {
+                      "type": "string",
+                      "description": "URL for the triggered build."
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Bitrise trigger result message."
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Bitrise trigger result status."
+                    },
+                    "triggered_pipeline": {
+                      "type": "string",
+                      "description": "Pipeline triggered by Bitrise."
+                    },
+                    "triggered_workflow": {
+                      "type": "string",
+                      "description": "Workflow triggered by Bitrise."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Single Bitrise trigger result."
+                },
+                "description": "Build or pipeline trigger results."
+              },
+              "service": {
+                "type": "string",
+                "description": "Bitrise response service identifier."
+              },
+              "slug": {
+                "type": "string",
+                "description": "Bitrise trigger response slug."
+              },
+              "status": {
+                "type": "string",
+                "description": "Bitrise trigger response status."
+              },
+              "build_number": {
+                "type": "integer",
+                "description": "Deprecated build number returned by Bitrise."
+              },
+              "build_slug": {
+                "type": "string",
+                "description": "Deprecated build slug returned by Bitrise."
+              },
+              "build_url": {
+                "type": "string",
+                "description": "Deprecated build URL returned by Bitrise."
+              },
+              "triggered_workflow": {
+                "type": "string",
+                "description": "Deprecated triggered workflow returned by Bitrise."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Bitrise build trigger response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Triggered Bitrise build metadata."
+      }
+    }
+  ]
+}

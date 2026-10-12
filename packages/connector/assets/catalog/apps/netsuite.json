@@ -1,0 +1,443 @@
+{
+  "service": "netsuite",
+  "displayName": "NetSuite",
+  "categories": [
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "accountId",
+          "label": "Account ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "1234567_SB1",
+          "description": "NetSuite account ID used to build the SuiteTalk REST domain. Find it in NetSuite under Setup > Company > Company Information."
+        },
+        {
+          "key": "consumerKey",
+          "label": "Consumer Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "netsuite_consumer_key",
+          "description": "Integration record consumer key used for NetSuite token-based authentication."
+        },
+        {
+          "key": "consumerSecret",
+          "label": "Consumer Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "netsuite_consumer_secret",
+          "description": "Integration record consumer secret used to sign NetSuite OAuth 1.0 requests."
+        },
+        {
+          "key": "tokenId",
+          "label": "Token ID",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "netsuite_token_id",
+          "description": "Token ID for a NetSuite access token created for the integration and user role."
+        },
+        {
+          "key": "tokenSecret",
+          "label": "Token Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "netsuite_token_secret",
+          "description": "Token secret paired with the NetSuite Token ID for token-based authentication."
+        }
+      ],
+      "testAction": {
+        "actionName": "list_records",
+        "input": {
+          "recordType": "customer",
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.netsuite.com",
+  "actions": [
+    {
+      "id": "netsuite.create_record",
+      "service": "netsuite",
+      "name": "create_record",
+      "description": "Create one NetSuite record for a record type.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite record type path segment, such as customer, vendor, salesOrder, or invoice."
+          },
+          "body": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A NetSuite JSON object with record-type-specific fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for creating a NetSuite record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether NetSuite accepted the create request."
+          },
+          "location": {
+            "type": "string",
+            "description": "The NetSuite Location header for the created record, when returned."
+          },
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The NetSuite response body, when NetSuite returned one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The normalized NetSuite create-record response."
+      }
+    },
+    {
+      "id": "netsuite.get_record",
+      "service": "netsuite",
+      "name": "get_record",
+      "description": "Retrieve one NetSuite record by record type and ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite record type path segment, such as customer, vendor, salesOrder, or invoice."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite internal ID or external ID for the record."
+          },
+          "expandSubResources": {
+            "type": "boolean",
+            "description": "Whether NetSuite should expand subresources."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordType",
+          "recordId"
+        ],
+        "description": "Input payload for retrieving a NetSuite record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A NetSuite JSON object with record-type-specific fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized NetSuite record response."
+      }
+    },
+    {
+      "id": "netsuite.list_records",
+      "service": "netsuite",
+      "name": "list_records",
+      "description": "List NetSuite records of one record type with optional REST filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite record type path segment, such as customer, vendor, salesOrder, or invoice."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of NetSuite records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based NetSuite result offset."
+          },
+          "q": {
+            "type": "string",
+            "description": "NetSuite REST record filtering expression."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "recordType"
+        ],
+        "description": "Input payload for listing NetSuite records."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "object",
+            "properties": {
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rel": {
+                      "type": "string",
+                      "description": "The link relationship returned by NetSuite."
+                    },
+                    "href": {
+                      "type": "string",
+                      "description": "The link URL or path returned by NetSuite."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "rel",
+                    "href"
+                  ],
+                  "description": "A NetSuite REST link object."
+                },
+                "description": "Links returned with the NetSuite collection."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of records returned in this page."
+              },
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether NetSuite has more records after this page."
+              },
+              "offset": {
+                "type": "integer",
+                "description": "The offset returned by NetSuite."
+              },
+              "totalResults": {
+                "type": "integer",
+                "description": "The total result count returned by NetSuite, when available."
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A NetSuite JSON object with record-type-specific fields."
+                },
+                "description": "NetSuite records returned in this page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "links",
+              "count",
+              "hasMore",
+              "offset",
+              "totalResults",
+              "items"
+            ],
+            "description": "A NetSuite paged collection response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized NetSuite record-list response."
+      }
+    },
+    {
+      "id": "netsuite.run_suiteql",
+      "service": "netsuite",
+      "name": "run_suiteql",
+      "description": "Execute a SuiteQL query through NetSuite REST Web Services.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SuiteQL query text to execute."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of NetSuite records to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based NetSuite result offset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input payload for executing a NetSuite SuiteQL query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "rel": {
+                      "type": "string",
+                      "description": "The link relationship returned by NetSuite."
+                    },
+                    "href": {
+                      "type": "string",
+                      "description": "The link URL or path returned by NetSuite."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "rel",
+                    "href"
+                  ],
+                  "description": "A NetSuite REST link object."
+                },
+                "description": "Links returned with the NetSuite collection."
+              },
+              "count": {
+                "type": "integer",
+                "description": "The number of records returned in this page."
+              },
+              "hasMore": {
+                "type": "boolean",
+                "description": "Whether NetSuite has more records after this page."
+              },
+              "offset": {
+                "type": "integer",
+                "description": "The offset returned by NetSuite."
+              },
+              "totalResults": {
+                "type": "integer",
+                "description": "The total result count returned by NetSuite, when available."
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A NetSuite JSON object with record-type-specific fields."
+                },
+                "description": "NetSuite records returned in this page."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "links",
+              "count",
+              "hasMore",
+              "offset",
+              "totalResults",
+              "items"
+            ],
+            "description": "A NetSuite paged collection response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized NetSuite SuiteQL response."
+      }
+    },
+    {
+      "id": "netsuite.update_record",
+      "service": "netsuite",
+      "name": "update_record",
+      "description": "Update one NetSuite record by record type and ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite record type path segment, such as customer, vendor, salesOrder, or invoice."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The NetSuite internal ID or external ID for the record."
+          },
+          "body": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A NetSuite JSON object with record-type-specific fields."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for updating a NetSuite record."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether NetSuite accepted the update."
+          },
+          "location": {
+            "type": "string",
+            "description": "The NetSuite Location header for the updated record, when returned."
+          },
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The NetSuite response body, when NetSuite returned one."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ok"
+        ],
+        "description": "The normalized NetSuite update-record response."
+      }
+    }
+  ]
+}

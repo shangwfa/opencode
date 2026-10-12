@@ -1,0 +1,147 @@
+{
+  "service": "yingmi_mcp",
+  "displayName": "Yingmi MCP",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Paste your Yingmi MCP API Key",
+      "description": "API Key sent in the x-api-key header. Apply and copy it from https://qieman.com/mcp/account."
+    }
+  ],
+  "homepageUrl": "https://qieman.com/mcp/mcp-market",
+  "actions": [
+    {
+      "id": "yingmi_mcp.call_tool",
+      "service": "yingmi_mcp",
+      "name": "call_tool",
+      "description": "Call a current Yingmi MCP tool with JSON arguments after checking its live schema and behavior annotations.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact tool name returned by list_tools."
+          },
+          "arguments": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "JSON arguments matching the inputSchema returned for the selected tool."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "toolName"
+        ],
+        "description": "Input for invoking one current Yingmi MCP tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The tool result. Structured MCP content is returned directly; otherwise the MCP content envelope is preserved."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized result returned by the Yingmi MCP tool."
+      },
+      "followUpActions": [
+        "yingmi_mcp.list_tools"
+      ]
+    },
+    {
+      "id": "yingmi_mcp.list_tools",
+      "service": "yingmi_mcp",
+      "name": "list_tools",
+      "description": "Discover the current Yingmi financial data, research, and advisory MCP tools with their live input schemas.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact Yingmi MCP tool name to pass to call_tool."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The current tool description supplied by Yingmi MCP."
+                },
+                "annotations": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "description": "A human-readable title for the tool."
+                    },
+                    "readOnlyHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool is expected not to modify data."
+                    },
+                    "destructiveHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may perform destructive operations."
+                    },
+                    "idempotentHint": {
+                      "type": "boolean",
+                      "description": "Whether repeated calls with the same arguments are expected to be idempotent."
+                    },
+                    "openWorldHint": {
+                      "type": "boolean",
+                      "description": "Whether the tool may interact with entities outside Yingmi."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "MCP hints supplied by Yingmi about a tool's behavior."
+                },
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The current JSON Schema for the tool arguments, supplied by Yingmi MCP."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "inputSchema"
+              ],
+              "description": "A tool currently exposed by the connected Yingmi MCP account."
+            },
+            "description": "Tools currently exposed to the connected Yingmi MCP account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The current Yingmi MCP tool catalog."
+      },
+      "followUpActions": [
+        "yingmi_mcp.call_tool"
+      ]
+    }
+  ]
+}

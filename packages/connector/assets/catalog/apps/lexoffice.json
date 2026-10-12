@@ -1,0 +1,2841 @@
+{
+  "service": "lexoffice",
+  "displayName": "lexoffice",
+  "categories": [
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "lexoffice_api_key",
+      "description": "lexoffice Public API key sent with the Authorization Bearer header. Create or view it in the lexoffice developer area: https://app.lexware.de/addons/public-api"
+    }
+  ],
+  "homepageUrl": "https://office.lexware.de/",
+  "actions": [
+    {
+      "id": "lexoffice.create_article",
+      "service": "lexoffice",
+      "name": "create_article",
+      "description": "Create one Lexoffice article with a NET or GROSS leading price payload.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The title of the article."
+              },
+              "description": {
+                "type": "string",
+                "description": "The article description."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PRODUCT",
+                  "SERVICE"
+                ],
+                "description": "The Lexoffice article type."
+              },
+              "articleNumber": {
+                "type": "string",
+                "description": "The article number."
+              },
+              "gtin": {
+                "type": "string",
+                "description": "The Global Trade Item Number of the article."
+              },
+              "note": {
+                "type": "string",
+                "description": "The internal article note."
+              },
+              "unitName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unit name of the article."
+              },
+              "price": {
+                "type": "object",
+                "properties": {
+                  "netPrice": {
+                    "type": "number",
+                    "description": "The net price of the article."
+                  },
+                  "grossPrice": {
+                    "type": "number",
+                    "description": "The gross price of the article."
+                  },
+                  "leadingPrice": {
+                    "type": "string",
+                    "enum": [
+                      "NET",
+                      "GROSS"
+                    ],
+                    "description": "The leading article price type."
+                  },
+                  "taxRate": {
+                    "type": "number",
+                    "description": "The article tax rate accepted by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "leadingPrice",
+                  "taxRate"
+                ],
+                "description": "The Lexoffice article price object.",
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "NET"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "netPrice"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "GROSS"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "grossPrice"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The article version used for optimistic locking."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "title",
+              "type",
+              "unitName",
+              "price"
+            ],
+            "description": "The Lexoffice article payload used for creating or updating an article."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The input payload for creating a Lexoffice article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice resource identifier.",
+                "format": "uuid"
+              },
+              "resourceUri": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The canonical Lexoffice resource URI."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The latest version returned by Lexoffice."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Lexoffice action result envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The response returned when creating a Lexoffice article."
+      }
+    },
+    {
+      "id": "lexoffice.create_contact",
+      "service": "lexoffice",
+      "name": "create_contact",
+      "description": "Create one Lexoffice contact using either a company or person payload.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The optimistic-locking version. Use 0 for POST and the latest value for PUT."
+              },
+              "roles": {
+                "type": "object",
+                "properties": {
+                  "customer": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false,
+                    "description": "An empty role object expected by Lexoffice."
+                  },
+                  "vendor": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false,
+                    "description": "An empty role object expected by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Lexoffice role payload used when creating or updating a contact."
+              },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "allowTaxFreeInvoices": {
+                    "type": "boolean",
+                    "description": "Whether tax-free invoices are allowed for this company."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "taxNumber": {
+                    "type": "string",
+                    "description": "The tax number of the company."
+                  },
+                  "vatRegistrationId": {
+                    "type": "string",
+                    "description": "The VAT registration ID of the company."
+                  },
+                  "contactPersons": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "salutation": {
+                          "type": "string",
+                          "description": "The salutation of the contact person."
+                        },
+                        "firstName": {
+                          "type": "string",
+                          "description": "The first name of the contact person."
+                        },
+                        "lastName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The last name of the contact person."
+                        },
+                        "primary": {
+                          "type": "boolean",
+                          "description": "Whether the contact person is the primary contact."
+                        },
+                        "emailAddress": {
+                          "type": "string",
+                          "description": "The email address of the contact person."
+                        },
+                        "phoneNumber": {
+                          "type": "string",
+                          "description": "The phone number of the contact person."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "lastName"
+                      ],
+                      "description": "A Lexoffice company contact person object."
+                    },
+                    "description": "The contact persons attached to the company."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "description": "The Lexoffice company object used for company contacts."
+              },
+              "person": {
+                "type": "object",
+                "properties": {
+                  "salutation": {
+                    "type": "string",
+                    "description": "The salutation of the person."
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "description": "The first name of the person."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The last name of the person."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "lastName"
+                ],
+                "description": "The Lexoffice person object used for private-person contacts."
+              },
+              "addresses": {
+                "type": "object",
+                "properties": {
+                  "billing": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The billing addresses."
+                  },
+                  "shipping": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The shipping addresses."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The address collections attached to the contact."
+              },
+              "xRechnung": {
+                "type": "object",
+                "properties": {
+                  "buyerReference": {
+                    "type": "string",
+                    "description": "The Leitweg-ID of the customer."
+                  },
+                  "vendorNumberAtCustomer": {
+                    "type": "string",
+                    "description": "Your vendor number as used by the customer."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The XRechnung attributes attached to the contact."
+              },
+              "emailAddresses": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized contact values grouped by Lexoffice field name."
+              },
+              "phoneNumbers": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "mobile": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "fax": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized phone numbers grouped by Lexoffice field name."
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000,
+                "description": "The optional contact note with a maximum length of 1000 characters."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "version",
+              "roles"
+            ],
+            "description": "The Lexoffice contact payload used for creating or updating a contact.",
+            "oneOf": [
+              {
+                "required": [
+                  "company"
+                ],
+                "not": {
+                  "required": [
+                    "person"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "person"
+                ],
+                "not": {
+                  "required": [
+                    "company"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The input payload for creating a Lexoffice contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice resource identifier.",
+                "format": "uuid"
+              },
+              "resourceUri": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The canonical Lexoffice resource URI."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The latest version returned by Lexoffice."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Lexoffice action result envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The response returned when creating a Lexoffice contact."
+      }
+    },
+    {
+      "id": "lexoffice.get_article",
+      "service": "lexoffice",
+      "name": "get_article",
+      "description": "Retrieve one Lexoffice article by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Lexoffice article identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Lexoffice action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "article": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice article identifier.",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The title of the article."
+              },
+              "description": {
+                "type": "string",
+                "description": "The article description."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PRODUCT",
+                  "SERVICE"
+                ],
+                "description": "The Lexoffice article type."
+              },
+              "articleNumber": {
+                "type": "string",
+                "description": "The article number."
+              },
+              "gtin": {
+                "type": "string",
+                "description": "The Global Trade Item Number of the article."
+              },
+              "note": {
+                "type": "string",
+                "description": "The internal article note."
+              },
+              "unitName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unit name of the article."
+              },
+              "price": {
+                "type": "object",
+                "properties": {
+                  "netPrice": {
+                    "type": "number",
+                    "description": "The net price of the article."
+                  },
+                  "grossPrice": {
+                    "type": "number",
+                    "description": "The gross price of the article."
+                  },
+                  "leadingPrice": {
+                    "type": "string",
+                    "enum": [
+                      "NET",
+                      "GROSS"
+                    ],
+                    "description": "The leading article price type."
+                  },
+                  "taxRate": {
+                    "type": "number",
+                    "description": "The article tax rate accepted by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "leadingPrice",
+                  "taxRate"
+                ],
+                "description": "The Lexoffice article price object.",
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "NET"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "netPrice"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "GROSS"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "grossPrice"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "version": {
+                "type": "integer",
+                "description": "The article version used for optimistic locking."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "type",
+              "unitName",
+              "price",
+              "version"
+            ],
+            "description": "A Lexoffice article object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "article"
+        ],
+        "description": "The response returned when retrieving one Lexoffice article."
+      }
+    },
+    {
+      "id": "lexoffice.get_contact",
+      "service": "lexoffice",
+      "name": "get_contact",
+      "description": "Retrieve one Lexoffice contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Lexoffice contact identifier.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Lexoffice action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice contact identifier.",
+                "format": "uuid"
+              },
+              "organizationId": {
+                "type": "string",
+                "description": "The Lexoffice organization identifier.",
+                "format": "uuid"
+              },
+              "version": {
+                "type": "integer",
+                "description": "The contact version used for optimistic locking."
+              },
+              "roles": {
+                "type": "object",
+                "properties": {
+                  "customer": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "description": "The generated customer number."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The customer role details returned by Lexoffice."
+                  },
+                  "vendor": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer",
+                        "description": "The generated vendor number."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "The vendor role details returned by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Lexoffice roles object. Each present key activates the corresponding role."
+              },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "allowTaxFreeInvoices": {
+                    "type": "boolean",
+                    "description": "Whether tax-free invoices are allowed for this company."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "taxNumber": {
+                    "type": "string",
+                    "description": "The tax number of the company."
+                  },
+                  "vatRegistrationId": {
+                    "type": "string",
+                    "description": "The VAT registration ID of the company."
+                  },
+                  "contactPersons": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "salutation": {
+                          "type": "string",
+                          "description": "The salutation of the contact person."
+                        },
+                        "firstName": {
+                          "type": "string",
+                          "description": "The first name of the contact person."
+                        },
+                        "lastName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The last name of the contact person."
+                        },
+                        "primary": {
+                          "type": "boolean",
+                          "description": "Whether the contact person is the primary contact."
+                        },
+                        "emailAddress": {
+                          "type": "string",
+                          "description": "The email address of the contact person."
+                        },
+                        "phoneNumber": {
+                          "type": "string",
+                          "description": "The phone number of the contact person."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "lastName"
+                      ],
+                      "description": "A Lexoffice company contact person object."
+                    },
+                    "description": "The contact persons attached to the company."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "description": "The Lexoffice company object used for company contacts."
+              },
+              "person": {
+                "type": "object",
+                "properties": {
+                  "salutation": {
+                    "type": "string",
+                    "description": "The salutation of the person."
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "description": "The first name of the person."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The last name of the person."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "lastName"
+                ],
+                "description": "The Lexoffice person object used for private-person contacts."
+              },
+              "addresses": {
+                "type": "object",
+                "properties": {
+                  "billing": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The billing addresses."
+                  },
+                  "shipping": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The shipping addresses."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The address collections attached to the contact."
+              },
+              "xRechnung": {
+                "type": "object",
+                "properties": {
+                  "buyerReference": {
+                    "type": "string",
+                    "description": "The Leitweg-ID of the customer."
+                  },
+                  "vendorNumberAtCustomer": {
+                    "type": "string",
+                    "description": "Your vendor number as used by the customer."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The XRechnung attributes attached to the contact."
+              },
+              "emailAddresses": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized contact values grouped by Lexoffice field name."
+              },
+              "phoneNumbers": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "mobile": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "fax": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized phone numbers grouped by Lexoffice field name."
+              },
+              "note": {
+                "type": "string",
+                "description": "The optional contact note."
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the contact is archived."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "organizationId",
+              "version",
+              "roles"
+            ],
+            "description": "A Lexoffice contact object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "The response returned when retrieving one Lexoffice contact."
+      }
+    },
+    {
+      "id": "lexoffice.get_profile",
+      "service": "lexoffice",
+      "name": "get_profile",
+      "description": "Retrieve the current Lexoffice connection profile and organization metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving the current Lexoffice profile."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "description": "The Lexoffice organization identifier.",
+            "format": "uuid"
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The organization name registered at Lexoffice."
+          },
+          "created": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "The Lexoffice user identifier.",
+                "format": "uuid"
+              },
+              "userName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The Lexoffice user who created the connection."
+              },
+              "userEmail": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The email address of the Lexoffice user."
+              },
+              "date": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The metadata about the established Lexoffice connection."
+          },
+          "connectionId": {
+            "type": "string",
+            "description": "The Lexoffice connection identifier.",
+            "format": "uuid"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The product features returned by Lexoffice."
+          },
+          "businessFeatures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The business features returned by Lexoffice."
+          },
+          "subscriptionStatus": {
+            "type": "string",
+            "description": "The subscription status returned by Lexoffice."
+          },
+          "taxType": {
+            "type": "string",
+            "description": "The configured tax type of the organization."
+          },
+          "distanceSalesPrinciple": {
+            "type": "string",
+            "description": "The configured distance sales principle."
+          },
+          "smallBusiness": {
+            "type": "boolean",
+            "description": "Whether the organization is marked as a small business."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizationId",
+          "companyName",
+          "created",
+          "connectionId"
+        ],
+        "description": "The Lexoffice profile object returned by GET /v1/profile."
+      }
+    },
+    {
+      "id": "lexoffice.list_articles",
+      "service": "lexoffice",
+      "name": "list_articles",
+      "description": "List Lexoffice articles with optional articleNumber, GTIN, or type filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "articleNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter articles by article number."
+          },
+          "gtin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter articles by GTIN."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PRODUCT",
+              "SERVICE"
+            ],
+            "description": "The Lexoffice article type."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The 0-based page number to retrieve."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The page size to request. Lexoffice allows up to 250."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Lexoffice articles."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Lexoffice article identifier.",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The title of the article."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The article description."
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "PRODUCT",
+                    "SERVICE"
+                  ],
+                  "description": "The Lexoffice article type."
+                },
+                "articleNumber": {
+                  "type": "string",
+                  "description": "The article number."
+                },
+                "gtin": {
+                  "type": "string",
+                  "description": "The Global Trade Item Number of the article."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The internal article note."
+                },
+                "unitName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unit name of the article."
+                },
+                "price": {
+                  "type": "object",
+                  "properties": {
+                    "netPrice": {
+                      "type": "number",
+                      "description": "The net price of the article."
+                    },
+                    "grossPrice": {
+                      "type": "number",
+                      "description": "The gross price of the article."
+                    },
+                    "leadingPrice": {
+                      "type": "string",
+                      "enum": [
+                        "NET",
+                        "GROSS"
+                      ],
+                      "description": "The leading article price type."
+                    },
+                    "taxRate": {
+                      "type": "number",
+                      "description": "The article tax rate accepted by Lexoffice."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "leadingPrice",
+                    "taxRate"
+                  ],
+                  "description": "The Lexoffice article price object.",
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "leadingPrice": {
+                            "const": "NET"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "netPrice"
+                        ]
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "leadingPrice": {
+                            "const": "GROSS"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "grossPrice"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The article version used for optimistic locking."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "title",
+                "type",
+                "unitName",
+                "price",
+                "version"
+              ],
+              "description": "A Lexoffice article object."
+            },
+            "description": "The articles returned by the current page."
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of available pages."
+          },
+          "totalElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records."
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Whether this is the last page."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The property used for sorting."
+                },
+                "direction": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sort direction returned by Lexoffice."
+                },
+                "ignoreCase": {
+                  "type": "boolean",
+                  "description": "Whether the sort ignores case."
+                },
+                "nullHandling": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The null-handling strategy."
+                },
+                "ascending": {
+                  "type": "boolean",
+                  "description": "Whether the sort order is ascending."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Lexoffice page sort item."
+            },
+            "description": "The sort specification returned by Lexoffice."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size returned by Lexoffice."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current 0-based page index."
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Whether this is the first page."
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of elements in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Lexoffice article page response."
+      }
+    },
+    {
+      "id": "lexoffice.list_contacts",
+      "service": "lexoffice",
+      "name": "list_contacts",
+      "description": "List Lexoffice contacts with optional filters and page navigation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Filter contacts by email with Lexoffice substring semantics."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Filter contacts by name with Lexoffice substring semantics."
+          },
+          "number": {
+            "type": "integer",
+            "description": "Filter contacts by customer or vendor number."
+          },
+          "customer": {
+            "type": "boolean",
+            "description": "Whether to filter customer contacts."
+          },
+          "vendor": {
+            "type": "boolean",
+            "description": "Whether to filter vendor contacts."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The 0-based page number to retrieve."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The page size to request. Lexoffice allows up to 250."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Lexoffice contacts."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Lexoffice contact identifier.",
+                  "format": "uuid"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "description": "The Lexoffice organization identifier.",
+                  "format": "uuid"
+                },
+                "version": {
+                  "type": "integer",
+                  "description": "The contact version used for optimistic locking."
+                },
+                "roles": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "integer",
+                          "description": "The generated customer number."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The customer role details returned by Lexoffice."
+                    },
+                    "vendor": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "integer",
+                          "description": "The generated vendor number."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "The vendor role details returned by Lexoffice."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The Lexoffice roles object. Each present key activates the corresponding role."
+                },
+                "company": {
+                  "type": "object",
+                  "properties": {
+                    "allowTaxFreeInvoices": {
+                      "type": "boolean",
+                      "description": "Whether tax-free invoices are allowed for this company."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The company name."
+                    },
+                    "taxNumber": {
+                      "type": "string",
+                      "description": "The tax number of the company."
+                    },
+                    "vatRegistrationId": {
+                      "type": "string",
+                      "description": "The VAT registration ID of the company."
+                    },
+                    "contactPersons": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "salutation": {
+                            "type": "string",
+                            "description": "The salutation of the contact person."
+                          },
+                          "firstName": {
+                            "type": "string",
+                            "description": "The first name of the contact person."
+                          },
+                          "lastName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "The last name of the contact person."
+                          },
+                          "primary": {
+                            "type": "boolean",
+                            "description": "Whether the contact person is the primary contact."
+                          },
+                          "emailAddress": {
+                            "type": "string",
+                            "description": "The email address of the contact person."
+                          },
+                          "phoneNumber": {
+                            "type": "string",
+                            "description": "The phone number of the contact person."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "lastName"
+                        ],
+                        "description": "A Lexoffice company contact person object."
+                      },
+                      "description": "The contact persons attached to the company."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "name"
+                  ],
+                  "description": "The Lexoffice company object used for company contacts."
+                },
+                "person": {
+                  "type": "object",
+                  "properties": {
+                    "salutation": {
+                      "type": "string",
+                      "description": "The salutation of the person."
+                    },
+                    "firstName": {
+                      "type": "string",
+                      "description": "The first name of the person."
+                    },
+                    "lastName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The last name of the person."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "lastName"
+                  ],
+                  "description": "The Lexoffice person object used for private-person contacts."
+                },
+                "addresses": {
+                  "type": "object",
+                  "properties": {
+                    "billing": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "supplement": {
+                            "type": "string",
+                            "description": "Additional address information."
+                          },
+                          "street": {
+                            "type": "string",
+                            "description": "Street and street number."
+                          },
+                          "zip": {
+                            "type": "string",
+                            "description": "ZIP or postal code."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City name."
+                          },
+                          "countryCode": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2,
+                            "description": "The ISO 3166 alpha-2 country code."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "countryCode"
+                        ],
+                        "description": "A Lexoffice address payload used for billing or shipping addresses."
+                      },
+                      "description": "The billing addresses."
+                    },
+                    "shipping": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "supplement": {
+                            "type": "string",
+                            "description": "Additional address information."
+                          },
+                          "street": {
+                            "type": "string",
+                            "description": "Street and street number."
+                          },
+                          "zip": {
+                            "type": "string",
+                            "description": "ZIP or postal code."
+                          },
+                          "city": {
+                            "type": "string",
+                            "description": "City name."
+                          },
+                          "countryCode": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2,
+                            "description": "The ISO 3166 alpha-2 country code."
+                          }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                          "countryCode"
+                        ],
+                        "description": "A Lexoffice address payload used for billing or shipping addresses."
+                      },
+                      "description": "The shipping addresses."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The address collections attached to the contact."
+                },
+                "xRechnung": {
+                  "type": "object",
+                  "properties": {
+                    "buyerReference": {
+                      "type": "string",
+                      "description": "The Leitweg-ID of the customer."
+                    },
+                    "vendorNumberAtCustomer": {
+                      "type": "string",
+                      "description": "Your vendor number as used by the customer."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The XRechnung attributes attached to the contact."
+                },
+                "emailAddresses": {
+                  "type": "object",
+                  "properties": {
+                    "business": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "office": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "private": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "other": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The categorized contact values grouped by Lexoffice field name."
+                },
+                "phoneNumbers": {
+                  "type": "object",
+                  "properties": {
+                    "business": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "office": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "mobile": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "private": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "fax": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    },
+                    "other": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "One string value."
+                      },
+                      "description": "A list of string values."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The categorized phone numbers grouped by Lexoffice field name."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "The optional contact note."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the contact is archived."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "organizationId",
+                "version",
+                "roles"
+              ],
+              "description": "A Lexoffice contact object."
+            },
+            "description": "The contacts returned by the current page."
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of available pages."
+          },
+          "totalElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records."
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Whether this is the last page."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The property used for sorting."
+                },
+                "direction": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sort direction returned by Lexoffice."
+                },
+                "ignoreCase": {
+                  "type": "boolean",
+                  "description": "Whether the sort ignores case."
+                },
+                "nullHandling": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The null-handling strategy."
+                },
+                "ascending": {
+                  "type": "boolean",
+                  "description": "Whether the sort order is ascending."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Lexoffice page sort item."
+            },
+            "description": "The sort specification returned by Lexoffice."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size returned by Lexoffice."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current 0-based page index."
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Whether this is the first page."
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of elements in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Lexoffice contact page response."
+      }
+    },
+    {
+      "id": "lexoffice.list_voucherlist",
+      "service": "lexoffice",
+      "name": "list_voucherlist",
+      "description": "List Lexoffice voucher metadata using the official voucherlist filters and paging.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "voucherType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated Lexoffice voucher type list, or the value any."
+          },
+          "voucherStatus": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated Lexoffice voucher status list, or the value any."
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether archived vouchers should be returned."
+          },
+          "contactId": {
+            "type": "string",
+            "description": "The Lexoffice contact identifier.",
+            "format": "uuid"
+          },
+          "voucherDateFrom": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "voucherDateTo": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "createdDateFrom": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "createdDateTo": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "updatedDateFrom": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "updatedDateTo": {
+            "type": "string",
+            "description": "The date value in YYYY-MM-DD format.",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "voucherNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter vouchers by voucher number."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 250,
+            "description": "The page size to request. Lexoffice allows up to 250."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The 0-based page number to retrieve."
+          },
+          "sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Lexoffice sort expression such as voucherDate,DESC or updatedDate,ASC."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "voucherType",
+          "voucherStatus"
+        ],
+        "description": "The input payload for listing Lexoffice voucher metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Lexoffice voucher identifier.",
+                  "format": "uuid"
+                },
+                "voucherType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The voucher type identifier."
+                },
+                "voucherStatus": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The voucher status identifier."
+                },
+                "voucherNumber": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The voucher number."
+                },
+                "voucherDate": {
+                  "type": "string",
+                  "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                  "format": "date-time"
+                },
+                "createdDate": {
+                  "type": "string",
+                  "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                  "format": "date-time"
+                },
+                "updatedDate": {
+                  "type": "string",
+                  "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                  "format": "date-time"
+                },
+                "dueDate": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The due date timestamp returned by Lexoffice.",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The due date timestamp returned by Lexoffice."
+                },
+                "contactId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The Lexoffice contact identifier.",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The Lexoffice contact identifier."
+                },
+                "contactName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The human-readable contact name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The human-readable contact name."
+                },
+                "totalAmount": {
+                  "type": "number",
+                  "description": "The total voucher amount."
+                },
+                "openAmount": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The currently open amount of the voucher."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The currently open amount of the voucher."
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The voucher currency."
+                },
+                "archived": {
+                  "type": "boolean",
+                  "description": "Whether the voucher is archived."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A voucher summary returned by the Lexoffice voucherlist endpoint."
+            },
+            "description": "The vouchers returned by the current page."
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of available pages."
+          },
+          "totalElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of matching records."
+          },
+          "last": {
+            "type": "boolean",
+            "description": "Whether this is the last page."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "property": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The property used for sorting."
+                },
+                "direction": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sort direction returned by Lexoffice."
+                },
+                "ignoreCase": {
+                  "type": "boolean",
+                  "description": "Whether the sort ignores case."
+                },
+                "nullHandling": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The null-handling strategy."
+                },
+                "ascending": {
+                  "type": "boolean",
+                  "description": "Whether the sort order is ascending."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Lexoffice page sort item."
+            },
+            "description": "The sort specification returned by Lexoffice."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The page size returned by Lexoffice."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The current 0-based page index."
+          },
+          "first": {
+            "type": "boolean",
+            "description": "Whether this is the first page."
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of elements in the current page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Lexoffice voucherlist page response."
+      }
+    },
+    {
+      "id": "lexoffice.update_article",
+      "service": "lexoffice",
+      "name": "update_article",
+      "description": "Update one Lexoffice article by ID using the latest optimistic-locking version.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Lexoffice article identifier.",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The title of the article."
+              },
+              "description": {
+                "type": "string",
+                "description": "The article description."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PRODUCT",
+                  "SERVICE"
+                ],
+                "description": "The Lexoffice article type."
+              },
+              "articleNumber": {
+                "type": "string",
+                "description": "The article number."
+              },
+              "gtin": {
+                "type": "string",
+                "description": "The Global Trade Item Number of the article."
+              },
+              "note": {
+                "type": "string",
+                "description": "The internal article note."
+              },
+              "unitName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unit name of the article."
+              },
+              "price": {
+                "type": "object",
+                "properties": {
+                  "netPrice": {
+                    "type": "number",
+                    "description": "The net price of the article."
+                  },
+                  "grossPrice": {
+                    "type": "number",
+                    "description": "The gross price of the article."
+                  },
+                  "leadingPrice": {
+                    "type": "string",
+                    "enum": [
+                      "NET",
+                      "GROSS"
+                    ],
+                    "description": "The leading article price type."
+                  },
+                  "taxRate": {
+                    "type": "number",
+                    "description": "The article tax rate accepted by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "leadingPrice",
+                  "taxRate"
+                ],
+                "description": "The Lexoffice article price object.",
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "NET"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "netPrice"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "leadingPrice": {
+                          "const": "GROSS"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "grossPrice"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The article version used for optimistic locking."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "title",
+              "type",
+              "unitName",
+              "price"
+            ],
+            "description": "The Lexoffice article payload used for creating or updating an article."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "data"
+        ],
+        "description": "The input payload for updating a Lexoffice article."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice resource identifier.",
+                "format": "uuid"
+              },
+              "resourceUri": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The canonical Lexoffice resource URI."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The latest version returned by Lexoffice."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Lexoffice action result envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The response returned when updating a Lexoffice article."
+      }
+    },
+    {
+      "id": "lexoffice.update_contact",
+      "service": "lexoffice",
+      "name": "update_contact",
+      "description": "Update one Lexoffice contact by ID using the latest optimistic-locking version.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The Lexoffice contact identifier.",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The optimistic-locking version. Use 0 for POST and the latest value for PUT."
+              },
+              "roles": {
+                "type": "object",
+                "properties": {
+                  "customer": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false,
+                    "description": "An empty role object expected by Lexoffice."
+                  },
+                  "vendor": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false,
+                    "description": "An empty role object expected by Lexoffice."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The Lexoffice role payload used when creating or updating a contact."
+              },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "allowTaxFreeInvoices": {
+                    "type": "boolean",
+                    "description": "Whether tax-free invoices are allowed for this company."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The company name."
+                  },
+                  "taxNumber": {
+                    "type": "string",
+                    "description": "The tax number of the company."
+                  },
+                  "vatRegistrationId": {
+                    "type": "string",
+                    "description": "The VAT registration ID of the company."
+                  },
+                  "contactPersons": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "salutation": {
+                          "type": "string",
+                          "description": "The salutation of the contact person."
+                        },
+                        "firstName": {
+                          "type": "string",
+                          "description": "The first name of the contact person."
+                        },
+                        "lastName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "The last name of the contact person."
+                        },
+                        "primary": {
+                          "type": "boolean",
+                          "description": "Whether the contact person is the primary contact."
+                        },
+                        "emailAddress": {
+                          "type": "string",
+                          "description": "The email address of the contact person."
+                        },
+                        "phoneNumber": {
+                          "type": "string",
+                          "description": "The phone number of the contact person."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "lastName"
+                      ],
+                      "description": "A Lexoffice company contact person object."
+                    },
+                    "description": "The contact persons attached to the company."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "description": "The Lexoffice company object used for company contacts."
+              },
+              "person": {
+                "type": "object",
+                "properties": {
+                  "salutation": {
+                    "type": "string",
+                    "description": "The salutation of the person."
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "description": "The first name of the person."
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The last name of the person."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "lastName"
+                ],
+                "description": "The Lexoffice person object used for private-person contacts."
+              },
+              "addresses": {
+                "type": "object",
+                "properties": {
+                  "billing": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The billing addresses."
+                  },
+                  "shipping": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "supplement": {
+                          "type": "string",
+                          "description": "Additional address information."
+                        },
+                        "street": {
+                          "type": "string",
+                          "description": "Street and street number."
+                        },
+                        "zip": {
+                          "type": "string",
+                          "description": "ZIP or postal code."
+                        },
+                        "city": {
+                          "type": "string",
+                          "description": "City name."
+                        },
+                        "countryCode": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 2,
+                          "description": "The ISO 3166 alpha-2 country code."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "required": [
+                        "countryCode"
+                      ],
+                      "description": "A Lexoffice address payload used for billing or shipping addresses."
+                    },
+                    "description": "The shipping addresses."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The address collections attached to the contact."
+              },
+              "xRechnung": {
+                "type": "object",
+                "properties": {
+                  "buyerReference": {
+                    "type": "string",
+                    "description": "The Leitweg-ID of the customer."
+                  },
+                  "vendorNumberAtCustomer": {
+                    "type": "string",
+                    "description": "Your vendor number as used by the customer."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The XRechnung attributes attached to the contact."
+              },
+              "emailAddresses": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized contact values grouped by Lexoffice field name."
+              },
+              "phoneNumbers": {
+                "type": "object",
+                "properties": {
+                  "business": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "office": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "mobile": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "private": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "fax": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  },
+                  "other": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "One string value."
+                    },
+                    "description": "A list of string values."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The categorized phone numbers grouped by Lexoffice field name."
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000,
+                "description": "The optional contact note with a maximum length of 1000 characters."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "version",
+              "roles"
+            ],
+            "description": "The Lexoffice contact payload used for creating or updating a contact.",
+            "oneOf": [
+              {
+                "required": [
+                  "company"
+                ],
+                "not": {
+                  "required": [
+                    "person"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "person"
+                ],
+                "not": {
+                  "required": [
+                    "company"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "data"
+        ],
+        "description": "The input payload for updating a Lexoffice contact."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Lexoffice resource identifier.",
+                "format": "uuid"
+              },
+              "resourceUri": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The canonical Lexoffice resource URI."
+              },
+              "createdDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "updatedDate": {
+                "type": "string",
+                "description": "The RFC 3339 timestamp returned by Lexoffice.",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The latest version returned by Lexoffice."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Lexoffice action result envelope."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "The response returned when updating a Lexoffice contact."
+      }
+    }
+  ]
+}

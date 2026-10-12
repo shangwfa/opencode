@@ -1,0 +1,2482 @@
+{
+  "service": "getresponse",
+  "displayName": "GetResponse",
+  "categories": [
+    "Marketing",
+    "Communication"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "GETRESPONSE_API_KEY",
+      "extraFields": [
+        {
+          "key": "maxApiBaseUrl",
+          "label": "MAX API Base URL",
+          "required": false,
+          "inputType": "text",
+          "secret": false,
+          "placeholder": "https://api3.getresponse360.com/v3"
+        },
+        {
+          "key": "domain",
+          "label": "MAX Domain",
+          "required": false,
+          "inputType": "text",
+          "secret": false,
+          "placeholder": "example.com"
+        },
+        {
+          "key": "parentLogin",
+          "label": "Parent Account Login",
+          "required": false,
+          "inputType": "text",
+          "secret": false,
+          "placeholder": "parent@example.com"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.getresponse.com",
+  "actions": [
+    {
+      "id": "getresponse.create_campaign",
+      "service": "getresponse",
+      "name": "create_campaign",
+      "description": "Create a GetResponse campaign for organizing contacts.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "A unique campaign name between 3 and 64 characters."
+          },
+          "languageCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign language code, such as EN."
+          },
+          "apiOptIn": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "description": "The opt-in mode for contacts added through the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "The new GetResponse campaign fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The campaign name."
+              },
+              "languageCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign language code when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign language code when returned by GetResponse."
+              },
+              "isDefault": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this is the account's default campaign."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this is the account's default campaign."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign creation timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign creation timestamp when returned by GetResponse."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw campaign object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse campaign, also known as a contact list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse campaign creation response."
+      }
+    },
+    {
+      "id": "getresponse.create_contact",
+      "service": "getresponse",
+      "name": "create_contact",
+      "description": "Queue a contact for creation in a GetResponse campaign.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The contact name.",
+            "pattern": "\\S"
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "dayOfCycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The autoresponder cycle day, or null to remove the contact from the cycle.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The autoresponder cycle day, or null to remove the contact from the cycle."
+          },
+          "scoring": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The contact score, or null to remove the score."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact score, or null to remove the score."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tagId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A tag to assign to a GetResponse contact."
+            },
+            "description": "Tags that replace the contact's current tag assignments."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customFieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A custom field value."
+                  },
+                  "description": "The values to assign to the custom field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A custom field value to assign to a GetResponse contact."
+            },
+            "description": "Custom fields that replace the contact's current custom field assignments."
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A valid IPv4 address.",
+                "format": "ipv4"
+              },
+              {
+                "type": "string",
+                "description": "A valid IPv6 address.",
+                "format": "ipv6"
+              }
+            ],
+            "description": "A valid IPv4 or IPv6 address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "campaignId"
+        ],
+        "description": "The new GetResponse contact fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether GetResponse accepted the contact for asynchronous processing."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The GetResponse contact creation acceptance response."
+      }
+    },
+    {
+      "id": "getresponse.delete_contact",
+      "service": "getresponse",
+      "name": "delete_contact",
+      "description": "Permanently delete a GetResponse contact by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The contact to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the contact was deleted."
+          },
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The GetResponse contact deletion result."
+      }
+    },
+    {
+      "id": "getresponse.get_campaign",
+      "service": "getresponse",
+      "name": "get_campaign",
+      "description": "Retrieve one GetResponse campaign by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The campaign to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The campaign name."
+              },
+              "languageCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign language code when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign language code when returned by GetResponse."
+              },
+              "isDefault": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this is the account's default campaign."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this is the account's default campaign."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign creation timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign creation timestamp when returned by GetResponse."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw campaign object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse campaign, also known as a contact list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse campaign response."
+      }
+    },
+    {
+      "id": "getresponse.get_contact",
+      "service": "getresponse",
+      "name": "get_contact",
+      "description": "Retrieve one GetResponse contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The contact to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "email": {
+                "type": "string",
+                "description": "The contact email address.",
+                "format": "email"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact name when present."
+              },
+              "campaign": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "campaignId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A GetResponse resource identifier."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The campaign name when returned by GetResponse."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The campaign name when returned by GetResponse."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A GetResponse campaign reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A GetResponse campaign reference."
+              },
+              "origin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "How the contact was added to GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "How the contact was added to GetResponse."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact creation timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact creation timestamp when returned by GetResponse."
+              },
+              "changedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest contact change timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest contact change timestamp when returned by GetResponse."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw contact object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse contact response."
+      }
+    },
+    {
+      "id": "getresponse.get_newsletter",
+      "service": "getresponse",
+      "name": "get_newsletter",
+      "description": "Retrieve one GetResponse newsletter by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "newsletterId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The newsletter to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "newsletter": {
+            "type": "object",
+            "properties": {
+              "newsletterId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The internal newsletter name when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The internal newsletter name when returned by GetResponse."
+              },
+              "subject": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The newsletter subject when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The newsletter subject when returned by GetResponse."
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The GetResponse newsletter type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The GetResponse newsletter type."
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The GetResponse newsletter status."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The GetResponse newsletter status."
+              },
+              "campaign": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "campaignId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A GetResponse resource identifier."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The campaign name when returned by GetResponse."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The campaign name when returned by GetResponse."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A GetResponse campaign reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A GetResponse campaign reference."
+              },
+              "sendOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The scheduled or actual send timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The scheduled or actual send timestamp when returned."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The newsletter creation timestamp when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The newsletter creation timestamp when returned."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw newsletter object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse newsletter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse newsletter response."
+      }
+    },
+    {
+      "id": "getresponse.get_newsletter_statistics",
+      "service": "getresponse",
+      "name": "get_newsletter_statistics",
+      "description": "Retrieve delivery and engagement statistics for one GetResponse newsletter.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "newsletterId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "total",
+              "hour",
+              "day",
+              "month"
+            ],
+            "description": "The time interval used to group statistics."
+          },
+          "createdFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "createdTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "newsletterId"
+        ],
+        "description": "Filters and pagination for GetResponse newsletter statistics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statistics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timeInterval": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The ISO 8601 time interval represented by this statistics row."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The ISO 8601 time interval represented by this statistics row."
+                },
+                "sent": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of messages sent."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of messages sent."
+                },
+                "totalOpened": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of message opens."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of message opens."
+                },
+                "totalHumanOpened": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of human message opens."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of human message opens."
+                },
+                "uniqueOpened": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of contacts who opened the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of contacts who opened the message."
+                },
+                "uniqueHumanOpened": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of contacts with a human message open."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of contacts with a human message open."
+                },
+                "totalClicked": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of tracked-link clicks."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of tracked-link clicks."
+                },
+                "totalHumanClicked": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of human tracked-link clicks."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of human tracked-link clicks."
+                },
+                "uniqueClicked": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of contacts who clicked a tracked link."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of contacts who clicked a tracked link."
+                },
+                "uniqueHumanClicked": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of contacts with a human tracked-link click."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of contacts with a human tracked-link click."
+                },
+                "goals": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The total number of completed goals."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The total number of completed goals."
+                },
+                "uniqueGoals": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of contacts who completed a goal."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of contacts who completed a goal."
+                },
+                "forwarded": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of message forwards."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of message forwards."
+                },
+                "unsubscribed": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of unsubscribes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of unsubscribes."
+                },
+                "bounced": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of bounced messages."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of bounced messages."
+                },
+                "complaints": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The number of spam complaints."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The number of spam complaints."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw newsletter statistics row returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse newsletter statistics row."
+            },
+            "description": "Statistics rows returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The GetResponse newsletter statistics response."
+      }
+    },
+    {
+      "id": "getresponse.list_campaigns",
+      "service": "getresponse",
+      "name": "list_campaigns",
+      "description": "List GetResponse campaigns, which represent contact lists.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter campaigns by name."
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Filter campaigns by default-list status."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "name",
+              "createdOn"
+            ],
+            "description": "The campaign field to sort by."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing GetResponse campaigns.",
+        "dependentRequired": {
+          "sortBy": [
+            "sortOrder"
+          ],
+          "sortOrder": [
+            "sortBy"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campaignId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The campaign name."
+                },
+                "languageCode": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign language code when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign language code when returned by GetResponse."
+                },
+                "isDefault": {
+                  "anyOf": [
+                    {
+                      "type": "boolean",
+                      "description": "Whether this is the account's default campaign."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Whether this is the account's default campaign."
+                },
+                "createdOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The campaign creation timestamp when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The campaign creation timestamp when returned by GetResponse."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw campaign object returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse campaign, also known as a contact list."
+            },
+            "description": "Campaigns returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse campaign list response."
+      }
+    },
+    {
+      "id": "getresponse.list_contacts",
+      "service": "getresponse",
+      "name": "list_contacts",
+      "description": "List and search GetResponse contacts with page-based pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter contacts by an exact address or partial email value."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter contacts by name."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "exactMatch": {
+            "type": "boolean",
+            "description": "Use exact matching for the email and name filters."
+          },
+          "createdFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "createdTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "changedFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "changedTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "email",
+              "name",
+              "createdOn",
+              "changedOn",
+              "campaignId"
+            ],
+            "description": "The contact field to sort by."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters, sorting, and pagination for listing GetResponse contacts.",
+        "dependentRequired": {
+          "sortBy": [
+            "sortOrder"
+          ],
+          "sortOrder": [
+            "sortBy"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contactId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The contact email address.",
+                  "format": "email"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact name when present."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact name when present."
+                },
+                "campaign": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "campaignId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A GetResponse resource identifier."
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The campaign name when returned by GetResponse."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The campaign name when returned by GetResponse."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A GetResponse campaign reference."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A GetResponse campaign reference."
+                },
+                "origin": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "How the contact was added to GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "How the contact was added to GetResponse."
+                },
+                "createdOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact creation timestamp when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact creation timestamp when returned by GetResponse."
+                },
+                "changedOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The latest contact change timestamp when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The latest contact change timestamp when returned by GetResponse."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw contact object returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse contact."
+            },
+            "description": "Contacts returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse contact list response."
+      }
+    },
+    {
+      "id": "getresponse.list_custom_fields",
+      "service": "getresponse",
+      "name": "list_custom_fields",
+      "description": "List GetResponse custom fields that can be assigned to contacts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter custom fields by name."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction applied to the custom field name."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing GetResponse custom fields."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customFieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The custom field name."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The custom field value type when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The custom field value type when returned."
+                },
+                "format": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The custom field input format when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The custom field input format when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw custom field object returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse custom field."
+            },
+            "description": "Custom fields returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse custom field list response."
+      }
+    },
+    {
+      "id": "getresponse.list_newsletters",
+      "service": "getresponse",
+      "name": "list_newsletters",
+      "description": "List GetResponse newsletters with filters and pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter newsletters by internal name."
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter newsletters by subject."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ],
+            "description": "Filter newsletters by status."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "broadcast",
+              "splittest",
+              "automation"
+            ],
+            "description": "Filter newsletters by type."
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "createdFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "createdTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "sentFrom": {
+            "type": "string",
+            "description": "Return newsletters sent on or after this date.",
+            "format": "date"
+          },
+          "sentTo": {
+            "type": "string",
+            "description": "Return newsletters sent on or before this date.",
+            "format": "date"
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "createdOn",
+              "sendOn"
+            ],
+            "description": "The newsletter field to sort by."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters, sorting, and pagination for listing GetResponse newsletters.",
+        "dependentRequired": {
+          "sortBy": [
+            "sortOrder"
+          ],
+          "sortOrder": [
+            "sortBy"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "newsletters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "newsletterId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The internal newsletter name when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The internal newsletter name when returned by GetResponse."
+                },
+                "subject": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The newsletter subject when returned by GetResponse."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The newsletter subject when returned by GetResponse."
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The GetResponse newsletter type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The GetResponse newsletter type."
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The GetResponse newsletter status."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The GetResponse newsletter status."
+                },
+                "campaign": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "campaignId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A GetResponse resource identifier."
+                        },
+                        "name": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The campaign name when returned by GetResponse."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The campaign name when returned by GetResponse."
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "A GetResponse campaign reference."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A GetResponse campaign reference."
+                },
+                "sendOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The scheduled or actual send timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The scheduled or actual send timestamp when returned."
+                },
+                "createdOn": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The newsletter creation timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The newsletter creation timestamp when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw newsletter object returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse newsletter."
+            },
+            "description": "Newsletters returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse newsletter list response."
+      }
+    },
+    {
+      "id": "getresponse.list_tags",
+      "service": "getresponse",
+      "name": "list_tags",
+      "description": "List GetResponse tags that can be assigned to contacts.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter tags by name."
+          },
+          "createdFrom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "createdTo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "An ISO 8601 calendar date.",
+                "format": "date"
+              },
+              {
+                "type": "string",
+                "description": "An ISO 8601 timestamp.",
+                "format": "date-time"
+              }
+            ],
+            "description": "An ISO 8601 date or timestamp."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "name"
+            ],
+            "description": "The tag field to sort by."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "ASC",
+              "DESC"
+            ],
+            "description": "The sort direction."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of results per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters, sorting, and pagination for listing GetResponse tags.",
+        "dependentRequired": {
+          "sortBy": [
+            "sortOrder"
+          ],
+          "sortOrder": [
+            "sortBy"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tagId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The tag name."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The tag creation timestamp when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The tag creation timestamp when returned."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw tag object returned by GetResponse."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized GetResponse tag."
+            },
+            "description": "Tags returned by GetResponse."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "currentPage": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The current page reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The current page reported by GetResponse."
+              },
+              "totalPages": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of result pages reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of result pages reported by GetResponse."
+              },
+              "totalCount": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The total number of matching records reported by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The total number of matching records reported by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination metadata returned by GetResponse."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse tag list response."
+      }
+    },
+    {
+      "id": "getresponse.update_campaign",
+      "service": "getresponse",
+      "name": "update_campaign",
+      "description": "Update mutable fields on a GetResponse campaign.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 64,
+            "description": "The current or new unique campaign name between 3 and 64 characters."
+          },
+          "languageCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The campaign language code, such as EN."
+          },
+          "apiOptIn": {
+            "type": "string",
+            "enum": [
+              "single",
+              "double"
+            ],
+            "description": "The opt-in mode for contacts added through the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "campaignId",
+          "name"
+        ],
+        "description": "Fields to update on a GetResponse campaign."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The campaign name."
+              },
+              "languageCode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign language code when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign language code when returned by GetResponse."
+              },
+              "isDefault": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether this is the account's default campaign."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether this is the account's default campaign."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The campaign creation timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The campaign creation timestamp when returned by GetResponse."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw campaign object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse campaign, also known as a contact list."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse campaign update response."
+      }
+    },
+    {
+      "id": "getresponse.update_contact",
+      "service": "getresponse",
+      "name": "update_contact",
+      "description": "Update a GetResponse contact, replacing tag and custom-field assignments when supplied.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "email": {
+            "type": "string",
+            "description": "The contact email address.",
+            "format": "email"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The contact name.",
+            "pattern": "\\S"
+          },
+          "campaignId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A GetResponse resource identifier."
+          },
+          "dayOfCycle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "The autoresponder cycle day, or null to remove the contact from the cycle.",
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The autoresponder cycle day, or null to remove the contact from the cycle."
+          },
+          "scoring": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The contact score, or null to remove the score."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The contact score, or null to remove the score."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tagId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A tag to assign to a GetResponse contact."
+            },
+            "description": "Tags that replace the contact's current tag assignments."
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "customFieldId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A GetResponse resource identifier."
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A custom field value."
+                  },
+                  "description": "The values to assign to the custom field."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A custom field value to assign to a GetResponse contact."
+            },
+            "description": "Custom fields that replace the contact's current custom field assignments."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "description": "An optional note attached to the contact."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An optional note attached to the contact."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactId"
+        ],
+        "description": "Fields to update on a GetResponse contact. At least one mutable field is required.",
+        "anyOf": [
+          {
+            "description": "An update that includes the email field.",
+            "required": [
+              "email"
+            ]
+          },
+          {
+            "description": "An update that includes the name field.",
+            "required": [
+              "name"
+            ]
+          },
+          {
+            "description": "An update that includes the campaignId field.",
+            "required": [
+              "campaignId"
+            ]
+          },
+          {
+            "description": "An update that includes the dayOfCycle field.",
+            "required": [
+              "dayOfCycle"
+            ]
+          },
+          {
+            "description": "An update that includes the scoring field.",
+            "required": [
+              "scoring"
+            ]
+          },
+          {
+            "description": "An update that includes the note field.",
+            "required": [
+              "note"
+            ]
+          },
+          {
+            "description": "An update that includes the tags field.",
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "description": "An update that includes the customFields field.",
+            "required": [
+              "customFields"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A GetResponse resource identifier."
+              },
+              "email": {
+                "type": "string",
+                "description": "The contact email address.",
+                "format": "email"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact name when present."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact name when present."
+              },
+              "campaign": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "campaignId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A GetResponse resource identifier."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The campaign name when returned by GetResponse."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The campaign name when returned by GetResponse."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "A GetResponse campaign reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A GetResponse campaign reference."
+              },
+              "origin": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "How the contact was added to GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "How the contact was added to GetResponse."
+              },
+              "createdOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact creation timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact creation timestamp when returned by GetResponse."
+              },
+              "changedOn": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The latest contact change timestamp when returned by GetResponse."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The latest contact change timestamp when returned by GetResponse."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw contact object returned by GetResponse."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized GetResponse contact."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized GetResponse contact update response."
+      }
+    }
+  ]
+}

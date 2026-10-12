@@ -1,0 +1,242 @@
+{
+  "service": "tinybird",
+  "displayName": "Tinybird",
+  "categories": [
+    "Data",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Token",
+      "placeholder": "TINYBIRD_TOKEN",
+      "description": "Tinybird token sent as an Authorization Bearer token. Create or copy Static Tokens in your Tinybird workspace, or use the token shown by `tb auth`: https://www.tinybird.co/docs/forward/core-concepts/tokens.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "API Base URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://api.tinybird.co",
+          "description": "Optional Tinybird region API base URL for your workspace. Use one of the official region hosts listed in the API overview: https://www.tinybird.co/docs/api-reference#regions-and-endpoints."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.tinybird.co",
+  "actions": [
+    {
+      "id": "tinybird.get_data_source",
+      "service": "tinybird",
+      "name": "get_data_source",
+      "description": "Read metadata and stats for one Tinybird Data Source.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data Source name or ID."
+          },
+          "attrs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Data Source attributes to include in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Input for reading one Tinybird Data Source."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataSource": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Tinybird Data Source object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataSource"
+        ],
+        "description": "Tinybird Data Source result."
+      }
+    },
+    {
+      "id": "tinybird.list_data_sources",
+      "service": "tinybird",
+      "name": "list_data_sources",
+      "description": "List Tinybird Data Sources visible to the authenticated token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attrs": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated Data Source attributes to include in the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for listing Tinybird Data Sources visible to the token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dataSources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Tinybird Data Source object."
+            },
+            "description": "Data Sources returned by Tinybird."
+          },
+          "payload": {
+            "description": "Raw JSON payload returned by Tinybird."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dataSources",
+          "payload"
+        ],
+        "description": "Tinybird Data Source list result."
+      },
+      "followUpActions": [
+        "tinybird.get_data_source"
+      ]
+    },
+    {
+      "id": "tinybird.run_pipe_endpoint",
+      "service": "tinybird",
+      "name": "run_pipe_endpoint",
+      "description": "Query a published Tinybird Pipe endpoint and return its JSON response.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "pipeName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Published Pipe endpoint name."
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string parameter value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric parameter value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean parameter value."
+                }
+              ],
+              "description": "A URL query parameter value."
+            },
+            "description": "Custom query or template parameters sent to Tinybird."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pipeName"
+        ],
+        "description": "Input for querying a published Tinybird Pipe endpoint."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "description": "Raw JSON payload returned by Tinybird."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "payload"
+        ],
+        "description": "Tinybird Pipe endpoint result."
+      },
+      "followUpActions": [
+        "tinybird.run_sql_query"
+      ]
+    },
+    {
+      "id": "tinybird.run_sql_query",
+      "service": "tinybird",
+      "name": "run_sql_query",
+      "description": "Run a SQL query against Tinybird through the synchronous Query API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SQL query to execute with Tinybird."
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Optional custom parameters merged into the JSON request body."
+          },
+          "pipeline": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional Pipe name used by Tinybird as the `_` placeholder."
+          },
+          "explain": {
+            "type": "boolean",
+            "description": "Whether Tinybird should return EXPLAIN output instead of executing."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "q"
+        ],
+        "description": "Input for running a Tinybird SQL query through the Query API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "description": "Raw JSON payload returned by Tinybird."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "payload"
+        ],
+        "description": "Tinybird SQL query result."
+      },
+      "followUpActions": [
+        "tinybird.run_pipe_endpoint"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1805 @@
+{
+  "service": "junglescout",
+  "displayName": "Jungle Scout",
+  "description": "Research Amazon keywords, products, sales estimates, and share of voice with Jungle Scout.",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "JUNGLE_SCOUT_API_KEY",
+      "description": "Jungle Scout API key. Create or view API credentials at https://members.junglescout.com/#/developer.",
+      "extraFields": [
+        {
+          "key": "keyName",
+          "label": "API Key Name",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "My API Key",
+          "description": "Name assigned to the Jungle Scout API key."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.junglescout.com/",
+  "actions": [
+    {
+      "id": "junglescout.get_historical_search_volume",
+      "service": "junglescout",
+      "name": "get_historical_search_volume",
+      "description": "Retrieve weekly historical exact-search-volume estimates for one Amazon keyword.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keyword to retrieve historical search volume for."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "Start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "End date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for retrieving historical search volume for one keyword."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "estimate_start_date": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Start date of the estimate period.",
+                          "format": "date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Start date of the estimate period."
+                    },
+                    "estimate_end_date": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "End date of the estimate period.",
+                          "format": "date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "End date of the estimate period."
+                    },
+                    "estimated_exact_search_volume": {
+                      "type": "integer",
+                      "description": "Exact search volume estimated for the period."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Official Jungle Scout historical search-volume attributes."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One historical search-volume period."
+            },
+            "description": "Resources returned by Jungle Scout."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total_items": {
+                "type": "integer",
+                "description": "Total number of matching items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Jungle Scout."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "URL for the current page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL for the next page, or null when no page remains."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL for the next page, or null when no page remains."
+              }
+            },
+            "additionalProperties": true,
+            "description": "JSON:API pagination links returned by Jungle Scout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Jungle Scout historical search-volume JSON:API response."
+      }
+    },
+    {
+      "id": "junglescout.get_keywords_by_asin",
+      "service": "junglescout",
+      "name": "get_keywords_by_asin",
+      "description": "Retrieve keywords that rank for up to 10 Amazon ASINs, including volume, trend, bid, relevance, and rank data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "asins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A 10-character Amazon ASIN normalized and validated at execution time."
+            },
+            "description": "Amazon ASINs to compare, with the first ASIN used as primary.",
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "include_variants": {
+            "type": "boolean",
+            "description": "Whether to include ASIN variants; Jungle Scout defaults to true."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "-name",
+              "dominant_category",
+              "-dominant_category",
+              "monthly_trend",
+              "-monthly_trend",
+              "quarterly_trend",
+              "-quarterly_trend",
+              "monthly_search_volume_exact",
+              "-monthly_search_volume_exact",
+              "monthly_search_volume_broad",
+              "-monthly_search_volume_broad",
+              "recommended_promotions",
+              "-recommended_promotions",
+              "sp_brand_ad_bid",
+              "-sp_brand_ad_bid",
+              "ppc_bid_broad",
+              "-ppc_bid_broad",
+              "ppc_bid_exact",
+              "-ppc_bid_exact",
+              "ease_of_ranking_score",
+              "-ease_of_ranking_score",
+              "relevancy_score",
+              "-relevancy_score",
+              "organic_product_count",
+              "-organic_product_count"
+            ],
+            "description": "Keyword sort field; a leading minus sign selects descending order."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of keyword results per page; defaults to 50."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Jungle Scout."
+          },
+          "min_monthly_search_volume_exact": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum exact-match monthly search volume."
+          },
+          "max_monthly_search_volume_exact": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum exact-match monthly search volume."
+          },
+          "min_monthly_search_volume_broad": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum broad-match monthly search volume."
+          },
+          "max_monthly_search_volume_broad": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum broad-match monthly search volume."
+          },
+          "min_word_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum keyword word count."
+          },
+          "max_word_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum keyword word count."
+          },
+          "min_organic_product_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum organic product count."
+          },
+          "max_organic_product_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum organic product count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "asins"
+        ],
+        "description": "Parameters for retrieving keywords that rank for one or more Amazon ASINs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Amazon marketplace code."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Amazon marketplace code."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Keyword or phrase."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Keyword or phrase."
+                    },
+                    "primary_asin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Primary ASIN used for a reverse lookup."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Primary ASIN used for a reverse lookup."
+                    },
+                    "monthly_trend": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Thirty-day keyword performance trend."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Thirty-day keyword performance trend."
+                    },
+                    "quarterly_trend": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Ninety-day keyword performance trend."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Ninety-day keyword performance trend."
+                    },
+                    "monthly_search_volume_exact": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Exact-match searches in the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Exact-match searches in the past 30 days."
+                    },
+                    "monthly_search_volume_broad": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Broad-match searches in the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Broad-match searches in the past 30 days."
+                    },
+                    "dominant_category": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Dominant Amazon category among top results."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dominant Amazon category among top results."
+                    },
+                    "organic_product_count": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Organic product count."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Organic product count."
+                    },
+                    "sponsored_product_count": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Sponsored product count."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Sponsored product count."
+                    },
+                    "relevancy_score": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Keyword relevancy score."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Keyword relevancy score."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Official Jungle Scout keyword result attributes; additional documented fields are preserved."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One keyword result for the supplied ASINs."
+            },
+            "description": "Resources returned by Jungle Scout."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total_items": {
+                "type": "integer",
+                "description": "Total number of matching items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Jungle Scout."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "URL for the current page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL for the next page, or null when no page remains."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL for the next page, or null when no page remains."
+              }
+            },
+            "additionalProperties": true,
+            "description": "JSON:API pagination links returned by Jungle Scout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Jungle Scout keyword-by-ASIN JSON:API response."
+      }
+    },
+    {
+      "id": "junglescout.get_keywords_by_keyword",
+      "service": "junglescout",
+      "name": "get_keywords_by_keyword",
+      "description": "Retrieve related Amazon keywords from a search term with volume, trend, bid, relevance, and competition data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "search_terms": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keyword or phrase to search for."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One marketplace-specific Amazon category name."
+            },
+            "description": "Dominant Amazon categories to include; omit to search all categories.",
+            "minItems": 1
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "-name",
+              "dominant_category",
+              "-dominant_category",
+              "monthly_trend",
+              "-monthly_trend",
+              "quarterly_trend",
+              "-quarterly_trend",
+              "monthly_search_volume_exact",
+              "-monthly_search_volume_exact",
+              "monthly_search_volume_broad",
+              "-monthly_search_volume_broad",
+              "recommended_promotions",
+              "-recommended_promotions",
+              "sp_brand_ad_bid",
+              "-sp_brand_ad_bid",
+              "ppc_bid_broad",
+              "-ppc_bid_broad",
+              "ppc_bid_exact",
+              "-ppc_bid_exact",
+              "ease_of_ranking_score",
+              "-ease_of_ranking_score",
+              "relevancy_score",
+              "-relevancy_score",
+              "organic_product_count",
+              "-organic_product_count"
+            ],
+            "description": "Keyword sort field; a leading minus sign selects descending order."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of keyword results per page; defaults to 50."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Jungle Scout."
+          },
+          "min_monthly_search_volume_exact": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum exact-match monthly search volume."
+          },
+          "max_monthly_search_volume_exact": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum exact-match monthly search volume."
+          },
+          "min_monthly_search_volume_broad": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum broad-match monthly search volume."
+          },
+          "max_monthly_search_volume_broad": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum broad-match monthly search volume."
+          },
+          "min_word_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum keyword word count."
+          },
+          "max_word_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum keyword word count."
+          },
+          "min_organic_product_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Minimum organic product count."
+          },
+          "max_organic_product_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum organic product count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace",
+          "search_terms"
+        ],
+        "description": "Parameters for retrieving related keyword data from a search term."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "country": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Amazon marketplace code."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Amazon marketplace code."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Keyword or phrase."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Keyword or phrase."
+                    },
+                    "primary_asin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Primary ASIN used for a reverse lookup."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Primary ASIN used for a reverse lookup."
+                    },
+                    "monthly_trend": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Thirty-day keyword performance trend."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Thirty-day keyword performance trend."
+                    },
+                    "quarterly_trend": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Ninety-day keyword performance trend."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Ninety-day keyword performance trend."
+                    },
+                    "monthly_search_volume_exact": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Exact-match searches in the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Exact-match searches in the past 30 days."
+                    },
+                    "monthly_search_volume_broad": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Broad-match searches in the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Broad-match searches in the past 30 days."
+                    },
+                    "dominant_category": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Dominant Amazon category among top results."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dominant Amazon category among top results."
+                    },
+                    "organic_product_count": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Organic product count."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Organic product count."
+                    },
+                    "sponsored_product_count": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Sponsored product count."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Sponsored product count."
+                    },
+                    "relevancy_score": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Keyword relevancy score."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Keyword relevancy score."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Official Jungle Scout keyword result attributes; additional documented fields are preserved."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One related keyword result."
+            },
+            "description": "Resources returned by Jungle Scout."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total_items": {
+                "type": "integer",
+                "description": "Total number of matching items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Jungle Scout."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "URL for the current page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL for the next page, or null when no page remains."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL for the next page, or null when no page remains."
+              }
+            },
+            "additionalProperties": true,
+            "description": "JSON:API pagination links returned by Jungle Scout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Jungle Scout keyword search JSON:API response."
+      }
+    },
+    {
+      "id": "junglescout.get_sales_estimates",
+      "service": "junglescout",
+      "name": "get_sales_estimates",
+      "description": "Retrieve daily estimated Amazon unit sales for one ASIN over a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "asin": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A 10-character Amazon ASIN normalized and validated at execution time."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "Start date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "End date in YYYY-MM-DD format and before the current date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for retrieving daily Jungle Scout sales estimates for one ASIN."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "parent_asin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Parent ASIN, or null for a standalone product."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Parent ASIN, or null for a standalone product."
+                    },
+                    "is_parent": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the queried ASIN is a parent."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the queried ASIN is a parent."
+                    },
+                    "is_variant": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the queried ASIN is a variant."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the queried ASIN is a variant."
+                    },
+                    "is_standalone": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the queried ASIN is standalone."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the queried ASIN is standalone."
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Estimate date.",
+                            "format": "date"
+                          },
+                          "estimated_units_sold": {
+                            "type": "integer",
+                            "description": "Estimated units sold on this date."
+                          },
+                          "last_known_price": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "description": "Last known price for this date."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Last known price for this date."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "One daily sales estimate."
+                      },
+                      "description": "Daily sales estimates."
+                    },
+                    "variants": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "One variant ASIN."
+                          },
+                          "description": "Variant ASINs when the queried ASIN is a parent."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Variant ASINs when the queried ASIN is a parent."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Official Jungle Scout sales estimate attributes."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Sales estimates for the queried ASIN or its variants."
+            },
+            "description": "Resources returned by Jungle Scout."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total_items": {
+                "type": "integer",
+                "description": "Total number of matching items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Jungle Scout."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "URL for the current page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL for the next page, or null when no page remains."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL for the next page, or null when no page remains."
+              }
+            },
+            "additionalProperties": true,
+            "description": "JSON:API pagination links returned by Jungle Scout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Jungle Scout sales-estimates JSON:API response."
+      }
+    },
+    {
+      "id": "junglescout.get_share_of_voice",
+      "service": "junglescout",
+      "name": "get_share_of_voice",
+      "description": "Retrieve Amazon keyword share of voice by brand, including organic, sponsored, and top-ASIN conversion data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "keyword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keyword to analyze."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parameters for retrieving share of voice for one Amazon keyword."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Jungle Scout JSON:API resource identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Jungle Scout JSON:API resource type."
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "estimated_30_day_search_volume": {
+                    "type": "integer",
+                    "description": "Exact-match search volume over 30 days."
+                  },
+                  "exact_suggested_bid_median": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "Median suggested exact-match bid."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Median suggested exact-match bid."
+                  },
+                  "product_count": {
+                    "type": "integer",
+                    "description": "Number of ASINs included in the result."
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "description": "Timestamp when Jungle Scout refreshed the data.",
+                    "format": "date-time"
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "brand": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Brand name."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Brand name."
+                        },
+                        "combined_products": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "description": "Organic and sponsored products for the brand."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Organic and sponsored products for the brand."
+                        },
+                        "combined_weighted_sov": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "description": "Weighted combined share of voice."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Weighted combined share of voice."
+                        },
+                        "combined_basic_sov": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "description": "Basic combined share of voice."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Basic combined share of voice."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One brand share-of-voice result."
+                    },
+                    "description": "Brand share-of-voice results."
+                  },
+                  "top_asins": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "asin": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Amazon ASIN."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Amazon ASIN."
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Product name."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Product name."
+                            },
+                            "brand": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "Product brand."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Product brand."
+                            },
+                            "clicks": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "description": "Customer clicks in the modeled period."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Customer clicks in the modeled period."
+                            },
+                            "conversions": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "description": "Purchases in the modeled period."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Purchases in the modeled period."
+                            },
+                            "conversion_rate": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "description": "Conversions divided by clicks."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Conversions divided by clicks."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "One top-ASIN result."
+                        },
+                        "description": "Top ASIN click and conversion results."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Top ASIN click and conversion results."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Official Jungle Scout share-of-voice attributes; brand and top-ASIN details are preserved."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Share-of-voice data for one keyword."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Jungle Scout share-of-voice JSON:API response."
+      }
+    },
+    {
+      "id": "junglescout.search_products",
+      "service": "junglescout",
+      "name": "search_products",
+      "description": "Search the Jungle Scout Amazon product database by category, keywords, price, demand, revenue, rating, seller, and listing-quality filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "marketplace": {
+            "type": "string",
+            "enum": [
+              "us",
+              "uk",
+              "de",
+              "in",
+              "ca",
+              "fr",
+              "it",
+              "es",
+              "mx",
+              "jp"
+            ],
+            "description": "Amazon marketplace code supported by Jungle Scout."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "name",
+              "-name",
+              "category",
+              "-category",
+              "revenue",
+              "-revenue",
+              "sales",
+              "-sales",
+              "price",
+              "-price",
+              "rank",
+              "-rank",
+              "reviews",
+              "-reviews",
+              "lqs",
+              "-lqs",
+              "sellers",
+              "-sellers"
+            ],
+            "description": "Product sort field; a leading minus sign selects descending order."
+          },
+          "collapse_by_parent": {
+            "type": "boolean",
+            "description": "Whether to collapse product results so only parent ASINs are returned."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of products per page; defaults to 50."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pagination cursor returned by Jungle Scout."
+          },
+          "product_tiers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "oversize",
+                "standard"
+              ],
+              "description": "One Jungle Scout product size tier."
+            },
+            "description": "Product size tiers to include.",
+            "minItems": 1
+          },
+          "seller_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "amz",
+                "fba",
+                "fbm"
+              ],
+              "description": "One seller fulfillment type."
+            },
+            "description": "Seller fulfillment types to include.",
+            "minItems": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One marketplace-specific Amazon category name."
+            },
+            "description": "Amazon categories to include.",
+            "minItems": 1
+          },
+          "include_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "description": "One keyword or ASIN to include."
+            },
+            "description": "Title keywords or ASINs to include.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "exclude_keywords": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "description": "One keyword or ASIN to exclude."
+            },
+            "description": "Title keywords or ASINs to exclude.",
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "exclude_top_brands": {
+            "type": "boolean",
+            "description": "Whether to exclude top brands."
+          },
+          "exclude_unavailable_products": {
+            "type": "boolean",
+            "description": "Whether to exclude unavailable products."
+          },
+          "min_price": {
+            "type": "number",
+            "description": "Minimum product price."
+          },
+          "max_price": {
+            "type": "number",
+            "description": "Maximum product price."
+          },
+          "min_net": {
+            "type": "number",
+            "description": "Minimum product price less FBA fees."
+          },
+          "max_net": {
+            "type": "number",
+            "description": "Maximum product price less FBA fees."
+          },
+          "min_rank": {
+            "type": "integer",
+            "description": "Minimum best-seller rank."
+          },
+          "max_rank": {
+            "type": "integer",
+            "description": "Maximum best-seller rank."
+          },
+          "min_sales": {
+            "type": "integer",
+            "description": "Minimum estimated monthly sales."
+          },
+          "max_sales": {
+            "type": "integer",
+            "description": "Maximum estimated monthly sales."
+          },
+          "min_revenue": {
+            "type": "number",
+            "description": "Minimum estimated monthly revenue."
+          },
+          "max_revenue": {
+            "type": "number",
+            "description": "Maximum estimated monthly revenue."
+          },
+          "min_reviews": {
+            "type": "integer",
+            "description": "Minimum review count."
+          },
+          "max_reviews": {
+            "type": "integer",
+            "description": "Maximum review count."
+          },
+          "min_rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Minimum star rating."
+          },
+          "max_rating": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Maximum star rating."
+          },
+          "min_weight": {
+            "type": "number",
+            "description": "Minimum product weight in pounds."
+          },
+          "max_weight": {
+            "type": "number",
+            "description": "Maximum product weight in pounds."
+          },
+          "min_sellers": {
+            "type": "integer",
+            "description": "Minimum seller count."
+          },
+          "max_sellers": {
+            "type": "integer",
+            "description": "Maximum seller count."
+          },
+          "min_lqs": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Minimum listing quality score."
+          },
+          "max_lqs": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Maximum listing quality score."
+          },
+          "min_updated_at": {
+            "type": "string",
+            "description": "Earliest product update date.",
+            "format": "date"
+          },
+          "max_updated_at": {
+            "type": "string",
+            "description": "Latest product update date.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "marketplace"
+        ],
+        "description": "Filters for searching the Jungle Scout Amazon product database."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Jungle Scout JSON:API resource type."
+                },
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Last known Amazon listing title."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Last known Amazon listing title."
+                    },
+                    "price": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Last known product price."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Last known product price."
+                    },
+                    "reviews": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Last known review count."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Last known review count."
+                    },
+                    "category": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Main Amazon category."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Main Amazon category."
+                    },
+                    "rating": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 1,
+                          "maximum": 5,
+                          "description": "Amazon product rating."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Amazon product rating."
+                    },
+                    "image_url": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Main Amazon product image URL."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Main Amazon product image URL."
+                    },
+                    "parent_asin": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Parent ASIN, or null for a standalone product."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Parent ASIN, or null for a standalone product."
+                    },
+                    "brand": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Product brand."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Product brand."
+                    },
+                    "product_rank": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Product rank."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Product rank."
+                    },
+                    "approximate_30_day_revenue": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "Estimated revenue over the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estimated revenue over the past 30 days."
+                    },
+                    "approximate_30_day_units_sold": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "Estimated units sold over the past 30 days."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estimated units sold over the past 30 days."
+                    },
+                    "is_available": {
+                      "type": "boolean",
+                      "description": "Whether the product is currently available."
+                    },
+                    "is_parent": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the product is a parent ASIN."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the product is a parent ASIN."
+                    },
+                    "is_variant": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the product is a variant ASIN."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the product is a variant ASIN."
+                    },
+                    "is_standalone": {
+                      "anyOf": [
+                        {
+                          "type": "boolean",
+                          "description": "Whether the product is a standalone ASIN."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Whether the product is a standalone ASIN."
+                    },
+                    "updated_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Timestamp when Jungle Scout last updated the product."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Timestamp when Jungle Scout last updated the product."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Official Jungle Scout product database attributes; additional documented fields are preserved."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One Amazon product database result."
+            },
+            "description": "Resources returned by Jungle Scout."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "total_items": {
+                "type": "integer",
+                "description": "Total number of matching items."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Jungle Scout."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "self": {
+                "type": "string",
+                "description": "URL for the current page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL for the next page, or null when no page remains."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL for the next page, or null when no page remains."
+              }
+            },
+            "additionalProperties": true,
+            "description": "JSON:API pagination links returned by Jungle Scout."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "Jungle Scout product database JSON:API response."
+      }
+    }
+  ]
+}

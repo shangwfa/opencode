@@ -1,0 +1,1925 @@
+{
+  "service": "strava",
+  "displayName": "Strava",
+  "categories": [
+    "Social"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://www.strava.com/oauth/authorize",
+      "tokenUrl": "https://www.strava.com/oauth/token",
+      "scopes": [
+        "read",
+        "read_all",
+        "profile:read_all",
+        "profile:write",
+        "activity:read",
+        "activity:read_all",
+        "activity:write"
+      ],
+      "scopeSeparator": ",",
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "authorizationParams": {
+        "approval_prompt": "auto"
+      }
+    }
+  ],
+  "homepageUrl": "https://www.strava.com",
+  "actions": [
+    {
+      "id": "strava.create_activity",
+      "service": "strava",
+      "name": "create_activity",
+      "description": "Create a manually entered Strava activity.",
+      "operationType": "write",
+      "requiredScopes": [
+        "activity:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Activity name."
+          },
+          "type": {
+            "type": "string",
+            "description": "Legacy activity type."
+          },
+          "sportType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Activity sport type."
+          },
+          "startDateLocal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event start time."
+          },
+          "elapsedTime": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Total time spent on the activity, in seconds."
+          },
+          "description": {
+            "type": "string",
+            "description": "Activity description."
+          },
+          "distance": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Activity distance in meters."
+          },
+          "trainer": {
+            "type": "boolean",
+            "description": "Whether to mark it as a trainer activity."
+          },
+          "commute": {
+            "type": "boolean",
+            "description": "Whether to mark it as commuting."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "sportType",
+          "startDateLocal",
+          "elapsedTime"
+        ],
+        "description": "Manual activity creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.explore_segments",
+      "service": "strava",
+      "name": "explore_segments",
+      "description": "Explore eligible Strava segments within a given bounding box.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bounds": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "description": "Coordinate value."
+            },
+            "description": "Bounding box coordinates: south latitude, west longitude, north latitude, east longitude.",
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "activityType": {
+            "type": "string",
+            "enum": [
+              "running",
+              "riding"
+            ],
+            "description": "Type of activities to explore."
+          },
+          "minCat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "Minimum climb classification."
+          },
+          "maxCat": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "description": "Maximum climb classification."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bounds"
+        ],
+        "description": "Segment exploration input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segments"
+        ],
+        "description": "Strava segments list response."
+      }
+    },
+    {
+      "id": "strava.export_route_gpx",
+      "service": "strava",
+      "name": "export_route_gpx",
+      "description": "Export the GPX content of a specified Strava route.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId"
+        ],
+        "description": "Strava route ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Response content type."
+          },
+          "content": {
+            "type": "string",
+            "description": "GPX text content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId",
+          "contentType",
+          "content"
+        ],
+        "description": "Strava GPX export response."
+      }
+    },
+    {
+      "id": "strava.export_route_tcx",
+      "service": "strava",
+      "name": "export_route_tcx",
+      "description": "Export TCX content for a specified Strava route.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId"
+        ],
+        "description": "Strava route ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Response content type."
+          },
+          "content": {
+            "type": "string",
+            "description": "TCX text content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId",
+          "contentType",
+          "content"
+        ],
+        "description": "Strava TCX export response."
+      }
+    },
+    {
+      "id": "strava.get_activity",
+      "service": "strava",
+      "name": "get_activity",
+      "description": "Get activity details for current Strava athlete by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          },
+          "includeAllEfforts": {
+            "type": "boolean",
+            "description": "Whether to return all segment efforts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "Activity details input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_activity_streams",
+      "service": "strava",
+      "name": "get_activity_streams",
+      "description": "Get stream data for the specified Strava activity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Stream keys to request.",
+            "minItems": 1
+          },
+          "keyByType": {
+            "type": "boolean",
+            "description": "Whether Strava should key streams by stream type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId",
+          "keys"
+        ],
+        "description": "Activity streams input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "streams": {
+            "description": "Stream payload returned by Strava."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "streams"
+        ],
+        "description": "Strava streams response."
+      }
+    },
+    {
+      "id": "strava.get_activity_zones",
+      "service": "strava",
+      "name": "get_activity_zones",
+      "description": "Get the training zones for the specified Strava activity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "Strava activity ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zones"
+        ],
+        "description": "Strava zones response."
+      }
+    },
+    {
+      "id": "strava.get_athlete_stats",
+      "service": "strava",
+      "name": "get_athlete_stats",
+      "description": "Get a summary of statistics for a specified Strava athlete.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "athleteId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Athlete ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Athlete ID."
+              }
+            ],
+            "description": "Athlete ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "athleteId"
+        ],
+        "description": "Athlete statistics query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_authenticated_athlete",
+      "service": "strava",
+      "name": "get_authenticated_athlete",
+      "description": "Get currently authenticated Strava athlete profile.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No additional input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_club",
+      "service": "strava",
+      "name": "get_club",
+      "description": "Get Strava club details by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clubId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Club ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Club ID."
+              }
+            ],
+            "description": "Club ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clubId"
+        ],
+        "description": "Strava clubId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_equipment",
+      "service": "strava",
+      "name": "get_equipment",
+      "description": "Get Strava gear details by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "profile:read_all"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "gearId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Equipment ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Equipment ID."
+              }
+            ],
+            "description": "Equipment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "gearId"
+        ],
+        "description": "Strava gearId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_route",
+      "service": "strava",
+      "name": "get_route",
+      "description": "Get Strava route details by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId"
+        ],
+        "description": "Strava route ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_route_streams",
+      "service": "strava",
+      "name": "get_route_streams",
+      "description": "Get stream data for a specified Strava route.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "routeId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Route ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Route ID."
+              }
+            ],
+            "description": "Route ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routeId"
+        ],
+        "description": "Strava route ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "streams": {
+            "description": "Stream payload returned by Strava."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "streams"
+        ],
+        "description": "Strava streams response."
+      }
+    },
+    {
+      "id": "strava.get_segment",
+      "service": "strava",
+      "name": "get_segment",
+      "description": "Get Strava segment details by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment ID."
+              }
+            ],
+            "description": "Road segment ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentId"
+        ],
+        "description": "Strava segmentId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_segment_effort",
+      "service": "strava",
+      "name": "get_segment_effort",
+      "description": "Get Strava segment effort details by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentEffortId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment effort ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment effort ID."
+              }
+            ],
+            "description": "Road segment effort ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentEffortId"
+        ],
+        "description": "Strava segmentEffortId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_segment_effort_streams",
+      "service": "strava",
+      "name": "get_segment_effort_streams",
+      "description": "Get stream data for a specified Strava segment effort.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentEffortId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment effort ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment effort ID."
+              }
+            ],
+            "description": "Road segment effort ID."
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Stream keys to request.",
+            "minItems": 1
+          },
+          "keyByType": {
+            "type": "boolean",
+            "description": "Whether Strava should key streams by stream type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentEffortId",
+          "keys"
+        ],
+        "description": "Segment effort stream input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "streams": {
+            "description": "Stream payload returned by Strava."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "streams"
+        ],
+        "description": "Strava streams response."
+      }
+    },
+    {
+      "id": "strava.get_segment_streams",
+      "service": "strava",
+      "name": "get_segment_streams",
+      "description": "Get stream data for a specified Strava segment.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment ID."
+              }
+            ],
+            "description": "Road segment ID."
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Stream keys to request.",
+            "minItems": 1
+          },
+          "keyByType": {
+            "type": "boolean",
+            "description": "Whether Strava should key streams by stream type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentId",
+          "keys"
+        ],
+        "description": "Segment stream input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "streams": {
+            "description": "Stream payload returned by Strava."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "streams"
+        ],
+        "description": "Strava streams response."
+      }
+    },
+    {
+      "id": "strava.get_upload",
+      "service": "strava",
+      "name": "get_upload",
+      "description": "Query the status of Strava activity upload tasks.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Upload task ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Upload task ID."
+              }
+            ],
+            "description": "Upload task ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "uploadId"
+        ],
+        "description": "Upload task query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.get_zones",
+      "service": "strava",
+      "name": "get_zones",
+      "description": "Get the current Strava athlete's training zones.",
+      "operationType": "read",
+      "requiredScopes": [
+        "profile:read_all"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No additional input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zones"
+        ],
+        "description": "Strava zones response."
+      }
+    },
+    {
+      "id": "strava.list_activity_comments",
+      "service": "strava",
+      "name": "list_activity_comments",
+      "description": "List comments for the specified Strava activity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Recommended number of records per page."
+          },
+          "afterCursor": {
+            "type": "string",
+            "description": "Cursor for the last record on the previous page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "Activity comment query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "comments"
+        ],
+        "description": "Strava comments list response."
+      }
+    },
+    {
+      "id": "strava.list_activity_kudoers",
+      "service": "strava",
+      "name": "list_activity_kudoers",
+      "description": "List athletes who have liked the specified Strava activity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "Paginated Strava activityId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "athletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "athletes"
+        ],
+        "description": "Strava athletes list response."
+      }
+    },
+    {
+      "id": "strava.list_activity_laps",
+      "service": "strava",
+      "name": "list_activity_laps",
+      "description": "List laps for a given Strava activity.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId"
+        ],
+        "description": "Strava activity ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "laps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "laps"
+        ],
+        "description": "Strava laps list response."
+      }
+    },
+    {
+      "id": "strava.list_athlete_activities",
+      "service": "strava",
+      "name": "list_athlete_activities",
+      "description": "Paginated list of current Strava athlete activities.",
+      "operationType": "read",
+      "requiredScopes": [
+        "activity:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": "integer",
+            "description": "Unix timestamp before which activities are returned."
+          },
+          "after": {
+            "type": "integer",
+            "description": "Unix timestamp after which activities are returned."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Activity list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activities"
+        ],
+        "description": "Strava activities list response."
+      }
+    },
+    {
+      "id": "strava.list_athlete_clubs",
+      "service": "strava",
+      "name": "list_athlete_clubs",
+      "description": "List the clubs current Strava athlete belongs to.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Club list query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "clubs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clubs"
+        ],
+        "description": "Strava clubs list response."
+      }
+    },
+    {
+      "id": "strava.list_athlete_routes",
+      "service": "strava",
+      "name": "list_athlete_routes",
+      "description": "Paginated list of routes for a given Strava athlete.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "athleteId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Athlete ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Athlete ID."
+              }
+            ],
+            "description": "Athlete ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "athleteId"
+        ],
+        "description": "Paginated Strava athleteId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "routes"
+        ],
+        "description": "Strava routes list response."
+      }
+    },
+    {
+      "id": "strava.list_club_activities",
+      "service": "strava",
+      "name": "list_club_activities",
+      "description": "Paginated list of recent activity for a given Strava club.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clubId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Club ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Club ID."
+              }
+            ],
+            "description": "Club ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clubId"
+        ],
+        "description": "Paginated Strava clubId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "activities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activities"
+        ],
+        "description": "Strava activities list response."
+      }
+    },
+    {
+      "id": "strava.list_club_administrators",
+      "service": "strava",
+      "name": "list_club_administrators",
+      "description": "Paginated list of Strava club admins.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clubId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Club ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Club ID."
+              }
+            ],
+            "description": "Club ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clubId"
+        ],
+        "description": "Paginated Strava clubId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "athletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "athletes"
+        ],
+        "description": "Strava athletes list response."
+      }
+    },
+    {
+      "id": "strava.list_club_members",
+      "service": "strava",
+      "name": "list_club_members",
+      "description": "Paginated list of Strava club members.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clubId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Club ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Club ID."
+              }
+            ],
+            "description": "Club ID."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "clubId"
+        ],
+        "description": "Paginated Strava clubId input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "athletes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "athletes"
+        ],
+        "description": "Strava athletes list response."
+      }
+    },
+    {
+      "id": "strava.list_segment_efforts",
+      "service": "strava",
+      "name": "list_segment_efforts",
+      "description": "List Strava segment efforts by segment ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment ID."
+              }
+            ],
+            "description": "Road segment ID."
+          },
+          "startDateLocal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lower bound on local start time."
+          },
+          "endDateLocal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Upper bound on local start time."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentId"
+        ],
+        "description": "Segment effort list query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "efforts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "efforts"
+        ],
+        "description": "Strava efforts list response."
+      }
+    },
+    {
+      "id": "strava.list_starred_segments",
+      "service": "strava",
+      "name": "list_starred_segments",
+      "description": "Paginated list of current Strava athlete starred segments.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pagination page number, starting from 1."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The number of records returned per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Favorite segment query input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw Strava object."
+            },
+            "description": "Raw Strava objects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segments"
+        ],
+        "description": "Strava segments list response."
+      }
+    },
+    {
+      "id": "strava.star_segment",
+      "service": "strava",
+      "name": "star_segment",
+      "description": "Favorite or unfavorite a specific Strava segment.",
+      "operationType": "write",
+      "requiredScopes": [
+        "profile:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "segmentId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Road segment ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Road segment ID."
+              }
+            ],
+            "description": "Road segment ID."
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Whether to bookmark this segment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "segmentId",
+          "starred"
+        ],
+        "description": "Segment star update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.update_activity",
+      "service": "strava",
+      "name": "update_activity",
+      "description": "Update activity information for current Strava athlete.",
+      "operationType": "write",
+      "requiredScopes": [
+        "activity:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Activity ID."
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "description": "Activity ID."
+              }
+            ],
+            "description": "Activity ID."
+          },
+          "activity": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Activity fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "activityId",
+          "activity"
+        ],
+        "description": "Activity update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.update_athlete",
+      "service": "strava",
+      "name": "update_athlete",
+      "description": "Update current Strava athlete's weight.",
+      "operationType": "write",
+      "requiredScopes": [
+        "profile:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Latest weight in kilograms."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "weight"
+        ],
+        "description": "Athlete update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    },
+    {
+      "id": "strava.upload_activity",
+      "service": "strava",
+      "name": "upload_activity",
+      "description": "Upload GPX, TCX or FIT files to Strava to generate activities.",
+      "operationType": "write",
+      "requiredScopes": [
+        "activity:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The transit file identifier returned by POST /api/files."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional filename override to send to the provider."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Optional MIME type override to send to the provider."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId"
+            ],
+            "description": "The GPX, TCX or FIT file uploaded through the local transit file API."
+          },
+          "name": {
+            "type": "string",
+            "description": "Generated activity name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Generated activity description."
+          },
+          "trainer": {
+            "type": "boolean",
+            "description": "Whether to mark it as a trainer activity."
+          },
+          "commute": {
+            "type": "boolean",
+            "description": "Whether to mark it as commuting."
+          },
+          "dataType": {
+            "type": "string",
+            "enum": [
+              "fit",
+              "fit.gz",
+              "tcx",
+              "tcx.gz",
+              "gpx",
+              "gpx.gz"
+            ],
+            "description": "Upload file format."
+          },
+          "externalId": {
+            "type": "string",
+            "description": "Custom external ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "dataType"
+        ],
+        "description": "Activity file upload input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Raw Strava object."
+      }
+    }
+  ]
+}

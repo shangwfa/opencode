@@ -1,0 +1,556 @@
+{
+  "service": "textcortex",
+  "displayName": "TextCortex",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TEXTCORTEX_API_KEY",
+      "description": "TextCortex API key sent as a Bearer token. Create or copy it from your TextCortex API keys page: https://app.textcortex.com/user/api-keys."
+    }
+  ],
+  "homepageUrl": "https://textcortex.com/",
+  "actions": [
+    {
+      "id": "textcortex.create_chat_completion",
+      "service": "textcortex",
+      "name": "create_chat_completion",
+      "description": "Create a non-streaming OpenAI-compatible chat completion with TextCortex.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The model id returned by list_models."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The role of the chat message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The message content as plain text."
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": true,
+                            "description": "One OpenAI-compatible message content part such as text or image_url."
+                          },
+                          "description": "The structured message content parts.",
+                          "minItems": 1
+                        }
+                      ],
+                      "description": "The message content as plain text, structured content parts, or null."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The message content as plain text, structured content parts, or null."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The optional participant name for the message."
+                },
+                "toolCallId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The tool call identifier this tool message responds to."
+                },
+                "toolCalls": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "A JSON object passed through to or from TextCortex."
+                      },
+                      "description": "The assistant tool calls to include in the message."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The assistant tool calls to include in the message."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role"
+              ],
+              "description": "One OpenAI-compatible chat message sent to TextCortex."
+            },
+            "description": "The ordered chat messages to send to TextCortex.",
+            "minItems": 1
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "The sampling temperature."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sampling temperature."
+          },
+          "topP": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "The nucleus sampling value."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The nucleus sampling value."
+          },
+          "maxTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of tokens to generate."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The maximum number of tokens to generate."
+          },
+          "maxCompletionTokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The maximum number of completion tokens to generate."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The maximum number of completion tokens to generate."
+          },
+          "presencePenalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2,
+                "description": "The presence penalty to apply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The presence penalty to apply."
+          },
+          "frequencyPenalty": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -2,
+                "maximum": 2,
+                "description": "The frequency penalty to apply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The frequency penalty to apply."
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A single stop sequence."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One stop sequence."
+                    },
+                    "description": "A list of stop sequences.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "One or more stop sequences."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One or more stop sequences."
+          },
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The number of chat completion choices to generate."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of chat completion choices to generate."
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether to request streaming. Connector actions only support false or null."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether to request streaming. Connector actions only support false or null."
+          },
+          "responseFormat": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A JSON object passed through to or from TextCortex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A JSON object passed through to or from TextCortex."
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object passed through to or from TextCortex."
+                },
+                "description": "The OpenAI-compatible tools available to the model."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OpenAI-compatible tools available to the model."
+          },
+          "toolChoice": {
+            "anyOf": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "A predefined tool choice."
+                  },
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A JSON object passed through to or from TextCortex."
+                  }
+                ],
+                "description": "The OpenAI-compatible tool selection policy."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OpenAI-compatible tool selection policy."
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A stable end-user identifier for abuse monitoring."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A stable end-user identifier for abuse monitoring."
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Additional OpenAI-compatible TextCortex request fields to merge into the request body."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Additional OpenAI-compatible TextCortex request fields to merge into the request body."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for creating a TextCortex chat completion."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The chat completion id returned by TextCortex."
+          },
+          "object": {
+            "type": "string",
+            "description": "The chat completion object type returned by TextCortex."
+          },
+          "created": {
+            "type": "integer",
+            "description": "The Unix timestamp when the chat completion was created."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used for the chat completion."
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The choice index returned by TextCortex."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The choice index returned by TextCortex."
+                },
+                "finishReason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The reason TextCortex stopped generating this choice."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The reason TextCortex stopped generating this choice."
+                },
+                "message": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The chat message object returned by TextCortex."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw choice object returned by TextCortex."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "raw"
+              ],
+              "description": "One chat completion choice returned by TextCortex."
+            },
+            "description": "The chat completion choices returned by TextCortex."
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The token usage object returned by TextCortex."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The token usage object returned by TextCortex."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw chat completion response returned by TextCortex."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating a TextCortex chat completion."
+      }
+    },
+    {
+      "id": "textcortex.list_models",
+      "service": "textcortex",
+      "name": "list_models",
+      "description": "List TextCortex models available to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing TextCortex models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "The top-level object type returned by TextCortex."
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The TextCortex model identifier."
+                },
+                "object": {
+                  "type": "string",
+                  "enum": [
+                    "model"
+                  ],
+                  "description": "The object type for a model record."
+                },
+                "created": {
+                  "type": "integer",
+                  "description": "The Unix timestamp for the model release date."
+                },
+                "ownedBy": {
+                  "type": "string",
+                  "description": "The organization that owns the model."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw model object returned by TextCortex."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A TextCortex model returned by the OpenAI-compatible API."
+            },
+            "description": "The models returned by TextCortex."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing TextCortex models."
+      }
+    },
+    {
+      "id": "textcortex.retrieve_model",
+      "service": "textcortex",
+      "name": "retrieve_model",
+      "description": "Retrieve metadata for one TextCortex model by model id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The TextCortex model id to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving a TextCortex model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The TextCortex model identifier."
+              },
+              "object": {
+                "type": "string",
+                "enum": [
+                  "model"
+                ],
+                "description": "The object type for a model record."
+              },
+              "created": {
+                "type": "integer",
+                "description": "The Unix timestamp for the model release date."
+              },
+              "ownedBy": {
+                "type": "string",
+                "description": "The organization that owns the model."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw model object returned by TextCortex."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A TextCortex model returned by the OpenAI-compatible API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving a TextCortex model."
+      }
+    }
+  ]
+}

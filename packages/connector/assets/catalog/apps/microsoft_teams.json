@@ -1,0 +1,2028 @@
+{
+  "service": "microsoft_teams",
+  "displayName": "Microsoft Teams",
+  "description": "Read collaboration data and send channel or chat messages for Microsoft work or school accounts.",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+      "tokenUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+      "scopes": [
+        "User.Read",
+        "Team.ReadBasic.All",
+        "Channel.ReadBasic.All",
+        "ChannelMessage.Read.All",
+        "ChannelMessage.Send",
+        "Chat.Read",
+        "ChatMessage.Send",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "response_mode": "query"
+      },
+      "clientConfigFields": [
+        {
+          "key": "tenant",
+          "label": "Tenant",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "defaultValue": "organizations",
+          "placeholder": "organizations",
+          "description": "The Microsoft identity platform organization tenant segment or a specific tenant ID."
+        }
+      ],
+      "clientSetup": {
+        "docsUrl": "https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app",
+        "steps": [
+          "Register a multitenant web application in Microsoft Entra ID and add the callback URL shown by this runtime.",
+          "Add the Microsoft Graph delegated permissions listed by this provider; ChannelMessage.Read.All requires tenant administrator consent.",
+          "Create a client secret and save its value with the application client ID in this runtime."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://www.microsoft.com/microsoft-teams/",
+  "actions": [
+    {
+      "id": "microsoft_teams.get_channel",
+      "service": "microsoft_teams",
+      "name": "get_channel",
+      "description": "Get one channel in a Microsoft team.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Channel.ReadBasic.All"
+      ],
+      "providerPermissions": [
+        "Channel.ReadBasic.All"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams channel ID."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "channelId"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Channel ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Channel display name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Channel description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel description."
+          },
+          "membershipType": {
+            "type": "string",
+            "description": "Standard, private, or shared membership type."
+          },
+          "webUrl": {
+            "type": "string",
+            "description": "Microsoft Teams channel URL."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Microsoft Entra tenant ID."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft Teams channel resource."
+      }
+    },
+    {
+      "id": "microsoft_teams.get_current_user",
+      "service": "microsoft_teams",
+      "name": "get_current_user",
+      "description": "Get the profile for the connected Microsoft work or school account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "User.Read"
+      ],
+      "providerPermissions": [
+        "User.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft account ID."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Account display name."
+          },
+          "mail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Primary email address."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Primary email address."
+          },
+          "userPrincipalName": {
+            "type": "string",
+            "description": "User principal name."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Current Microsoft account profile."
+      }
+    },
+    {
+      "id": "microsoft_teams.get_team",
+      "service": "microsoft_teams",
+      "name": "get_team",
+      "description": "Get one Microsoft team by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Team.ReadBasic.All"
+      ],
+      "providerPermissions": [
+        "Team.ReadBasic.All"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team ID."
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team display name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Team description."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Team description."
+          },
+          "webUrl": {
+            "type": "string",
+            "description": "Microsoft Teams web URL."
+          },
+          "isArchived": {
+            "type": "boolean",
+            "description": "Whether the team is archived."
+          },
+          "tenantId": {
+            "type": "string",
+            "description": "Microsoft Entra tenant ID."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft Teams team resource."
+      }
+    },
+    {
+      "id": "microsoft_teams.list_channel_messages",
+      "service": "microsoft_teams",
+      "name": "list_channel_messages",
+      "description": "List channel posts with optionally expanded replies, or continue root-message or reply pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "ChannelMessage.Read.All"
+      ],
+      "providerPermissions": [
+        "ChannelMessage.Read.All"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams channel ID."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum root messages to return."
+          },
+          "includeReplies": {
+            "type": "boolean",
+            "description": "Whether to expand replies on each root message."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "channelId"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Message ID."
+                },
+                "replyToId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Parent message ID for a channel reply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent message ID for a channel reply."
+                },
+                "messageType": {
+                  "type": "string",
+                  "description": "Message type."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "Creation timestamp."
+                },
+                "lastModifiedDateTime": {
+                  "type": "string",
+                  "description": "Last modification timestamp."
+                },
+                "deletedDateTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Deletion timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Deletion timestamp."
+                },
+                "subject": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Channel post subject."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Channel post subject."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Notification summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Notification summary."
+                },
+                "importance": {
+                  "type": "string",
+                  "description": "Message importance."
+                },
+                "locale": {
+                  "type": "string",
+                  "description": "Message locale."
+                },
+                "webUrl": {
+                  "type": "string",
+                  "description": "Microsoft Teams message URL."
+                },
+                "from": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "body": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "channelIdentity": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "chatId": {
+                  "type": "string",
+                  "description": "Chat containing the message."
+                },
+                "attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message attachments."
+                },
+                "mentions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message mentions."
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message reactions."
+                },
+                "replies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Channel replies expanded with the root message."
+                },
+                "repliesNextLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Next-page URL for additional expanded replies."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Next-page URL for additional expanded replies."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft Teams chat message resource."
+            },
+            "description": "Microsoft Graph messages results."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "nextLink"
+        ],
+        "description": "Paginated Microsoft Teams response."
+      }
+    },
+    {
+      "id": "microsoft_teams.list_chat_messages",
+      "service": "microsoft_teams",
+      "name": "list_chat_messages",
+      "description": "List messages from an existing one-on-one, group, or meeting chat.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Chat.Read"
+      ],
+      "providerPermissions": [
+        "Chat.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams chat ID."
+          },
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum messages to return."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "Supported Microsoft Graph message ordering."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Supported Microsoft Graph message filter."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chatId"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Message ID."
+                },
+                "replyToId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Parent message ID for a channel reply."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Parent message ID for a channel reply."
+                },
+                "messageType": {
+                  "type": "string",
+                  "description": "Message type."
+                },
+                "createdDateTime": {
+                  "type": "string",
+                  "description": "Creation timestamp."
+                },
+                "lastModifiedDateTime": {
+                  "type": "string",
+                  "description": "Last modification timestamp."
+                },
+                "deletedDateTime": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Deletion timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Deletion timestamp."
+                },
+                "subject": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Channel post subject."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Channel post subject."
+                },
+                "summary": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Notification summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Notification summary."
+                },
+                "importance": {
+                  "type": "string",
+                  "description": "Message importance."
+                },
+                "locale": {
+                  "type": "string",
+                  "description": "Message locale."
+                },
+                "webUrl": {
+                  "type": "string",
+                  "description": "Microsoft Teams message URL."
+                },
+                "from": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "body": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "channelIdentity": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                },
+                "chatId": {
+                  "type": "string",
+                  "description": "Chat containing the message."
+                },
+                "attachments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message attachments."
+                },
+                "mentions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message mentions."
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Message reactions."
+                },
+                "replies": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Channel replies expanded with the root message."
+                },
+                "repliesNextLink": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Next-page URL for additional expanded replies."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Next-page URL for additional expanded replies."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft Teams chat message resource."
+            },
+            "description": "Microsoft Graph messages results."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "messages",
+          "nextLink"
+        ],
+        "description": "Paginated Microsoft Teams response."
+      }
+    },
+    {
+      "id": "microsoft_teams.list_chats",
+      "service": "microsoft_teams",
+      "name": "list_chats",
+      "description": "List chats that include the connected account.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Chat.Read"
+      ],
+      "providerPermissions": [
+        "Chat.Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum chats to return."
+          },
+          "filter": {
+            "type": "string",
+            "description": "Supported Microsoft Graph chat filter."
+          },
+          "orderby": {
+            "type": "string",
+            "description": "Supported Microsoft Graph chat ordering."
+          },
+          "expand": {
+            "type": "string",
+            "enum": [
+              "members",
+              "lastMessagePreview",
+              "members,lastMessagePreview"
+            ],
+            "description": "Related chat data to expand."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "chats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Chat ID."
+                },
+                "topic": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Chat topic."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Chat topic."
+                },
+                "chatType": {
+                  "type": "string",
+                  "description": "One-on-one, group, or meeting chat type."
+                },
+                "webUrl": {
+                  "type": "string",
+                  "description": "Microsoft Teams chat URL."
+                },
+                "tenantId": {
+                  "type": "string",
+                  "description": "Microsoft Entra tenant ID."
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "A Microsoft Graph object."
+                  },
+                  "description": "Chat members when expanded."
+                },
+                "lastMessagePreview": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft Teams chat resource."
+            },
+            "description": "Microsoft Graph chats results."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chats",
+          "nextLink"
+        ],
+        "description": "Paginated Microsoft Teams response."
+      }
+    },
+    {
+      "id": "microsoft_teams.list_joined_teams",
+      "service": "microsoft_teams",
+      "name": "list_joined_teams",
+      "description": "List teams that the connected account has joined.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Team.ReadBasic.All"
+      ],
+      "providerPermissions": [
+        "Team.ReadBasic.All"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Team ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Team display name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Team description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Team description."
+                },
+                "webUrl": {
+                  "type": "string",
+                  "description": "Microsoft Teams web URL."
+                },
+                "isArchived": {
+                  "type": "boolean",
+                  "description": "Whether the team is archived."
+                },
+                "tenantId": {
+                  "type": "string",
+                  "description": "Microsoft Entra tenant ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft Teams team resource."
+            },
+            "description": "Microsoft Graph teams results."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teams",
+          "nextLink"
+        ],
+        "description": "Paginated Microsoft Teams response."
+      }
+    },
+    {
+      "id": "microsoft_teams.list_team_channels",
+      "service": "microsoft_teams",
+      "name": "list_team_channels",
+      "description": "List channels visible to the connected account in a team.",
+      "operationType": "read",
+      "requiredScopes": [
+        "Channel.ReadBasic.All"
+      ],
+      "providerPermissions": [
+        "Channel.ReadBasic.All"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "select": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Microsoft Graph fields to include in the response.",
+            "minItems": 1
+          },
+          "filter": {
+            "type": "string",
+            "description": "OData filter expression."
+          },
+          "nextLink": {
+            "type": "string",
+            "description": "Opaque Microsoft Graph pagination URL returned by a previous call.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Channel ID."
+                },
+                "displayName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Channel display name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Channel description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Channel description."
+                },
+                "membershipType": {
+                  "type": "string",
+                  "description": "Standard, private, or shared membership type."
+                },
+                "webUrl": {
+                  "type": "string",
+                  "description": "Microsoft Teams channel URL."
+                },
+                "tenantId": {
+                  "type": "string",
+                  "description": "Microsoft Entra tenant ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Microsoft Teams channel resource."
+            },
+            "description": "Microsoft Graph channels results."
+          },
+          "nextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL, or null when no page remains."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL, or null when no page remains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channels",
+          "nextLink"
+        ],
+        "description": "Paginated Microsoft Teams response."
+      }
+    },
+    {
+      "id": "microsoft_teams.reply_to_channel_message",
+      "service": "microsoft_teams",
+      "name": "reply_to_channel_message",
+      "description": "Reply to an existing root message in a Microsoft Teams channel.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ChannelMessage.Send"
+      ],
+      "providerPermissions": [
+        "ChannelMessage.Send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams channel ID."
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams message ID."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Message body content type."
+              },
+              "content": {
+                "type": "string",
+                "description": "Message body content."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "contentType",
+              "content"
+            ],
+            "description": "Teams message body."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Attachment ID referenced by the message body."
+                },
+                "contentType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment MIME type or reference type."
+                },
+                "contentUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "URL for a reference attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "URL for a reference attachment."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Serialized attachment content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Serialized attachment content."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment name."
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment thumbnail URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment thumbnail URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message attachment."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Mention identifier used by the body markup."
+                },
+                "mentionText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Text displayed for the mention."
+                },
+                "mentioned": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message mention."
+            },
+            "description": "Message mentions matching body markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "channelId",
+          "messageId",
+          "body"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message ID."
+          },
+          "replyToId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Parent message ID for a channel reply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent message ID for a channel reply."
+          },
+          "messageType": {
+            "type": "string",
+            "description": "Message type."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "Creation timestamp."
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "Last modification timestamp."
+          },
+          "deletedDateTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Deletion timestamp."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deletion timestamp."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Channel post subject."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Notification summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "webUrl": {
+            "type": "string",
+            "description": "Microsoft Teams message URL."
+          },
+          "from": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "channelIdentity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat containing the message."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message mentions."
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message reactions."
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Channel replies expanded with the root message."
+          },
+          "repliesNextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL for additional expanded replies."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL for additional expanded replies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft Teams chat message resource."
+      }
+    },
+    {
+      "id": "microsoft_teams.send_channel_message",
+      "service": "microsoft_teams",
+      "name": "send_channel_message",
+      "description": "Send a new root message to a Microsoft Teams channel.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ChannelMessage.Send"
+      ],
+      "providerPermissions": [
+        "ChannelMessage.Send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams team ID."
+          },
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams channel ID."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Message body content type."
+              },
+              "content": {
+                "type": "string",
+                "description": "Message body content."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "contentType",
+              "content"
+            ],
+            "description": "Teams message body."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Attachment ID referenced by the message body."
+                },
+                "contentType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment MIME type or reference type."
+                },
+                "contentUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "URL for a reference attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "URL for a reference attachment."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Serialized attachment content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Serialized attachment content."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment name."
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment thumbnail URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment thumbnail URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message attachment."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Mention identifier used by the body markup."
+                },
+                "mentionText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Text displayed for the mention."
+                },
+                "mentioned": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message mention."
+            },
+            "description": "Message mentions matching body markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "channelId",
+          "body"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message ID."
+          },
+          "replyToId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Parent message ID for a channel reply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent message ID for a channel reply."
+          },
+          "messageType": {
+            "type": "string",
+            "description": "Message type."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "Creation timestamp."
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "Last modification timestamp."
+          },
+          "deletedDateTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Deletion timestamp."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deletion timestamp."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Channel post subject."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Notification summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "webUrl": {
+            "type": "string",
+            "description": "Microsoft Teams message URL."
+          },
+          "from": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "channelIdentity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat containing the message."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message mentions."
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message reactions."
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Channel replies expanded with the root message."
+          },
+          "repliesNextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL for additional expanded replies."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL for additional expanded replies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft Teams chat message resource."
+      }
+    },
+    {
+      "id": "microsoft_teams.send_chat_message",
+      "service": "microsoft_teams",
+      "name": "send_chat_message",
+      "description": "Send a message to an existing one-on-one, group, or meeting chat.",
+      "operationType": "write",
+      "requiredScopes": [
+        "ChatMessage.Send"
+      ],
+      "providerPermissions": [
+        "ChatMessage.Send"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Microsoft Teams chat ID."
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "contentType": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "html"
+                ],
+                "description": "Message body content type."
+              },
+              "content": {
+                "type": "string",
+                "description": "Message body content."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "contentType",
+              "content"
+            ],
+            "description": "Teams message body."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "type": "string",
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "urgent"
+            ],
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Attachment ID referenced by the message body."
+                },
+                "contentType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Attachment MIME type or reference type."
+                },
+                "contentUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "URL for a reference attachment."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "URL for a reference attachment."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Serialized attachment content."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Serialized attachment content."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment name."
+                },
+                "thumbnailUrl": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Attachment thumbnail URL."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Attachment thumbnail URL."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message attachment."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Mention identifier used by the body markup."
+                },
+                "mentionText": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Text displayed for the mention."
+                },
+                "mentioned": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A Microsoft Graph object."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Teams chat message mention."
+            },
+            "description": "Message mentions matching body markup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "chatId",
+          "body"
+        ],
+        "description": "Microsoft Teams action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Message ID."
+          },
+          "replyToId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Parent message ID for a channel reply."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parent message ID for a channel reply."
+          },
+          "messageType": {
+            "type": "string",
+            "description": "Message type."
+          },
+          "createdDateTime": {
+            "type": "string",
+            "description": "Creation timestamp."
+          },
+          "lastModifiedDateTime": {
+            "type": "string",
+            "description": "Last modification timestamp."
+          },
+          "deletedDateTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Deletion timestamp."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deletion timestamp."
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Channel post subject."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel post subject."
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Notification summary."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Notification summary."
+          },
+          "importance": {
+            "type": "string",
+            "description": "Message importance."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Message locale."
+          },
+          "webUrl": {
+            "type": "string",
+            "description": "Microsoft Teams message URL."
+          },
+          "from": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "channelIdentity": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "A Microsoft Graph object."
+          },
+          "chatId": {
+            "type": "string",
+            "description": "Chat containing the message."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message attachments."
+          },
+          "mentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message mentions."
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Message reactions."
+          },
+          "replies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A Microsoft Graph object."
+            },
+            "description": "Channel replies expanded with the root message."
+          },
+          "repliesNextLink": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Next-page URL for additional expanded replies."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next-page URL for additional expanded replies."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Microsoft Teams chat message resource."
+      }
+    }
+  ]
+}

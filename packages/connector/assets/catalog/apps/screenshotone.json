@@ -1,0 +1,694 @@
+{
+  "service": "screenshotone",
+  "displayName": "ScreenshotOne",
+  "categories": [
+    "Developer Tools",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Access Key",
+      "placeholder": "access_key_xxx",
+      "description": "ScreenshotOne access key used to authenticate API requests. Get it from https://dash.screenshotone.com/access."
+    }
+  ],
+  "homepageUrl": "https://screenshotone.com",
+  "actions": [
+    {
+      "id": "screenshotone.get_usage",
+      "service": "screenshotone",
+      "name": "get_usage",
+      "description": "Retrieve the current ScreenshotOne plan usage and concurrency information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for reading ScreenshotOne usage."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "The total requests allowed in the current billing period."
+          },
+          "available": {
+            "type": "integer",
+            "description": "The remaining requests available in the current billing period."
+          },
+          "used": {
+            "type": "integer",
+            "description": "The number of requests already used in the current billing period."
+          },
+          "concurrency": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "The total concurrent requests allowed."
+              },
+              "remaining": {
+                "type": "integer",
+                "description": "The remaining concurrent requests allowed."
+              },
+              "reset": {
+                "type": "integer",
+                "description": "The reset timestamp in nanoseconds."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The current concurrency allowance."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The usage snapshot returned by ScreenshotOne."
+      }
+    },
+    {
+      "id": "screenshotone.list_devices",
+      "service": "screenshotone",
+      "name": "list_devices",
+      "description": "List the ScreenshotOne device presets available for viewport emulation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing ScreenshotOne devices."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The device preset identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The human-readable device preset name."
+                },
+                "userAgent": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The user agent string used by the device preset."
+                },
+                "viewport": {
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "type": "integer",
+                      "description": "The viewport width in pixels."
+                    },
+                    "height": {
+                      "type": "integer",
+                      "description": "The viewport height in pixels."
+                    },
+                    "deviceScaleFactor": {
+                      "type": "number",
+                      "description": "The device pixel ratio."
+                    },
+                    "isMobile": {
+                      "type": "boolean",
+                      "description": "Whether the device is mobile."
+                    },
+                    "hasTouch": {
+                      "type": "boolean",
+                      "description": "Whether the device supports touch."
+                    },
+                    "isLandscape": {
+                      "type": "boolean",
+                      "description": "Whether the device is in landscape orientation."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The viewport configuration for a ScreenshotOne device preset."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A ScreenshotOne supported device preset."
+            },
+            "description": "The available ScreenshotOne device presets."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for listing ScreenshotOne devices."
+      }
+    },
+    {
+      "id": "screenshotone.take_animated_screenshot",
+      "service": "screenshotone",
+      "name": "take_animated_screenshot",
+      "description": "Take an animated ScreenshotOne capture as a video or GIF file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The website URL to capture as an animation.",
+            "format": "uri"
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The delay in milliseconds before recording begins."
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The output width in pixels."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The output height in pixels."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "mp4",
+              "mov",
+              "avi",
+              "webm",
+              "gif"
+            ],
+            "description": "The animation output format."
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "description": "The animation duration in seconds."
+          },
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "default",
+              "scroll"
+            ],
+            "description": "The animation scenario."
+          },
+          "block_ads": {
+            "type": "boolean",
+            "description": "Whether to block ads during capture."
+          },
+          "full_page": {
+            "type": "boolean",
+            "description": "Whether to capture the full scrollable page."
+          },
+          "scroll_by": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The pixels to scroll per step."
+          },
+          "clip_x": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The X coordinate for GIF clipping."
+          },
+          "clip_y": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The Y coordinate for GIF clipping."
+          },
+          "clip_width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The GIF clip width in pixels."
+          },
+          "clip_height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The GIF clip height in pixels."
+          },
+          "scroll_back": {
+            "type": "boolean",
+            "description": "Whether to scroll back to the top after scrolling."
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The output aspect ratio string."
+          },
+          "scroll_delay": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The delay between scroll steps in milliseconds."
+          },
+          "scroll_easing": {
+            "type": "string",
+            "enum": [
+              "linear",
+              "ease_in_quad",
+              "ease_out_quad",
+              "ease_in_out_quad",
+              "ease_in_cubic",
+              "ease_out_cubic",
+              "ease_in_out_cubic",
+              "ease_in_quart",
+              "ease_out_quart",
+              "ease_in_out_quart",
+              "ease_in_quint",
+              "ease_out_quint",
+              "ease_in_out_quint"
+            ],
+            "description": "The easing to use for scrolling animations."
+          },
+          "viewport_width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport width in pixels."
+          },
+          "omit_background": {
+            "type": "boolean",
+            "description": "Whether to omit the background. Only supported for MOV output."
+          },
+          "scroll_complete": {
+            "type": "boolean",
+            "description": "Whether to stop recording when scrolling completes."
+          },
+          "scroll_duration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The duration of each scroll in milliseconds."
+          },
+          "viewport_height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport height in pixels."
+          },
+          "scroll_start_delay": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The delay before scrolling begins in milliseconds."
+          },
+          "device_scale_factor": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The device scale factor."
+          },
+          "scroll_to_end_after": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Scroll to the end after the specified duration in milliseconds."
+          },
+          "scroll_try_navigate": {
+            "type": "boolean",
+            "description": "Whether to navigate while scrolling and record the new page."
+          },
+          "block_cookie_banners": {
+            "type": "boolean",
+            "description": "Whether to block cookie banners during capture."
+          },
+          "scroll_till_selector": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Scroll until the CSS selector becomes visible."
+          },
+          "scroll_back_algorithm": {
+            "type": "string",
+            "enum": [
+              "once",
+              "repeat"
+            ],
+            "description": "The algorithm used when scrolling back."
+          },
+          "scroll_navigate_after": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Navigate after the specified duration in milliseconds."
+          },
+          "scroll_navigate_to_url": {
+            "type": "string",
+            "description": "The URL to navigate to while recording the animation.",
+            "format": "uri"
+          },
+          "scroll_start_immediately": {
+            "type": "boolean",
+            "description": "Whether scrolling should start immediately."
+          },
+          "scroll_back_after_duration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Scroll back after the specified duration in milliseconds."
+          },
+          "scroll_navigate_link_hints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The link text hints used when selecting a navigation target."
+          },
+          "scroll_stop_after_duration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Stop scrolling after the specified duration in milliseconds."
+          },
+          "scroll_till_selector_adjust_top": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Adjust the top selector position in pixels."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "description": "The input payload for taking an animated ScreenshotOne capture."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated filename."
+              },
+              "mimetype": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the generated file."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The generated file size in bytes."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the generated file."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A downloadable file uploaded to connector transit storage."
+          },
+          "content_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response content type returned by ScreenshotOne."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for taking an animated ScreenshotOne capture."
+      }
+    },
+    {
+      "id": "screenshotone.take_bulk_screenshots",
+      "service": "screenshotone",
+      "name": "take_bulk_screenshots",
+      "description": "Submit multiple ScreenshotOne screenshot requests in a single bulk call.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "execute": {
+            "type": "boolean",
+            "description": "Whether ScreenshotOne should execute all requests immediately."
+          },
+          "options": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The default ScreenshotOne bulk screenshot options."
+          },
+          "optimize": {
+            "type": "boolean",
+            "description": "Whether to optimize same-site bulk execution. Requires execute=true."
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One ScreenshotOne bulk screenshot request."
+            },
+            "description": "The list of individual bulk screenshot requests.",
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requests"
+        ],
+        "description": "The input payload for taking multiple ScreenshotOne screenshots."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "The download URL for the generated screenshot.",
+                  "format": "uri"
+                },
+                "response": {
+                  "type": "object",
+                  "properties": {
+                    "is_successful": {
+                      "type": "boolean",
+                      "description": "Whether ScreenshotOne executed the request successfully."
+                    },
+                    "status": {
+                      "type": "integer",
+                      "description": "The HTTP status code of the executed request."
+                    },
+                    "statusText": {
+                      "type": "string",
+                      "description": "The HTTP status text of the executed request."
+                    },
+                    "body": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "description": "A body value."
+                      },
+                      "description": "A response body object returned by ScreenshotOne."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "is_successful",
+                    "status",
+                    "statusText"
+                  ],
+                  "description": "The execution summary returned by ScreenshotOne bulk mode."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "url"
+              ],
+              "description": "One ScreenshotOne bulk response entry."
+            },
+            "description": "The list of ScreenshotOne bulk response items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for taking ScreenshotOne bulk screenshots."
+      }
+    },
+    {
+      "id": "screenshotone.take_screenshot",
+      "service": "screenshotone",
+      "name": "take_screenshot",
+      "description": "Take a ScreenshotOne screenshot from a website URL, HTML, or Markdown source.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The website URL to render. Exactly one of url, html, or markdown is required.",
+            "format": "uri"
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The raw HTML content to render. Exactly one of url, html, or markdown is required."
+          },
+          "markdown": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Markdown content to render. Exactly one of url, html, or markdown is required."
+          },
+          "cache": {
+            "type": "boolean",
+            "description": "Whether ScreenshotOne should return or reuse a cached screenshot URL."
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 30,
+            "description": "The delay in seconds before rendering the screenshot."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "png",
+              "jpeg",
+              "webp",
+              "pdf",
+              "html"
+            ],
+            "description": "The output format for the screenshot."
+          },
+          "response_type": {
+            "type": "string",
+            "enum": [
+              "by_format",
+              "json",
+              "empty"
+            ],
+            "description": "The response type requested from ScreenshotOne."
+          },
+          "block_ads": {
+            "type": "boolean",
+            "description": "Whether to block ads while rendering the screenshot."
+          },
+          "block_chats": {
+            "type": "boolean",
+            "description": "Whether to block chat widgets while rendering the screenshot."
+          },
+          "block_cookie_banners": {
+            "type": "boolean",
+            "description": "Whether to block cookie banners while rendering the screenshot."
+          },
+          "dark_mode": {
+            "type": "boolean",
+            "description": "Whether to enable dark mode during rendering."
+          },
+          "viewport_width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport width in pixels."
+          },
+          "viewport_height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The viewport height in pixels."
+          },
+          "device_scale_factor": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "The viewport device scale factor."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for taking a ScreenshotOne screenshot.",
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ]
+          },
+          {
+            "required": [
+              "html"
+            ]
+          },
+          {
+            "required": [
+              "markdown"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated filename."
+              },
+              "mimetype": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the generated file."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit download URL.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "description": "The generated file size in bytes."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The MIME type of the generated file."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A downloadable file uploaded to connector transit storage."
+          },
+          "content_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The response content type returned by ScreenshotOne."
+          },
+          "cache_url": {
+            "type": "string",
+            "description": "The cached screenshot URL returned when ScreenshotOne responds with JSON.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The output payload for taking a ScreenshotOne screenshot."
+      }
+    }
+  ]
+}

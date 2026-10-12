@@ -1,0 +1,529 @@
+{
+  "service": "anthropic",
+  "displayName": "Anthropic",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "anthropic_api_key",
+      "description": "Anthropic API key used with the x-api-key header. Create or manage API keys in the Anthropic Console: https://console.anthropic.com/settings/keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.anthropic.com",
+  "actions": [
+    {
+      "id": "anthropic.count_message_tokens",
+      "service": "anthropic",
+      "name": "count_message_tokens",
+      "description": "Count input tokens for an Anthropic message request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The Anthropic model identifier to use."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "A structured Anthropic content block."
+                      },
+                      "description": "Structured content blocks.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "Anthropic message content."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An input message in an Anthropic conversation."
+            },
+            "description": "The ordered conversation history to count.",
+            "minItems": 1
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text system prompt."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A structured Anthropic content block."
+                },
+                "description": "Structured system prompt content blocks.",
+                "minItems": 1
+              }
+            ],
+            "description": "System prompt content."
+          },
+          "thinking": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Anthropic API."
+            },
+            "description": "A JSON object passed through to the Anthropic API."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "any",
+                  "none"
+                ],
+                "description": "A predefined tool choice mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the Anthropic API."
+                },
+                "description": "A JSON object passed through to the Anthropic API."
+              }
+            ],
+            "description": "Tool selection strategy for the request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the Anthropic API."
+              },
+              "description": "A JSON object passed through to the Anthropic API."
+            },
+            "description": "Tools available to the model."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "The input payload for counting tokens in an Anthropic message request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "description": "The number of input tokens counted for the request."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for counting Anthropic message tokens."
+      }
+    },
+    {
+      "id": "anthropic.create_message",
+      "service": "anthropic",
+      "name": "create_message",
+      "description": "Create a non-streaming Anthropic message.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "The Anthropic model identifier to use."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum number of tokens to generate."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "description": "The role of the message author."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "A structured Anthropic content block."
+                      },
+                      "description": "Structured content blocks.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "Anthropic message content."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An input message in an Anthropic conversation."
+            },
+            "description": "The ordered conversation history sent to the model.",
+            "minItems": 1
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain text system prompt."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "A structured Anthropic content block."
+                },
+                "description": "Structured system prompt content blocks.",
+                "minItems": 1
+              }
+            ],
+            "description": "System prompt content."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "description": "An external user identifier for abuse detection."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Metadata about the request."
+          },
+          "stop_sequences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A stop sequence."
+            },
+            "description": "Custom text sequences that stop generation."
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Whether to request a streaming response. This connector only accepts false or an omitted value."
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The sampling temperature."
+          },
+          "thinking": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Any JSON value accepted by the Anthropic API."
+            },
+            "description": "A JSON object passed through to the Anthropic API."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "any",
+                  "none"
+                ],
+                "description": "A predefined tool choice mode."
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "Any JSON value accepted by the Anthropic API."
+                },
+                "description": "A JSON object passed through to the Anthropic API."
+              }
+            ],
+            "description": "Tool selection strategy for the request."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "description": "Any JSON value accepted by the Anthropic API."
+              },
+              "description": "A JSON object passed through to the Anthropic API."
+            },
+            "description": "Tools available to the model."
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Only sample from the top K options for each token."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "The nucleus sampling threshold."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "model",
+          "max_tokens",
+          "messages"
+        ],
+        "description": "The input payload for creating a non-streaming Anthropic message."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The message identifier."
+          },
+          "type": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          },
+          "role": {
+            "type": "string",
+            "description": "The role of the returned message."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model used to generate the response."
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A structured Anthropic content block."
+            },
+            "description": "Content blocks generated by the model."
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The reason generation stopped."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reason generation stopped."
+          },
+          "stop_sequence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The stop sequence that ended generation."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stop sequence that ended generation."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "input_tokens": {
+                "type": "integer",
+                "description": "The number of input tokens consumed."
+              },
+              "output_tokens": {
+                "type": "integer",
+                "description": "The number of output tokens generated."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Token usage information."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for an Anthropic message."
+      }
+    },
+    {
+      "id": "anthropic.get_model",
+      "service": "anthropic",
+      "name": "get_model",
+      "description": "Fetch metadata for one Anthropic model.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "description": "The exact Anthropic model identifier to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving an Anthropic model."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The model identifier."
+          },
+          "type": {
+            "type": "string",
+            "description": "The object type returned by the API."
+          },
+          "display_name": {
+            "type": "string",
+            "description": "A human-readable model name."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "The date and time when the model was created.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "An Anthropic model record."
+      }
+    },
+    {
+      "id": "anthropic.list_models",
+      "service": "anthropic",
+      "name": "list_models",
+      "description": "List Anthropic models available to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "before_id": {
+            "type": "string",
+            "description": "Returns models before this model identifier."
+          },
+          "after_id": {
+            "type": "string",
+            "description": "Returns models after this model identifier."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The maximum number of models to return."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Anthropic models."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The model identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "The object type returned by the API."
+                },
+                "display_name": {
+                  "type": "string",
+                  "description": "A human-readable model name."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The date and time when the model was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "description": "An Anthropic model record."
+            },
+            "description": "The list of Anthropic models."
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Whether more results are available."
+          },
+          "first_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The first model identifier in this page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first model identifier in this page."
+          },
+          "last_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last model identifier in this page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last model identifier in this page."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The response payload for listing Anthropic models."
+      }
+    }
+  ]
+}

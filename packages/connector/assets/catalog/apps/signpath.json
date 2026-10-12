@@ -1,0 +1,406 @@
+{
+  "service": "signpath",
+  "displayName": "SignPath",
+  "categories": [
+    "Developer Tools",
+    "Security"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "signpath_api_token",
+      "description": "SignPath API token sent with the Authorization Bearer header. Generate it from your personal settings or a CI user account as documented at https://docs.signpath.io/users#interactive-api-token.",
+      "extraFields": [
+        {
+          "key": "organizationId",
+          "label": "Organization ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "094f5736-6b8c-4ca7-9514-0933c8b928e2",
+          "description": "The SignPath organization ID inserted into every API path. Find it on your organization page, as noted in the official users guide: https://docs.signpath.io/users#support."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://signpath.io/",
+  "actions": [
+    {
+      "id": "signpath.fast_sign_hash",
+      "service": "signpath",
+      "name": "fast_sign_hash",
+      "description": "Submit a fast SignPath hash-signing request using the REST API payload.json contract and return the signature result immediately.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project slug to submit the signing request to."
+          },
+          "signingPolicySlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signing policy slug to submit the request to."
+          },
+          "signatureAlgorithm": {
+            "type": "string",
+            "enum": [
+              "RsaPkcs1",
+              "RsaPss",
+              "Ecdsa"
+            ],
+            "description": "The signature algorithm used by the SignPath signing policy."
+          },
+          "rsaHashAlgorithm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The RSA hash algorithm OID used when the signing policy uses an RSA key."
+          },
+          "ecdsaSignatureFormat": {
+            "type": "string",
+            "enum": [
+              "Ieee",
+              "Asn1"
+            ],
+            "description": "The ECDSA signature format used when the signing policy uses an ECDSA key."
+          },
+          "base64EncodedHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded hash digest that SignPath should sign."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional description to attach to the signing request, such as a version label."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by the SignPath API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "projectSlug",
+          "signingPolicySlug",
+          "signatureAlgorithm",
+          "base64EncodedHash"
+        ],
+        "description": "Input parameters for submitting a fast SignPath hash-signing request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signingRequestId": {
+            "type": "string",
+            "description": "The signing request identifier created by SignPath.",
+            "format": "uuid"
+          },
+          "webLink": {
+            "type": "string",
+            "description": "The SignPath web application link for the signing request.",
+            "format": "uri"
+          },
+          "signature": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded signature returned by SignPath."
+          },
+          "signatureAlgorithm": {
+            "type": "string",
+            "enum": [
+              "RsaPkcs1",
+              "RsaPss",
+              "Ecdsa"
+            ],
+            "description": "The signature algorithm used by the SignPath signing policy."
+          },
+          "rsaHashAlgorithm": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The RSA hash algorithm OID used when the signing policy uses an RSA key."
+          },
+          "base64EncodedHash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded hash digest that was signed."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw JSON object returned by the SignPath API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "signingRequestId",
+          "webLink",
+          "signature",
+          "signatureAlgorithm",
+          "base64EncodedHash"
+        ],
+        "description": "The normalized result returned by a fast SignPath hash-signing request."
+      },
+      "asyncLifecycle": {
+        "startActionId": "signpath.fast_sign_hash",
+        "statusActionId": "signpath.get_signing_request"
+      }
+    },
+    {
+      "id": "signpath.get_signing_request",
+      "service": "signpath",
+      "name": "get_signing_request",
+      "description": "Get the current status and metadata for a SignPath signing request so callers can poll for completion.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "signingRequestId": {
+            "type": "string",
+            "description": "The signing request identifier returned by SignPath.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for retrieving one SignPath signing request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signingRequest": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The signing request identifier.",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "InProgress",
+                  "WaitingForApproval",
+                  "Completed",
+                  "Failed",
+                  "Denied",
+                  "Canceled"
+                ],
+                "description": "The high-level SignPath request status."
+              },
+              "isFinalStatus": {
+                "type": "boolean",
+                "description": "Whether the signing request has reached a terminal status."
+              },
+              "workflowStatus": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The detailed workflow status reported by SignPath."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The optional description attached to the signing request."
+              },
+              "projectId": {
+                "type": "string",
+                "description": "The project identifier.",
+                "format": "uuid"
+              },
+              "projectSlug": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The project slug."
+              },
+              "projectName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The project display name."
+              },
+              "artifactConfigurationId": {
+                "type": "string",
+                "description": "The artifact configuration identifier.",
+                "format": "uuid"
+              },
+              "artifactConfigurationSlug": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The artifact configuration slug."
+              },
+              "artifactConfigurationName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The artifact configuration display name."
+              },
+              "signingPolicyId": {
+                "type": "string",
+                "description": "The signing policy identifier.",
+                "format": "uuid"
+              },
+              "signingPolicySlug": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The signing policy slug."
+              },
+              "signingPolicyName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The signing policy display name."
+              },
+              "unsignedArtifactLink": {
+                "type": "string",
+                "description": "The SignPath link for downloading the unsigned artifact.",
+                "format": "uri"
+              },
+              "signedArtifactLink": {
+                "type": "string",
+                "description": "The SignPath link for downloading the signed artifact.",
+                "format": "uri"
+              },
+              "origin": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw JSON object returned by the SignPath API."
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Raw JSON object returned by the SignPath API."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status",
+              "isFinalStatus",
+              "workflowStatus"
+            ],
+            "description": "A normalized SignPath signing request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized SignPath signing request result."
+      },
+      "asyncLifecycle": {
+        "startActionId": "signpath.fast_sign_hash",
+        "statusActionId": "signpath.get_signing_request"
+      }
+    },
+    {
+      "id": "signpath.list_signing_policies",
+      "service": "signpath",
+      "name": "list_signing_policies",
+      "description": "List SignPath signing policies visible to the API token, optionally filtered by project and policy slug.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectSlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional project slug to filter returned signing policies."
+          },
+          "signingPolicySlug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional signing policy slug to filter returned signing policies."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing SignPath signing policies."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "signingPolicies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signingPolicyId": {
+                  "type": "string",
+                  "description": "The unique identifier of the signing policy.",
+                  "format": "uuid"
+                },
+                "signingPolicySlug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The slug of the signing policy."
+                },
+                "projectSlug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The slug of the project that owns the signing policy."
+                },
+                "keyType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The key type returned by SignPath, such as Rsa or Ecc."
+                },
+                "keySizeInBits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The signing key size in bits when available."
+                },
+                "rsaParameters": {
+                  "type": "object",
+                  "properties": {
+                    "publicExponent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The base64 public exponent returned by SignPath."
+                    },
+                    "modulus": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The base64 modulus returned by SignPath."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The RSA public key parameters returned for RSA-backed signing policies."
+                },
+                "certificateBytes": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The base64-encoded X.509 certificate bytes returned by SignPath."
+                },
+                "publicKeyBytes": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The base64-encoded public key bytes returned by SignPath."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "signingPolicyId",
+                "signingPolicySlug",
+                "projectSlug",
+                "keyType"
+              ],
+              "description": "A SignPath signing policy visible to the API token."
+            },
+            "description": "The signing policies returned by SignPath."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized SignPath signing policy list."
+      }
+    }
+  ]
+}

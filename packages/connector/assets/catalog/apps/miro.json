@@ -1,0 +1,2091 @@
+{
+  "service": "miro",
+  "displayName": "Miro",
+  "description": "Read Miro boards and create lightweight board content.",
+  "categories": [
+    "Design",
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://miro.com/oauth/authorize",
+      "tokenUrl": "https://api.miro.com/v1/oauth/token",
+      "scopes": [
+        "boards:read",
+        "boards:write"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post",
+      "tokenRequestFormat": "form",
+      "authorizationRequestFields": {
+        "scope": false
+      }
+    }
+  ],
+  "homepageUrl": "https://miro.com",
+  "actions": [
+    {
+      "id": "miro.create_board",
+      "service": "miro",
+      "name": "create_board",
+      "description": "Create a Miro board with optional team, project, and sharing policy settings.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Board name."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Board description."
+          },
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team where the board will be created."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Project or space where the board will be created."
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Provider-native Miro board policy object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Properties for the new Miro board."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro board identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro resource type."
+              },
+              "name": {
+                "type": "string",
+                "description": "Miro board name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Miro board description."
+              },
+              "viewLink": {
+                "type": "string",
+                "description": "URL for opening the board in Miro.",
+                "format": "uri"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the board was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the board was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "owner": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "policy": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Miro board."
+      }
+    },
+    {
+      "id": "miro.create_connector",
+      "service": "miro",
+      "name": "create_connector",
+      "description": "Create a connector between two items on a Miro board.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "startItem": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique identifier of the Miro board item."
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "Horizontal relative offset."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Vertical relative offset."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Relative attachment position on the item."
+              },
+              "snapTo": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "top",
+                  "right",
+                  "bottom",
+                  "left"
+                ],
+                "description": "Side of the item where the connector snaps."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A Miro item attached to one end of the connector."
+          },
+          "endItem": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique identifier of the Miro board item."
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "Horizontal relative offset."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Vertical relative offset."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Relative attachment position on the item."
+              },
+              "snapTo": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "top",
+                  "right",
+                  "bottom",
+                  "left"
+                ],
+                "description": "Side of the item where the connector snaps."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "A Miro item attached to one end of the connector."
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "straight",
+              "elbowed",
+              "curved"
+            ],
+            "description": "Connector line shape."
+          },
+          "captions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Caption text."
+                },
+                "position": {
+                  "type": "string",
+                  "description": "Caption position along the connector, expressed as a percentage."
+                },
+                "textAlignVertical": {
+                  "type": "string",
+                  "enum": [
+                    "top",
+                    "middle",
+                    "bottom"
+                  ],
+                  "description": "Vertical alignment of the caption text."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "content"
+              ],
+              "description": "A caption displayed on the connector."
+            },
+            "description": "Captions displayed on the connector."
+          },
+          "style": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Additional provider fields returned by Miro."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId",
+          "startItem",
+          "endItem"
+        ],
+        "description": "Properties for a new Miro connector."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "connector": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Additional provider fields returned by Miro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Miro connector."
+      }
+    },
+    {
+      "id": "miro.create_shape",
+      "service": "miro",
+      "name": "create_shape",
+      "description": "Create a shape on a Miro board.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "maxLength": 6000,
+                "description": "Text or supported HTML displayed inside the shape."
+              },
+              "shape": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Miro shape type, such as rectangle, circle, or triangle."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Miro shape data."
+          },
+          "style": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "description": "Text color."
+              },
+              "fillColor": {
+                "type": "string",
+                "description": "Item fill color."
+              },
+              "fillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fill opacity from 0 to 1."
+              },
+              "fontFamily": {
+                "type": "string",
+                "description": "Font family used by a text item."
+              },
+              "fontSize": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Font size used by a text item."
+              },
+              "textAlign": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ],
+                "description": "Horizontal text alignment."
+              },
+              "textAlignVertical": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "middle",
+                  "bottom"
+                ],
+                "description": "Vertical text alignment."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Provider-native Miro item style fields."
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "description": "Horizontal coordinate relative to the origin."
+              },
+              "y": {
+                "type": "number",
+                "description": "Vertical coordinate relative to the origin."
+              },
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "center"
+                ],
+                "description": "Coordinate origin used by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Position of the item on the board."
+          },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Item width."
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Item height."
+              },
+              "rotation": {
+                "type": "number",
+                "description": "Clockwise item rotation in degrees."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Geometry of the Miro sticky note."
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identifier of the parent frame."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional parent frame for the item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Properties for a new Miro shape."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro item identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro item type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the item was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the item was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "geometry": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional provider fields returned by Miro."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Miro shape."
+      }
+    },
+    {
+      "id": "miro.create_sticky_note",
+      "service": "miro",
+      "name": "create_sticky_note",
+      "description": "Create a sticky note on a Miro board with optional style, position, geometry, and parent frame.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6000,
+                "description": "Text or supported HTML displayed by the sticky note."
+              },
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "square",
+                  "rectangle"
+                ],
+                "description": "Sticky note shape."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "content"
+            ],
+            "description": "Miro sticky note data."
+          },
+          "style": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "description": "Text color."
+              },
+              "fillColor": {
+                "type": "string",
+                "description": "Item fill color."
+              },
+              "fillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fill opacity from 0 to 1."
+              },
+              "fontFamily": {
+                "type": "string",
+                "description": "Font family used by a text item."
+              },
+              "fontSize": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Font size used by a text item."
+              },
+              "textAlign": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ],
+                "description": "Horizontal text alignment."
+              },
+              "textAlignVertical": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "middle",
+                  "bottom"
+                ],
+                "description": "Vertical text alignment."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Provider-native Miro item style fields."
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "description": "Horizontal coordinate relative to the origin."
+              },
+              "y": {
+                "type": "number",
+                "description": "Vertical coordinate relative to the origin."
+              },
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "center"
+                ],
+                "description": "Coordinate origin used by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Position of the item on the board."
+          },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Item width."
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Item height."
+              },
+              "rotation": {
+                "type": "number",
+                "description": "Clockwise item rotation in degrees."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Geometry of the Miro sticky note."
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identifier of the parent frame."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional parent frame for the item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId",
+          "data"
+        ],
+        "description": "Properties for a new Miro sticky note."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro item identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro item type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the item was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the item was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "geometry": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional provider fields returned by Miro."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Miro sticky note."
+      }
+    },
+    {
+      "id": "miro.create_text",
+      "service": "miro",
+      "name": "create_text",
+      "description": "Create a text item on a Miro board with optional style, position, geometry, and parent frame.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 6000,
+                "description": "Text or HTML content displayed by the item."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "content"
+            ],
+            "description": "Miro item data."
+          },
+          "style": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "description": "Text color."
+              },
+              "fillColor": {
+                "type": "string",
+                "description": "Item fill color."
+              },
+              "fillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fill opacity from 0 to 1."
+              },
+              "fontFamily": {
+                "type": "string",
+                "description": "Font family used by a text item."
+              },
+              "fontSize": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Font size used by a text item."
+              },
+              "textAlign": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ],
+                "description": "Horizontal text alignment."
+              },
+              "textAlignVertical": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "middle",
+                  "bottom"
+                ],
+                "description": "Vertical text alignment."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Provider-native Miro item style fields."
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "description": "Horizontal coordinate relative to the origin."
+              },
+              "y": {
+                "type": "number",
+                "description": "Vertical coordinate relative to the origin."
+              },
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "center"
+                ],
+                "description": "Coordinate origin used by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Position of the item on the board."
+          },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Text item width."
+              },
+              "rotation": {
+                "type": "number",
+                "description": "Clockwise text item rotation in degrees."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Geometry of the Miro text item. Miro calculates text height from its content and width."
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identifier of the parent frame."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional parent frame for the item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId",
+          "data"
+        ],
+        "description": "Properties for a new Miro text item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro item identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro item type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the item was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the item was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "geometry": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional provider fields returned by Miro."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The created Miro text item."
+      }
+    },
+    {
+      "id": "miro.delete_connector",
+      "service": "miro",
+      "name": "delete_connector",
+      "description": "Delete a connector from a Miro board.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "connectorId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro connector."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro board and connector identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "connectorId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro connector."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the connector was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation of the deleted Miro connector."
+      }
+    },
+    {
+      "id": "miro.delete_item",
+      "service": "miro",
+      "name": "delete_item",
+      "description": "Delete an item from a Miro board.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro board and item identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board item."
+          },
+          "deleted": {
+            "const": true,
+            "type": "boolean",
+            "description": "Whether the item was deleted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Confirmation of the deleted Miro item."
+      }
+    },
+    {
+      "id": "miro.get_board",
+      "service": "miro",
+      "name": "get_board",
+      "description": "Get one Miro board by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "boards:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro board identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro board identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro resource type."
+              },
+              "name": {
+                "type": "string",
+                "description": "Miro board name."
+              },
+              "description": {
+                "type": "string",
+                "description": "Miro board description."
+              },
+              "viewLink": {
+                "type": "string",
+                "description": "URL for opening the board in Miro.",
+                "format": "uri"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the board was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the board was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "owner": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "policy": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Miro board."
+      }
+    },
+    {
+      "id": "miro.get_item",
+      "service": "miro",
+      "name": "get_item",
+      "description": "Get one item from a Miro board.",
+      "operationType": "read",
+      "requiredScopes": [
+        "boards:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro board and item identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro item identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro item type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the item was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the item was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "geometry": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional provider fields returned by Miro."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested Miro board item."
+      }
+    },
+    {
+      "id": "miro.list_boards",
+      "service": "miro",
+      "name": "list_boards",
+      "description": "List Miro boards visible to the connected user with optional team, project, owner, or text filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "boards:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return boards visible in this Miro team."
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return boards in this Miro project or space."
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Search text matched against board names and descriptions."
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return boards owned by this Miro user ID."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of boards to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based offset of the first board to return."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "default",
+              "last_modified",
+              "last_opened",
+              "last_created",
+              "alphabetically"
+            ],
+            "description": "Miro board sort order."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Miro boards."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Miro board identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Miro resource type."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Miro board name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Miro board description."
+                },
+                "viewLink": {
+                  "type": "string",
+                  "description": "URL for opening the board in Miro.",
+                  "format": "uri"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the board was created.",
+                  "format": "date-time"
+                },
+                "modifiedAt": {
+                  "type": "string",
+                  "description": "When the board was last modified.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Miro user identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Miro user display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Miro resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Miro user reference."
+                },
+                "modifiedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Miro user identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Miro user display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Miro resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Miro user reference."
+                },
+                "owner": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Miro user identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Miro user display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Miro resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Miro user reference."
+                },
+                "policy": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional provider fields returned by Miro."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Miro board."
+            },
+            "description": "Boards returned by Miro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "description": "Requested page size."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Zero-based offset of the page."
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Number of boards returned."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Offset pagination returned with Miro boards."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro boards and pagination metadata."
+      }
+    },
+    {
+      "id": "miro.list_items",
+      "service": "miro",
+      "name": "list_items",
+      "description": "List items on a Miro board with cursor pagination and an optional item-type filter.",
+      "operationType": "read",
+      "requiredScopes": [
+        "boards:read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 50,
+            "description": "Maximum number of items to return."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned by Miro."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "shape",
+              "sticky_note",
+              "image",
+              "document",
+              "card",
+              "app_card",
+              "preview",
+              "frame",
+              "embed",
+              "doc_format",
+              "data_table_format"
+            ],
+            "description": "Miro item type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "description": "Board, pagination, and type filter for listing Miro items."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Miro item identifier."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Miro item type."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "When the item was created.",
+                  "format": "date-time"
+                },
+                "modifiedAt": {
+                  "type": "string",
+                  "description": "When the item was last modified.",
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Miro user identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Miro user display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Miro resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Miro user reference."
+                },
+                "modifiedBy": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Miro user identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Miro user display name."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Miro resource type."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A Miro user reference."
+                },
+                "data": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional provider fields returned by Miro."
+                },
+                "style": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional provider fields returned by Miro."
+                },
+                "position": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional provider fields returned by Miro."
+                },
+                "geometry": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Additional provider fields returned by Miro."
+                },
+                "parent": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Additional provider fields returned by Miro."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Additional provider fields returned by Miro."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Miro board item."
+            },
+            "description": "Items returned by Miro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, or null when no next page is available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, or null when no next page is available."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor pagination returned with Miro board items."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Miro board items and pagination metadata."
+      }
+    },
+    {
+      "id": "miro.update_sticky_note",
+      "service": "miro",
+      "name": "update_sticky_note",
+      "description": "Update a sticky note on a Miro board.",
+      "operationType": "write",
+      "requiredScopes": [
+        "boards:write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board."
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Miro board item."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string",
+                "maxLength": 6000,
+                "description": "Updated text or supported HTML displayed by the sticky note."
+              },
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "square",
+                  "rectangle"
+                ],
+                "description": "Updated sticky note shape."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Updated Miro sticky note data."
+          },
+          "style": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "string",
+                "description": "Text color."
+              },
+              "fillColor": {
+                "type": "string",
+                "description": "Item fill color."
+              },
+              "fillOpacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fill opacity from 0 to 1."
+              },
+              "fontFamily": {
+                "type": "string",
+                "description": "Font family used by a text item."
+              },
+              "fontSize": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Font size used by a text item."
+              },
+              "textAlign": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ],
+                "description": "Horizontal text alignment."
+              },
+              "textAlignVertical": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "middle",
+                  "bottom"
+                ],
+                "description": "Vertical text alignment."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Provider-native Miro item style fields."
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number",
+                "description": "Horizontal coordinate relative to the origin."
+              },
+              "y": {
+                "type": "number",
+                "description": "Vertical coordinate relative to the origin."
+              },
+              "origin": {
+                "type": "string",
+                "enum": [
+                  "center"
+                ],
+                "description": "Coordinate origin used by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Position of the item on the board."
+          },
+          "geometry": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Updated item width."
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Updated item height."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Updated size of the Miro sticky note."
+          },
+          "parent": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Identifier of the parent frame."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Optional parent frame for the item."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "boardId",
+          "itemId"
+        ],
+        "description": "Miro sticky note identifier and fields to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Miro item identifier."
+              },
+              "type": {
+                "type": "string",
+                "description": "Miro item type."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "When the item was created.",
+                "format": "date-time"
+              },
+              "modifiedAt": {
+                "type": "string",
+                "description": "When the item was last modified.",
+                "format": "date-time"
+              },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "modifiedBy": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Miro user identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Miro user display name."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Miro resource type."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Miro user reference."
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "position": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "geometry": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Additional provider fields returned by Miro."
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional provider fields returned by Miro."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional provider fields returned by Miro."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Miro board item."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The updated Miro sticky note."
+      }
+    }
+  ]
+}

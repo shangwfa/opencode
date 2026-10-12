@@ -1,0 +1,749 @@
+{
+  "service": "simple_analytics",
+  "displayName": "Simple Analytics",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "sa_api_key_...",
+      "description": "Simple Analytics API key used with the Api-Key header. Create it in your account settings: https://docs.simpleanalytics.com/api/authenticate.",
+      "extraFields": [
+        {
+          "key": "userId",
+          "label": "User ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "sa_user_id_...",
+          "description": "Simple Analytics user ID required for Admin API and Export API requests. It is shown in your account settings: https://docs.simpleanalytics.com/api/authenticate."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://simpleanalytics.com",
+  "actions": [
+    {
+      "id": "simple_analytics.export_data_points",
+      "service": "simple_analytics",
+      "name": "export_data_points",
+      "description": "Export raw datapoints from the Simple Analytics Export API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The website hostname tracked in Simple Analytics."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date or hour range in YYYY-MM-DD or YYYY-MM-DDTHH format."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date or hour range in YYYY-MM-DD or YYYY-MM-DDTHH format."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone used to interpret the selected date range."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ],
+            "description": "Export response format."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A non-empty string value."
+            },
+            "description": "A list of non-empty strings.",
+            "minItems": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "pageviews",
+              "events",
+              "all"
+            ],
+            "description": "Datapoint type filter used by the export."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hostname",
+          "start",
+          "end"
+        ],
+        "description": "The input payload for exporting raw datapoints."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ],
+            "description": "Export response format returned by the provider."
+          },
+          "csv": {
+            "type": "string",
+            "description": "CSV payload when the export format is csv."
+          },
+          "datapoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "added_iso": {
+                  "type": "string",
+                  "description": "ISO 8601 timestamp when the datapoint was recorded."
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "Hostname associated with the datapoint."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Page path associated with the datapoint."
+                },
+                "session_id": {
+                  "type": "string",
+                  "description": "Session identifier associated with the datapoint."
+                },
+                "is_unique": {
+                  "type": "boolean",
+                  "description": "Whether the datapoint is marked as unique."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A raw datapoint returned by the Export API."
+            },
+            "description": "Datapoints returned by the Export API when the format is json."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "description": "Number of datapoints returned by the export."
+              },
+              "finishedInMs": {
+                "type": "integer",
+                "description": "Time spent generating the export in milliseconds."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Export metadata returned by Simple Analytics."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw JSON payload returned by Simple Analytics."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "added_iso": {
+                      "type": "string",
+                      "description": "ISO 8601 timestamp when the datapoint was recorded."
+                    },
+                    "hostname": {
+                      "type": "string",
+                      "description": "Hostname associated with the datapoint."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Page path associated with the datapoint."
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "description": "Session identifier associated with the datapoint."
+                    },
+                    "is_unique": {
+                      "type": "boolean",
+                      "description": "Whether the datapoint is marked as unique."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A raw datapoint returned by the Export API."
+                },
+                "description": "The raw datapoint array returned by Simple Analytics."
+              }
+            ],
+            "description": "The raw export payload returned by Simple Analytics."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "format"
+        ],
+        "description": "The normalized export response returned by Simple Analytics."
+      }
+    },
+    {
+      "id": "simple_analytics.get_aggregated_stats",
+      "service": "simple_analytics",
+      "name": "get_aggregated_stats",
+      "description": "Get aggregated website statistics from the Simple Analytics Stats API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The website hostname tracked in Simple Analytics."
+          },
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date or hour range in YYYY-MM-DD or YYYY-MM-DDTHH format."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Date or hour range in YYYY-MM-DD or YYYY-MM-DDTHH format."
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA timezone used to interpret the selected date range."
+          },
+          "page": {
+            "type": "string",
+            "description": "Filter the response to a specific page path."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Filter the response to a specific referrer."
+          },
+          "includeHistogram": {
+            "type": "boolean",
+            "description": "Whether to include the histogram field in the response."
+          },
+          "eventNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A non-empty string value."
+            },
+            "description": "A list of non-empty strings.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "hostname"
+        ],
+        "description": "The input payload for the Stats API request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the Stats API request succeeded."
+          },
+          "docs": {
+            "type": "string",
+            "description": "Documentation URL returned by the Stats API."
+          },
+          "hostname": {
+            "type": "string",
+            "description": "Hostname used for the stats request."
+          },
+          "url": {
+            "type": "string",
+            "description": "Website URL associated with the hostname."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path scope applied to the stats request."
+          },
+          "start": {
+            "type": "string",
+            "description": "Resolved start timestamp for the stats response."
+          },
+          "end": {
+            "type": "string",
+            "description": "Resolved end timestamp for the stats response."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Stats API version used for the response."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Timezone used to generate the stats response."
+          },
+          "pageviews": {
+            "type": "integer",
+            "description": "Total pageviews in the selected range."
+          },
+          "visitors": {
+            "type": "integer",
+            "description": "Total visitors in the selected range."
+          },
+          "seconds_on_page": {
+            "type": "integer",
+            "description": "Median seconds on page in the selected range."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "Page buckets returned by the Stats API."
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "Country buckets returned by the Stats API."
+          },
+          "referrers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "Referrer buckets returned by the Stats API."
+          },
+          "browser_names": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "Browser buckets returned by the Stats API."
+          },
+          "os_names": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "OS buckets returned by the Stats API."
+          },
+          "device_types": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "Bucket label returned by Simple Analytics."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews counted for the bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total unique visitors counted for the bucket."
+                },
+                "seconds_on_page": {
+                  "type": "integer",
+                  "description": "Median seconds on page for the bucket when Simple Analytics includes it."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "pageviews",
+                "visitors"
+              ],
+              "description": "An aggregated metric bucket returned by Simple Analytics."
+            },
+            "description": "Device type buckets returned by the Stats API."
+          },
+          "histogram": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "description": "Date label for the histogram bucket in YYYY-MM-DD format."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews in the histogram bucket."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Total visitors in the histogram bucket."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A histogram bucket returned by the Stats API."
+            },
+            "description": "Histogram buckets returned by the Stats API."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Event name returned by Simple Analytics."
+                },
+                "total": {
+                  "type": "integer",
+                  "description": "Total event count for the selected range."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An event total returned by Simple Analytics."
+            },
+            "description": "Event totals returned by the Stats API."
+          },
+          "generated_in_ms": {
+            "type": "integer",
+            "description": "Server-side generation time reported by Simple Analytics."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON payload returned by Simple Analytics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized stats response returned by Simple Analytics."
+      }
+    },
+    {
+      "id": "simple_analytics.list_websites",
+      "service": "simple_analytics",
+      "name": "list_websites",
+      "description": "List websites available to the authenticated Simple Analytics account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing tracked websites."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Admin API request succeeded."
+          },
+          "websites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hostname": {
+                  "type": "string",
+                  "description": "Tracked website hostname."
+                },
+                "is_public": {
+                  "type": "boolean",
+                  "description": "Whether the website is publicly accessible."
+                },
+                "timezone": {
+                  "type": "string",
+                  "description": "Timezone configured for the website."
+                },
+                "has_ssl": {
+                  "type": "boolean",
+                  "description": "Whether the website serves traffic over HTTPS."
+                },
+                "has_script": {
+                  "type": "boolean",
+                  "description": "Whether the tracking script was detected on the website."
+                },
+                "pageviews": {
+                  "type": "integer",
+                  "description": "Total pageviews recorded for the website."
+                },
+                "events": {
+                  "type": "integer",
+                  "description": "Total custom events recorded for the website."
+                },
+                "own_hostname": {
+                  "type": "string",
+                  "description": "Custom analytics hostname configured for the website when present."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "hostname",
+                "is_public",
+                "timezone",
+                "has_ssl",
+                "has_script",
+                "pageviews",
+                "events"
+              ],
+              "description": "A website summary returned by the Admin API."
+            },
+            "description": "Tracked websites returned by the Admin API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The website list returned by the Simple Analytics Admin API."
+      }
+    },
+    {
+      "id": "simple_analytics.send_event",
+      "service": "simple_analytics",
+      "name": "send_event",
+      "description": "Send a server-side event or pageview to Simple Analytics.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "event",
+              "pageview"
+            ],
+            "description": "Type of server-side submission to send."
+          },
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The website hostname tracked in Simple Analytics."
+          },
+          "event": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Event name recorded by Simple Analytics."
+          },
+          "ua": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User agent string sent to the server-side events endpoint."
+          },
+          "path": {
+            "type": "string",
+            "description": "Page path associated with the event."
+          },
+          "referrer": {
+            "type": "string",
+            "description": "Referrer URL associated with the event."
+          },
+          "source": {
+            "type": "string",
+            "description": "UTM source associated with the event."
+          },
+          "campaign": {
+            "type": "string",
+            "description": "UTM campaign associated with the event."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "A string metadata value."
+                },
+                {
+                  "type": "number",
+                  "description": "A numeric metadata value."
+                },
+                {
+                  "type": "boolean",
+                  "description": "A boolean metadata value."
+                }
+              ],
+              "description": "A flat metadata value supported by Simple Analytics."
+            },
+            "description": "Flat metadata values attached to the server-side event."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "hostname",
+          "event",
+          "ua"
+        ],
+        "description": "The input payload for submitting a server-side event."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the event submission was accepted."
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional message returned by the events endpoint."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "The acknowledgement returned by the server-side events endpoint."
+      }
+    }
+  ]
+}

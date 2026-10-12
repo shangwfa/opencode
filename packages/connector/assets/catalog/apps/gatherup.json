@@ -1,0 +1,531 @@
+{
+  "service": "gatherup",
+  "displayName": "GatherUp",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "apiKey",
+          "label": "Bearer Token",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "GATHERUP_BEARER_TOKEN",
+          "description": "GatherUp Bearer token. Obtain it from the account owner details: https://help.gatherup.com/s/article/GatherUp-API-Client-ID-Private-Key-and-Bearer-Token."
+        },
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "GATHERUP_CLIENT_ID",
+          "description": "GatherUp client ID paired with the Bearer token: https://help.gatherup.com/s/article/GatherUp-API-Client-ID-Private-Key-and-Bearer-Token."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://gatherup.com/",
+  "actions": [
+    {
+      "id": "gatherup.get_business",
+      "service": "gatherup",
+      "name": "get_business",
+      "description": "Get one GatherUp business location by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional GatherUp agency client number to target when using account-owner credentials."
+          },
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The GatherUp business ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "businessId"
+        ],
+        "description": "The GatherUp business lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The GatherUp business ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The business name."
+          },
+          "errorCode": {
+            "type": "integer",
+            "description": "The GatherUp result code. A successful response returns 0."
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "The GatherUp result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "errorCode",
+          "errorMessage"
+        ],
+        "description": "A GatherUp business location with provider-defined fields preserved."
+      }
+    },
+    {
+      "id": "gatherup.get_customer",
+      "service": "gatherup",
+      "name": "get_customer",
+      "description": "Get one GatherUp customer by ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional GatherUp agency client number to target when using account-owner credentials."
+          },
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The GatherUp customer ID to retrieve."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customerId"
+        ],
+        "description": "The GatherUp customer lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "businessId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The GatherUp business ID associated with the customer as a string."
+              },
+              {
+                "type": "integer",
+                "description": "The GatherUp business ID associated with the customer as an integer."
+              }
+            ],
+            "description": "The GatherUp business ID associated with the customer"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "The customer's first name."
+          },
+          "lastName": {
+            "type": "string",
+            "description": "The customer's last name."
+          },
+          "email": {
+            "type": "string",
+            "description": "The customer's email address when present."
+          },
+          "phone": {
+            "type": "string",
+            "description": "The customer's phone number when present."
+          },
+          "jobId": {
+            "type": "string",
+            "description": "The customer job ID when configured."
+          },
+          "customId": {
+            "type": "string",
+            "description": "The customer custom ID when configured."
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The customer's rating, or null when no rating has been received."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The customer's rating, or null when no rating has been received."
+          },
+          "statusInfo": {
+            "type": "string",
+            "description": "The current GatherUp feedback request status."
+          },
+          "unsubscribed": {
+            "type": "string",
+            "description": "The customer unsubscribe flag returned by GatherUp."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The timestamp when the customer was created."
+          },
+          "errorCode": {
+            "type": "integer",
+            "description": "The GatherUp result code. A successful response returns 0."
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "The GatherUp result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "businessId",
+          "errorCode",
+          "errorMessage"
+        ],
+        "description": "A GatherUp customer with provider-defined fields preserved."
+      }
+    },
+    {
+      "id": "gatherup.list_businesses",
+      "service": "gatherup",
+      "name": "list_businesses",
+      "description": "List one page of business locations available to the connected GatherUp account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional GatherUp agency client number to target when using account-owner credentials."
+          },
+          "includeDeletedBusinesses": {
+            "type": "boolean",
+            "description": "Whether GatherUp should include deleted business locations."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to request."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of business locations to request per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing GatherUp business locations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The current page number."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of business locations requested per page."
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of pages."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of business locations."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "businessId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The GatherUp business ID."
+                },
+                "businessName": {
+                  "type": "string",
+                  "description": "The business name."
+                },
+                "businessDeleted": {
+                  "type": "integer",
+                  "description": "Whether GatherUp marks the business as deleted."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "businessId",
+                "businessName",
+                "businessDeleted"
+              ],
+              "description": "A business location returned by GatherUp."
+            },
+            "description": "The business locations returned on this page."
+          },
+          "errorCode": {
+            "type": "integer",
+            "description": "The GatherUp result code. A successful response returns 0."
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "The GatherUp result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "page",
+          "perPage",
+          "pages",
+          "count",
+          "data",
+          "errorCode",
+          "errorMessage"
+        ],
+        "description": "A page of GatherUp business locations."
+      }
+    },
+    {
+      "id": "gatherup.list_customers",
+      "service": "gatherup",
+      "name": "list_customers",
+      "description": "List one page of GatherUp customers with optional business and customer filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional GatherUp agency client number to target when using account-owner credentials."
+          },
+          "businessId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter customers by GatherUp business ID."
+          },
+          "customerId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Filter customers by GatherUp customer ID."
+          },
+          "customId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter customers by custom ID."
+          },
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Filter customers by job ID."
+          },
+          "email": {
+            "type": "string",
+            "description": "Filter customers by email address.",
+            "format": "email"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to request."
+          },
+          "subscription": {
+            "type": "boolean",
+            "description": "Filter customers by subscription status."
+          },
+          "showHistory": {
+            "type": "boolean",
+            "description": "Whether GatherUp should include customer history."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing GatherUp customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The current page number."
+          },
+          "pages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of pages."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total number of customers."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of customers returned per page."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The GatherUp customer ID as a string."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "The GatherUp customer ID as an integer."
+                    }
+                  ],
+                  "description": "The GatherUp customer ID"
+                },
+                "businessId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The GatherUp business ID associated with the customer as a string."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "The GatherUp business ID associated with the customer as an integer."
+                    }
+                  ],
+                  "description": "The GatherUp business ID associated with the customer"
+                },
+                "firstName": {
+                  "type": "string",
+                  "description": "The customer's first name."
+                },
+                "lastName": {
+                  "type": "string",
+                  "description": "The customer's last name."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "The customer's phone number when present."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The customer's email address when present."
+                },
+                "jobId": {
+                  "type": "string",
+                  "description": "The customer job ID when configured."
+                },
+                "customId": {
+                  "type": "string",
+                  "description": "The customer custom ID when configured."
+                },
+                "parentId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The parent customer ID as a string."
+                    },
+                    {
+                      "type": "integer",
+                      "description": "The parent customer ID as an integer."
+                    }
+                  ],
+                  "description": "The parent customer ID"
+                },
+                "rating": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer's rating, or null when no rating has been received."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer's rating, or null when no rating has been received."
+                },
+                "review": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The customer's review, or null when no review has been received."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The customer's review, or null when no review has been received."
+                },
+                "statusInfo": {
+                  "type": "string",
+                  "description": "The current GatherUp feedback request status."
+                },
+                "subscription": {
+                  "type": "integer",
+                  "description": "The customer's subscription flag returned by GatherUp."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The timestamp when the customer was created."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "businessId"
+              ],
+              "description": "A customer returned by GatherUp."
+            },
+            "description": "The customers returned on this page."
+          },
+          "errorCode": {
+            "type": "integer",
+            "description": "The GatherUp result code. A successful response returns 0."
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "The GatherUp result message."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "page",
+          "pages",
+          "count",
+          "perPage",
+          "data"
+        ],
+        "description": "A page of GatherUp customers."
+      }
+    }
+  ]
+}

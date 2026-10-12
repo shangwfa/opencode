@@ -1,0 +1,733 @@
+{
+  "service": "shipday",
+  "displayName": "Shipday",
+  "categories": [
+    "Productivity",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "SHIPDAY_API_KEY",
+      "description": "Shipday API key used as the Authorization: Basic header value. Create or view it from the Shipday dashboard API settings: https://docs.shipday.com/reference."
+    }
+  ],
+  "homepageUrl": "https://www.shipday.com/",
+  "actions": [
+    {
+      "id": "shipday.create_order",
+      "service": "shipday",
+      "name": "create_order",
+      "description": "Insert a Shipday delivery order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The alphanumeric identifier for the order."
+          },
+          "customerName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the customer."
+          },
+          "customerAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the customer."
+          },
+          "customerPhoneNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number of the customer with country code."
+          },
+          "restaurantName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the restaurant."
+          },
+          "restaurantAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the restaurant."
+          },
+          "customerEmail": {
+            "type": "string",
+            "description": "The email address of the customer.",
+            "format": "email"
+          },
+          "restaurantPhoneNumber": {
+            "type": "string",
+            "description": "The phone number of the restaurant with country code."
+          },
+          "expectedDeliveryDate": {
+            "type": "string",
+            "description": "The expected delivery date in yyyy-mm-dd format.",
+            "format": "date"
+          },
+          "expectedPickupTime": {
+            "type": "string",
+            "description": "The expected pickup time in hh:mm:ss format."
+          },
+          "expectedDeliveryTime": {
+            "type": "string",
+            "description": "The expected delivery time in hh:mm:ss format."
+          },
+          "pickupLatitude": {
+            "type": "number",
+            "description": "The pickup location latitude."
+          },
+          "pickupLongitude": {
+            "type": "number",
+            "description": "The pickup location longitude."
+          },
+          "deliveryLatitude": {
+            "type": "number",
+            "description": "The delivery location latitude."
+          },
+          "deliveryLongitude": {
+            "type": "number",
+            "description": "The delivery location longitude."
+          },
+          "orderItem": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The name of the order item."
+                },
+                "unitPrice": {
+                  "type": "number",
+                  "description": "The price of one unit of the order item."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The quantity of the order item."
+                },
+                "addOns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One add-on name."
+                  },
+                  "description": "The add-on names for the order item."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detailed note for the order item."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "unitPrice",
+                "quantity"
+              ],
+              "description": "A Shipday order item."
+            },
+            "description": "The order items to send to Shipday."
+          },
+          "tips": {
+            "type": "number",
+            "description": "The tip amount for the order."
+          },
+          "tax": {
+            "type": "number",
+            "description": "The tax amount for the order."
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "The discount amount for the order."
+          },
+          "deliveryFee": {
+            "type": "number",
+            "description": "The delivery fee amount for the order."
+          },
+          "totalOrderCost": {
+            "type": "number",
+            "description": "The total cost for the order."
+          },
+          "pickupInstruction": {
+            "type": "string",
+            "description": "The pickup instructions for the order."
+          },
+          "deliveryInstruction": {
+            "type": "string",
+            "description": "The delivery instructions for the driver or restaurant."
+          },
+          "orderSource": {
+            "type": "string",
+            "description": "The source of the order."
+          },
+          "additionalId": {
+            "type": "string",
+            "description": "The additional ID for the order."
+          },
+          "clientRestaurantId": {
+            "type": "integer",
+            "description": "The client restaurant ID."
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "credit_card"
+            ],
+            "description": "The selected payment method for the order."
+          },
+          "creditCardType": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTER_CARD",
+              "AMEX",
+              "OTHER"
+            ],
+            "description": "The type of credit card used for the order."
+          },
+          "creditCardId": {
+            "type": "integer",
+            "description": "The last four digits of the credit card."
+          },
+          "pickup": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "object",
+                "properties": {
+                  "unit": {
+                    "type": "string",
+                    "description": "The unit or second address line."
+                  },
+                  "street": {
+                    "type": "string",
+                    "description": "The street or first address line."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city name."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state, province, or region."
+                  },
+                  "zip": {
+                    "type": "string",
+                    "description": "The postal code."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "The country name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A structured Shipday address."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A structured Shipday pickup or dropoff location."
+          },
+          "dropoff": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "object",
+                "properties": {
+                  "unit": {
+                    "type": "string",
+                    "description": "The unit or second address line."
+                  },
+                  "street": {
+                    "type": "string",
+                    "description": "The street or first address line."
+                  },
+                  "city": {
+                    "type": "string",
+                    "description": "The city name."
+                  },
+                  "state": {
+                    "type": "string",
+                    "description": "The state, province, or region."
+                  },
+                  "zip": {
+                    "type": "string",
+                    "description": "The postal code."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "The country name."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "A structured Shipday address."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A structured Shipday pickup or dropoff location."
+          },
+          "isCatering": {
+            "type": "boolean",
+            "description": "Whether this is a catering order."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "orderNumber",
+          "customerName",
+          "customerAddress",
+          "customerPhoneNumber",
+          "restaurantName",
+          "restaurantAddress"
+        ],
+        "description": "The input payload for inserting a Shipday delivery order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the order insert completed successfully."
+          },
+          "response": {
+            "type": "string",
+            "description": "The response message returned by Shipday."
+          },
+          "orderId": {
+            "type": "integer",
+            "description": "The inserted Shipday order ID."
+          },
+          "raw": {
+            "description": "The raw response body returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "response",
+          "orderId",
+          "raw"
+        ],
+        "description": "The Shipday create order response."
+      }
+    },
+    {
+      "id": "shipday.delete_order",
+      "service": "shipday",
+      "name": "delete_order",
+      "description": "Delete a Shipday delivery order by order ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive Shipday identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "The input payload for one Shipday order ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Shipday request completed successfully."
+          },
+          "orderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive Shipday identifier."
+          },
+          "raw": {
+            "description": "The raw response body returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "orderId",
+          "raw"
+        ],
+        "description": "A stable confirmation for a Shipday mutation."
+      }
+    },
+    {
+      "id": "shipday.edit_order",
+      "service": "shipday",
+      "name": "edit_order",
+      "description": "Edit an existing Shipday delivery order.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive Shipday identifier."
+          },
+          "orderNo": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The numeric or alphanumeric identifier for the order."
+          },
+          "customerName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the customer."
+          },
+          "customerAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the customer."
+          },
+          "customerEmail": {
+            "type": "string",
+            "description": "The email address of the customer.",
+            "format": "email"
+          },
+          "customerPhoneNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The phone number of the customer with country code."
+          },
+          "restaurantName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of the restaurant."
+          },
+          "restaurantAddress": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The address of the restaurant."
+          },
+          "restaurantPhoneNumber": {
+            "type": "string",
+            "description": "The phone number of the restaurant with country code."
+          },
+          "expectedDeliveryDate": {
+            "type": "string",
+            "description": "The expected delivery date in yyyy-mm-dd format.",
+            "format": "date"
+          },
+          "expectedPickupTime": {
+            "type": "string",
+            "description": "The expected pickup time in hh:mm:ss format."
+          },
+          "expectedDeliveryTime": {
+            "type": "string",
+            "description": "The expected delivery time in hh:mm:ss format."
+          },
+          "pickupLatitude": {
+            "type": "number",
+            "description": "The pickup location latitude."
+          },
+          "pickupLongitude": {
+            "type": "number",
+            "description": "The pickup location longitude."
+          },
+          "deliveryLatitude": {
+            "type": "number",
+            "description": "The delivery location latitude."
+          },
+          "deliveryLongitude": {
+            "type": "number",
+            "description": "The delivery location longitude."
+          },
+          "orderItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The name of the order item."
+                },
+                "unitPrice": {
+                  "type": "number",
+                  "description": "The price of one unit of the order item."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The quantity of the order item."
+                },
+                "addOns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One add-on name."
+                  },
+                  "description": "The add-on names for the order item."
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "The detailed note for the order item."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "unitPrice",
+                "quantity"
+              ],
+              "description": "A Shipday order item."
+            },
+            "description": "The order items to send to Shipday."
+          },
+          "tip": {
+            "type": "number",
+            "description": "The tip amount for the order."
+          },
+          "tax": {
+            "type": "number",
+            "description": "The tax amount for the order."
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "The discount amount for the order."
+          },
+          "deliveryFee": {
+            "type": "number",
+            "description": "The delivery fee amount for the order."
+          },
+          "totalCost": {
+            "type": "string",
+            "description": "The total cost for the order."
+          },
+          "deliveryInstruction": {
+            "type": "string",
+            "description": "The delivery instructions for the driver or restaurant."
+          },
+          "orderSource": {
+            "type": "string",
+            "description": "The source of the order."
+          },
+          "additionalId": {
+            "type": "string",
+            "description": "The additional ID for the order."
+          },
+          "clientRestaurantId": {
+            "type": "integer",
+            "description": "The client restaurant ID."
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "The selected payment method for the order."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "orderId",
+          "orderNo",
+          "customerName",
+          "customerAddress",
+          "customerEmail",
+          "customerPhoneNumber",
+          "restaurantName",
+          "restaurantAddress"
+        ],
+        "description": "The input payload for editing a Shipday delivery order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the Shipday request completed successfully."
+          },
+          "orderId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The positive Shipday identifier."
+          },
+          "raw": {
+            "description": "The raw response body returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "orderId",
+          "raw"
+        ],
+        "description": "A stable confirmation for a Shipday mutation."
+      }
+    },
+    {
+      "id": "shipday.get_order",
+      "service": "shipday",
+      "name": "get_order",
+      "description": "Retrieve one Shipday delivery order by order number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderNumber": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shipday order number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderNumber"
+        ],
+        "description": "The input payload for retrieving one Shipday order by order number."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Shipday order returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "order"
+        ],
+        "description": "The Shipday order response."
+      }
+    },
+    {
+      "id": "shipday.get_order_progress",
+      "service": "shipday",
+      "name": "get_order_progress",
+      "description": "Retrieve real-time delivery progress and ETA for a Shipday order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shipday tracking ID."
+          },
+          "isStaticDataRequired": {
+            "type": "boolean",
+            "description": "Whether the response should include static customer, restaurant, and carrier details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "trackingId"
+        ],
+        "description": "The input payload for retrieving Shipday order delivery progress."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "progress": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The delivery progress returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "progress"
+        ],
+        "description": "The Shipday delivery progress response."
+      }
+    },
+    {
+      "id": "shipday.list_active_orders",
+      "service": "shipday",
+      "name": "list_active_orders",
+      "description": "Retrieve active delivery orders from Shipday.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing active Shipday orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Shipday order."
+            },
+            "description": "The active orders returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "The active Shipday orders response."
+      }
+    },
+    {
+      "id": "shipday.list_carriers",
+      "service": "shipday",
+      "name": "list_carriers",
+      "description": "Retrieve carriers configured in Shipday.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing Shipday carriers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "carriers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Shipday carrier."
+            },
+            "description": "The carriers returned by Shipday."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "carriers"
+        ],
+        "description": "The Shipday carriers response."
+      }
+    }
+  ]
+}

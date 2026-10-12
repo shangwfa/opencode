@@ -1,0 +1,387 @@
+{
+  "service": "seatable",
+  "displayName": "SeaTable",
+  "description": "Read and manage rows in a SeaTable base.",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Base API Token",
+      "placeholder": "SeaTable base API token",
+      "description": "A read-write API token for one SeaTable base. Create it from the base menu under Advanced > API Tokens: https://seatable.com/help/create-api-tokens/",
+      "extraFields": [
+        {
+          "key": "serverUrl",
+          "label": "Server URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://cloud.seatable.io",
+          "description": "The HTTPS URL of SeaTable Cloud or your self-hosted SeaTable server. Public addresses work by default; private-network instances require OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK in the self-hosted runtime. Reserved, local, and cloud-metadata targets remain blocked."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://seatable.com",
+  "actions": [
+    {
+      "id": "seatable.append_rows",
+      "service": "seatable",
+      "name": "append_rows",
+      "description": "Append one or more rows to a SeaTable table using column names as keys.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SeaTable table name."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A row keyed by SeaTable column names."
+            },
+            "description": "Rows to append, keyed by column names.",
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "applyDefault": {
+            "type": "boolean",
+            "description": "Whether SeaTable should apply column default values to missing fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableName",
+          "rows"
+        ],
+        "description": "Input payload for appending SeaTable rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "insertedRowCount": {
+            "type": "integer",
+            "description": "Number of rows inserted by SeaTable."
+          },
+          "rowIds": {
+            "type": "array",
+            "items": {
+              "description": "A returned row identifier."
+            },
+            "description": "Identifiers of the inserted rows."
+          },
+          "firstRow": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The SeaTable row ID."
+              },
+              "_mtime": {
+                "type": "string",
+                "description": "The row modification timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A row returned by SeaTable."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SeaTable API response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "insertedRowCount",
+          "rowIds",
+          "raw"
+        ],
+        "description": "SeaTable append rows response."
+      }
+    },
+    {
+      "id": "seatable.delete_rows",
+      "service": "seatable",
+      "name": "delete_rows",
+      "description": "Delete one or more SeaTable rows by row ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SeaTable table name."
+          },
+          "rowIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 22,
+              "maxLength": 22,
+              "description": "The 22-character SeaTable row ID."
+            },
+            "description": "SeaTable row IDs to delete.",
+            "minItems": 1,
+            "maxItems": 10000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for deleting SeaTable rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether SeaTable accepted the deletion."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SeaTable API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SeaTable delete rows response."
+      }
+    },
+    {
+      "id": "seatable.get_metadata",
+      "service": "seatable",
+      "name": "get_metadata",
+      "description": "Get metadata for the SeaTable base associated with the API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input payload for reading SeaTable base metadata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SeaTable API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SeaTable base metadata response."
+      }
+    },
+    {
+      "id": "seatable.get_row",
+      "service": "seatable",
+      "name": "get_row",
+      "description": "Get one row from a SeaTable table by row ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SeaTable table name."
+          },
+          "rowId": {
+            "type": "string",
+            "minLength": 22,
+            "maxLength": 22,
+            "description": "The 22-character SeaTable row ID."
+          },
+          "convertKeys": {
+            "type": "boolean",
+            "description": "Whether returned row keys should use column names instead of internal keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableName",
+          "rowId"
+        ],
+        "description": "Input payload for reading one SeaTable row."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "properties": {
+              "_id": {
+                "type": "string",
+                "description": "The SeaTable row ID."
+              },
+              "_mtime": {
+                "type": "string",
+                "description": "The row modification timestamp."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A row returned by SeaTable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Single SeaTable row response."
+      }
+    },
+    {
+      "id": "seatable.list_rows",
+      "service": "seatable",
+      "name": "list_rows",
+      "description": "List rows from a SeaTable table or view with offset pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SeaTable table name."
+          },
+          "viewName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional SeaTable view name."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based row offset."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Maximum rows to return, from 1 to 1000."
+          },
+          "convertKeys": {
+            "type": "boolean",
+            "description": "Whether returned row keys should use column names instead of internal keys."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tableName"
+        ],
+        "description": "Input payload for listing SeaTable rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string",
+                  "description": "The SeaTable row ID."
+                },
+                "_mtime": {
+                  "type": "string",
+                  "description": "The row modification timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A row returned by SeaTable."
+            },
+            "description": "Rows returned by SeaTable."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SeaTable row list response."
+      }
+    },
+    {
+      "id": "seatable.update_rows",
+      "service": "seatable",
+      "name": "update_rows",
+      "description": "Update one or more SeaTable rows using column names as keys.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SeaTable table name."
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rowId": {
+                  "type": "string",
+                  "minLength": 22,
+                  "maxLength": 22,
+                  "description": "The 22-character SeaTable row ID."
+                },
+                "row": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A row keyed by SeaTable column names."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One SeaTable row update."
+            },
+            "description": "Rows to update.",
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for updating SeaTable rows."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether SeaTable accepted the updates."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw SeaTable API response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "SeaTable update rows response."
+      }
+    }
+  ]
+}

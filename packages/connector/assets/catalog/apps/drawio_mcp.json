@@ -1,0 +1,192 @@
+{
+  "service": "drawio_mcp",
+  "displayName": "draw.io MCP",
+  "description": "Create draw.io diagrams from Mermaid or draw.io XML and search the draw.io shape library through the draw.io MCP server.",
+  "categories": [
+    "Design",
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "mcpEndpoint",
+          "label": "MCP Endpoint URL",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://mcp.draw.io/mcp",
+          "description": "No credentials are required; this connection only selects the MCP server. Leave blank to use the official hosted server at mcp.draw.io, which receives the diagram content you send. To keep diagrams on your own infrastructure, enter the /mcp URL of a self-hosted jgraph/drawio-mcp mcp-app-server, version 1.0.4 or later (earlier builds do not return the editor link)."
+        }
+      ],
+      "testAction": {
+        "actionName": "search_shapes",
+        "input": {
+          "query": "database",
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "homepageUrl": "https://www.drawio.com",
+  "actions": [
+    {
+      "id": "drawio_mcp.create_diagram",
+      "service": "drawio_mcp",
+      "name": "create_diagram",
+      "description": "Build a draw.io diagram from Mermaid or draw.io XML and return a link that opens it in the draw.io editor. Nothing is saved on the draw.io side; share the link with the user to view or edit the diagram.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mermaid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mermaid diagram source, such as `flowchart TD\n  A --> B`. Prefer Mermaid for flowcharts, sequence, class, state, ER, Gantt, mind map, timeline, and other diagram types Mermaid supports. For a layered layout of a large or branching flowchart, start the source with the frontmatter `---\nconfig:\n  layout: elk\n---`.",
+            "pattern": "\\S"
+          },
+          "xml": {
+            "type": "string",
+            "minLength": 1,
+            "description": "draw.io diagram XML with an `<mxGraphModel>` or `<mxfile>` root. Use it for layouts Mermaid cannot express, such as cloud architecture with vendor shapes, network topology, floor plans, or UI mockups. It must be well-formed and must not contain XML comments.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Provide exactly one of mermaid or xml.",
+        "oneOf": [
+          {
+            "required": [
+              "mermaid"
+            ]
+          },
+          {
+            "required": [
+              "xml"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "editorUrl": {
+            "type": "string",
+            "description": "A link that opens the diagram in the draw.io web editor. The diagram source is compressed into the URL fragment.",
+            "format": "uri"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Problems draw.io expects to break rendering, such as XML comments. Fix them and create the diagram again. Items quote attribute values from the diagram source verbatim and may contain line breaks. draw.io only checks XML; Mermaid is converted when the link is opened, so an empty list does not mean the Mermaid source is valid."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Problems draw.io expects may affect rendering of XML, such as edges that reference missing cells. Items quote attribute values from the diagram source verbatim and may contain line breaks. Always empty for Mermaid."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "editorUrl",
+          "errors",
+          "warnings"
+        ],
+        "description": "The draw.io diagram."
+      },
+      "followUpActions": [
+        "drawio_mcp.search_shapes"
+      ]
+    },
+    {
+      "id": "drawio_mcp.search_shapes",
+      "service": "drawio_mcp",
+      "name": "search_shapes",
+      "description": "Search the draw.io shape library for vendor, industry, and icon shapes, such as cloud services, network devices, P&ID symbols, and product logos, and return the style strings to use in draw.io XML. Basic shapes such as rectangles, diamonds, and cylinders do not need a search.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Space-separated keywords, such as `aws lambda`, `cisco router`, `kubernetes pod`, or `pid globe valve`.",
+            "pattern": "\\S"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Maximum number of shapes to return.",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "Input for searching the draw.io shape library."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "shapes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The shape name."
+                },
+                "style": {
+                  "type": "string",
+                  "description": "The draw.io style string to use as the style attribute of an mxCell."
+                },
+                "width": {
+                  "type": "number",
+                  "description": "The default shape width in pixels."
+                },
+                "height": {
+                  "type": "number",
+                  "description": "The default shape height in pixels."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "style",
+                "width",
+                "height"
+              ],
+              "description": "A draw.io shape."
+            },
+            "description": "Matching shapes, best match first. Empty when nothing matched."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shapes"
+        ],
+        "description": "Shapes matching the search."
+      },
+      "followUpActions": [
+        "drawio_mcp.create_diagram"
+      ]
+    }
+  ]
+}

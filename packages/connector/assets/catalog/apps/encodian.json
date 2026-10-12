@@ -1,0 +1,606 @@
+{
+  "service": "encodian",
+  "displayName": "Encodian",
+  "categories": [
+    "Productivity",
+    "Design & Media"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "encodian_api_key",
+      "description": "Encodian API key sent with the X-ApiKey header. Generate or manage keys from the Encodian API key portal: https://www.encodian.com/apikey/.",
+      "extraFields": [
+        {
+          "key": "apiBaseUrl",
+          "label": "Regional API Host",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "https://us-api.apps-encodian.com",
+          "description": "Optional Encodian regional API host. Leave empty to use the default host at https://api.apps-encodian.com."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.encodian.com",
+  "actions": [
+    {
+      "id": "encodian.compress_pdf",
+      "service": "encodian",
+      "name": "compress_pdf",
+      "description": "Compress one PDF document with Encodian and return the optimized PDF file as base64 content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded PDF document content to process."
+          },
+          "compressImages": {
+            "type": "boolean",
+            "description": "Whether Encodian should compress images embedded in the PDF document."
+          },
+          "imageQuality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The image quality percentage used when image compression is enabled."
+          },
+          "maxResolution": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum image resolution in DPI before Encodian scales oversized images down."
+          },
+          "resizeImages": {
+            "type": "boolean",
+            "description": "Whether Encodian should resize images larger than the maximum resolution."
+          },
+          "removePrivateInfo": {
+            "type": "boolean",
+            "description": "Whether Encodian should remove private PDF metadata from the document."
+          },
+          "removeUnusedObjects": {
+            "type": "boolean",
+            "description": "Whether Encodian should remove unused PDF objects from the document."
+          },
+          "removeUnusedStreams": {
+            "type": "boolean",
+            "description": "Whether Encodian should remove unused PDF resource streams."
+          },
+          "linkDuplicateStreams": {
+            "type": "boolean",
+            "description": "Whether Encodian should deduplicate identical PDF resource streams."
+          },
+          "allowReusePageContent": {
+            "type": "boolean",
+            "description": "Whether Encodian should reuse identical page content while optimizing pages."
+          },
+          "unembedFonts": {
+            "type": "boolean",
+            "description": "Whether Encodian should remove embedded fonts from the document."
+          },
+          "flattenAnnotations": {
+            "type": "boolean",
+            "description": "Whether Encodian should flatten annotations into the PDF content."
+          },
+          "deleteAnnotations": {
+            "type": "boolean",
+            "description": "Whether Encodian should delete annotations from the PDF document."
+          },
+          "flattenFields": {
+            "type": "boolean",
+            "description": "Whether Encodian should flatten AcroForm fields into the PDF content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileContent"
+        ],
+        "description": "Input parameters for compressing one PDF document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The output PDF file name returned by Encodian when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The output PDF file name returned by Encodian when available."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The processed PDF document content returned by Encodian as a base64 string."
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation identifier returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation identifier returned for this request when available."
+          },
+          "operationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation status returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation status returned for this request when available."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Encodian error message returned alongside the response."
+            },
+            "description": "Any Encodian error messages echoed with the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Encodian file result with base64 output content."
+      }
+    },
+    {
+      "id": "encodian.extract_pdf_pages",
+      "service": "encodian",
+      "name": "extract_pdf_pages",
+      "description": "Extract selected pages from one PDF document and return the resulting PDF file as base64 content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded PDF document content to process."
+          },
+          "startPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The first one-based page number to extract."
+          },
+          "endPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The last one-based page number to extract. Leave empty to continue to the final page."
+          },
+          "pageNumbers": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A comma-separated list of one-based page numbers to extract, such as '1,3,4'."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileContent"
+        ],
+        "description": "Input parameters for extracting selected pages from one PDF document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The output PDF file name returned by Encodian when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The output PDF file name returned by Encodian when available."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The processed PDF document content returned by Encodian as a base64 string."
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation identifier returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation identifier returned for this request when available."
+          },
+          "operationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation status returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation status returned for this request when available."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Encodian error message returned alongside the response."
+            },
+            "description": "Any Encodian error messages echoed with the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Encodian file result with base64 output content."
+      }
+    },
+    {
+      "id": "encodian.get_pdf_text_layer",
+      "service": "encodian",
+      "name": "get_pdf_text_layer",
+      "description": "Extract the text layer from one PDF document with optional page-range and encoding controls.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source PDF file name, including the .pdf extension required by Encodian."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded PDF document content to process."
+          },
+          "startPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The first one-based page number to include when extracting the text layer."
+          },
+          "endPage": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The last one-based page number to include when extracting the text layer."
+          },
+          "textEncodingType": {
+            "type": "string",
+            "enum": [
+              "Default",
+              "Latin1",
+              "BigEndianUnicode",
+              "UTF16",
+              "UTF8",
+              "UTF7",
+              "ASCII"
+            ],
+            "description": "The text encoding Encodian should use for the extracted PDF text layer."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName",
+          "fileContent"
+        ],
+        "description": "Input parameters for extracting the text layer from one PDF document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "textLayer": {
+            "type": "string",
+            "description": "The PDF text layer extracted by Encodian."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The PDF file name echoed by Encodian when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The PDF file name echoed by Encodian when available."
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation identifier returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation identifier returned for this request when available."
+          },
+          "operationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation status returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation status returned for this request when available."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Encodian error message returned alongside the response."
+            },
+            "description": "Any Encodian error messages echoed with the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Encodian PDF text-layer extraction result."
+      }
+    },
+    {
+      "id": "encodian.secure_pdf_document",
+      "service": "encodian",
+      "name": "secure_pdf_document",
+      "description": "Encrypt one PDF document with optional open and edit passwords, then return the protected PDF as base64 content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source PDF file name, including the .pdf extension required by Encodian."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded PDF document content to process."
+          },
+          "userPassword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional password required to open the protected PDF document."
+          },
+          "adminPassword": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional password required to edit the protected PDF document."
+          },
+          "pdfPrivileges": {
+            "type": "string",
+            "enum": [
+              "AllowAll",
+              "DenyAll",
+              "Specific"
+            ],
+            "description": "The Encodian privilege mode applied to the protected PDF document."
+          },
+          "cryptoAlgorithm": {
+            "type": "string",
+            "enum": [
+              "RC4x40",
+              "RC4x128",
+              "AESx128",
+              "AESx256"
+            ],
+            "description": "The cryptographic algorithm Encodian should use for PDF encryption."
+          },
+          "pdfPrivilegesAllowAssembly": {
+            "type": "boolean",
+            "description": "Whether document assembly should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowCopy": {
+            "type": "boolean",
+            "description": "Whether content copying should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowFillIn": {
+            "type": "boolean",
+            "description": "Whether form filling should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowPrint": {
+            "type": "boolean",
+            "description": "Whether printing should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowScreenReaders": {
+            "type": "boolean",
+            "description": "Whether screen-reader extraction should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowModifyContents": {
+            "type": "boolean",
+            "description": "Whether content modification should be permitted when privileges are Specific."
+          },
+          "pdfPrivilegesAllowModifyAnnotations": {
+            "type": "boolean",
+            "description": "Whether annotation modification should be permitted when privileges are Specific."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileName",
+          "fileContent"
+        ],
+        "description": "Input parameters for securing one PDF document with passwords and privileges."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The output PDF file name returned by Encodian when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The output PDF file name returned by Encodian when available."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The processed PDF document content returned by Encodian as a base64 string."
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation identifier returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation identifier returned for this request when available."
+          },
+          "operationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation status returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation status returned for this request when available."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Encodian error message returned alongside the response."
+            },
+            "description": "Any Encodian error messages echoed with the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Encodian file result with base64 output content."
+      }
+    },
+    {
+      "id": "encodian.unlock_pdf_document",
+      "service": "encodian",
+      "name": "unlock_pdf_document",
+      "description": "Remove password protection from one PDF document and return the unlocked PDF as base64 content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The source PDF file name, including the .pdf extension required by Encodian."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The base64-encoded PDF document content to process."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The password Encodian should use to unlock the PDF document."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for unlocking one password-protected PDF document."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The output PDF file name returned by Encodian when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The output PDF file name returned by Encodian when available."
+          },
+          "fileContent": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The processed PDF document content returned by Encodian as a base64 string."
+          },
+          "operationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation identifier returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation identifier returned for this request when available."
+          },
+          "operationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The Encodian operation status returned for this request when available."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Encodian operation status returned for this request when available."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Encodian error message returned alongside the response."
+            },
+            "description": "Any Encodian error messages echoed with the response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Normalized Encodian file result with base64 output content."
+      }
+    }
+  ]
+}

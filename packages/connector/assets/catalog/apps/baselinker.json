@@ -1,0 +1,634 @@
+{
+  "service": "baselinker",
+  "displayName": "BaseLinker",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "BASELINKER_API_TOKEN",
+      "description": "BaseLinker API token sent with the X-BLToken header. Generate it in BaseLinker under Account & other > My account > API: https://api.baselinker.com/."
+    }
+  ],
+  "homepageUrl": "https://baselinker.com",
+  "actions": [
+    {
+      "id": "baselinker.list_inventories",
+      "service": "baselinker",
+      "name": "list_inventories",
+      "description": "List inventory catalogs available in BaseLinker storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing BaseLinker inventory catalogs."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inventories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "inventory_id": {
+                  "type": "integer",
+                  "description": "Inventory catalog ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Inventory catalog name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Inventory catalog description."
+                },
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Language code."
+                  },
+                  "description": "Languages available in the inventory."
+                },
+                "default_language": {
+                  "type": "string",
+                  "description": "Default inventory language code."
+                },
+                "price_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "description": "Price group ID."
+                  },
+                  "description": "Price group IDs available in the inventory."
+                },
+                "default_price_group": {
+                  "type": "integer",
+                  "description": "Default price group ID."
+                },
+                "warehouses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Warehouse ID such as bl_205, shop_2334, or warehouse_4556."
+                  },
+                  "description": "Warehouse IDs available in the inventory."
+                },
+                "default_warehouse": {
+                  "type": "string",
+                  "description": "Default warehouse ID."
+                },
+                "reservations": {
+                  "type": "boolean",
+                  "description": "Whether this inventory supports reservations."
+                },
+                "is_default": {
+                  "type": "boolean",
+                  "description": "Whether this is the default inventory catalog."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker inventory catalog."
+            },
+            "description": "Inventory catalogs returned by BaseLinker."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker inventories response."
+      }
+    },
+    {
+      "id": "baselinker.list_inventory_products",
+      "service": "baselinker",
+      "name": "list_inventory_products",
+      "description": "List basic product data from a BaseLinker inventory catalog.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "inventory_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Inventory catalog ID returned by list_inventories."
+          },
+          "filter_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Product ID filter."
+          },
+          "filter_category_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Category ID filter."
+          },
+          "filter_ean": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Product EAN filter."
+          },
+          "filter_sku": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Product SKU filter."
+          },
+          "filter_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Product name search filter."
+          },
+          "filter_price_from": {
+            "type": "number",
+            "description": "Minimum product price filter."
+          },
+          "filter_price_to": {
+            "type": "number",
+            "description": "Maximum product price filter."
+          },
+          "filter_stock_from": {
+            "type": "integer",
+            "description": "Minimum stock quantity filter."
+          },
+          "filter_stock_to": {
+            "type": "integer",
+            "description": "Maximum stock quantity filter."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "One-based result page. BaseLinker returns up to 1000 products per page."
+          },
+          "filter_sort": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sort expression accepted by BaseLinker, such as \"id ASC\"."
+          },
+          "filter_locations": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Location name filter."
+          },
+          "include_variants": {
+            "type": "boolean",
+            "description": "Whether to include product variants in addition to main products."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inventory_id"
+        ],
+        "description": "Input parameters for listing BaseLinker inventory products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Product ID."
+                },
+                "parent_id": {
+                  "type": "integer",
+                  "description": "Parent product ID, or 0 for a main product."
+                },
+                "ean": {
+                  "type": "string",
+                  "description": "Product EAN."
+                },
+                "sku": {
+                  "type": "string",
+                  "description": "Product SKU."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Product name."
+                },
+                "prices": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number",
+                    "description": "Gross product price."
+                  },
+                  "description": "Gross prices keyed by price group ID."
+                },
+                "stock": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "description": "Product stock quantity."
+                  },
+                  "description": "Stock quantity keyed by warehouse ID."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker inventory product summary."
+            },
+            "description": "Products keyed by product ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker inventory product summaries response."
+      }
+    },
+    {
+      "id": "baselinker.list_inventory_warehouses",
+      "service": "baselinker",
+      "name": "list_inventory_warehouses",
+      "description": "List warehouses available in BaseLinker inventories.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing BaseLinker inventory warehouses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "warehouses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "warehouse_type": {
+                  "type": "string",
+                  "description": "Warehouse type, such as bl, shop, warehouse, fulfillment, or blconnect."
+                },
+                "warehouse_id": {
+                  "type": "integer",
+                  "description": "Warehouse identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Warehouse name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Warehouse description."
+                },
+                "stock_edition": {
+                  "type": "boolean",
+                  "description": "Whether manual stock editing is permitted for this warehouse."
+                },
+                "is_default": {
+                  "type": "boolean",
+                  "description": "Whether this is the default warehouse."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "Warehouse street address."
+                },
+                "postcode": {
+                  "type": "string",
+                  "description": "Warehouse postal code."
+                },
+                "city": {
+                  "type": "string",
+                  "description": "Warehouse city."
+                },
+                "country": {
+                  "type": "string",
+                  "description": "Warehouse country as a two-letter ISO 3166-1 code."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker inventory warehouse."
+            },
+            "description": "Inventory warehouses returned by BaseLinker."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker inventory warehouses response."
+      }
+    },
+    {
+      "id": "baselinker.list_order_events",
+      "service": "baselinker",
+      "name": "list_order_events",
+      "description": "List recent BaseLinker order events from the order journal.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "last_log_id": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Log ID from which events should be retrieved."
+          },
+          "logs_types": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "BaseLinker event type ID."
+            },
+            "description": "Event type IDs to include."
+          },
+          "order_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Order identifier used to filter events."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing BaseLinker order events."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "log_id": {
+                  "type": "integer",
+                  "description": "Event log ID returned by BaseLinker."
+                },
+                "id": {
+                  "type": "integer",
+                  "description": "Event ID when BaseLinker returns the documented id field."
+                },
+                "order_id": {
+                  "type": "integer",
+                  "description": "Order identifier associated with the event."
+                },
+                "log_type": {
+                  "type": "integer",
+                  "description": "BaseLinker event type identifier."
+                },
+                "object_id": {
+                  "type": "integer",
+                  "description": "Additional object identifier associated with the event type."
+                },
+                "date": {
+                  "type": "integer",
+                  "description": "Event time as a Unix timestamp."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker order event."
+            },
+            "description": "Order events returned by BaseLinker."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker order events response."
+      }
+    },
+    {
+      "id": "baselinker.list_order_statuses",
+      "service": "baselinker",
+      "name": "list_order_statuses",
+      "description": "List order statuses configured in the BaseLinker order manager.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing BaseLinker order statuses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Status ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Status name."
+                },
+                "color": {
+                  "type": "string",
+                  "description": "Status color as a hex value."
+                },
+                "group_id": {
+                  "type": "integer",
+                  "description": "Status group ID."
+                },
+                "is_primary": {
+                  "type": "integer",
+                  "description": "Whether this is the primary status, represented as 0 or 1."
+                },
+                "name_for_customer": {
+                  "type": "string",
+                  "description": "Full status name displayed to the customer."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker order status."
+            },
+            "description": "Order statuses returned by BaseLinker."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker order statuses response."
+      }
+    },
+    {
+      "id": "baselinker.list_orders",
+      "service": "baselinker",
+      "name": "list_orders",
+      "description": "List BaseLinker orders using official order manager filters, returning up to 100 orders.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Order identifier. When provided, only this order is returned."
+          },
+          "date_confirmed_from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp value accepted by BaseLinker."
+          },
+          "date_from": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp value accepted by BaseLinker."
+          },
+          "id_from": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Order ID from which subsequent orders are collected."
+          },
+          "get_unconfirmed_orders": {
+            "type": "boolean",
+            "description": "Whether to include unconfirmed orders."
+          },
+          "status_id": {
+            "type": "integer",
+            "description": "Order status identifier used to filter orders."
+          },
+          "filter_email": {
+            "type": "string",
+            "description": "Email address used to filter orders.",
+            "format": "email"
+          },
+          "filter_order_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Order source filter, such as ebay or amazon."
+          },
+          "filter_order_source_id": {
+            "type": "integer",
+            "description": "Order source identifier filter."
+          },
+          "filter_shop_order_id": {
+            "type": "integer",
+            "description": "Shop order identifier filter."
+          },
+          "filter_external_order_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "External marketplace or store order ID filter."
+          },
+          "include_custom_extra_fields": {
+            "type": "boolean",
+            "description": "Whether to include custom order extra fields."
+          },
+          "include_commissions": {
+            "type": "boolean",
+            "description": "Whether to include marketplace commission data."
+          },
+          "include_connect_data": {
+            "type": "boolean",
+            "description": "Whether to include Base Connect contractor data."
+          },
+          "include_discounts_data": {
+            "type": "boolean",
+            "description": "Whether to include applied discount data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing BaseLinker orders."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "integer",
+                  "description": "Order identifier from BaseLinker order manager."
+                },
+                "shop_order_id": {
+                  "type": "integer",
+                  "description": "Order ID assigned by the connected store."
+                },
+                "external_order_id": {
+                  "type": "string",
+                  "description": "Order identifier assigned by an external marketplace or store."
+                },
+                "order_source": {
+                  "type": "string",
+                  "description": "Order source, such as shop, personal, or a marketplace code."
+                },
+                "order_source_id": {
+                  "type": "integer",
+                  "description": "Identifier of the source account or store."
+                },
+                "order_status_id": {
+                  "type": "integer",
+                  "description": "Current BaseLinker order status ID."
+                },
+                "date_add": {
+                  "type": "integer",
+                  "description": "Order creation time as a Unix timestamp."
+                },
+                "date_confirmed": {
+                  "type": "integer",
+                  "description": "Order confirmation time as a Unix timestamp."
+                },
+                "date_in_status": {
+                  "type": "integer",
+                  "description": "Time when the order entered its current status."
+                },
+                "confirmed": {
+                  "type": "boolean",
+                  "description": "Whether the order is confirmed."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Three-letter order currency code."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Buyer email address."
+                },
+                "phone": {
+                  "type": "string",
+                  "description": "Buyer phone number."
+                },
+                "payment_method": {
+                  "type": "string",
+                  "description": "Payment method name."
+                },
+                "payment_done": {
+                  "type": "number",
+                  "description": "Amount already paid for the order."
+                },
+                "delivery_method": {
+                  "type": "string",
+                  "description": "Delivery method name."
+                },
+                "delivery_price": {
+                  "type": "number",
+                  "description": "Gross delivery price."
+                },
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A raw object returned by BaseLinker."
+                  },
+                  "description": "Products included in the order."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A BaseLinker order."
+            },
+            "description": "Orders returned by BaseLinker."
+          }
+        },
+        "additionalProperties": false,
+        "description": "BaseLinker order list response."
+      }
+    }
+  ]
+}

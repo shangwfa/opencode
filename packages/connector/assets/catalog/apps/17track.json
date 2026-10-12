@@ -1,0 +1,518 @@
+{
+  "service": "17track",
+  "displayName": "17TRACK",
+  "categories": [
+    "Productivity",
+    "Location"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "17TRACK_API_KEY",
+      "description": "17TRACK API key sent in the 17token header. Get or change the key in 17TRACK API Settings: https://api.17track.net/admin/settings."
+    }
+  ],
+  "homepageUrl": "https://www.17track.net/",
+  "actions": [
+    {
+      "id": "17track.get_quota",
+      "service": "17track",
+      "name": "get_quota",
+      "description": "Get the current tracking and email quota counters for the 17TRACK account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to retrieve quota counters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The total tracking quota."
+          },
+          "used": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The tracking quota already used."
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The tracking quota still available."
+          },
+          "todayUsed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The number of tracking registrations used today."
+          },
+          "dailyLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The maximum number of registrations allowed per day, where 0 means unlimited."
+          },
+          "freeEmailQuota": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The free email notification quota."
+          },
+          "freeEmailQuotaUsed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The free email notification quota already used."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized quota counters for the 17TRACK account."
+      }
+    },
+    {
+      "id": "17track.get_tracking_details",
+      "service": "17track",
+      "name": "get_tracking_details",
+      "description": "Get current tracking details for up to 40 registered tracking numbers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "minLength": 5,
+                  "maxLength": 50,
+                  "description": "A 17TRACK-compatible tracking number.",
+                  "pattern": "^[A-Za-z0-9-]+$"
+                },
+                "carrier": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric 17TRACK carrier code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "number"
+              ],
+              "description": "A tracking number and optional carrier used to retrieve its details."
+            },
+            "description": "Tracking numbers to retrieve.",
+            "minItems": 1,
+            "maxItems": 40
+          }
+        },
+        "additionalProperties": false,
+        "description": "The tracking numbers whose details should be retrieved."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by 17TRACK."
+            },
+            "description": "Items accepted and processed by 17TRACK."
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by 17TRACK."
+            },
+            "description": "Items rejected by 17TRACK with error details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized 17TRACK batch response."
+      }
+    },
+    {
+      "id": "17track.list_trackings",
+      "service": "17track",
+      "name": "list_trackings",
+      "description": "List registered 17TRACK shipments with status, time, and pagination filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tracking_numbers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 50,
+              "description": "A 17TRACK-compatible tracking number.",
+              "pattern": "^[A-Za-z0-9-]+$"
+            },
+            "description": "Tracking numbers to filter by.",
+            "minItems": 1,
+            "maxItems": 200
+          },
+          "carrier": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The numeric 17TRACK carrier code."
+          },
+          "data_origin": {
+            "type": "string",
+            "enum": [
+              "Api",
+              "Manual",
+              "Import"
+            ],
+            "description": "The source used to register the tracking number."
+          },
+          "package_status": {
+            "type": "string",
+            "enum": [
+              "NotFound",
+              "InfoReceived",
+              "InTransit",
+              "Expired",
+              "AvailableForPickup",
+              "OutForDelivery",
+              "DeliveryFailure",
+              "Delivered",
+              "Exception"
+            ],
+            "description": "The current main package status."
+          },
+          "register_time_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the registration time range."
+          },
+          "register_time_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the registration time range."
+          },
+          "tracking_status": {
+            "type": "string",
+            "enum": [
+              "Tracking",
+              "Stopped"
+            ],
+            "description": "Whether 17TRACK is still tracking the shipment."
+          },
+          "sync_status": {
+            "type": "boolean",
+            "description": "Whether the latest carrier synchronization succeeded."
+          },
+          "track_time_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the latest tracking time range."
+          },
+          "track_time_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the latest tracking time range."
+          },
+          "push_time_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the webhook push time range."
+          },
+          "push_time_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the webhook push time range."
+          },
+          "push_status": {
+            "type": "string",
+            "enum": [
+              "NotPushed",
+              "Success",
+              "Failure"
+            ],
+            "description": "The webhook push result."
+          },
+          "push_status_code": {
+            "type": "integer",
+            "description": "The webhook HTTP response status code."
+          },
+          "stop_track_time_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the stopped tracking time range."
+          },
+          "stop_track_time_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the stopped tracking time range."
+          },
+          "page_no": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The result page number, starting from 0."
+          },
+          "order_by": {
+            "type": "string",
+            "enum": [
+              "RegisterTimeAsc",
+              "RegisterTimeDesc",
+              "PushTimeAsc",
+              "PushTimeDesc",
+              "TrackTimeAsc",
+              "TrackTimeDesc"
+            ],
+            "description": "The order used for tracking records."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The filters used to list registered tracking numbers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "trackings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by 17TRACK."
+            },
+            "description": "Tracking records returned by 17TRACK."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalItems": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of matching tracking records."
+              },
+              "totalPages": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total number of result pages."
+              },
+              "pageNumber": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The current page number."
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The number of records in a page."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Pagination information returned by 17TRACK."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized 17TRACK tracking list response."
+      }
+    },
+    {
+      "id": "17track.register_trackings",
+      "service": "17track",
+      "name": "register_trackings",
+      "description": "Register up to 40 tracking numbers for automatic tracking by 17TRACK.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "trackings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "minLength": 5,
+                  "maxLength": 50,
+                  "description": "A 17TRACK-compatible tracking number.",
+                  "pattern": "^[A-Za-z0-9-]+$"
+                },
+                "lang": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The language code used to translate tracking events."
+                },
+                "translation_mode": {
+                  "type": "string",
+                  "enum": [
+                    "Denied",
+                    "UseDefaultLang",
+                    "UseThirdPartyServices"
+                  ],
+                  "description": "The fallback behavior when the carrier does not support the requested language."
+                },
+                "email": {
+                  "type": "string",
+                  "maxLength": 250,
+                  "description": "The recipient email used for optional 17TRACK notifications.",
+                  "format": "email"
+                },
+                "order_no": {
+                  "type": "string",
+                  "minLength": 5,
+                  "maxLength": 50,
+                  "description": "The merchant order number.",
+                  "pattern": "^[A-Za-z0-9-]+$"
+                },
+                "order_time": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The order time accepted by 17TRACK."
+                },
+                "carrier": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The numeric 17TRACK carrier code."
+                },
+                "final_carrier": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The last-mile carrier code for a UPU shipment."
+                },
+                "auto_detection": {
+                  "type": "boolean",
+                  "description": "Whether 17TRACK should auto-detect the carrier."
+                },
+                "origin_country": {
+                  "type": "string",
+                  "description": "The origin ISO 3166-1 alpha-2 country code.",
+                  "pattern": "^[A-Za-z]{2}$"
+                },
+                "ship_date": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The shipping date, normally in YYYY/MM/DD format."
+                },
+                "destination_postal_code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The destination postal code."
+                },
+                "destination_country": {
+                  "type": "string",
+                  "description": "The destination ISO 3166-1 alpha-2 country code.",
+                  "pattern": "^[A-Za-z]{2}$"
+                },
+                "destination_city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The destination city."
+                },
+                "shipper": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The shipper name."
+                },
+                "consignee": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The consignee name."
+                },
+                "phone_number_last_4": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The last digits of the shipper or recipient phone number."
+                },
+                "phone_number": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The shipper or recipient phone number."
+                },
+                "cpf_or_cnpj": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Brazilian CPF or CNPJ identifier."
+                },
+                "special_tracking_info": {
+                  "type": "object",
+                  "properties": {
+                    "number_type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The carrier query channel type."
+                    },
+                    "parameter": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The value required by the carrier query channel."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Carrier-specific information required to retrieve tracking events."
+                },
+                "tag": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "A custom tag attached to the tracking number."
+                },
+                "remark": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "A note describing the package."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "number"
+              ],
+              "description": "A tracking number and its optional registration metadata."
+            },
+            "description": "Tracking numbers to register.",
+            "minItems": 1,
+            "maxItems": 40
+          }
+        },
+        "additionalProperties": false,
+        "description": "The tracking numbers to register with 17TRACK."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by 17TRACK."
+            },
+            "description": "Items accepted and processed by 17TRACK."
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "A JSON object returned by 17TRACK."
+            },
+            "description": "Items rejected by 17TRACK with error details."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A normalized 17TRACK batch response."
+      }
+    }
+  ]
+}

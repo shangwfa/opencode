@@ -1,0 +1,1206 @@
+{
+  "service": "buildkite",
+  "displayName": "Buildkite",
+  "categories": [
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Access Token",
+      "placeholder": "bkua_...",
+      "description": "Buildkite API access token used with the Authorization Bearer header. Create it from Personal Settings > API Access Tokens at https://buildkite.com/user/api-access-tokens.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://buildkite.com",
+  "actions": [
+    {
+      "id": "buildkite.cancel_build",
+      "service": "buildkite",
+      "name": "cancel_build",
+      "description": "Cancel a Buildkite build by build number.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "write_builds"
+      ],
+      "providerPermissions": [
+        "write_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The pipeline-local Buildkite build number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug",
+          "number"
+        ],
+        "description": "The input payload for canceling a Buildkite build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Buildkite build."
+      }
+    },
+    {
+      "id": "buildkite.create_build",
+      "service": "buildkite",
+      "name": "create_build",
+      "description": "Create a new Buildkite build for a pipeline.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write_builds"
+      ],
+      "providerPermissions": [
+        "write_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          },
+          "commit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ref, SHA, or tag to build."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The branch the build commit belongs to."
+          },
+          "message": {
+            "type": "string",
+            "description": "Custom message for the build, when provided."
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Name of the user to attribute the build to."
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address of the user to attribute the build to.",
+                "format": "email"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "email"
+            ],
+            "description": "Build author metadata."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "Environment variable value."
+            },
+            "description": "A JSON object whose values are strings."
+          },
+          "meta_data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Metadata values to attach to the build."
+          },
+          "clean_checkout": {
+            "type": "boolean",
+            "description": "Whether the agent should perform a fresh checkout."
+          },
+          "ignore_pipeline_branch_filters": {
+            "type": "boolean",
+            "description": "Whether the build should ignore pipeline-level branch filters."
+          },
+          "pull_request_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Pull request number for a pull request build."
+          },
+          "pull_request_base_branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Base branch for a pull request build."
+          },
+          "pull_request_repository": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repository URL of the pull request build source."
+          },
+          "pull_request_labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A non-empty string value."
+            },
+            "description": "A non-empty list of strings.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug",
+          "commit",
+          "branch"
+        ],
+        "description": "The input payload for creating a Buildkite build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Buildkite build."
+      }
+    },
+    {
+      "id": "buildkite.get_build",
+      "service": "buildkite",
+      "name": "get_build",
+      "description": "Get a single Buildkite build by organization, pipeline slug, and build number.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_builds"
+      ],
+      "providerPermissions": [
+        "read_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The pipeline-local Buildkite build number."
+          },
+          "include_retried_jobs": {
+            "type": "boolean",
+            "description": "Whether retried job executions should be included in each build."
+          },
+          "include_test_engine": {
+            "type": "boolean",
+            "description": "Whether Buildkite Test Engine data should be included in the build response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug",
+          "number"
+        ],
+        "description": "The input payload for getting a Buildkite build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Buildkite build."
+      }
+    },
+    {
+      "id": "buildkite.get_current_access_token",
+      "service": "buildkite",
+      "name": "get_current_access_token",
+      "description": "Inspect the current Buildkite API access token, including scopes and owner summary.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the current Buildkite API access token."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the API access token."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Granted scopes for the current API access token."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description configured for the current API access token, when present."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Timestamp when the current API access token was created, when present."
+          },
+          "user": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Summary of the user account that owns the token."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "uuid",
+          "scopes"
+        ],
+        "description": "The current Buildkite API access token."
+      },
+      "followUpActions": [
+        "buildkite.get_current_user",
+        "buildkite.list_organizations"
+      ]
+    },
+    {
+      "id": "buildkite.get_current_user",
+      "service": "buildkite",
+      "name": "get_current_user",
+      "description": "Get the Buildkite user account that owns the current API access token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_user"
+      ],
+      "providerPermissions": [
+        "read_user"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for getting the current Buildkite user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Buildkite user."
+          },
+          "graphql_id": {
+            "type": "string",
+            "description": "GraphQL identifier of the Buildkite user."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the Buildkite user."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the Buildkite user.",
+            "format": "email"
+          },
+          "avatar_url": {
+            "type": "string",
+            "description": "Avatar URL of the Buildkite user, when present.",
+            "format": "uri"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Timestamp when the user account was created.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "email",
+          "created_at"
+        ],
+        "description": "Buildkite user."
+      },
+      "followUpActions": [
+        "buildkite.list_organizations"
+      ]
+    },
+    {
+      "id": "buildkite.get_organization",
+      "service": "buildkite",
+      "name": "get_organization",
+      "description": "Get a single Buildkite organization by slug.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_organizations"
+      ],
+      "providerPermissions": [
+        "read_organizations"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug"
+        ],
+        "description": "The input payload for getting a Buildkite organization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the Buildkite organization."
+          },
+          "graphql_id": {
+            "type": "string",
+            "description": "GraphQL identifier of the Buildkite organization."
+          },
+          "url": {
+            "type": "string",
+            "description": "Canonical API URL of the organization.",
+            "format": "uri"
+          },
+          "web_url": {
+            "type": "string",
+            "description": "Buildkite web URL of the organization.",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the organization."
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipelines_url": {
+            "type": "string",
+            "description": "API URL for the organization's pipelines.",
+            "format": "uri"
+          },
+          "agents_url": {
+            "type": "string",
+            "description": "API URL for the organization's agents.",
+            "format": "uri"
+          },
+          "emojis_url": {
+            "type": "string",
+            "description": "API URL for the organization's custom emojis.",
+            "format": "uri"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Timestamp when the organization was created.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "url",
+          "web_url",
+          "name",
+          "slug",
+          "created_at"
+        ],
+        "description": "Buildkite organization."
+      },
+      "followUpActions": [
+        "buildkite.list_pipelines",
+        "buildkite.list_builds_for_organization"
+      ]
+    },
+    {
+      "id": "buildkite.get_pipeline",
+      "service": "buildkite",
+      "name": "get_pipeline",
+      "description": "Get a single Buildkite pipeline by organization and pipeline slug.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_pipelines"
+      ],
+      "providerPermissions": [
+        "read_pipelines"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug"
+        ],
+        "description": "The input payload for getting a Buildkite pipeline."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Buildkite pipeline."
+      }
+    },
+    {
+      "id": "buildkite.list_builds_for_organization",
+      "service": "buildkite",
+      "name": "list_builds_for_organization",
+      "description": "List builds across all pipelines in a Buildkite organization.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_builds"
+      ],
+      "providerPermissions": [
+        "read_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page of results to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many results to return per page."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this branch."
+          },
+          "commit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this full commit SHA."
+          },
+          "created_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds created on or after this ISO 8601 timestamp."
+          },
+          "created_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds created before this ISO 8601 timestamp."
+          },
+          "finished_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds finished on or after this ISO 8601 timestamp."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "creating",
+              "scheduled",
+              "running",
+              "passed",
+              "failing",
+              "failed",
+              "blocked",
+              "canceling",
+              "canceled",
+              "skipped",
+              "not_run",
+              "finished"
+            ],
+            "description": "Only return builds in this Buildkite state."
+          },
+          "include_retried_jobs": {
+            "type": "boolean",
+            "description": "Whether retried job executions should be included in each build."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug"
+        ],
+        "description": "The input payload for listing Buildkite builds for an organization."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Buildkite build."
+            },
+            "description": "Buildkite builds returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the next page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the next page returned in the Buildkite Link header, or null."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the previous page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the previous page returned in the Buildkite Link header, or null."
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the first page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the first page returned in the Buildkite Link header, or null."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the last page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the last page returned in the Buildkite Link header, or null."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev",
+              "first",
+              "last"
+            ],
+            "description": "Pagination links parsed from the Buildkite Link response header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "builds",
+          "links"
+        ],
+        "description": "Paginated Buildkite build list."
+      },
+      "followUpActions": [
+        "buildkite.get_build"
+      ]
+    },
+    {
+      "id": "buildkite.list_builds_for_pipeline",
+      "service": "buildkite",
+      "name": "list_builds_for_pipeline",
+      "description": "List builds for a single Buildkite pipeline.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_builds"
+      ],
+      "providerPermissions": [
+        "read_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page of results to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many results to return per page."
+          },
+          "branch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this branch."
+          },
+          "commit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds for this full commit SHA."
+          },
+          "created_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds created on or after this ISO 8601 timestamp."
+          },
+          "created_to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds created before this ISO 8601 timestamp."
+          },
+          "finished_from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return builds finished on or after this ISO 8601 timestamp."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "creating",
+              "scheduled",
+              "running",
+              "passed",
+              "failing",
+              "failed",
+              "blocked",
+              "canceling",
+              "canceled",
+              "skipped",
+              "not_run",
+              "finished"
+            ],
+            "description": "Only return builds in this Buildkite state."
+          },
+          "include_retried_jobs": {
+            "type": "boolean",
+            "description": "Whether retried job executions should be included in each build."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug"
+        ],
+        "description": "The input payload for listing Buildkite builds for a pipeline."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "builds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Buildkite build."
+            },
+            "description": "Buildkite builds returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the next page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the next page returned in the Buildkite Link header, or null."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the previous page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the previous page returned in the Buildkite Link header, or null."
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the first page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the first page returned in the Buildkite Link header, or null."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the last page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the last page returned in the Buildkite Link header, or null."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev",
+              "first",
+              "last"
+            ],
+            "description": "Pagination links parsed from the Buildkite Link response header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "builds",
+          "links"
+        ],
+        "description": "Paginated Buildkite build list."
+      },
+      "followUpActions": [
+        "buildkite.get_build"
+      ]
+    },
+    {
+      "id": "buildkite.list_organizations",
+      "service": "buildkite",
+      "name": "list_organizations",
+      "description": "List Buildkite organizations accessible to the current API token.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_organizations"
+      ],
+      "providerPermissions": [
+        "read_organizations"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page of results to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many results to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing Buildkite organizations."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier of the Buildkite organization."
+                },
+                "graphql_id": {
+                  "type": "string",
+                  "description": "GraphQL identifier of the Buildkite organization."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Canonical API URL of the organization.",
+                  "format": "uri"
+                },
+                "web_url": {
+                  "type": "string",
+                  "description": "Buildkite web URL of the organization.",
+                  "format": "uri"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Display name of the organization."
+                },
+                "slug": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The Buildkite organization slug."
+                },
+                "pipelines_url": {
+                  "type": "string",
+                  "description": "API URL for the organization's pipelines.",
+                  "format": "uri"
+                },
+                "agents_url": {
+                  "type": "string",
+                  "description": "API URL for the organization's agents.",
+                  "format": "uri"
+                },
+                "emojis_url": {
+                  "type": "string",
+                  "description": "API URL for the organization's custom emojis.",
+                  "format": "uri"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Timestamp when the organization was created.",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "url",
+                "web_url",
+                "name",
+                "slug",
+                "created_at"
+              ],
+              "description": "Buildkite organization."
+            },
+            "description": "Buildkite organizations returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the next page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the next page returned in the Buildkite Link header, or null."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the previous page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the previous page returned in the Buildkite Link header, or null."
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the first page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the first page returned in the Buildkite Link header, or null."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the last page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the last page returned in the Buildkite Link header, or null."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev",
+              "first",
+              "last"
+            ],
+            "description": "Pagination links parsed from the Buildkite Link response header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organizations",
+          "links"
+        ],
+        "description": "Paginated Buildkite organization list."
+      },
+      "followUpActions": [
+        "buildkite.get_organization"
+      ]
+    },
+    {
+      "id": "buildkite.list_pipelines",
+      "service": "buildkite",
+      "name": "list_pipelines",
+      "description": "List Buildkite pipelines for an organization.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read_pipelines"
+      ],
+      "providerPermissions": [
+        "read_pipelines"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page of results to return."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "How many results to return per page."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return pipelines whose name contains this case-insensitive value."
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Only return pipelines whose repository URL contains this case-insensitive value."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug"
+        ],
+        "description": "The input payload for listing Buildkite pipelines."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pipelines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Buildkite pipeline."
+            },
+            "description": "Buildkite pipelines returned by the request."
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the next page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the next page returned in the Buildkite Link header, or null."
+              },
+              "prev": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the previous page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the previous page returned in the Buildkite Link header, or null."
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the first page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the first page returned in the Buildkite Link header, or null."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "URL of the last page returned in the Buildkite Link header, or null."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "URL of the last page returned in the Buildkite Link header, or null."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "next",
+              "prev",
+              "first",
+              "last"
+            ],
+            "description": "Pagination links parsed from the Buildkite Link response header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "pipelines",
+          "links"
+        ],
+        "description": "Paginated Buildkite pipeline list."
+      },
+      "followUpActions": [
+        "buildkite.get_pipeline",
+        "buildkite.list_builds_for_pipeline"
+      ]
+    },
+    {
+      "id": "buildkite.rebuild_build",
+      "service": "buildkite",
+      "name": "rebuild_build",
+      "description": "Rebuild a Buildkite build by build number.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write_builds"
+      ],
+      "providerPermissions": [
+        "write_builds"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "org_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite organization slug."
+          },
+          "pipeline_slug": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Buildkite pipeline slug."
+          },
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The pipeline-local Buildkite build number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "org_slug",
+          "pipeline_slug",
+          "number"
+        ],
+        "description": "The input payload for rebuilding a Buildkite build."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "description": "Buildkite build."
+      }
+    }
+  ]
+}

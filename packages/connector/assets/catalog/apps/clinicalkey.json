@@ -1,0 +1,259 @@
+{
+  "service": "clinicalkey",
+  "displayName": "ClinicalKey",
+  "categories": [
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "COUNTER API Key",
+      "placeholder": "ELSEVIER_COUNTER_API_KEY",
+      "description": "Elsevier COUNTER 5.1 API key from https://dev.elsevier.com/sushicop5.html",
+      "extraFields": [
+        {
+          "key": "requestorId",
+          "label": "Requestor ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false
+        },
+        {
+          "key": "customerId",
+          "label": "Customer ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.clinicalkey.com/",
+  "actions": [
+    {
+      "id": "clinicalkey.get_service_status",
+      "service": "clinicalkey",
+      "name": "get_service_status",
+      "description": "Get the current operational status of Elsevier's ClinicalKey COUNTER 5.1 service.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for checking the ClinicalKey COUNTER service status."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw COUNTER 5.1 JSON object returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClinicalKey COUNTER service status response."
+      }
+    },
+    {
+      "id": "clinicalkey.get_usage_report",
+      "service": "clinicalkey",
+      "name": "get_usage_report",
+      "description": "Retrieve one ClinicalKey COUNTER 5.1 usage report for an inclusive date range with optional standard filters and attributes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The report identifier returned by list_reports, such as PR, PR_P1, TR_B1, or TR_J1.",
+            "pattern": "\\S"
+          },
+          "beginDate": {
+            "type": "string",
+            "description": "The inclusive first usage date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The inclusive last usage date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "dataTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The official COUNTER Data_Type values to include, such as Book, Journal, or Reference_Work.",
+            "minItems": 1
+          },
+          "accessTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The official COUNTER Access_Type values to include, such as Controlled, Open, or Free_To_Read.",
+            "minItems": 1
+          },
+          "accessMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The official COUNTER Access_Method values to include, such as Regular or TDM.",
+            "minItems": 1
+          },
+          "metricTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The official COUNTER Metric_Type values to include, such as Total_Item_Requests or Unique_Item_Requests.",
+            "minItems": 1
+          },
+          "yearsOfPublication": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The publication years or ranges to include, such as 2024, 2020-2024, 0001, or 9999.",
+            "minItems": 1
+          },
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The database name to include when the selected report supports the Database filter.",
+            "pattern": "\\S"
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The item identifier to include when the selected title report supports the Item_ID filter.",
+            "pattern": "\\S"
+          },
+          "attributesToShow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[^|]+$",
+              "description": "One official COUNTER filter value, without the pipe separator used on the wire."
+            },
+            "description": "The additional official COUNTER columns or elements to include in the report.",
+            "minItems": 1
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "Month",
+              "Totals"
+            ],
+            "description": "The JSON report usage granularity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reportId",
+          "beginDate",
+          "endDate"
+        ],
+        "description": "Input for retrieving one ClinicalKey COUNTER 5.1 usage report."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw COUNTER 5.1 JSON object returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The requested ClinicalKey COUNTER usage report."
+      }
+    },
+    {
+      "id": "clinicalkey.list_members",
+      "service": "clinicalkey",
+      "name": "list_members",
+      "description": "List the consortium members or sites associated with the connected ClinicalKey customer account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing ClinicalKey consortium members or sites."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw COUNTER 5.1 JSON object returned by Elsevier."
+            },
+            "description": "The member account records, including customer and requestor identifiers returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClinicalKey consortium members or sites."
+      }
+    },
+    {
+      "id": "clinicalkey.list_reports",
+      "service": "clinicalkey",
+      "name": "list_reports",
+      "description": "List the COUNTER 5.1 usage reports currently available to the connected ClinicalKey customer account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input for listing available ClinicalKey COUNTER reports."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "The raw COUNTER 5.1 JSON object returned by Elsevier."
+            },
+            "description": "The account-specific report definitions returned by Elsevier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The available ClinicalKey COUNTER reports."
+      }
+    }
+  ]
+}

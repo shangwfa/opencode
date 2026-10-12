@@ -1,0 +1,619 @@
+{
+  "service": "odoo",
+  "displayName": "Odoo",
+  "description": "Query and modify Odoo models through the legacy JSON-RPC API available in Odoo 14–19. JSON-2 and XML-RPC are not supported by this connector.",
+  "categories": [
+    "ERP",
+    "CRM"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://mycompany.odoo.com",
+          "description": "Your Odoo instance URL, without /jsonrpc. HTTPS is required by default. A self-hosted runtime can enable OOMOL_CONNECT_ALLOW_PRIVATE_NETWORK to permit private instances and unencrypted HTTP. Use HTTP only on a trusted network; it transmits credentials and data in plaintext. Loopback and cloud metadata targets remain blocked."
+        },
+        {
+          "key": "database",
+          "label": "Database",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "mycompany",
+          "description": "The Odoo database name, not its display label."
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@example.com",
+          "description": "The login or email of the Odoo user whose access rights will apply."
+        },
+        {
+          "key": "password",
+          "label": "Password or API Key",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "description": "An Odoo password or API key from Preferences > Account Security. Odoo Online requires an API-enabled plan. Legacy RPC is deprecated since Odoo 19; see https://www.odoo.com/documentation/19.0/developer/reference/external_rpc_api.html."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.odoo.com",
+  "actions": [
+    {
+      "id": "odoo.create",
+      "service": "odoo",
+      "name": "create",
+      "description": "Create one record in an Odoo model. Relational commands may delete related records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field values for the new record, including any relational command arrays."
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "values"
+        ],
+        "description": "Record to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Created record ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "description": "Created record."
+      }
+    },
+    {
+      "id": "odoo.execute_kw",
+      "service": "odoo",
+      "name": "execute_kw",
+      "description": "Call a public Odoo model method, including custom methods. The method may modify or delete data.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Public model method name, such as action_confirm.",
+            "pattern": "\\S"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "description": "Positional argument."
+            },
+            "description": "Positional arguments. For record methods, pass the record ID array as the first argument."
+          },
+          "kwargs": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Keyword arguments, including context when needed."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "method"
+        ],
+        "description": "Model method and arguments."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The JSON value returned by the method, without coercion."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "Model method result."
+      }
+    },
+    {
+      "id": "odoo.fields_get",
+      "service": "odoo",
+      "name": "fields_get",
+      "description": "Inspect field types and metadata for an Odoo model.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Field names to return. Omit to use Odoo's default field selection."
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Metadata attributes, such as string, type, help, required, or selection. Omit to return all attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model"
+        ],
+        "description": "Fields and metadata to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Field metadata returned by Odoo."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fields"
+        ],
+        "description": "Metadata keyed by field name."
+      }
+    },
+    {
+      "id": "odoo.read",
+      "service": "odoo",
+      "name": "read",
+      "description": "Read fields from specific Odoo records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Record ID."
+            },
+            "description": "IDs of the records to operate on.",
+            "minItems": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Field names to return. Omit to use Odoo's default field selection."
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "ids"
+        ],
+        "description": "Records and fields to read."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "An Odoo record. Relational fields retain Odoo's JSON representation."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Matching records with model-specific fields."
+      }
+    },
+    {
+      "id": "odoo.search",
+      "service": "odoo",
+      "name": "search",
+      "description": "Find record IDs matching an Odoo domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "domain": {
+            "type": "array",
+            "items": {
+              "description": "A domain condition array or prefix operator: &, |, !."
+            },
+            "description": "Odoo domain in JSON form, for example [[\"is_company\", \"=\", true]]. Use [] to match all records."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum records to return. Defaults to 100.",
+            "default": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching records to skip."
+          },
+          "order": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sort expression, such as name asc, id asc.",
+            "pattern": "\\S"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "domain"
+        ],
+        "description": "Search criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Record ID."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ids"
+        ],
+        "description": "Matching record IDs."
+      }
+    },
+    {
+      "id": "odoo.search_count",
+      "service": "odoo",
+      "name": "search_count",
+      "description": "Count Odoo records matching a domain.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "domain": {
+            "type": "array",
+            "items": {
+              "description": "A domain condition array or prefix operator: &, |, !."
+            },
+            "description": "Odoo domain in JSON form, for example [[\"is_company\", \"=\", true]]. Use [] to match all records."
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "domain"
+        ],
+        "description": "Records to count."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Record count."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "count"
+        ],
+        "description": "Number of matching records."
+      }
+    },
+    {
+      "id": "odoo.search_read",
+      "service": "odoo",
+      "name": "search_read",
+      "description": "Search and read Odoo records in one ORM call.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "domain": {
+            "type": "array",
+            "items": {
+              "description": "A domain condition array or prefix operator: &, |, !."
+            },
+            "description": "Odoo domain in JSON form, for example [[\"is_company\", \"=\", true]]. Use [] to match all records."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Field names to return. Omit to use Odoo's default field selection."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum records to return. Defaults to 100.",
+            "default": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching records to skip."
+          },
+          "order": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Sort expression, such as name asc, id asc.",
+            "pattern": "\\S"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "domain"
+        ],
+        "description": "Search criteria and fields to return."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "An Odoo record. Relational fields retain Odoo's JSON representation."
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "records"
+        ],
+        "description": "Matching records with model-specific fields."
+      }
+    },
+    {
+      "id": "odoo.unlink",
+      "service": "odoo",
+      "name": "unlink",
+      "description": "Delete one or more Odoo records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Record ID."
+            },
+            "description": "IDs of the records to operate on.",
+            "minItems": 1
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "ids"
+        ],
+        "description": "Records to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Odoo reported success."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Deletion result."
+      }
+    },
+    {
+      "id": "odoo.write",
+      "service": "odoo",
+      "name": "write",
+      "description": "Update fields on one or more Odoo records. Relational commands may delete related records.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Technical model name, such as res.partner or sale.order.",
+            "pattern": "\\S"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Record ID."
+            },
+            "description": "IDs of the records to operate on.",
+            "minItems": 1
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Field values to update, including any relational command arrays."
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Odoo context, such as lang, tz, or allowed_company_ids."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "ids",
+          "values"
+        ],
+        "description": "Records and values to update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether Odoo reported success."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success"
+        ],
+        "description": "Update result."
+      }
+    }
+  ]
+}

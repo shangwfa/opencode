@@ -1,0 +1,738 @@
+{
+  "service": "planly",
+  "displayName": "Planly",
+  "homepageUrl": "https://planly.com",
+  "categories": [
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "Planly API key",
+      "description": "Create your Planly API key in Settings > Security: https://app.planly.com/settings/account/security"
+    }
+  ],
+  "actions": [
+    {
+      "id": "planly.create_schedules",
+      "service": "planly",
+      "name": "create_schedules",
+      "description": "Create scheduled or immediate social posts in Planly. This endpoint creates scheduled posts, not drafts; publication status can be read with list_schedules.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "channelId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Connected channel ID returned by list_channels."
+                },
+                "publishOn": {
+                  "type": "string",
+                  "description": "Publication date and time; omit to publish immediately.",
+                  "format": "date-time"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Text content for the post."
+                },
+                "media": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Planly media ID returned by import_media or list_media."
+                      },
+                      "options": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "Platform-specific media options passed unchanged to Planly."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id"
+                    ],
+                    "description": "Media reference and platform options."
+                  },
+                  "description": "Previously imported Planly media."
+                },
+                "options": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Social-network options passed unchanged to Planly. Pinterest publishing requires boardId; TikTok requires privacyLevel. See https://docs.planly.com/#social-network-options for all platform fields."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "channelId"
+              ],
+              "description": "A post to publish on a connected social channel."
+            },
+            "description": "Social posts to schedule.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schedules"
+        ],
+        "description": "Posts to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "upsert": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Planly resource, including additional upstream fields."
+                },
+                "description": "Created groups with schedules and publication status."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Created schedule groups."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.delete_media",
+      "service": "planly",
+      "name": "delete_media",
+      "description": "Delete media resources from Planly by ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Media ID."
+            },
+            "description": "Media IDs to delete.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ids"
+        ],
+        "description": "Media resources to delete."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "boolean",
+            "description": "Whether the deletion succeeded."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.import_media",
+      "service": "planly",
+      "name": "import_media",
+      "description": "Import a public media URL into Planly. Supports MP4, PNG, JPEG and WebP.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination team ID."
+          },
+          "url": {
+            "type": "string",
+            "description": "Public media URL downloaded by Planly.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "url"
+        ],
+        "description": "Media URL and destination team."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Media ID for use in schedules."
+              },
+              "contentUri": {
+                "type": "string",
+                "description": "Hosted media URL."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Imported media metadata."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.list_channels",
+      "service": "planly",
+      "name": "list_channels",
+      "description": "List connected social channels in a Planly team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team ID returned by list_teams."
+          },
+          "excludeCompetitors": {
+            "type": "boolean",
+            "description": "Exclude competitor channels; defaults to false."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team_id"
+        ],
+        "description": "Channel list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Channel ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Channel name."
+                },
+                "social_network": {
+                  "type": "string",
+                  "description": "Social network identifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Planly channel."
+            },
+            "description": "Connected channels."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.list_media",
+      "service": "planly",
+      "name": "list_media",
+      "description": "List a page of media in a Planly team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team ID returned by list_teams."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor from the previous data.next; omit for the first page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor from the previous data.next; omit for the first page."
+              },
+              "orderBy": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "CreatedAt",
+                      "ContentLength"
+                    ],
+                    "description": "Sort property."
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "description": "Sort direction."
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Sort property and direction."
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of results; Planly defaults to 50."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor pagination options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Team and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Planly resource, including additional upstream fields."
+                },
+                "description": "Resources in this page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, when available."
+              },
+              "totalNumberOfRows": {
+                "type": "integer",
+                "description": "Total number of matching resources, when provided."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "rows"
+            ],
+            "description": "Page of Planly resources."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.list_pinterest_boards",
+      "service": "planly",
+      "name": "list_pinterest_boards",
+      "description": "List boards for a connected Pinterest channel to obtain publishing board IDs.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Connected Pinterest channel ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channelId"
+        ],
+        "description": "Pinterest channel to query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "boards": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "description": "Board ID."
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Board name."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "Pinterest board."
+                },
+                "description": "Available boards."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Pinterest boards result."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.list_schedules",
+      "service": "planly",
+      "name": "list_schedules",
+      "description": "List a page of Planly schedules and their publication status.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Team ID returned by list_teams."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "cursor": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor from the previous data.next; omit for the first page."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor from the previous data.next; omit for the first page."
+              },
+              "orderBy": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "CreatedAt",
+                      "ContentLength"
+                    ],
+                    "description": "Sort property."
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ],
+                    "description": "Sort direction."
+                  }
+                ],
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Sort property and direction."
+              },
+              "pageSize": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Number of results; Planly defaults to 50."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Cursor pagination options."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "teamId"
+        ],
+        "description": "Team and pagination options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Planly resource, including additional upstream fields."
+                },
+                "description": "Resources in this page."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Cursor for the next page, when available."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Cursor for the next page, when available."
+              },
+              "totalNumberOfRows": {
+                "type": "integer",
+                "description": "Total number of matching resources, when provided."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "rows"
+            ],
+            "description": "Page of Planly resources."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    },
+    {
+      "id": "planly.list_teams",
+      "service": "planly",
+      "name": "list_teams",
+      "description": "List the Planly teams accessible to the API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Team ID."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Team name."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Planly team."
+            },
+            "description": "Accessible teams."
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Upstream error details, or null on success."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Upstream error details, or null on success."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "data"
+        ],
+        "description": "Planly response envelope."
+      }
+    }
+  ]
+}

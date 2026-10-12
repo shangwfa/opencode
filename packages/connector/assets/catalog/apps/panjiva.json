@@ -1,0 +1,2858 @@
+{
+  "service": "panjiva",
+  "displayName": "Panjiva",
+  "description": "Query Panjiva trade, company, shipment, and analytics data.",
+  "categories": [
+    "Data & Analytics",
+    "Cross-border E-commerce"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "label": "Client ID",
+          "required": true,
+          "secret": false,
+          "inputType": "text",
+          "description": "Copy the client ID from myPanjiva > API Settings. See https://panjiva.com/api-guide/authentication."
+        },
+        {
+          "key": "clientSecret",
+          "label": "Client Secret",
+          "required": true,
+          "secret": true,
+          "inputType": "password",
+          "description": "Copy the client secret paired with the client ID from myPanjiva > API Settings. See https://panjiva.com/api-guide/authentication."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://panjiva.com/",
+  "actions": [
+    {
+      "id": "panjiva.batch_search_companies",
+      "service": "panjiva",
+      "name": "batch_search_companies",
+      "description": "Submit multiple company searches as one downloadable batch. Poll get_batch_job_status with the returned job ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "jsonl",
+              "csv"
+            ],
+            "description": "Download file format; upstream default is jsonl."
+          },
+          "notify_email": {
+            "type": "string",
+            "description": "Optional email address for job completion notification. Omit to retrieve the download URL by polling.",
+            "format": "email"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                    },
+                    "group": {
+                      "type": "string",
+                      "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                    },
+                    "custom_group": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Searchable field name."
+                      },
+                      "description": "Explicit fields to search instead of a named group."
+                    },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "AND",
+                        "OR"
+                      ],
+                      "description": "Boolean operator between search terms; the upstream default is OR."
+                    },
+                    "match": {
+                      "type": "string",
+                      "enum": [
+                        "stem",
+                        "exact"
+                      ],
+                      "description": "Match word stems or exact terms; the upstream default is stem."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "text"
+                  ],
+                  "description": "Free-text search criteria."
+                },
+                "queries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                      },
+                      "group": {
+                        "type": "string",
+                        "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                      },
+                      "custom_group": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Searchable field name."
+                        },
+                        "description": "Explicit fields to search instead of a named group."
+                      },
+                      "operator": {
+                        "type": "string",
+                        "enum": [
+                          "AND",
+                          "OR"
+                        ],
+                        "description": "Boolean operator between search terms; the upstream default is OR."
+                      },
+                      "match": {
+                        "type": "string",
+                        "enum": [
+                          "stem",
+                          "exact"
+                        ],
+                        "description": "Match word stems or exact terms; the upstream default is stem."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "text"
+                    ],
+                    "description": "Free-text search criteria."
+                  },
+                  "description": "Multiple search criteria; every query must match.",
+                  "maxItems": 500
+                },
+                "filters": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+                },
+                "company_type": {
+                  "type": "string",
+                  "enum": [
+                    "ccn",
+                    "country_company_name",
+                    "pid",
+                    "capiq",
+                    "ultimate_parent_capiq"
+                  ],
+                  "description": "Company identifier representation; upstream default is country_company_name."
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "bidirectional",
+                    "consignee",
+                    "shipper"
+                  ],
+                  "description": "Trade role to search; upstream default is bidirectional."
+                },
+                "metrics": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "metric": {
+                        "type": "string",
+                        "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "sum",
+                          "max",
+                          "avg",
+                          "min"
+                        ],
+                        "description": "Statistical aggregation operation."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Metric and aggregation operation."
+                  },
+                  "description": "Aggregate statistics across matching shipments."
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5000,
+                  "description": "Maximum company results per trade direction."
+                },
+                "sort": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Sort by count, field, or an available metric."
+                    },
+                    "order": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Ascending or descending order."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "sum",
+                        "max",
+                        "avg",
+                        "min"
+                      ],
+                      "description": "Statistical aggregation operation."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "key"
+                  ],
+                  "description": "Sort an aggregation; metric keys must also be declared in metrics."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Company search criteria."
+            },
+            "description": "Individual company search requests.",
+            "minItems": 1,
+            "maxItems": 50000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "requests"
+        ],
+        "description": "Batch company searches."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Upstream job status, initially submitted."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Submitted asynchronous job."
+      },
+      "asyncLifecycle": {
+        "startActionId": "panjiva.batch_search_companies",
+        "statusActionId": "panjiva.get_batch_job_status"
+      }
+    },
+    {
+      "id": "panjiva.bulk_rollup_shipments",
+      "service": "panjiva",
+      "name": "bulk_rollup_shipments",
+      "description": "Submit a bulk shipment aggregation for JSONL or CSV download. Poll get_bulk_job_status with the returned job ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "jsonl",
+              "csv"
+            ],
+            "description": "Download file format; upstream default is jsonl."
+          },
+          "notify_email": {
+            "type": "string",
+            "description": "Optional email address for job completion notification. Omit to retrieve the download URL by polling.",
+            "format": "email"
+          },
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field to group by; discover available dimensions with get_data_source_metadata."
+                },
+                "include_missing": {
+                  "type": "boolean",
+                  "description": "Include missing values as NO_VALUE buckets."
+                },
+                "sort": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Sort by count, field, or an available metric."
+                    },
+                    "order": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Ascending or descending order."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "sum",
+                        "max",
+                        "avg",
+                        "min"
+                      ],
+                      "description": "Statistical aggregation operation."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "key"
+                  ],
+                  "description": "Sort an aggregation; metric keys must also be declared in metrics."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "sort"
+              ],
+              "description": "One bulk grouping dimension."
+            },
+            "description": "One grouping dimension for a bulk rollup without synchronous pagination limits.",
+            "minItems": 1,
+            "maxItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source",
+          "dimensions"
+        ],
+        "description": "Bulk shipment rollup criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Upstream job status, initially submitted."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Submitted asynchronous job."
+      },
+      "asyncLifecycle": {
+        "startActionId": "panjiva.bulk_rollup_shipments",
+        "statusActionId": "panjiva.get_bulk_job_status"
+      }
+    },
+    {
+      "id": "panjiva.bulk_search_shipments",
+      "service": "panjiva",
+      "name": "bulk_search_shipments",
+      "description": "Submit a large shipment search for JSONL or CSV download. Poll get_bulk_job_status with the returned job ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "jsonl",
+              "csv"
+            ],
+            "description": "Download file format; upstream default is jsonl."
+          },
+          "notify_email": {
+            "type": "string",
+            "description": "Optional email address for job completion notification. Omit to retrieve the download URL by polling.",
+            "format": "email"
+          },
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Sortable shipment field; discover fields with get_data_source_metadata."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Ascending or descending order."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One shipment sort rule."
+            },
+            "description": "Shipment sort fields in priority order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source"
+        ],
+        "description": "Bulk shipment search criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Upstream job status, initially submitted."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Submitted asynchronous job."
+      },
+      "asyncLifecycle": {
+        "startActionId": "panjiva.bulk_search_shipments",
+        "statusActionId": "panjiva.get_bulk_job_status"
+      }
+    },
+    {
+      "id": "panjiva.get_batch_job_status",
+      "service": "panjiva",
+      "name": "get_batch_job_status",
+      "description": "Check a batch company search job and retrieve its download URL when ready.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Batch job to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Upstream state: submitted, in_process, fetched, uploaded, notification_sent, or error."
+          },
+          "download_url": {
+            "type": "string",
+            "description": "Download URL when ready; pass this URL to a file consumer."
+          },
+          "last_changed": {
+            "type": "string",
+            "description": "Time of the latest state change.",
+            "format": "date-time"
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Original job parameters."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "Asynchronous job status and download location."
+      },
+      "asyncLifecycle": {
+        "startActionId": "panjiva.batch_search_companies",
+        "statusActionId": "panjiva.get_batch_job_status"
+      }
+    },
+    {
+      "id": "panjiva.get_bulk_job_status",
+      "service": "panjiva",
+      "name": "get_bulk_job_status",
+      "description": "Check a bulk shipment job and retrieve its download URL when ready.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Bulk job to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Job ID returned by the corresponding submission action.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "Upstream state: submitted, in_process, fetched, uploaded, notification_sent, or error."
+          },
+          "download_url": {
+            "type": "string",
+            "description": "Download URL when ready; pass this URL to a file consumer."
+          },
+          "last_changed": {
+            "type": "string",
+            "description": "Time of the latest state change.",
+            "format": "date-time"
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Original job parameters."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "status"
+        ],
+        "description": "Asynchronous job status and download location."
+      },
+      "asyncLifecycle": {
+        "startActionId": "panjiva.bulk_search_shipments",
+        "statusActionId": "panjiva.get_bulk_job_status"
+      }
+    },
+    {
+      "id": "panjiva.get_company_network",
+      "service": "panjiva",
+      "name": "get_company_network",
+      "description": "Retrieve a company's top buyers, suppliers and trade statistics from Panjiva.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "company_type": {
+            "type": "string",
+            "enum": [
+              "ccn",
+              "country_company_name",
+              "pid",
+              "capiq",
+              "ultimate_parent_capiq"
+            ],
+            "description": "Company identifier representation; upstream default is country_company_name."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "bidirectional",
+              "consignee",
+              "shipper"
+            ],
+            "description": "Trade role to search; upstream default is bidirectional."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000,
+            "description": "Maximum company results per trade direction."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Sort by count, field, or an available metric."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "Ascending or descending order."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "sum",
+                  "max",
+                  "avg",
+                  "min"
+                ],
+                "description": "Statistical aggregation operation."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key"
+            ],
+            "description": "Sort an aggregation; metric keys must also be declared in metrics."
+          },
+          "company_id": {
+            "type": "integer",
+            "description": "Company ID whose trade network should be retrieved."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_id"
+        ],
+        "description": "Company network criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Company network with top_consignees, top_shippers and stats."
+            },
+            "description": "Trade network keyed by company ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Company trade network."
+      }
+    },
+    {
+      "id": "panjiva.get_data_source_metadata",
+      "service": "panjiva",
+      "name": "get_data_source_metadata",
+      "description": "Discover searchable fields, filters, sort keys, metrics, dimensions and refinements for a Panjiva data source.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Data source to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Query groups and defaults."
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native record with all data-source-specific fields preserved."
+            },
+            "description": "Filter fields and their types."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Valid sort keys and defaults."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native record with all data-source-specific fields preserved."
+            },
+            "description": "Available metrics and supported operations."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Dimension field."
+            },
+            "description": "Available dimension fields."
+          },
+          "refinements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Refinement field."
+            },
+            "description": "Available refinement fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Data-source query capabilities."
+      }
+    },
+    {
+      "id": "panjiva.get_data_source_schema",
+      "service": "panjiva",
+      "name": "get_data_source_schema",
+      "description": "Retrieve native shipment record schemas for a Panjiva data source.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Data source to inspect."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schemas": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native record with all data-source-specific fields preserved."
+            },
+            "description": "Schemas keyed by country and trade direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Data-source shipment schemas."
+      }
+    },
+    {
+      "id": "panjiva.get_shipment_refinements",
+      "service": "panjiva",
+      "name": "get_shipment_refinements",
+      "description": "List the most common values of selected shipment attributes for matching Panjiva records.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Shipment attribute name."
+            },
+            "description": "Attributes whose top values should be returned; discover available refinements with get_data_source_metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source",
+          "fields"
+        ],
+        "description": "Shipment refinement criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record_count": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total matching records."
+              },
+              "returned": {
+                "type": "integer",
+                "description": "Records returned in this response."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Matching and returned record counts."
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Panjiva metrics, refinements, time_series or rollup results, keyed by requested fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching record counts and requested analytics."
+      }
+    },
+    {
+      "id": "panjiva.get_shipment_time_series",
+      "service": "panjiva",
+      "name": "get_shipment_time_series",
+      "description": "Calculate shipment metrics aggregated by week, month, quarter or year.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ],
+            "description": "Time-series bucket interval."
+          },
+          "min_date": {
+            "type": "string",
+            "description": "First date included in the time series.",
+            "format": "date"
+          },
+          "max_date": {
+            "type": "string",
+            "description": "Last date included in the time series.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source",
+          "metrics",
+          "interval"
+        ],
+        "description": "Shipment time-series criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record_count": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total matching records."
+              },
+              "returned": {
+                "type": "integer",
+                "description": "Records returned in this response."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Matching and returned record counts."
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Panjiva metrics, refinements, time_series or rollup results, keyed by requested fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching record counts and requested analytics."
+      }
+    },
+    {
+      "id": "panjiva.list_data_sources",
+      "service": "panjiva",
+      "name": "list_data_sources",
+      "description": "List the Panjiva data sources available to the connected organization.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Data-source identifier."
+            },
+            "description": "Available data-source identifiers."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Available data sources."
+      }
+    },
+    {
+      "id": "panjiva.lookup_companies",
+      "service": "panjiva",
+      "name": "lookup_companies",
+      "description": "Retrieve Panjiva company entities by company IDs and identifier representation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "company_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Company ID."
+            },
+            "description": "Company IDs to retrieve.",
+            "minItems": 1
+          },
+          "company_type": {
+            "type": "string",
+            "enum": [
+              "ccn",
+              "country_company_name",
+              "pid",
+              "capiq",
+              "ultimate_parent_capiq"
+            ],
+            "description": "Company identifier representation; upstream default is country_company_name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "company_ids"
+        ],
+        "description": "Company lookup identifiers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native company entity, trade statistics and requested aggregations."
+            },
+            "description": "Requested company entities."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Company lookup results."
+      }
+    },
+    {
+      "id": "panjiva.parse_hs_codes",
+      "service": "panjiva",
+      "name": "parse_hs_codes",
+      "description": "Identify HS codes from a product description using the Panjiva commodity coder. Optionally restrict the HS prefix and enable parser, manual rules or classifier methods; the first matching method supplies the results.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Product description to classify into HS codes."
+          },
+          "partial_hs": {
+            "type": "string",
+            "description": "Optional two- or four-digit HS code prefix that restricts classification results.",
+            "pattern": "^(?:[0-9]{2}|[0-9]{4})$"
+          },
+          "use_parser": {
+            "type": "boolean",
+            "description": "Whether to extract HS codes already present in the description."
+          },
+          "use_manual_logic": {
+            "type": "boolean",
+            "description": "Whether to match predefined classification rules."
+          },
+          "use_classifier": {
+            "type": "boolean",
+            "description": "Whether to use the machine-learning HS classifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "description"
+        ],
+        "description": "Commodity coding request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result_count": {
+            "type": "number",
+            "description": "Number of classification results reported by Panjiva."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "predCode": {
+                  "type": "string",
+                  "description": "Predicted HS code."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description associated with the predicted code."
+                },
+                "confidence": {
+                  "type": "number",
+                  "description": "Confidence value reported by Panjiva."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Classification method that produced the prediction."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One HS code prediction."
+            },
+            "description": "HS code classification candidates."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Commodity coding results."
+      }
+    },
+    {
+      "id": "panjiva.parse_many_hs_codes",
+      "service": "panjiva",
+      "name": "parse_many_hs_codes",
+      "description": "Call Panjiva's Parse Many commodity coder and return per-item HS codes and classifier metadata. The published request schema defines items as an object with description, optional marks and partial_hs; pass that documented object shape.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Product description to classify into HS codes."
+              },
+              "marks": {
+                "type": "string",
+                "description": "Shipment marks text accompanying the product description."
+              },
+              "partial_hs": {
+                "type": "string",
+                "description": "Optional two- or four-digit HS code prefix that restricts classification results.",
+                "pattern": "^(?:[0-9]{2}|[0-9]{4})$"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "description"
+            ],
+            "description": "Commodity item object as defined by the official Parse Many request schema."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Parse Many commodity coding request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "classifier_training_date": {
+            "type": "string",
+            "description": "Classifier training date reported by Panjiva."
+          },
+          "classifier_version": {
+            "type": "string",
+            "description": "Classifier model version."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "parsed_hs_codes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "HS code."
+                  },
+                  "description": "HS codes returned by this classification method."
+                },
+                "piers_override": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "HS code."
+                  },
+                  "description": "HS codes returned by this classification method."
+                },
+                "panjiva_override": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "HS code."
+                  },
+                  "description": "HS codes returned by this classification method."
+                },
+                "classifier_codes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "hs_code": {
+                        "type": "string",
+                        "description": "Predicted HS code."
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "description": "Confidence value reported by Panjiva."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One classifier prediction."
+                  },
+                  "description": "HS codes predicted by the classifier."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Classification results for one commodity item."
+            },
+            "description": "Per-item commodity classification results."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Parse Many classification results and model metadata."
+      }
+    },
+    {
+      "id": "panjiva.rollup_companies",
+      "service": "panjiva",
+      "name": "rollup_companies",
+      "description": "Aggregate trade records for selected companies into up to three grouping dimensions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "company_type": {
+            "type": "string",
+            "enum": [
+              "ccn",
+              "country_company_name",
+              "pid",
+              "capiq",
+              "ultimate_parent_capiq"
+            ],
+            "description": "Company identifier representation; upstream default is country_company_name."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "bidirectional",
+              "consignee",
+              "shipper"
+            ],
+            "description": "Trade role to search; upstream default is bidirectional."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "company_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "Company ID."
+            },
+            "description": "Company IDs to analyze."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field to group by; discover available dimensions with get_data_source_metadata."
+                },
+                "include_missing": {
+                  "type": "boolean",
+                  "description": "Include missing values as NO_VALUE buckets."
+                },
+                "sort": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Sort by count, field, or an available metric."
+                    },
+                    "order": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Ascending or descending order."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "sum",
+                        "max",
+                        "avg",
+                        "min"
+                      ],
+                      "description": "Statistical aggregation operation."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "key"
+                  ],
+                  "description": "Sort an aggregation; metric keys must also be declared in metrics."
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Maximum buckets in this dimension; upstream default is 10."
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 999,
+                  "description": "First-dimension bucket offset; upstream default is 0."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "sort"
+              ],
+              "description": "One grouping dimension."
+            },
+            "description": "One to three successive grouping dimensions. Only the first dimension supports offset; size plus offset cannot exceed 1000.",
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dimensions"
+        ],
+        "description": "Company rollup criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "consignees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native company entity, trade statistics and requested aggregations."
+            },
+            "description": "Matching buyers or consignees."
+          },
+          "shippers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native company entity, trade statistics and requested aggregations."
+            },
+            "description": "Matching suppliers or shippers."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Company results separated by trade role."
+      }
+    },
+    {
+      "id": "panjiva.rollup_shipments",
+      "service": "panjiva",
+      "name": "rollup_shipments",
+      "description": "Group matching shipments into up to three dimensions with metrics and optional time-series aggregation.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Field to group by; discover available dimensions with get_data_source_metadata."
+                },
+                "include_missing": {
+                  "type": "boolean",
+                  "description": "Include missing values as NO_VALUE buckets."
+                },
+                "sort": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Sort by count, field, or an available metric."
+                    },
+                    "order": {
+                      "type": "string",
+                      "enum": [
+                        "asc",
+                        "desc"
+                      ],
+                      "description": "Ascending or descending order."
+                    },
+                    "op": {
+                      "type": "string",
+                      "enum": [
+                        "sum",
+                        "max",
+                        "avg",
+                        "min"
+                      ],
+                      "description": "Statistical aggregation operation."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "key"
+                  ],
+                  "description": "Sort an aggregation; metric keys must also be declared in metrics."
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Maximum buckets in this dimension; upstream default is 10."
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 999,
+                  "description": "First-dimension bucket offset; upstream default is 0."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "sort"
+              ],
+              "description": "One grouping dimension."
+            },
+            "description": "One to three successive grouping dimensions. Only the first dimension supports offset; size plus offset cannot exceed 1000.",
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "time_series": {
+            "type": "object",
+            "properties": {
+              "interval": {
+                "type": "string",
+                "enum": [
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "description": "Time-series bucket interval."
+              },
+              "min_date": {
+                "type": "string",
+                "description": "First date included in the time series.",
+                "format": "date"
+              },
+              "max_date": {
+                "type": "string",
+                "description": "Last date included in the time series.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "interval"
+            ],
+            "description": "Time-series aggregation within the rollup."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source",
+          "dimensions"
+        ],
+        "description": "Shipment rollup criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record_count": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total matching records."
+              },
+              "returned": {
+                "type": "integer",
+                "description": "Records returned in this response."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Matching and returned record counts."
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Panjiva metrics, refinements, time_series or rollup results, keyed by requested fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching record counts and requested analytics."
+      }
+    },
+    {
+      "id": "panjiva.search_companies",
+      "service": "panjiva",
+      "name": "search_companies",
+      "description": "Find buyers and suppliers through matching Panjiva trade records, with company identity types and trade-role filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "company_type": {
+            "type": "string",
+            "enum": [
+              "ccn",
+              "country_company_name",
+              "pid",
+              "capiq",
+              "ultimate_parent_capiq"
+            ],
+            "description": "Company identifier representation; upstream default is country_company_name."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "bidirectional",
+              "consignee",
+              "shipper"
+            ],
+            "description": "Trade role to search; upstream default is bidirectional."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5000,
+            "description": "Maximum company results per trade direction."
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Sort by count, field, or an available metric."
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ],
+                "description": "Ascending or descending order."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "sum",
+                  "max",
+                  "avg",
+                  "min"
+                ],
+                "description": "Statistical aggregation operation."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key"
+            ],
+            "description": "Sort an aggregation; metric keys must also be declared in metrics."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Company search criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "consignees": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native company entity, trade statistics and requested aggregations."
+            },
+            "description": "Matching buyers or consignees."
+          },
+          "shippers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native company entity, trade statistics and requested aggregations."
+            },
+            "description": "Matching suppliers or shippers."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Company results separated by trade role."
+      }
+    },
+    {
+      "id": "panjiva.search_hs_codes",
+      "service": "panjiva",
+      "name": "search_hs_codes",
+      "description": "Search Harmonized System codes and US Harmonized Tariff Schedule descriptions.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Text to search in HS code descriptions."
+              }
+            },
+            "additionalProperties": false,
+            "description": "HS code text query."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Text to search in HS code descriptions."
+                }
+              },
+              "additionalProperties": false,
+              "description": "HS code text query."
+            },
+            "description": "Additional HS code text queries."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "HS code level and section constraints, supporting AND, OR and NOT. Levels are 2, 4, 6, 8 or 10."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4500,
+            "description": "Record offset."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500,
+            "description": "Maximum records to return."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ],
+        "description": "HS code search criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record_count": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total matching records."
+              },
+              "returned": {
+                "type": "integer",
+                "description": "Records returned in this response."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Matching and returned record counts."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "commodity": {
+                  "type": "string",
+                  "description": "HS code."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Commodity description."
+                },
+                "level": {
+                  "type": "string",
+                  "description": "HS code digit level."
+                },
+                "parent": {
+                  "type": "string",
+                  "description": "Parent HS code."
+                },
+                "section": {
+                  "type": "string",
+                  "description": "HS system section."
+                }
+              },
+              "additionalProperties": true,
+              "description": "HS code and its hierarchy."
+            },
+            "description": "Matching HS codes."
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Panjiva metrics, refinements, time_series or rollup results, keyed by requested fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "HS code search results."
+      }
+    },
+    {
+      "id": "panjiva.search_shipments",
+      "service": "panjiva",
+      "name": "search_shipments",
+      "description": "Search Panjiva import and export shipment records with filtering, sorting, pagination and optional metrics. Use bulk_search_shipments for larger result sets.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Data source, such as global or us-imports. Use list_data_sources to discover available sources; global covers the last five years."
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+              },
+              "group": {
+                "type": "string",
+                "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+              },
+              "custom_group": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "Searchable field name."
+                },
+                "description": "Explicit fields to search instead of a named group."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "AND",
+                  "OR"
+                ],
+                "description": "Boolean operator between search terms; the upstream default is OR."
+              },
+              "match": {
+                "type": "string",
+                "enum": [
+                  "stem",
+                  "exact"
+                ],
+                "description": "Match word stems or exact terms; the upstream default is stem."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "text"
+            ],
+            "description": "Free-text search criteria."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Search text. Supports + (AND), | (OR), - (exclude), quoted phrases, trailing *, and parentheses."
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Named search group, such as goods_described, consignee_name, shipper_name, or main. Discover groups with get_data_source_metadata."
+                },
+                "custom_group": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Searchable field name."
+                  },
+                  "description": "Explicit fields to search instead of a named group."
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "AND",
+                    "OR"
+                  ],
+                  "description": "Boolean operator between search terms; the upstream default is OR."
+                },
+                "match": {
+                  "type": "string",
+                  "enum": [
+                    "stem",
+                    "exact"
+                  ],
+                  "description": "Match word stems or exact terms; the upstream default is stem."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "description": "Free-text search criteria."
+            },
+            "description": "Multiple search criteria; every query must match.",
+            "maxItems": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Native Panjiva filters, including AND, OR, NOT, ranges, dates and geographic constraints. For example: {record_date:{gte:'2025-01-01'},destination_countries:'United States'}. Discover fields with get_data_source_metadata; syntax: https://panjiva.com/api-guide/data-selection/filters."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4500,
+            "description": "Record offset."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500,
+            "description": "Maximum records to return."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "description": "Numeric field to aggregate, such as value_usd, weight_kg or volume_teu. Available fields depend on the data source."
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "sum",
+                    "max",
+                    "avg",
+                    "min"
+                  ],
+                  "description": "Statistical aggregation operation."
+                }
+              },
+              "additionalProperties": false,
+              "description": "Metric and aggregation operation."
+            },
+            "description": "Aggregate statistics across matching shipments."
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Sortable shipment field; discover fields with get_data_source_metadata."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "Ascending or descending order."
+                }
+              },
+              "additionalProperties": false,
+              "description": "One shipment sort rule."
+            },
+            "description": "Shipment sort fields in priority order."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data_source"
+        ],
+        "description": "Shipment search criteria."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record_count": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Total matching records."
+              },
+              "returned": {
+                "type": "integer",
+                "description": "Records returned in this response."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Matching and returned record counts."
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Native record with all data-source-specific fields preserved."
+            },
+            "description": "Matching shipment records."
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Panjiva metrics, refinements, time_series or rollup results, keyed by requested fields."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Shipment search results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,418 @@
+{
+  "service": "triple_whale",
+  "displayName": "Triple Whale",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TRIPLE_WHALE_API_KEY",
+      "description": "Triple Whale API key sent with the x-api-key header. Generate it from Data > APIs in the Triple Whale app: https://app.triplewhale.com/api-keys"
+    }
+  ],
+  "homepageUrl": "https://www.triplewhale.com",
+  "actions": [
+    {
+      "id": "triple_whale.execute_custom_sql_query",
+      "service": "triple_whale",
+      "name": "execute_custom_sql_query",
+      "description": "Execute a Triple Whale Data-Out custom SQL query for a store and date period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shopId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shopify shop domain for the Triple Whale store, for example example.myshopify.com."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The SQL query to execute with @startDate and @endDate parameters."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "startDate": {
+                "type": "string",
+                "description": "The start date for the SQL query period.",
+                "format": "date"
+              },
+              "endDate": {
+                "type": "string",
+                "description": "The end date for the SQL query period.",
+                "format": "date"
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Custom SQL query date range."
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "The currency code for data aggregation, such as USD or EUR."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shopId",
+          "query",
+          "period"
+        ],
+        "description": "Input payload for executing a Triple Whale custom SQL query."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "Whether Triple Whale reported the query as successful."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether Triple Whale reported the query as successful."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The message returned by Triple Whale."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The message returned by Triple Whale."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Triple Whale response object."
+            },
+            "description": "Rows returned by the custom SQL query."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Triple Whale response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "success",
+          "message",
+          "data",
+          "raw"
+        ],
+        "description": "Custom SQL query result returned by Triple Whale."
+      }
+    },
+    {
+      "id": "triple_whale.get_customer_journey_attribution_data",
+      "service": "triple_whale",
+      "name": "get_customer_journey_attribution_data",
+      "description": "Export Triple Whale customer journey attribution data for orders in a date period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Pixel Attribution: Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shop": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shopify shop domain for the Triple Whale store, for example example.myshopify.com."
+          },
+          "startDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start timestamp for the requested attribution period."
+          },
+          "endDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end timestamp for the requested attribution period."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "The page number of results to return, starting from 1."
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of results per page."
+          },
+          "excludeJourneyData": {
+            "type": "boolean",
+            "description": "Whether to exclude detailed journey events from each order result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shop",
+          "startDate",
+          "endDate"
+        ],
+        "description": "Input payload for retrieving Triple Whale customer journey attribution data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "totalForRange": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The total number of orders in the requested date range."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of orders in the requested date range."
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The number of orders returned in this response."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of orders returned in this response."
+          },
+          "startDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The start timestamp returned by Triple Whale."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The start timestamp returned by Triple Whale."
+          },
+          "endDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The end timestamp returned by Triple Whale."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The end timestamp returned by Triple Whale."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "number",
+                "description": "The current result page returned by Triple Whale."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current result page returned by Triple Whale."
+          },
+          "earliestDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The earliest available attribution date returned by Triple Whale."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The earliest available attribution date returned by Triple Whale."
+          },
+          "ordersWithJourneys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Triple Whale response object."
+            },
+            "description": "Orders with attribution and customer journey details."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Triple Whale response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "totalForRange",
+          "count",
+          "startDate",
+          "endDate",
+          "page",
+          "earliestDate",
+          "ordersWithJourneys",
+          "raw"
+        ],
+        "description": "Customer journey attribution data returned by Triple Whale."
+      }
+    },
+    {
+      "id": "triple_whale.get_summary_page_data",
+      "service": "triple_whale",
+      "name": "get_summary_page_data",
+      "description": "Retrieve Triple Whale Summary Page metrics for a store and date period.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [
+        "Summary Page: Read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shopDomain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Shopify shop domain for the Triple Whale store, for example example.myshopify.com."
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO 8601 start date or timestamp for the Summary Page period."
+              },
+              "end": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The ISO 8601 end date or timestamp for the Summary Page period."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The Summary Page date range to request."
+          },
+          "todayHour": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 25,
+                "description": "The base-1 current-day hour requested by Triple Whale. Pass null or omit it when the requested period has no current-day hour."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The base-1 current-day hour requested by Triple Whale. Pass null or omit it when the requested period has no current-day hour."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "shopDomain",
+          "period"
+        ],
+        "description": "Input payload for retrieving Triple Whale Summary Page data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metricName": {
+                  "type": "string",
+                  "description": "The metric name returned by Triple Whale."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "The metric value returned by Triple Whale."
+                }
+              },
+              "additionalProperties": true,
+              "description": "One Summary Page metric object."
+            },
+            "description": "Summary Page metrics returned by Triple Whale."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Triple Whale response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "metrics",
+          "raw"
+        ],
+        "description": "Summary Page data returned by Triple Whale."
+      }
+    },
+    {
+      "id": "triple_whale.validate_api_key",
+      "service": "triple_whale",
+      "name": "validate_api_key",
+      "description": "Validate the connected Triple Whale API key and return its metadata when present.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether Triple Whale accepted the connected API key."
+          },
+          "apiKey": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Triple Whale response object."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "valid",
+          "apiKey"
+        ],
+        "description": "Action output."
+      }
+    }
+  ]
+}

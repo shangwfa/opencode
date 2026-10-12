@@ -1,0 +1,390 @@
+{
+  "service": "knack",
+  "displayName": "Knack",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "knack_api_key",
+      "description": "Knack server-side REST API key used with the X-Knack-REST-API-Key header. View it under Settings -> API & Code -> API in the Knack Builder: https://docs.knack.com/v3/reference/api-key-app-id.",
+      "extraFields": [
+        {
+          "key": "appId",
+          "label": "Application ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "app_xxxxxxxx",
+          "description": "The Knack Application ID sent with the X-Knack-Application-Id header. Copy it from Settings -> API & Code -> API in the Knack Builder: https://docs.knack.com/v3/reference/api-key-app-id."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.knack.com",
+  "actions": [
+    {
+      "id": "knack.create_record",
+      "service": "knack",
+      "name": "create_record",
+      "description": "Create one Knack record in the selected object with a raw JSON record payload.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack object key, such as object_1, that identifies which object to query."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "raw",
+              "both"
+            ],
+            "description": "The Knack response format query parameter forwarded to the API."
+          },
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey",
+          "record"
+        ],
+        "description": "Request parameters for creating one Knack record in the selected object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Knack single-record response."
+      },
+      "followUpActions": [
+        "knack.get_record",
+        "knack.update_record"
+      ]
+    },
+    {
+      "id": "knack.delete_record",
+      "service": "knack",
+      "name": "delete_record",
+      "description": "Delete one Knack record by object key and record ID.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack object key, such as object_1, that identifies which object to query."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack record ID, such as 6838de4ef4d2453c4d1b402f, that identifies one record."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request parameters for deleting one Knack record by object key and record ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the Knack delete request completed successfully."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack record ID, such as 6838de4ef4d2453c4d1b402f, that identifies one record."
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw Knack delete response payload when the API returned a JSON body."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The raw Knack delete response payload when the API returned a JSON body."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Knack record deletion response."
+      }
+    },
+    {
+      "id": "knack.get_record",
+      "service": "knack",
+      "name": "get_record",
+      "description": "Retrieve one Knack record by object key and record ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack object key, such as object_1, that identifies which object to query."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack record ID, such as 6838de4ef4d2453c4d1b402f, that identifies one record."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "raw",
+              "both"
+            ],
+            "description": "The Knack response format query parameter forwarded to the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey",
+          "recordId"
+        ],
+        "description": "Request parameters for reading one Knack record by object key and record ID."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Knack single-record response."
+      },
+      "followUpActions": [
+        "knack.update_record",
+        "knack.delete_record"
+      ]
+    },
+    {
+      "id": "knack.list_records",
+      "service": "knack",
+      "name": "list_records",
+      "description": "List records from one Knack object with optional pagination, sorting, formatting, and filter query parameters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack object key, such as object_1, that identifies which object to query."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based page number to request from Knack."
+          },
+          "rowsPerPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of records to request per page, from 1 to 1000."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "raw",
+              "both"
+            ],
+            "description": "The Knack response format query parameter forwarded to the API."
+          },
+          "sortField": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack field key used for server-side sorting, such as field_25."
+          },
+          "sortOrder": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The Knack sort order applied to the selected sort field."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The Knack filters JSON object forwarded to the filters query parameter as-is."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey"
+        ],
+        "description": "Request parameters for listing records from one Knack object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+            },
+            "description": "The records returned by the current Knack list request."
+          },
+          "currentPage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The current Knack response page when the API includes pagination metadata."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current Knack response page when the API includes pagination metadata."
+          },
+          "totalPages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of available Knack pages when returned by the API."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of available Knack pages when returned by the API."
+          },
+          "totalRecords": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of Knack records that match the current query."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of Knack records that match the current query."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw Knack list response envelope returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Knack record list returned by the connector."
+      },
+      "followUpActions": [
+        "knack.get_record",
+        "knack.create_record"
+      ]
+    },
+    {
+      "id": "knack.update_record",
+      "service": "knack",
+      "name": "update_record",
+      "description": "Update one Knack record by sending a partial JSON payload for the selected object and record ID.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack object key, such as object_1, that identifies which object to query."
+          },
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Knack record ID, such as 6838de4ef4d2453c4d1b402f, that identifies one record."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "raw",
+              "both"
+            ],
+            "description": "The Knack response format query parameter forwarded to the API."
+          },
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "objectKey",
+          "recordId",
+          "record"
+        ],
+        "description": "Request parameters for updating one Knack record in the selected object."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Knack record payload containing field_xx keys and any nested data returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The normalized Knack single-record response."
+      },
+      "followUpActions": [
+        "knack.get_record"
+      ]
+    }
+  ]
+}

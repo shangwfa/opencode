@@ -1,0 +1,378 @@
+{
+  "service": "stealthgpt",
+  "displayName": "StealthGPT",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "YOUR_STEALTHGPT_API_TOKEN",
+      "description": "StealthGPT API token sent with the api-token header. Activate API access, then copy the token from the API Key tab: https://www.stealthgpt.ai/api-dashboard/api-key."
+    }
+  ],
+  "homepageUrl": "https://www.stealthgpt.ai",
+  "actions": [
+    {
+      "id": "stealthgpt.detect_ai_text",
+      "service": "stealthgpt",
+      "name": "detect_ai_text",
+      "description": "Score how likely text is to be flagged as AI-generated with StealthGPT.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text to analyze, up to 3,000 words."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Input for detecting AI-generated text with StealthGPT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "howLikelyToBeDetected": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Score from 0 to 100 where a higher value means the text is more likely to be flagged as AI-generated."
+          },
+          "wordsSpent": {
+            "type": "number",
+            "description": "Words charged for this detection request."
+          },
+          "remainingCredits": {
+            "type": "number",
+            "description": "Prepaid word balance remaining after this request."
+          },
+          "billingMode": {
+            "type": "string",
+            "enum": [
+              "prepaid",
+              "payg"
+            ],
+            "description": "Billing source used for this request."
+          },
+          "meteredChargedCredits": {
+            "type": "number",
+            "description": "Words added to metered usage, or zero when prepaid words were used."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "howLikelyToBeDetected",
+          "wordsSpent",
+          "remainingCredits",
+          "billingMode",
+          "meteredChargedCredits"
+        ],
+        "description": "AI detection score and billing details returned by StealthGPT."
+      }
+    },
+    {
+      "id": "stealthgpt.generate_text",
+      "service": "stealthgpt",
+      "name": "generate_text",
+      "description": "Generate text from instructions with StealthGPT and return usage details.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instructions or topic for the content to generate."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "super",
+              "standard",
+              "lite"
+            ],
+            "description": "StealthGPT model used to process the text."
+          },
+          "writingMode": {
+            "type": "string",
+            "enum": [
+              "default",
+              "essay"
+            ],
+            "description": "How StealthGPT structures generated content."
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "Standard",
+              "HighSchool",
+              "College",
+              "PhD"
+            ],
+            "description": "Writing complexity used when writingMode is essay."
+          },
+          "qualityMode": {
+            "type": "string",
+            "enum": [
+              "quality",
+              "fast"
+            ],
+            "description": "Whether StealthGPT prioritizes rewrite quality or speed."
+          },
+          "isMultilingual": {
+            "type": "boolean",
+            "description": "Whether non-English input should produce output in the original language."
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "text",
+              "markdown"
+            ],
+            "description": "Format of the generated or humanized result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prompt",
+          "model"
+        ],
+        "description": "Input for generating text with StealthGPT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "The generated or humanized content."
+          },
+          "howLikelyToBeDetected": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Historical StealthGPT score where a higher value means the content reads as more human."
+          },
+          "wordsSpent": {
+            "type": "number",
+            "description": "Words charged for this request."
+          },
+          "remainingCredits": {
+            "type": "number",
+            "description": "Prepaid word balance remaining after this request."
+          },
+          "billingMode": {
+            "type": "string",
+            "enum": [
+              "prepaid",
+              "payg"
+            ],
+            "description": "Billing source used for this request."
+          },
+          "meteredChargedCredits": {
+            "type": "number",
+            "description": "Words added to metered usage, or zero when prepaid words were used."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "result",
+          "howLikelyToBeDetected",
+          "wordsSpent",
+          "remainingCredits",
+          "billingMode",
+          "meteredChargedCredits"
+        ],
+        "description": "Text processing result and billing details returned by StealthGPT."
+      }
+    },
+    {
+      "id": "stealthgpt.get_balance",
+      "service": "stealthgpt",
+      "name": "get_balance",
+      "description": "Get the current StealthGPT prepaid and pay-as-you-go word balance.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "This action does not require input parameters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "credits": {
+            "type": "number",
+            "description": "Prepaid words available in the account."
+          },
+          "payg": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "metered_active",
+                      "metered_past_due",
+                      "metered_setup_required"
+                    ],
+                    "description": "Current pay-as-you-go billing state."
+                  },
+                  "unbilledCredits": {
+                    "type": "number",
+                    "description": "Words accumulated for metered billing but not yet reported."
+                  },
+                  "lastUsageReportAt": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "Timestamp when metered usage was last reported, when available.",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Timestamp when metered usage was last reported, when available."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "unbilledCredits",
+                  "lastUsageReportAt"
+                ],
+                "description": "StealthGPT pay-as-you-go billing status."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "StealthGPT pay-as-you-go billing status."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "credits",
+          "payg"
+        ],
+        "description": "Current StealthGPT account balance."
+      }
+    },
+    {
+      "id": "stealthgpt.humanize_text",
+      "service": "stealthgpt",
+      "name": "humanize_text",
+      "description": "Humanize existing text with StealthGPT and return usage details.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Source text to humanize without instruction wrappers, up to 3,000 words."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "super",
+              "standard",
+              "lite"
+            ],
+            "description": "StealthGPT model used to process the text."
+          },
+          "qualityMode": {
+            "type": "string",
+            "enum": [
+              "quality",
+              "fast"
+            ],
+            "description": "Whether StealthGPT prioritizes rewrite quality or speed."
+          },
+          "isMultilingual": {
+            "type": "boolean",
+            "description": "Whether non-English source text should remain in its original language."
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "text",
+              "markdown"
+            ],
+            "description": "Format of the generated or humanized result."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "model"
+        ],
+        "description": "Input for humanizing existing text with StealthGPT."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "The generated or humanized content."
+          },
+          "howLikelyToBeDetected": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Historical StealthGPT score where a higher value means the content reads as more human."
+          },
+          "wordsSpent": {
+            "type": "number",
+            "description": "Words charged for this request."
+          },
+          "remainingCredits": {
+            "type": "number",
+            "description": "Prepaid word balance remaining after this request."
+          },
+          "billingMode": {
+            "type": "string",
+            "enum": [
+              "prepaid",
+              "payg"
+            ],
+            "description": "Billing source used for this request."
+          },
+          "meteredChargedCredits": {
+            "type": "number",
+            "description": "Words added to metered usage, or zero when prepaid words were used."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "result",
+          "howLikelyToBeDetected",
+          "wordsSpent",
+          "remainingCredits",
+          "billingMode",
+          "meteredChargedCredits"
+        ],
+        "description": "Text processing result and billing details returned by StealthGPT."
+      }
+    }
+  ]
+}

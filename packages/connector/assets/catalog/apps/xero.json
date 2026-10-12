@@ -1,0 +1,2101 @@
+{
+  "service": "xero",
+  "displayName": "Xero",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://login.xero.com/identity/connect/authorize",
+      "tokenUrl": "https://identity.xero.com/connect/token",
+      "scopes": [
+        "openid",
+        "profile",
+        "email",
+        "accounting.settings.read",
+        "accounting.contacts.read",
+        "accounting.invoices.read",
+        "accounting.banktransactions.read",
+        "accounting.reports.profitandloss.read",
+        "accounting.reports.balancesheet.read",
+        "accounting.contacts",
+        "accounting.invoices",
+        "offline_access"
+      ],
+      "tokenEndpointAuthMethod": "client_secret_post"
+    }
+  ],
+  "homepageUrl": "https://www.xero.com",
+  "actions": [
+    {
+      "id": "xero.create_contact",
+      "service": "xero",
+      "name": "create_contact",
+      "description": "Create a contact. Requires a connection with the accounting.contacts scope.",
+      "operationType": "write",
+      "requiredScopes": [
+        "accounting.contacts"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "The contact name."
+          },
+          "email_address": {
+            "type": "string",
+            "description": "The contact email address."
+          },
+          "first_name": {
+            "type": "string",
+            "description": "The contact first name."
+          },
+          "last_name": {
+            "type": "string",
+            "description": "The contact last name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "description": "Contact creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "properties": {
+              "contact_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's first name."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's last name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's last name."
+              },
+              "email_address": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's email address."
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's phone number."
+              },
+              "is_customer": {
+                "type": "boolean"
+              },
+              "is_supplier": {
+                "type": "boolean"
+              },
+              "account_number": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The account number in the accounting system."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The account number in the accounting system."
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "contact_id",
+              "name",
+              "is_customer",
+              "is_supplier",
+              "status"
+            ],
+            "description": "A contact summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact"
+        ],
+        "description": "The created contact."
+      }
+    },
+    {
+      "id": "xero.create_invoice",
+      "service": "xero",
+      "name": "create_invoice",
+      "description": "Create an invoice for a contact. Requires a connection with the accounting.invoices scope.",
+      "operationType": "write",
+      "requiredScopes": [
+        "accounting.invoices"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "contact_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ACCREC",
+              "ACCPAY"
+            ],
+            "description": "ACCREC bills the customer; ACCPAY records a bill from a supplier.",
+            "default": "ACCREC"
+          },
+          "date": {
+            "type": "string",
+            "description": "The invoice date. When omitted, Xero uses today in the organisation timezone.",
+            "format": "date"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "The due date. When omitted, a 30-day term is applied only when date is provided; otherwise Xero determines the date.",
+            "format": "date"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The invoice reference."
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "description": "The line item description."
+                },
+                "quantity": {
+                  "type": "number",
+                  "description": "The quantity."
+                },
+                "unit_amount": {
+                  "type": "number",
+                  "description": "The unit price excluding tax."
+                },
+                "account_code": {
+                  "type": "string",
+                  "description": "The account code this line is posted to."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "description",
+                "quantity",
+                "unit_amount",
+                "account_code"
+              ],
+              "description": "An invoice or bank transaction line item."
+            },
+            "description": "The invoice line items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id",
+          "line_items"
+        ],
+        "description": "Invoice creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "invoice_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "invoice_number": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ACCREC",
+                  "ACCPAY"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "DRAFT",
+                  "SUBMITTED",
+                  "AUTHORISED",
+                  "PAID",
+                  "VOIDED",
+                  "DELETED"
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice date (YYYY-MM-DD)."
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The due date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The due date (YYYY-MM-DD)."
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice reference."
+              },
+              "total": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "amount_due": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "currency_code": {
+                "type": "string"
+              },
+              "contact_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The linked contact name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The linked contact name."
+              },
+              "line_items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "line_item_id": {
+                      "type": "string",
+                      "description": "A Xero resource ID.",
+                      "format": "uuid"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The line item description."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The line item description."
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "unit_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "line_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "account_code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The account code this line is posted to."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The account code this line is posted to."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "line_item_id",
+                    "quantity",
+                    "unit_amount",
+                    "line_amount"
+                  ],
+                  "description": "A line item with computed amounts."
+                },
+                "description": "The invoice line items."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "invoice_id",
+              "invoice_number",
+              "type",
+              "status",
+              "date",
+              "total",
+              "amount_due",
+              "currency_code",
+              "line_items"
+            ],
+            "description": "An invoice with line items."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "The created invoice."
+      }
+    },
+    {
+      "id": "xero.get_account",
+      "service": "xero",
+      "name": "get_account",
+      "description": "Get an account by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.settings.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "account_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "account_id"
+        ],
+        "description": "Account lookup input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "account_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ACTIVE",
+                  "ARCHIVED",
+                  "DELETED"
+                ]
+              },
+              "tax_type": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The default tax type."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The default tax type."
+              },
+              "currency_code": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "account_id",
+              "code",
+              "name",
+              "type",
+              "status",
+              "currency_code"
+            ],
+            "description": "An account summary."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "An account summary."
+      }
+    },
+    {
+      "id": "xero.get_balance_sheet",
+      "service": "xero",
+      "name": "get_balance_sheet",
+      "description": "Get the balance sheet report for a tenant, as labelled sections an agent can summarise.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.reports.balancesheet.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "description": "The as-at date for the balance sheet. Defaults to today in the organisation timezone.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Balance sheet report input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string"
+          },
+          "report_name": {
+            "type": "string"
+          },
+          "titles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The report titles."
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the report was generated (ISO 8601)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the report was generated (ISO 8601)."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The section title, for example Operating Income."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The section title, for example Operating Income."
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The formatted cell value."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The formatted cell value."
+                      },
+                      "is_total": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "label",
+                      "is_total"
+                    ],
+                    "description": "A row inside a report section."
+                  },
+                  "description": "The rows in this section."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "rows"
+              ],
+              "description": "A report section with labelled rows."
+            },
+            "description": "The report body as labelled sections."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id",
+          "report_name",
+          "titles",
+          "sections"
+        ],
+        "description": "A financial report with labelled sections an agent can summarise."
+      }
+    },
+    {
+      "id": "xero.get_bank_transaction",
+      "service": "xero",
+      "name": "get_bank_transaction",
+      "description": "Get a bank transaction with its line items by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.banktransactions.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "bank_transaction_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "bank_transaction_id"
+        ],
+        "description": "Bank transaction lookup input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "transaction_id": {
+                "type": "string",
+                "description": "The Xero identifier for a bank transaction, overpayment, or prepayment.",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "RECEIVE",
+                  "RECEIVE-OVERPAYMENT",
+                  "RECEIVE-PREPAYMENT",
+                  "SPEND",
+                  "SPEND-OVERPAYMENT",
+                  "SPEND-PREPAYMENT",
+                  "RECEIVE-TRANSFER",
+                  "SPEND-TRANSFER"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "AUTHORISED",
+                  "DELETED",
+                  "PAID",
+                  "VOIDED"
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The transaction date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The transaction date (YYYY-MM-DD)."
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The transaction reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The transaction reference."
+              },
+              "total": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "currency_code": {
+                "type": "string"
+              },
+              "contact_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The linked contact name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The linked contact name."
+              },
+              "line_items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "line_item_id": {
+                      "type": "string",
+                      "description": "A Xero resource ID.",
+                      "format": "uuid"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The line item description."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The line item description."
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "unit_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "line_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "account_code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The account code this line is posted to."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The account code this line is posted to."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "line_item_id",
+                    "quantity",
+                    "unit_amount",
+                    "line_amount"
+                  ],
+                  "description": "A line item with computed amounts."
+                },
+                "description": "The transaction line items."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "transaction_id",
+              "type",
+              "status",
+              "date",
+              "total",
+              "currency_code",
+              "line_items"
+            ],
+            "description": "A bank transaction with line items."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "A bank transaction with line items."
+      }
+    },
+    {
+      "id": "xero.get_contact",
+      "service": "xero",
+      "name": "get_contact",
+      "description": "Get a contact by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "contact_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contact_id"
+        ],
+        "description": "Contact lookup input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "contact_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "first_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's first name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's first name."
+              },
+              "last_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's last name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's last name."
+              },
+              "email_address": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's email address."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's email address."
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The contact's phone number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The contact's phone number."
+              },
+              "is_customer": {
+                "type": "boolean"
+              },
+              "is_supplier": {
+                "type": "boolean"
+              },
+              "account_number": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The account number in the accounting system."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The account number in the accounting system."
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "contact_id",
+              "name",
+              "is_customer",
+              "is_supplier",
+              "status"
+            ],
+            "description": "A contact summary."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "A contact summary."
+      }
+    },
+    {
+      "id": "xero.get_invoice",
+      "service": "xero",
+      "name": "get_invoice",
+      "description": "Get an invoice with its line items by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.invoices.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "invoice_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice_id"
+        ],
+        "description": "Invoice lookup input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "invoice_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "invoice_number": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ACCREC",
+                  "ACCPAY"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "DRAFT",
+                  "SUBMITTED",
+                  "AUTHORISED",
+                  "PAID",
+                  "VOIDED",
+                  "DELETED"
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice date (YYYY-MM-DD)."
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The due date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The due date (YYYY-MM-DD)."
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice reference."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice reference."
+              },
+              "total": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "amount_due": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "currency_code": {
+                "type": "string"
+              },
+              "contact_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The linked contact name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The linked contact name."
+              },
+              "line_items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "line_item_id": {
+                      "type": "string",
+                      "description": "A Xero resource ID.",
+                      "format": "uuid"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The line item description."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The line item description."
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "unit_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "line_amount": {
+                      "type": "number",
+                      "description": "A monetary amount."
+                    },
+                    "account_code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The account code this line is posted to."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The account code this line is posted to."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "required": [
+                    "line_item_id",
+                    "quantity",
+                    "unit_amount",
+                    "line_amount"
+                  ],
+                  "description": "A line item with computed amounts."
+                },
+                "description": "The invoice line items."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "invoice_id",
+              "invoice_number",
+              "type",
+              "status",
+              "date",
+              "total",
+              "amount_due",
+              "currency_code",
+              "line_items"
+            ],
+            "description": "An invoice with line items."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "An invoice with line items."
+      }
+    },
+    {
+      "id": "xero.get_organisation",
+      "service": "xero",
+      "name": "get_organisation",
+      "description": "Get the organisation profile for a tenant.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.settings.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Organisation lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organisation_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "currency_code": {
+            "type": "string"
+          },
+          "country_code": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "tax_system_type": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "organisation_id",
+          "name",
+          "legal_name",
+          "currency_code",
+          "country_code"
+        ],
+        "description": "An organisation profile."
+      }
+    },
+    {
+      "id": "xero.get_profit_and_loss",
+      "service": "xero",
+      "name": "get_profit_and_loss",
+      "description": "Get the profit and loss report for a tenant, as labelled sections an agent can summarise.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.reports.profitandloss.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "from_date": {
+            "type": "string",
+            "description": "The report start date.",
+            "format": "date"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "The report end date. Defaults to today.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Profit and loss report input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string"
+          },
+          "report_name": {
+            "type": "string"
+          },
+          "titles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "The report titles."
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "When the report was generated (ISO 8601)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the report was generated (ISO 8601)."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The section title, for example Operating Income."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The section title, for example Operating Income."
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The formatted cell value."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The formatted cell value."
+                      },
+                      "is_total": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "label",
+                      "is_total"
+                    ],
+                    "description": "A row inside a report section."
+                  },
+                  "description": "The rows in this section."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "rows"
+              ],
+              "description": "A report section with labelled rows."
+            },
+            "description": "The report body as labelled sections."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "report_id",
+          "report_name",
+          "titles",
+          "sections"
+        ],
+        "description": "A financial report with labelled sections an agent can summarise."
+      }
+    },
+    {
+      "id": "xero.list_accounts",
+      "service": "xero",
+      "name": "list_accounts",
+      "description": "List the chart of accounts for a tenant.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.settings.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED",
+              "DELETED"
+            ],
+            "description": "Filter by account status."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Account list input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "description": "A Xero resource ID.",
+                  "format": "uuid"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ACTIVE",
+                    "ARCHIVED",
+                    "DELETED"
+                  ]
+                },
+                "tax_type": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The default tax type."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The default tax type."
+                },
+                "currency_code": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "account_id",
+                "code",
+                "name",
+                "type",
+                "status",
+                "currency_code"
+              ],
+              "description": "An account summary."
+            },
+            "description": "The chart of accounts."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accounts"
+        ],
+        "description": "The chart of accounts."
+      }
+    },
+    {
+      "id": "xero.list_organisations",
+      "service": "xero",
+      "name": "list_organisations",
+      "description": "List the Xero organisations (tenants) connected to this account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "organisations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tenant_id": {
+                  "type": "string",
+                  "description": "The Xero tenant (organisation) ID for this connection.",
+                  "format": "uuid"
+                },
+                "tenant_name": {
+                  "type": "string"
+                },
+                "tenant_type": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "tenant_id",
+                "tenant_name",
+                "tenant_type"
+              ],
+              "description": "An organisation connected to this Xero account."
+            },
+            "description": "The connected organisations."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "organisations"
+        ],
+        "description": "Connected Xero organisations."
+      }
+    },
+    {
+      "id": "xero.search_bank_transactions",
+      "service": "xero",
+      "name": "search_bank_transactions",
+      "description": "Search bank transactions, overpayments, prepayments, and transfers by status with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.banktransactions.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AUTHORISED",
+              "DELETED",
+              "PAID",
+              "VOIDED"
+            ],
+            "description": "Filter by transaction status."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. Xero returns up to 100 items per page.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Bank transaction search input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transaction_id": {
+                  "type": "string",
+                  "description": "The Xero identifier for a bank transaction, overpayment, or prepayment.",
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "RECEIVE",
+                    "RECEIVE-OVERPAYMENT",
+                    "RECEIVE-PREPAYMENT",
+                    "SPEND",
+                    "SPEND-OVERPAYMENT",
+                    "SPEND-PREPAYMENT",
+                    "RECEIVE-TRANSFER",
+                    "SPEND-TRANSFER"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "AUTHORISED",
+                    "DELETED",
+                    "PAID",
+                    "VOIDED"
+                  ]
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The transaction date (YYYY-MM-DD)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The transaction date (YYYY-MM-DD)."
+                },
+                "total": {
+                  "type": "number",
+                  "description": "A monetary amount."
+                },
+                "currency_code": {
+                  "type": "string"
+                },
+                "contact_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The linked contact name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The linked contact name."
+                },
+                "line_item_count": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "transaction_id",
+                "type",
+                "status",
+                "date",
+                "total",
+                "currency_code",
+                "line_item_count"
+              ],
+              "description": "A bank transaction summary."
+            },
+            "description": "Matching bank transactions."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number that was returned."
+          },
+          "returned": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "returned"
+        ],
+        "description": "A page of results."
+      }
+    },
+    {
+      "id": "xero.search_contacts",
+      "service": "xero",
+      "name": "search_contacts",
+      "description": "Search contacts by name fragment with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.contacts.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "search": {
+            "type": "string",
+            "description": "A name fragment to match. When omitted, all contacts are returned."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. Xero returns up to 100 items per page.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Contact search input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "contact_id": {
+                  "type": "string",
+                  "description": "A Xero resource ID.",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "first_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's first name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's first name."
+                },
+                "last_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's last name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's last name."
+                },
+                "email_address": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's email address."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's email address."
+                },
+                "phone": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The contact's phone number."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The contact's phone number."
+                },
+                "is_customer": {
+                  "type": "boolean"
+                },
+                "is_supplier": {
+                  "type": "boolean"
+                },
+                "account_number": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The account number in the accounting system."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The account number in the accounting system."
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "contact_id",
+                "name",
+                "is_customer",
+                "is_supplier",
+                "status"
+              ],
+              "description": "A contact summary."
+            },
+            "description": "Matching contacts."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number that was returned."
+          },
+          "returned": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "returned"
+        ],
+        "description": "A page of results."
+      }
+    },
+    {
+      "id": "xero.search_invoices",
+      "service": "xero",
+      "name": "search_invoices",
+      "description": "Search invoices by status with pagination.",
+      "operationType": "read",
+      "requiredScopes": [
+        "accounting.invoices.read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "AUTHORISED",
+              "PAID",
+              "VOIDED",
+              "DELETED"
+            ],
+            "description": "Filter by invoice status."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. Xero returns up to 100 items per page.",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "description": "Invoice search input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "invoice_id": {
+                  "type": "string",
+                  "description": "A Xero resource ID.",
+                  "format": "uuid"
+                },
+                "invoice_number": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ACCREC",
+                    "ACCPAY"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "DRAFT",
+                    "SUBMITTED",
+                    "AUTHORISED",
+                    "PAID",
+                    "VOIDED",
+                    "DELETED"
+                  ]
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The invoice date (YYYY-MM-DD)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The invoice date (YYYY-MM-DD)."
+                },
+                "due_date": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The due date (YYYY-MM-DD)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The due date (YYYY-MM-DD)."
+                },
+                "total": {
+                  "type": "number",
+                  "description": "A monetary amount."
+                },
+                "amount_due": {
+                  "type": "number",
+                  "description": "A monetary amount."
+                },
+                "currency_code": {
+                  "type": "string"
+                },
+                "contact_name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The linked contact name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The linked contact name."
+                },
+                "line_item_count": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "invoice_id",
+                "invoice_number",
+                "type",
+                "status",
+                "date",
+                "total",
+                "amount_due",
+                "currency_code",
+                "line_item_count"
+              ],
+              "description": "An invoice summary."
+            },
+            "description": "Matching invoices."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number that was returned."
+          },
+          "returned": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "returned"
+        ],
+        "description": "A page of results."
+      }
+    },
+    {
+      "id": "xero.update_invoice_status",
+      "service": "xero",
+      "name": "update_invoice_status",
+      "description": "Move an invoice through its lifecycle: submit, approve, or void. Requires the accounting.invoices scope.",
+      "operationType": "write",
+      "requiredScopes": [
+        "accounting.invoices"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "The Xero tenant (organisation) ID for this connection.",
+            "format": "uuid"
+          },
+          "invoice_id": {
+            "type": "string",
+            "description": "A Xero resource ID.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SUBMITTED",
+              "AUTHORISED",
+              "VOIDED"
+            ],
+            "description": "The status to move the invoice to."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice_id",
+          "status"
+        ],
+        "description": "Invoice status update input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "type": "object",
+            "properties": {
+              "invoice_id": {
+                "type": "string",
+                "description": "A Xero resource ID.",
+                "format": "uuid"
+              },
+              "invoice_number": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ACCREC",
+                  "ACCPAY"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "DRAFT",
+                  "SUBMITTED",
+                  "AUTHORISED",
+                  "PAID",
+                  "VOIDED",
+                  "DELETED"
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The invoice date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The invoice date (YYYY-MM-DD)."
+              },
+              "due_date": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The due date (YYYY-MM-DD)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The due date (YYYY-MM-DD)."
+              },
+              "total": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "amount_due": {
+                "type": "number",
+                "description": "A monetary amount."
+              },
+              "currency_code": {
+                "type": "string"
+              },
+              "contact_name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The linked contact name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The linked contact name."
+              },
+              "line_item_count": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "invoice_id",
+              "invoice_number",
+              "type",
+              "status",
+              "date",
+              "total",
+              "amount_due",
+              "currency_code",
+              "line_item_count"
+            ],
+            "description": "An invoice summary."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "invoice"
+        ],
+        "description": "The updated invoice."
+      }
+    }
+  ]
+}

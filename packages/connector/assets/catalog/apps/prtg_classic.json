@@ -1,0 +1,260 @@
+{
+  "service": "prtg_classic",
+  "displayName": "PRTG Classic",
+  "categories": [
+    "Developer Tools",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "prtg_api_key",
+      "description": "PRTG API key sent as the apitoken query parameter. Create or view API keys from Account Settings > API Keys in PRTG: https://www.paessler.com/manuals/prtg/api_keys",
+      "extraFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Instance URL",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "https://prtg.example.com",
+          "description": "Your public HTTPS PRTG instance URL. URLs ending in /api are also accepted."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.paessler.com/prtg",
+  "actions": [
+    {
+      "id": "prtg_classic.list_devices",
+      "service": "prtg_classic",
+      "name": "list_devices",
+      "description": "List PRTG devices with host, status, and message fields from the classic table API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50000,
+            "description": "Maximum number of items to return. PRTG allows values from 1 to 50000."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based item offset for paginated table reads."
+          },
+          "objectId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "PRTG object ID used to restrict the table to that object and its child objects."
+          },
+          "filterStatus": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 14,
+              "description": "A PRTG raw status code."
+            },
+            "description": "PRTG raw status codes to include. Multiple status filters are sent as repeated filter_status query parameters.",
+            "minItems": 1
+          },
+          "sortDescending": {
+            "type": "boolean",
+            "description": "Reverse the selected sortBy column by sending a leading dash."
+          },
+          "filterHost": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PRTG host column filter value or filter expression."
+          },
+          "filterDevice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PRTG device column filter value or filter expression."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "objid",
+              "probe",
+              "group",
+              "device",
+              "host",
+              "status",
+              "message",
+              "priority",
+              "favorite"
+            ],
+            "description": "PRTG device table column used for sorting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing PRTG devices through the classic table API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "treeSize": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching PRTG table rows when provided by PRTG."
+          },
+          "prtgVersion": {
+            "type": "string",
+            "description": "PRTG server version string when included in the API response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw PRTG table API response."
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One row returned by the PRTG table API."
+            },
+            "description": "Device rows returned by PRTG."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "devices",
+          "raw"
+        ],
+        "description": "A PRTG devices table page."
+      }
+    },
+    {
+      "id": "prtg_classic.list_sensors",
+      "service": "prtg_classic",
+      "name": "list_sensors",
+      "description": "List PRTG sensors with status, message, and last value fields from the classic table API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50000,
+            "description": "Maximum number of items to return. PRTG allows values from 1 to 50000."
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based item offset for paginated table reads."
+          },
+          "objectId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "PRTG object ID used to restrict the table to that object and its child objects."
+          },
+          "filterStatus": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 14,
+              "description": "A PRTG raw status code."
+            },
+            "description": "PRTG raw status codes to include. Multiple status filters are sent as repeated filter_status query parameters.",
+            "minItems": 1
+          },
+          "sortDescending": {
+            "type": "boolean",
+            "description": "Reverse the selected sortBy column by sending a leading dash."
+          },
+          "filterTags": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tag name or PRTG @tag(...) expression used to filter sensors by tag."
+          },
+          "filterType": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PRTG sensor type filter value or filter expression."
+          },
+          "filterDevice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PRTG device column filter value or filter expression."
+          },
+          "filterSensor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "PRTG sensor column filter value or filter expression."
+          },
+          "sortBy": {
+            "type": "string",
+            "enum": [
+              "objid",
+              "probe",
+              "group",
+              "device",
+              "sensor",
+              "status",
+              "message",
+              "lastvalue",
+              "priority",
+              "favorite"
+            ],
+            "description": "PRTG sensor table column used for sorting."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Query parameters for listing PRTG sensors through the classic table API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "treeSize": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching PRTG table rows when provided by PRTG."
+          },
+          "prtgVersion": {
+            "type": "string",
+            "description": "PRTG server version string when included in the API response."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw PRTG table API response."
+          },
+          "sensors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "One row returned by the PRTG table API."
+            },
+            "description": "Sensor rows returned by PRTG."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sensors",
+          "raw"
+        ],
+        "description": "A PRTG sensors table page."
+      }
+    }
+  ]
+}

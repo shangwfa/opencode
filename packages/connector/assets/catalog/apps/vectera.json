@@ -1,0 +1,954 @@
+{
+  "service": "vectera",
+  "displayName": "Vectera",
+  "description": "Manage Vectera meeting rooms, settings, permissions, and join links.",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "VECTERA_API_TOKEN",
+      "description": "Vectera API token sent as Authorization: Token <token>. Request a token from Vectera support, then view it at the bottom of your profile: https://www.vectera.com/profile/."
+    }
+  ],
+  "homepageUrl": "https://go.vectera.com/",
+  "actions": [
+    {
+      "id": "vectera.create_meeting_room",
+      "service": "vectera",
+      "name": "create_meeting_room",
+      "description": "Create a Vectera meeting room with optional ownership and access settings.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "A unique identifier to use in the meeting room URL.",
+            "pattern": "\\S"
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera user id that owns the meeting room.",
+            "pattern": "\\S"
+          },
+          "publicAccessLevel": {
+            "type": "string",
+            "enum": [
+              "should_knock",
+              "can_always_join",
+              "is_host"
+            ],
+            "description": "The access level granted for a Vectera meeting room."
+          },
+          "teamAccessLevel": {
+            "type": "string",
+            "enum": [
+              "should_knock",
+              "can_always_join",
+              "is_host"
+            ],
+            "description": "The access level granted for a Vectera meeting room."
+          },
+          "preferredKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "A preferred meeting room key that Vectera may suffix to avoid conflicts.",
+            "pattern": "\\S"
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room template id to apply.",
+            "pattern": "\\S"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "owner",
+                "numTranscriptions"
+              ],
+              "description": "A related meeting room field to include."
+            },
+            "description": "Optional related fields to include in each Vectera meeting room response.",
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "description": "Fields for creating a Vectera meeting room.",
+        "not": {
+          "required": [
+            "key",
+            "preferredKey"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoom": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vectera meeting room id."
+              },
+              "key": {
+                "type": "string",
+                "description": "The identifier used in the meeting room URL."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public URL used to join the meeting room.",
+                "format": "uri"
+              },
+              "ownerId": {
+                "type": "string",
+                "description": "The id of the meeting room owner."
+              },
+              "publicAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "teamAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "When the meeting room was created.",
+                "format": "date-time"
+              },
+              "isOpened": {
+                "type": "boolean",
+                "description": "Whether at least one participant is currently in the meeting room."
+              },
+              "isActive": {
+                "type": "boolean",
+                "description": "Whether the meeting room currently has an active multi-participant session."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Vectera meeting room returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoom"
+        ],
+        "description": "The created Vectera meeting room response."
+      }
+    },
+    {
+      "id": "vectera.create_meeting_room_permission",
+      "service": "vectera",
+      "name": "create_meeting_room_permission",
+      "description": "Create a shareable Vectera meeting room access permission and join URL.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room id to grant access to.",
+            "pattern": "\\S"
+          },
+          "accessLevel": {
+            "type": "string",
+            "enum": [
+              "should_knock",
+              "can_always_join",
+              "is_host"
+            ],
+            "description": "The access level granted for a Vectera meeting room."
+          },
+          "email": {
+            "type": "string",
+            "description": "An email address that should receive the meeting room invitation.",
+            "format": "email"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Vectera user id that should receive the invitation.",
+            "pattern": "\\S"
+          },
+          "inviteMessage": {
+            "type": "string",
+            "description": "The optional message included with an emailed invitation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoomId"
+        ],
+        "description": "Fields for creating a Vectera meeting room permission.",
+        "not": {
+          "required": [
+            "email",
+            "userId"
+          ]
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "permission": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vectera meeting room permission id."
+              },
+              "meetingRoomId": {
+                "type": "string",
+                "description": "The id of the meeting room this permission grants access to."
+              },
+              "accessKey": {
+                "type": "string",
+                "description": "The secure access key generated for this permission."
+              },
+              "url": {
+                "type": "string",
+                "description": "The URL used to join the meeting room with this permission.",
+                "format": "uri"
+              },
+              "accessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Vectera meeting room permission returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "permission"
+        ],
+        "description": "The created Vectera meeting room permission response."
+      }
+    },
+    {
+      "id": "vectera.get_current_user",
+      "service": "vectera",
+      "name": "get_current_user",
+      "description": "Get the user associated with the connected Vectera API token.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "organization",
+                "organization.defaultSmartSummaryTemplate",
+                "organization.integrationStatus"
+              ],
+              "description": "A related current-user field to include."
+            },
+            "description": "Optional related fields to include in the current Vectera user response.",
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "additionalProperties": false,
+        "description": "Options for retrieving the current Vectera user."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vectera user id."
+              },
+              "username": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The username within the Vectera organization."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The username within the Vectera organization."
+              },
+              "firstName": {
+                "type": "string",
+                "description": "The user's first name."
+              },
+              "lastName": {
+                "type": "string",
+                "description": "The user's last name."
+              },
+              "fullName": {
+                "type": "string",
+                "description": "The user's full display name."
+              },
+              "email": {
+                "type": "string",
+                "description": "The user's email address.",
+                "format": "email"
+              },
+              "organizationId": {
+                "type": "string",
+                "description": "The id of the user's Vectera organization."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The current Vectera user returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "user"
+        ],
+        "description": "The current Vectera user response."
+      }
+    },
+    {
+      "id": "vectera.get_meeting_room",
+      "service": "vectera",
+      "name": "get_meeting_room",
+      "description": "Get one Vectera meeting room by id.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room id.",
+            "pattern": "\\S"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "owner",
+                "numTranscriptions"
+              ],
+              "description": "A related meeting room field to include."
+            },
+            "description": "Optional related fields to include in each Vectera meeting room response.",
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoomId"
+        ],
+        "description": "Input for retrieving one Vectera meeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoom": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vectera meeting room id."
+              },
+              "key": {
+                "type": "string",
+                "description": "The identifier used in the meeting room URL."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public URL used to join the meeting room.",
+                "format": "uri"
+              },
+              "ownerId": {
+                "type": "string",
+                "description": "The id of the meeting room owner."
+              },
+              "publicAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "teamAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "When the meeting room was created.",
+                "format": "date-time"
+              },
+              "isOpened": {
+                "type": "boolean",
+                "description": "Whether at least one participant is currently in the meeting room."
+              },
+              "isActive": {
+                "type": "boolean",
+                "description": "Whether the meeting room currently has an active multi-participant session."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Vectera meeting room returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoom"
+        ],
+        "description": "The Vectera meeting room response."
+      }
+    },
+    {
+      "id": "vectera.get_meeting_room_settings",
+      "service": "vectera",
+      "name": "get_meeting_room_settings",
+      "description": "Get settings for one Vectera meeting room.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room id.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoomId"
+        ],
+        "description": "Input identifying one Vectera meeting room."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "showPrivateNotes": {
+                "type": "boolean",
+                "description": "Whether private note controls are visible to the meeting room host."
+              },
+              "presenterMode": {
+                "type": "boolean",
+                "description": "Whether presenter mode is active in the meeting room."
+              },
+              "forwardUrl": {
+                "type": "string",
+                "description": "The URL guests are sent to after the meeting ends."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Vectera meeting room settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "settings"
+        ],
+        "description": "The Vectera meeting room settings response."
+      }
+    },
+    {
+      "id": "vectera.list_meeting_rooms",
+      "service": "vectera",
+      "name": "list_meeting_rooms",
+      "description": "List Vectera meeting rooms available to the connected user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The 1-based result page to request."
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The number of meeting rooms to return per page."
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text to search for in meeting room keys.",
+            "pattern": "\\S"
+          },
+          "filter": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A Vectera filter expression for meeting room fields.",
+            "pattern": "\\S"
+          },
+          "orderBy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Vectera meeting room sort field.",
+              "pattern": "\\S"
+            },
+            "description": "Meeting room fields to sort by; prefix a field with - for descending order.",
+            "minItems": 1
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "owner",
+                "numTranscriptions"
+              ],
+              "description": "A related meeting room field to include."
+            },
+            "description": "Optional related fields to include in each Vectera meeting room response.",
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination controls for listing Vectera meeting rooms."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRooms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The Vectera meeting room id."
+                },
+                "key": {
+                  "type": "string",
+                  "description": "The identifier used in the meeting room URL."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The public URL used to join the meeting room.",
+                  "format": "uri"
+                },
+                "ownerId": {
+                  "type": "string",
+                  "description": "The id of the meeting room owner."
+                },
+                "publicAccessLevel": {
+                  "type": "string",
+                  "enum": [
+                    "should_knock",
+                    "can_always_join",
+                    "is_host"
+                  ],
+                  "description": "The access level granted for a Vectera meeting room."
+                },
+                "teamAccessLevel": {
+                  "type": "string",
+                  "enum": [
+                    "should_knock",
+                    "can_always_join",
+                    "is_host"
+                  ],
+                  "description": "The access level granted for a Vectera meeting room."
+                },
+                "dateCreated": {
+                  "type": "string",
+                  "description": "When the meeting room was created.",
+                  "format": "date-time"
+                },
+                "isOpened": {
+                  "type": "boolean",
+                  "description": "Whether at least one participant is currently in the meeting room."
+                },
+                "isActive": {
+                  "type": "boolean",
+                  "description": "Whether the meeting room currently has an active multi-participant session."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Vectera meeting room returned by the API."
+            },
+            "description": "The meeting rooms returned for this page."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The requested 1-based page number."
+              },
+              "next": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the next page, or null when there is no next page.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the next page, or null when there is no next page."
+              },
+              "previous": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the previous page, or null when there is no previous page.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the previous page, or null when there is no previous page."
+              },
+              "first": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the first page, or null when it is not returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the first page, or null when it is not returned."
+              },
+              "last": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The URL of the last page, or null when it is not returned.",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The URL of the last page, or null when it is not returned."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "page",
+              "next",
+              "previous",
+              "first",
+              "last"
+            ],
+            "description": "Pagination links parsed from the Vectera Link header."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRooms",
+          "pagination"
+        ],
+        "description": "A page of Vectera meeting rooms."
+      }
+    },
+    {
+      "id": "vectera.update_meeting_room",
+      "service": "vectera",
+      "name": "update_meeting_room",
+      "description": "Update the key, owner, or access levels of a Vectera meeting room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room id.",
+            "pattern": "\\S"
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "A unique identifier to use in the meeting room URL.",
+            "pattern": "\\S"
+          },
+          "ownerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera user id that owns the meeting room.",
+            "pattern": "\\S"
+          },
+          "publicAccessLevel": {
+            "type": "string",
+            "enum": [
+              "should_knock",
+              "can_always_join",
+              "is_host"
+            ],
+            "description": "The access level granted for a Vectera meeting room."
+          },
+          "teamAccessLevel": {
+            "type": "string",
+            "enum": [
+              "should_knock",
+              "can_always_join",
+              "is_host"
+            ],
+            "description": "The access level granted for a Vectera meeting room."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "owner",
+                "numTranscriptions"
+              ],
+              "description": "A related meeting room field to include."
+            },
+            "description": "Optional related fields to include in each Vectera meeting room response.",
+            "minItems": 1,
+            "maxItems": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoomId"
+        ],
+        "description": "Fields for updating a Vectera meeting room.",
+        "anyOf": [
+          {
+            "required": [
+              "key"
+            ]
+          },
+          {
+            "required": [
+              "ownerId"
+            ]
+          },
+          {
+            "required": [
+              "publicAccessLevel"
+            ]
+          },
+          {
+            "required": [
+              "teamAccessLevel"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoom": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The Vectera meeting room id."
+              },
+              "key": {
+                "type": "string",
+                "description": "The identifier used in the meeting room URL."
+              },
+              "url": {
+                "type": "string",
+                "description": "The public URL used to join the meeting room.",
+                "format": "uri"
+              },
+              "ownerId": {
+                "type": "string",
+                "description": "The id of the meeting room owner."
+              },
+              "publicAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "teamAccessLevel": {
+                "type": "string",
+                "enum": [
+                  "should_knock",
+                  "can_always_join",
+                  "is_host"
+                ],
+                "description": "The access level granted for a Vectera meeting room."
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "When the meeting room was created.",
+                "format": "date-time"
+              },
+              "isOpened": {
+                "type": "boolean",
+                "description": "Whether at least one participant is currently in the meeting room."
+              },
+              "isActive": {
+                "type": "boolean",
+                "description": "Whether the meeting room currently has an active multi-participant session."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Vectera meeting room returned by the API."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoom"
+        ],
+        "description": "The updated Vectera meeting room response."
+      }
+    },
+    {
+      "id": "vectera.update_meeting_room_settings",
+      "service": "vectera",
+      "name": "update_meeting_room_settings",
+      "description": "Update writable settings for one Vectera meeting room.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "meetingRoomId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Vectera meeting room id.",
+            "pattern": "\\S"
+          },
+          "showPrivateNotes": {
+            "type": "boolean",
+            "description": "Whether private note controls are visible to the meeting room host."
+          },
+          "presenterMode": {
+            "type": "boolean",
+            "description": "Whether presenter mode is active in the meeting room."
+          },
+          "forwardUrl": {
+            "type": "string",
+            "description": "The URL guests are sent to after the meeting, or an empty string to remove it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "meetingRoomId"
+        ],
+        "description": "Writable settings for one Vectera meeting room.",
+        "anyOf": [
+          {
+            "required": [
+              "showPrivateNotes"
+            ]
+          },
+          {
+            "required": [
+              "presenterMode"
+            ]
+          },
+          {
+            "required": [
+              "forwardUrl"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "showPrivateNotes": {
+                "type": "boolean",
+                "description": "Whether private note controls are visible to the meeting room host."
+              },
+              "presenterMode": {
+                "type": "boolean",
+                "description": "Whether presenter mode is active in the meeting room."
+              },
+              "forwardUrl": {
+                "type": "string",
+                "description": "The URL guests are sent to after the meeting ends."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Vectera meeting room settings."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "settings"
+        ],
+        "description": "The updated Vectera meeting room settings response."
+      }
+    }
+  ]
+}

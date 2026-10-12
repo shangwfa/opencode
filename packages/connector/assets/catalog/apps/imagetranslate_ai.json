@@ -1,0 +1,144 @@
+{
+  "service": "imagetranslate_ai",
+  "displayName": "ImageTranslate.AI",
+  "categories": [
+    "Artificial Intelligence",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "IMAGETRANSLATE_AI_API_KEY",
+      "description": "ImageTranslate.AI API key used for translation requests. Create or copy it from your ImageTranslate.AI account at https://imagetranslate.ai."
+    }
+  ],
+  "homepageUrl": "https://imagetranslate.ai",
+  "actions": [
+    {
+      "id": "imagetranslate_ai.translate_image",
+      "service": "imagetranslate_ai",
+      "name": "translate_image",
+      "description": "Translate text in a public image with ImageTranslate.AI, preserve the selected layout style, and return a rendered PNG up to 50 MB through transit storage. ImageTranslate.AI may charge before Connector can reject an oversized rendered result.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "A public HTTP or HTTPS URL for a JPG, PNG, or WebP image no larger than 20 MB.",
+            "format": "uri"
+          },
+          "sourceLanguage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The source language as an ISO 639-1 or BCP-47 code, or auto for detection. Defaults to auto."
+          },
+          "targetLanguage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "The target language as an ISO 639-1 or BCP-47 code, such as en, ja, ko, zh-cn, or zh-tw."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "general",
+              "manga",
+              "e-commerce",
+              "light-novel"
+            ],
+            "description": "The layout mode: manga preserves comic text layout and strokes; general uses standard rendering; e-commerce preserves layout without strokes; light-novel overlays translated text. Defaults to general."
+          },
+          "translator": {
+            "type": "string",
+            "enum": [
+              "grok",
+              "gemini",
+              "deepseek",
+              "kimi",
+              "chatgpt",
+              "claude"
+            ],
+            "description": "The AI translation model. Defaults to grok."
+          },
+          "customPrompt": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Additional translation instructions, terminology, character context, or style guidance."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "A caller-generated UUID that must be reused when retrying the same translation after a timeout to avoid duplicate credit charges.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "imageUrl",
+          "targetLanguage",
+          "idempotencyKey"
+        ],
+        "description": "Input for translating text in an image while preserving its visual layout."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recordId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ImageTranslate.AI record ID to include when contacting provider support."
+          },
+          "remainingCredit": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The advanced-credit balance remaining after this translation."
+          },
+          "file": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The generated translated image filename."
+              },
+              "mimeType": {
+                "type": "string",
+                "enum": [
+                  "image/png"
+                ],
+                "description": "The MIME type of the translated image."
+              },
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local URL for downloading the translated image.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The translated image size in bytes, up to 50 MB."
+              }
+            },
+            "additionalProperties": false,
+            "description": "The translated PNG, no larger than 50 MB, uploaded to connector transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The completed ImageTranslate.AI translation and remaining credit balance."
+      }
+    }
+  ]
+}

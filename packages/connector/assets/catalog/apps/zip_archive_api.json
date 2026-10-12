@@ -1,0 +1,200 @@
+{
+  "service": "zip_archive_api",
+  "displayName": "Zip Archive API",
+  "categories": [
+    "Developer Tools",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Secret Key",
+      "placeholder": "ARCHIVEAPI_SECRET",
+      "description": "ArchiveAPI secret key appended to API requests. View it at https://archiveapi.com/account.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://archiveapi.com",
+  "actions": [
+    {
+      "id": "zip_archive_api.compress_files",
+      "service": "zip_archive_api",
+      "name": "compress_files",
+      "description": "Compress one or more publicly accessible files into a ZIP archive and return a transit download URL.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "One publicly accessible file URL.",
+              "format": "uri"
+            },
+            "description": "The publicly accessible file URLs that ArchiveAPI should compress.",
+            "minItems": 1
+          },
+          "archiveName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The requested archive filename, including the .zip extension."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional password used to protect the ZIP archive."
+          },
+          "compressionLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9,
+            "description": "The ZIP compression level from 1 through 9."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrls"
+        ],
+        "description": "Public file URLs and ZIP options."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The local transit file identifier."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file name."
+              },
+              "mimeType": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The file MIME type returned by ArchiveAPI."
+              },
+              "downloadUrl": {
+                "type": "string",
+                "description": "The local transit URL for downloading the file.",
+                "format": "uri"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The file size in bytes."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "fileId",
+              "name",
+              "mimeType",
+              "downloadUrl",
+              "sizeBytes"
+            ],
+            "description": "A file uploaded to connector transit storage."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "description": "The compressed ZIP archive in connector transit storage."
+      }
+    },
+    {
+      "id": "zip_archive_api.extract_archive",
+      "service": "zip_archive_api",
+      "name": "extract_archive",
+      "description": "Extract a publicly accessible archive and return each extracted file through transit storage.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "The publicly accessible archive URL that ArchiveAPI should extract.",
+            "format": "uri"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The password used to open a protected archive."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl"
+        ],
+        "description": "A public archive URL and optional password."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The local transit file identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The file name."
+                },
+                "mimeType": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The file MIME type returned by ArchiveAPI."
+                },
+                "downloadUrl": {
+                  "type": "string",
+                  "description": "The local transit URL for downloading the file.",
+                  "format": "uri"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The file size in bytes."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "fileId",
+                "name",
+                "mimeType",
+                "downloadUrl",
+                "sizeBytes"
+              ],
+              "description": "A file uploaded to connector transit storage."
+            },
+            "description": "The files extracted from the source archive.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "files"
+        ],
+        "description": "The extracted files uploaded to connector transit storage."
+      }
+    }
+  ]
+}

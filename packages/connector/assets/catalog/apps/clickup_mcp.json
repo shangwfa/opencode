@@ -1,0 +1,541 @@
+{
+  "service": "clickup_mcp",
+  "displayName": "ClickUp MCP",
+  "description": "Search and manage ClickUp work through ClickUp's official remote MCP server.",
+  "categories": [
+    "Productivity"
+  ],
+  "authTypes": [
+    "oauth2"
+  ],
+  "auth": [
+    {
+      "type": "oauth2",
+      "authorizationUrl": "https://mcp.clickup.com/oauth/authorize",
+      "tokenUrl": "https://mcp.clickup.com/oauth/token",
+      "scopes": [
+        "read",
+        "write"
+      ],
+      "tokenEndpointAuthMethod": "none",
+      "pkce": {
+        "method": "S256"
+      },
+      "authorizationParams": {
+        "resource": "https://mcp.clickup.com/mcp"
+      },
+      "clientSetup": {
+        "docsUrl": "https://developer.clickup.com/docs/connect-an-ai-assistant-to-clickups-mcp-server",
+        "steps": [
+          "Copy the Callback URL shown below.",
+          "POST {\"client_name\":\"Open Connector\",\"redirect_uris\":[\"<Callback URL>\"],\"grant_types\":[\"authorization_code\"],\"response_types\":[\"code\"],\"token_endpoint_auth_method\":\"none\"} as JSON to https://mcp.clickup.com/oauth/register.",
+          "Copy the returned client_id into the Client ID field below and leave Client Secret empty."
+        ]
+      }
+    }
+  ],
+  "homepageUrl": "https://developer.clickup.com/docs/connect-an-ai-assistant-to-clickups-mcp-server",
+  "actions": [
+    {
+      "id": "clickup_mcp.create_task",
+      "service": "clickup_mcp",
+      "name": "create_task",
+      "description": "Create a task in a ClickUp List.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The task name."
+          },
+          "list_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The destination ClickUp List ID."
+          },
+          "markdown_description": {
+            "type": "string",
+            "description": "The task description in Markdown."
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One user ID."
+            },
+            "description": "ClickUp user IDs to assign."
+          },
+          "due_date": {
+            "type": "string",
+            "description": "The due date as YYYY-MM-DD or YYYY-MM-DD HH:MM."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "The start date as YYYY-MM-DD or YYYY-MM-DD HH:MM."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "high",
+              "normal",
+              "low"
+            ],
+            "description": "The task priority."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A status available in the destination List."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag name."
+            },
+            "description": "Existing tag names to apply."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "list_id"
+        ],
+        "description": "Arguments for the ClickUp MCP create_task tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.create_task_comment",
+      "service": "clickup_mcp",
+      "name": "create_task_comment",
+      "description": "Add a comment to a ClickUp task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The target task ID."
+          },
+          "comment_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40000,
+            "description": "The plain-text comment body."
+          },
+          "reply_to_id": {
+            "type": "string",
+            "description": "The parent comment ID when creating a threaded reply."
+          },
+          "notify_all": {
+            "type": "boolean",
+            "description": "Whether to notify every assignee."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "entity_id",
+          "comment_text"
+        ],
+        "description": "Arguments for the ClickUp MCP create_task_comment tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.get_task",
+      "service": "clickup_mcp",
+      "name": "get_task",
+      "description": "Get one ClickUp task, optionally including normally summarized sections.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickUp task ID, including a custom ID when configured."
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "attachments",
+                "checklists",
+                "custom_fields",
+                "dependencies",
+                "description",
+                "linked_tasks",
+                "subtasks",
+                "watchers"
+              ],
+              "description": "One task section."
+            },
+            "description": "Sections to expand in the response."
+          },
+          "expand_statuses": {
+            "type": "boolean",
+            "description": "Whether to include the statuses available for this task's List."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Arguments for the ClickUp MCP get_task tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.get_workspace_hierarchy",
+      "service": "clickup_mcp",
+      "name": "get_workspace_hierarchy",
+      "description": "Get the authorized ClickUp Workspace hierarchy of Spaces, Folders, and Lists.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "The cursor returned by the previous page."
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "The maximum number of Spaces to return."
+          },
+          "max_depth": {
+            "type": "string",
+            "enum": [
+              "0",
+              "1",
+              "2"
+            ],
+            "description": "The hierarchy depth: Spaces only, Folders, or Lists."
+          },
+          "space_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One Space ID."
+            },
+            "description": "Only return these Space IDs."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Arguments for the ClickUp MCP get_workspace_hierarchy tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.get_workspace_members",
+      "service": "clickup_mcp",
+      "name": "get_workspace_members",
+      "description": "List members and guests in an authorized ClickUp Workspace.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Arguments for the ClickUp MCP get_workspace_members tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.search_workspace",
+      "service": "clickup_mcp",
+      "name": "search_workspace",
+      "description": "Search tasks, Lists, Folders, and Docs across the authorized ClickUp Workspaces.",
+      "operationType": "read",
+      "requiredScopes": [
+        "read"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Keywords to search for."
+          },
+          "count": {
+            "type": "number",
+            "description": "The maximum number of results to return on this page."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The cursor returned by the previous page."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Arguments for the ClickUp MCP search_workspace tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.send_chat_message",
+      "service": "clickup_mcp",
+      "name": "send_chat_message",
+      "description": "Send a message to a ClickUp Chat channel.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickUp Chat channel ID."
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message content."
+          },
+          "parent_message_id": {
+            "type": "string",
+            "description": "The parent message ID when sending a threaded reply."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "message",
+              "post"
+            ],
+            "description": "The chat item type."
+          },
+          "content_format": {
+            "type": "string",
+            "enum": [
+              "text/md",
+              "text/plain"
+            ],
+            "description": "The content format."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "channel_id",
+          "content"
+        ],
+        "description": "Arguments for the ClickUp MCP send_chat_message tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    },
+    {
+      "id": "clickup_mcp.update_task",
+      "service": "clickup_mcp",
+      "name": "update_task",
+      "description": "Update the properties of an existing ClickUp task.",
+      "operationType": "write",
+      "requiredScopes": [
+        "write"
+      ],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ClickUp task ID, including a custom ID when configured."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated task name."
+          },
+          "markdown_description": {
+            "type": "string",
+            "description": "The updated task description in Markdown."
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One user ID."
+            },
+            "description": "Replacement ClickUp user IDs."
+          },
+          "due_date": {
+            "type": "string",
+            "description": "The updated due date, or `none` to clear it."
+          },
+          "start_date": {
+            "type": "string",
+            "description": "The updated start date, or `none` to clear it."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "urgent",
+              "high",
+              "normal",
+              "low",
+              "none"
+            ],
+            "description": "The updated task priority, or `none` to clear it."
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The updated task status."
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "The Workspace ID when the connection authorizes multiple Workspaces.",
+            "pattern": "^\\d+$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "task_id"
+        ],
+        "description": "Arguments for the ClickUp MCP update_task tool."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "The normalized structured result, text, or MCP content returned by ClickUp."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The ClickUp MCP tool response."
+      }
+    }
+  ]
+}

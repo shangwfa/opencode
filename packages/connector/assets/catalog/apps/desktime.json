@@ -1,0 +1,426 @@
+{
+  "service": "desktime",
+  "displayName": "DeskTime",
+  "categories": [
+    "Productivity",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "DESKTIME_API_KEY",
+      "description": "DeskTime API key passed as the apiKey query parameter. Create or view it from the DeskTime API settings page linked in the official API introduction: https://help.desktime.com/hc/en-us/articles/25494558790685-Introduction-to-the-DeskTime-API"
+    }
+  ],
+  "homepageUrl": "https://desktime.com/",
+  "actions": [
+    {
+      "id": "desktime.create_project",
+      "service": "desktime",
+      "name": "create_project",
+      "description": "Create a DeskTime project and optionally create an associated task.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The project name to create in DeskTime."
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The optional task name to create under the new DeskTime project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "project"
+        ],
+        "description": "The input payload for creating a DeskTime project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by DeskTime."
+          },
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "description": "The DeskTime project ID when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The DeskTime project ID when returned."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The DeskTime project name when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The DeskTime project name when returned."
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project creation date or timestamp returned by DeskTime."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project creation date or timestamp returned by DeskTime."
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "description": "The DeskTime task ID when returned."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The DeskTime task ID when returned."
+                    },
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The DeskTime task name when returned."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The DeskTime task name when returned."
+                    },
+                    "raw": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": true,
+                      "description": "The raw task object returned by DeskTime."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name",
+                    "raw"
+                  ],
+                  "description": "A normalized DeskTime project task."
+                },
+                "description": "The tasks returned for the DeskTime project."
+              },
+              "raw": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The raw project object returned by DeskTime."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "createdAt",
+              "tasks",
+              "raw"
+            ],
+            "description": "A normalized DeskTime project."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "project"
+        ],
+        "description": "The response returned after creating a DeskTime project."
+      }
+    },
+    {
+      "id": "desktime.get_company",
+      "service": "desktime",
+      "name": "get_company",
+      "description": "Retrieve DeskTime company account settings and timezone information.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for retrieving DeskTime company data."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by DeskTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The response returned when retrieving DeskTime company data."
+      }
+    },
+    {
+      "id": "desktime.get_employee",
+      "service": "desktime",
+      "name": "get_employee",
+      "description": "Retrieve DeskTime tracking data for one employee or the API key owner.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The DeskTime employee ID. When omitted, DeskTime returns the API key owner's employee data."
+          },
+          "date": {
+            "type": "string",
+            "description": "The DeskTime date in YYYY-MM-DD format.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving one DeskTime employee."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by DeskTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The response returned when retrieving one DeskTime employee."
+      }
+    },
+    {
+      "id": "desktime.list_employees",
+      "service": "desktime",
+      "name": "list_employees",
+      "description": "Retrieve all DeskTime company employees with optional day or month tracking data.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The DeskTime date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "day",
+              "month"
+            ],
+            "description": "The DeskTime tracking period to return for employee data."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for retrieving DeskTime company employees."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by DeskTime."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "description": "The response returned when retrieving DeskTime company employees."
+      }
+    },
+    {
+      "id": "desktime.list_projects",
+      "service": "desktime",
+      "name": "list_projects",
+      "description": "List active DeskTime projects and their related tasks.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "The input payload for listing DeskTime projects."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by DeskTime."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "description": "The DeskTime project ID when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DeskTime project ID when returned."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The DeskTime project name when returned."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The DeskTime project name when returned."
+                },
+                "createdAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project creation date or timestamp returned by DeskTime."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project creation date or timestamp returned by DeskTime."
+                },
+                "tasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "description": "The DeskTime task ID when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The DeskTime task ID when returned."
+                      },
+                      "name": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "description": "The DeskTime task name when returned."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The DeskTime task name when returned."
+                      },
+                      "raw": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The raw task object returned by DeskTime."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name",
+                      "raw"
+                    ],
+                    "description": "A normalized DeskTime project task."
+                  },
+                  "description": "The tasks returned for the DeskTime project."
+                },
+                "raw": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The raw project object returned by DeskTime."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name",
+                "createdAt",
+                "tasks",
+                "raw"
+              ],
+              "description": "A normalized DeskTime project."
+            },
+            "description": "The normalized active DeskTime projects."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "projects"
+        ],
+        "description": "The response returned when listing DeskTime projects."
+      }
+    }
+  ]
+}

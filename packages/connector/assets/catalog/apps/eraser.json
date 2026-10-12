@@ -1,0 +1,1113 @@
+{
+  "service": "eraser",
+  "displayName": "Eraser",
+  "categories": [
+    "Design & Media",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Token",
+      "placeholder": "ERASER_API_TOKEN",
+      "description": "Eraser team API token sent as a bearer token. Generate it in team settings: https://app.eraser.io/dashboard/all?settings=api-tokens."
+    }
+  ],
+  "homepageUrl": "https://www.eraser.io",
+  "actions": [
+    {
+      "id": "eraser.archive_file",
+      "service": "eraser",
+      "name": "archive_file",
+      "description": "Archive an Eraser file.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the file was archived."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL of the archived file.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of archiving an Eraser file."
+      }
+    },
+    {
+      "id": "eraser.create_diagram",
+      "service": "eraser",
+      "name": "create_diagram",
+      "description": "Create a diagram from Eraser DSL inside an existing file.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Eraser DSL source for the new diagram."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId",
+          "diagramType"
+        ],
+        "description": "Input for creating a diagram in an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique diagram identifier."
+          },
+          "diagramUrl": {
+            "type": "string",
+            "description": "The URL for viewing the diagram in Eraser.",
+            "format": "uri"
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "code": {
+            "type": "string",
+            "description": "The Eraser DSL source for the diagram."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the diagram was last updated."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "diagramUrl",
+          "diagramType",
+          "code",
+          "updatedAt"
+        ],
+        "description": "An Eraser diagram and its current DSL content."
+      }
+    },
+    {
+      "id": "eraser.create_file",
+      "service": "eraser",
+      "name": "create_file",
+      "description": "Create an Eraser file with optional Markdown content.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The file title; Eraser uses Untitled when omitted."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder in which to create the file."
+          },
+          "document": {
+            "type": "string",
+            "description": "The Markdown document content, including optional diagram code blocks."
+          },
+          "linkAccess": {
+            "type": "string",
+            "enum": [
+              "no-link-access",
+              "anyone-with-link-can-edit",
+              "publicly-viewable",
+              "publicly-editable",
+              "sso-readable",
+              "sso-editable"
+            ],
+            "description": "The link access setting for the Eraser file."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for creating an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique file identifier."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL for viewing the file in Eraser.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "The file title."
+          },
+          "author": {
+            "type": "string",
+            "description": "The identifier of the file author."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The containing folder identifier, or null for the root."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The containing folder identifier, or null for the root."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was last updated."
+          },
+          "linkAccess": {
+            "type": "string",
+            "enum": [
+              "no-link-access",
+              "anyone-with-link-can-edit",
+              "publicly-viewable",
+              "publicly-editable",
+              "sso-readable",
+              "sso-editable"
+            ],
+            "description": "The link access setting for the Eraser file."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "fileUrl",
+          "title",
+          "author",
+          "folderId",
+          "createdAt",
+          "updatedAt",
+          "linkAccess"
+        ],
+        "description": "An Eraser file and its current metadata."
+      }
+    },
+    {
+      "id": "eraser.delete_diagram",
+      "service": "eraser",
+      "name": "delete_diagram",
+      "description": "Delete a diagram from an Eraser file.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          },
+          "diagramId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique diagram identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying a diagram in an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the diagram was deleted."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL of the file that contained the diagram.",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The result of deleting an Eraser diagram."
+      }
+    },
+    {
+      "id": "eraser.generate_diagram_from_dsl",
+      "service": "eraser",
+      "name": "generate_diagram_from_dsl",
+      "description": "Render Eraser DSL into a diagram image and optional editable Eraser file.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Eraser DSL source to render."
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "description": "The rendering theme."
+          },
+          "background": {
+            "type": "boolean",
+            "description": "Whether the rendered image should use a solid background."
+          },
+          "imageQuality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "The image quality multiplier."
+          },
+          "fileOptions": {
+            "type": "object",
+            "properties": {
+              "create": {
+                "type": "boolean",
+                "description": "Whether to create an Eraser file immediately."
+              },
+              "linkAccess": {
+                "type": "string",
+                "enum": [
+                  "no-link-access",
+                  "anyone-with-link-can-edit",
+                  "publicly-viewable",
+                  "publicly-editable",
+                  "sso-readable",
+                  "sso-editable"
+                ],
+                "description": "The link access setting for the Eraser file."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Options for creating an editable Eraser file from the generated diagram."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The title for a file created from the diagram."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "diagramType"
+        ],
+        "description": "Input for rendering an Eraser DSL diagram."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The identifier of the AI generation request."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "The URL of the generated PNG image.",
+            "format": "uri"
+          },
+          "createEraserFileUrl": {
+            "type": "string",
+            "description": "The URL for creating an editable Eraser file.",
+            "format": "uri"
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL of the Eraser file created by the request.",
+            "format": "uri"
+          },
+          "diagrams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "diagramType": {
+                  "type": "string",
+                  "enum": [
+                    "sequence-diagram",
+                    "entity-relationship-diagram",
+                    "cloud-architecture-diagram",
+                    "flowchart-diagram",
+                    "bpmn-diagram"
+                  ],
+                  "description": "The Eraser diagram type."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The generated Eraser DSL source."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "diagramType",
+                "code"
+              ],
+              "description": "A diagram generated by Eraser AI."
+            },
+            "description": "The diagrams generated by Eraser."
+          },
+          "relevantFilePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A repository-qualified file path used as context."
+            },
+            "description": "Git repository file paths used as generation context."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The generated Eraser diagram and links for using it."
+      }
+    },
+    {
+      "id": "eraser.generate_diagram_from_prompt",
+      "service": "eraser",
+      "name": "generate_diagram_from_prompt",
+      "description": "Generate or revise an Eraser diagram from a natural-language prompt.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The natural-language prompt or source text for the diagram."
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "premium"
+            ],
+            "description": "The Eraser AI model tier."
+          },
+          "priorRequestId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A previous request identifier to revise."
+          },
+          "contextId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AI preset identifier to use as context."
+          },
+          "fileOptions": {
+            "type": "object",
+            "properties": {
+              "create": {
+                "type": "boolean",
+                "description": "Whether to create an Eraser file immediately."
+              },
+              "linkAccess": {
+                "type": "string",
+                "enum": [
+                  "no-link-access",
+                  "anyone-with-link-can-edit",
+                  "publicly-viewable",
+                  "publicly-editable",
+                  "sso-readable",
+                  "sso-editable"
+                ],
+                "description": "The link access setting for the Eraser file."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Options for creating an editable Eraser file from the generated diagram."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "description": "Input for generating an Eraser diagram with AI."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The identifier of the AI generation request."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "The URL of the generated PNG image.",
+            "format": "uri"
+          },
+          "createEraserFileUrl": {
+            "type": "string",
+            "description": "The URL for creating an editable Eraser file.",
+            "format": "uri"
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL of the Eraser file created by the request.",
+            "format": "uri"
+          },
+          "diagrams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "diagramType": {
+                  "type": "string",
+                  "enum": [
+                    "sequence-diagram",
+                    "entity-relationship-diagram",
+                    "cloud-architecture-diagram",
+                    "flowchart-diagram",
+                    "bpmn-diagram"
+                  ],
+                  "description": "The Eraser diagram type."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "The generated Eraser DSL source."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "diagramType",
+                "code"
+              ],
+              "description": "A diagram generated by Eraser AI."
+            },
+            "description": "The diagrams generated by Eraser."
+          },
+          "relevantFilePaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A repository-qualified file path used as context."
+            },
+            "description": "Git repository file paths used as generation context."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The generated Eraser diagram and links for using it."
+      }
+    },
+    {
+      "id": "eraser.get_diagram",
+      "service": "eraser",
+      "name": "get_diagram",
+      "description": "Get one diagram from an Eraser file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          },
+          "diagramId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique diagram identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying a diagram in an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique diagram identifier."
+          },
+          "diagramUrl": {
+            "type": "string",
+            "description": "The URL for viewing the diagram in Eraser.",
+            "format": "uri"
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "code": {
+            "type": "string",
+            "description": "The Eraser DSL source for the diagram."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the diagram was last updated."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "diagramUrl",
+          "diagramType",
+          "code",
+          "updatedAt"
+        ],
+        "description": "An Eraser diagram and its current DSL content."
+      }
+    },
+    {
+      "id": "eraser.get_file",
+      "service": "eraser",
+      "name": "get_file",
+      "description": "Get an Eraser file and its current content.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique file identifier."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL for viewing the file in Eraser.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "The file title."
+          },
+          "author": {
+            "type": "string",
+            "description": "The identifier of the file author."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The containing folder identifier, or null for the root."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The containing folder identifier, or null for the root."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was last updated."
+          },
+          "linkAccess": {
+            "type": "string",
+            "enum": [
+              "no-link-access",
+              "anyone-with-link-can-edit",
+              "publicly-viewable",
+              "publicly-editable",
+              "sso-readable",
+              "sso-editable"
+            ],
+            "description": "The link access setting for the Eraser file."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "fileUrl",
+          "title",
+          "author",
+          "folderId",
+          "createdAt",
+          "updatedAt",
+          "linkAccess"
+        ],
+        "description": "An Eraser file and its current metadata."
+      }
+    },
+    {
+      "id": "eraser.list_diagrams",
+      "service": "eraser",
+      "name": "list_diagrams",
+      "description": "List diagrams contained in an Eraser file.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input identifying an Eraser file."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The unique diagram identifier."
+            },
+            "diagramUrl": {
+              "type": "string",
+              "description": "The URL for viewing the diagram in Eraser.",
+              "format": "uri"
+            },
+            "diagramType": {
+              "type": "string",
+              "enum": [
+                "sequence-diagram",
+                "entity-relationship-diagram",
+                "cloud-architecture-diagram",
+                "flowchart-diagram",
+                "bpmn-diagram"
+              ],
+              "description": "The Eraser diagram type."
+            },
+            "code": {
+              "type": "string",
+              "description": "The Eraser DSL source for the diagram."
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "The ISO 8601 timestamp when the diagram was last updated."
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "id",
+            "diagramUrl",
+            "diagramType",
+            "code",
+            "updatedAt"
+          ],
+          "description": "An Eraser diagram and its current DSL content."
+        },
+        "description": "The diagrams contained in the file."
+      }
+    },
+    {
+      "id": "eraser.list_files",
+      "service": "eraser",
+      "name": "list_files",
+      "description": "List files available to the authenticated Eraser team.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "The maximum number of files to return, from 1 to 500."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The cursor returned by a previous page."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder identifier used to filter files."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "createdAt",
+              "-createdAt",
+              "updatedAt",
+              "-updatedAt"
+            ],
+            "description": "The field and direction used to sort files."
+          },
+          "author": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user identifier or email address used to filter files."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters and pagination for listing Eraser files."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The unique file identifier."
+                },
+                "fileUrl": {
+                  "type": "string",
+                  "description": "The URL for viewing the file in Eraser.",
+                  "format": "uri"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "The file title."
+                },
+                "author": {
+                  "type": "string",
+                  "description": "The identifier of the file author."
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The containing folder identifier, or null for the root."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The containing folder identifier, or null for the root."
+                },
+                "createdAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was created."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "description": "The ISO 8601 timestamp when the file was last updated."
+                },
+                "linkAccess": {
+                  "type": "string",
+                  "enum": [
+                    "no-link-access",
+                    "anyone-with-link-can-edit",
+                    "publicly-viewable",
+                    "publicly-editable",
+                    "sso-readable",
+                    "sso-editable"
+                  ],
+                  "description": "The link access setting for the Eraser file."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "fileUrl",
+                "title",
+                "author",
+                "folderId",
+                "createdAt",
+                "updatedAt",
+                "linkAccess"
+              ],
+              "description": "An Eraser file and its current metadata."
+            },
+            "description": "The files in the current page."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The next-page cursor, or null when no next page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The next-page cursor, or null when no next page exists."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Eraser files."
+      }
+    },
+    {
+      "id": "eraser.update_diagram",
+      "service": "eraser",
+      "name": "update_diagram",
+      "description": "Replace the Eraser DSL source of a diagram in a file.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          },
+          "diagramId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique diagram identifier."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement Eraser DSL source."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input for updating a diagram in an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique diagram identifier."
+          },
+          "diagramUrl": {
+            "type": "string",
+            "description": "The URL for viewing the diagram in Eraser.",
+            "format": "uri"
+          },
+          "diagramType": {
+            "type": "string",
+            "enum": [
+              "sequence-diagram",
+              "entity-relationship-diagram",
+              "cloud-architecture-diagram",
+              "flowchart-diagram",
+              "bpmn-diagram"
+            ],
+            "description": "The Eraser diagram type."
+          },
+          "code": {
+            "type": "string",
+            "description": "The Eraser DSL source for the diagram."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the diagram was last updated."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "diagramUrl",
+          "diagramType",
+          "code",
+          "updatedAt"
+        ],
+        "description": "An Eraser diagram and its current DSL content."
+      }
+    },
+    {
+      "id": "eraser.update_file",
+      "service": "eraser",
+      "name": "update_file",
+      "description": "Replace selected metadata or Markdown content of an Eraser file.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique Eraser file identifier."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement file title."
+          },
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The folder to which the file should be moved."
+          },
+          "document": {
+            "type": "string",
+            "description": "The replacement Markdown document content."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileId"
+        ],
+        "description": "Input for updating an Eraser file."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique file identifier."
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "The URL for viewing the file in Eraser.",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "description": "The file title."
+          },
+          "author": {
+            "type": "string",
+            "description": "The identifier of the file author."
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The containing folder identifier, or null for the root."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The containing folder identifier, or null for the root."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was created."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "The ISO 8601 timestamp when the file was last updated."
+          },
+          "linkAccess": {
+            "type": "string",
+            "enum": [
+              "no-link-access",
+              "anyone-with-link-can-edit",
+              "publicly-viewable",
+              "publicly-editable",
+              "sso-readable",
+              "sso-editable"
+            ],
+            "description": "The link access setting for the Eraser file."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "fileUrl",
+          "title",
+          "author",
+          "folderId",
+          "createdAt",
+          "updatedAt",
+          "linkAccess"
+        ],
+        "description": "An Eraser file and its current metadata."
+      }
+    }
+  ]
+}

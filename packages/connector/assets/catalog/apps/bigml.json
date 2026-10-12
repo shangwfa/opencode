@@ -1,0 +1,1316 @@
+{
+  "service": "bigml",
+  "displayName": "BigML",
+  "categories": [
+    "AI",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "YOUR_BIGML_API_KEY",
+      "description": "BigML API key sent as the api_key query parameter. Copy it from https://bigml.com/account/apikey",
+      "extraFields": [
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your_bigml_username",
+          "description": "BigML username sent with every API request. Find it beside your API key at https://bigml.com/account/apikey"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://bigml.com/",
+  "actions": [
+    {
+      "id": "bigml.create_prediction",
+      "service": "bigml",
+      "name": "create_prediction",
+      "description": "Submit a JSON prediction against an existing BigML model.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A model identifier."
+          },
+          "inputData": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Prediction input values."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional prediction name."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 8192,
+            "description": "An optional description."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "An optional project identifier."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One tag."
+            },
+            "description": "Prediction tags."
+          },
+          "missingStrategy": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Missing-value strategy, 0 or 1."
+          },
+          "operatingKind": {
+            "type": "string",
+            "enum": [
+              "probability",
+              "confidence"
+            ],
+            "description": "Classification output metric."
+          },
+          "explain": {
+            "type": "boolean",
+            "description": "Whether to compute an explanation."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId",
+          "inputData"
+        ],
+        "description": "Prediction creation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prediction": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The prediction resource identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The prediction name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The prediction name."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The creation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The creation timestamp."
+              },
+              "updated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The update timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The update timestamp."
+              },
+              "model": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The model resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The model resource."
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project resource."
+              },
+              "inputData": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The prediction input."
+              },
+              "output": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string prediction."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric prediction."
+                      }
+                    ],
+                    "description": "A scalar prediction value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A scalar prediction value."
+              },
+              "prediction": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Prediction values keyed by objective field."
+              },
+              "confidence": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The confidence value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The confidence value."
+              },
+              "objectiveFieldName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The objective field name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The objective field name."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "waiting",
+                  "queued",
+                  "started",
+                  "in_progress",
+                  "summarized",
+                  "finished",
+                  "faulty",
+                  "unknown"
+                ],
+                "description": "The normalized BigML resource state."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The numeric status code."
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The status message."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The status message."
+                  },
+                  "progress": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The completion ratio."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The completion ratio."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The normalized BigML resource status."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized BigML prediction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prediction"
+        ],
+        "description": "The created prediction."
+      },
+      "followUpActions": [
+        "bigml.get_prediction"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "bigml.create_prediction",
+        "statusActionId": "bigml.get_prediction"
+      }
+    },
+    {
+      "id": "bigml.delete_prediction",
+      "service": "bigml",
+      "name": "delete_prediction",
+      "description": "Permanently delete one stored BigML prediction resource.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "predictionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A prediction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "predictionId"
+        ],
+        "description": "Prediction deletion input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the prediction was deleted."
+          },
+          "resource": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deleted resource identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "resource"
+        ],
+        "description": "Prediction deletion result."
+      }
+    },
+    {
+      "id": "bigml.get_model",
+      "service": "bigml",
+      "name": "get_model",
+      "description": "Retrieve compact BigML model metadata and field definitions needed for prediction input.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A model identifier as model/ID or a bare ID."
+          },
+          "fieldLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The maximum fields to return."
+          },
+          "fieldOffset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The field offset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "modelId"
+        ],
+        "description": "Model lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The model resource identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The model name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The model name."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The creation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The creation timestamp."
+              },
+              "updated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The update timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The update timestamp."
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project resource."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "waiting",
+                  "queued",
+                  "started",
+                  "in_progress",
+                  "summarized",
+                  "finished",
+                  "faulty",
+                  "unknown"
+                ],
+                "description": "The normalized BigML resource state."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The numeric status code."
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The status message."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The status message."
+                  },
+                  "progress": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The completion ratio."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The completion ratio."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The normalized BigML resource status."
+              },
+              "objectiveField": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The objective field identifier."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The objective field identifier."
+              },
+              "objectiveFieldName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The objective field name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The objective field name."
+              },
+              "inputFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One field identifier."
+                },
+                "description": "Accepted input field identifiers."
+              },
+              "fields": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Model field metadata."
+              },
+              "fieldPagination": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "count": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Returned fields."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Returned fields."
+                      },
+                      "limit": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Field limit."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Field limit."
+                      },
+                      "offset": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Field offset."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Field offset."
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Total fields."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Total fields."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Field pagination."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Field pagination."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Compact model details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model"
+        ],
+        "description": "The compact model details."
+      }
+    },
+    {
+      "id": "bigml.get_prediction",
+      "service": "bigml",
+      "name": "get_prediction",
+      "description": "Retrieve the status and result of one BigML prediction.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "predictionId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A prediction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "predictionId"
+        ],
+        "description": "Prediction lookup input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "prediction": {
+            "type": "object",
+            "properties": {
+              "resource": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The prediction resource identifier."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The prediction name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The prediction name."
+              },
+              "created": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The creation timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The creation timestamp."
+              },
+              "updated": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The update timestamp."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The update timestamp."
+              },
+              "model": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The model resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The model resource."
+              },
+              "project": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The project resource."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The project resource."
+              },
+              "inputData": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "The prediction input."
+              },
+              "output": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string prediction."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric prediction."
+                      }
+                    ],
+                    "description": "A scalar prediction value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A scalar prediction value."
+              },
+              "prediction": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Prediction values keyed by objective field."
+              },
+              "confidence": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The confidence value."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The confidence value."
+              },
+              "objectiveFieldName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The objective field name."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The objective field name."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "waiting",
+                  "queued",
+                  "started",
+                  "in_progress",
+                  "summarized",
+                  "finished",
+                  "faulty",
+                  "unknown"
+                ],
+                "description": "The normalized BigML resource state."
+              },
+              "status": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "The numeric status code."
+                  },
+                  "message": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The status message."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The status message."
+                  },
+                  "progress": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "description": "The completion ratio."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The completion ratio."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "The normalized BigML resource status."
+              }
+            },
+            "additionalProperties": false,
+            "description": "A normalized BigML prediction."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "prediction"
+        ],
+        "description": "The current prediction."
+      },
+      "asyncLifecycle": {
+        "startActionId": "bigml.create_prediction",
+        "statusActionId": "bigml.get_prediction"
+      }
+    },
+    {
+      "id": "bigml.list_models",
+      "service": "bigml",
+      "name": "list_models",
+      "description": "List existing BigML supervised models with compact status details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum resources to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BigML ordering field."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A project resource identifier."
+          },
+          "nameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A name substring filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and filtering input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The model resource identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The model name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The model name."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The creation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The creation timestamp."
+                },
+                "updated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The update timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The update timestamp."
+                },
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project resource."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project resource."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "waiting",
+                    "queued",
+                    "started",
+                    "in_progress",
+                    "summarized",
+                    "finished",
+                    "faulty",
+                    "unknown"
+                  ],
+                  "description": "The normalized BigML resource state."
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "The numeric status code."
+                    },
+                    "message": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The status message."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The status message."
+                    },
+                    "progress": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The completion ratio."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The completion ratio."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The normalized BigML resource status."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A compact BigML model summary."
+            },
+            "description": "The returned models."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total matching resources."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The page size."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The page offset."
+              },
+              "nextOffset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The next offset."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next offset."
+              },
+              "previousOffset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The previous offset."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous offset."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Credential-safe pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "models",
+          "pagination"
+        ],
+        "description": "A page of models."
+      }
+    },
+    {
+      "id": "bigml.list_predictions",
+      "service": "bigml",
+      "name": "list_predictions",
+      "description": "List stored BigML prediction resources.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "The maximum resources to return."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The zero-based offset."
+          },
+          "orderBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The BigML ordering field."
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A project resource identifier."
+          },
+          "nameContains": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A name substring filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Pagination and filtering input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "predictions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resource": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The prediction resource identifier."
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The prediction name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The prediction name."
+                },
+                "created": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The creation timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The creation timestamp."
+                },
+                "updated": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The update timestamp."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The update timestamp."
+                },
+                "model": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The model resource."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The model resource."
+                },
+                "project": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The project resource."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The project resource."
+                },
+                "inputData": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "The prediction input."
+                },
+                "output": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "A string prediction."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric prediction."
+                        }
+                      ],
+                      "description": "A scalar prediction value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A scalar prediction value."
+                },
+                "prediction": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "Prediction values keyed by objective field."
+                },
+                "confidence": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "description": "The confidence value."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The confidence value."
+                },
+                "objectiveFieldName": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The objective field name."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The objective field name."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "waiting",
+                    "queued",
+                    "started",
+                    "in_progress",
+                    "summarized",
+                    "finished",
+                    "faulty",
+                    "unknown"
+                  ],
+                  "description": "The normalized BigML resource state."
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "description": "The numeric status code."
+                    },
+                    "message": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The status message."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The status message."
+                    },
+                    "progress": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "description": "The completion ratio."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The completion ratio."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "The normalized BigML resource status."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A normalized BigML prediction."
+            },
+            "description": "The returned predictions."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "totalCount": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The total matching resources."
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The page size."
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The page offset."
+              },
+              "nextOffset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The next offset."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The next offset."
+              },
+              "previousOffset": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The previous offset."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The previous offset."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Credential-safe pagination metadata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "predictions",
+          "pagination"
+        ],
+        "description": "A page of predictions."
+      }
+    }
+  ]
+}

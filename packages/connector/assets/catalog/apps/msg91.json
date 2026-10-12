@@ -1,0 +1,424 @@
+{
+  "service": "msg91",
+  "displayName": "MSG91",
+  "categories": [
+    "Communication",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "Authkey",
+      "placeholder": "MSG91_AUTHKEY",
+      "description": "MSG91 authkey used with the official SMS and OTP APIs. Sign in to the MSG91 control panel to view or create API keys: https://control.msg91.com/signin/."
+    }
+  ],
+  "homepageUrl": "https://msg91.com",
+  "actions": [
+    {
+      "id": "msg91.resend_otp",
+      "service": "msg91",
+      "name": "resend_otp",
+      "description": "Resend an existing MSG91 OTP by text message or voice call.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mobile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mobile number in international format with country code and without a plus sign."
+          },
+          "retryType": {
+            "type": "string",
+            "enum": [
+              "voice",
+              "text"
+            ],
+            "description": "The MSG91 retry channel for resending the OTP."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mobile",
+          "retryType"
+        ],
+        "description": "Input parameters for resending an MSG91 OTP."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether MSG91 accepted the OTP resend request."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 response type."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 response message when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 response message when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by MSG91."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sent",
+          "type",
+          "message",
+          "raw"
+        ],
+        "description": "A normalized MSG91 OTP resend response."
+      }
+    },
+    {
+      "id": "msg91.send_flow_sms",
+      "service": "msg91",
+      "name": "send_flow_sms",
+      "description": "Send an SMS through an approved MSG91 Flow template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 Flow SMS template ID from the MSG91 dashboard."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mobile": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Recipient mobile number in international format with country code and without a plus sign."
+                },
+                "variables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "One template variable value."
+                  },
+                  "description": "Template variable values keyed by the exact MSG91 template placeholder name."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "mobile"
+              ],
+              "description": "One recipient for an MSG91 Flow SMS template."
+            },
+            "description": "The SMS recipients and template variables to send.",
+            "minItems": 1
+          },
+          "shortUrl": {
+            "type": "boolean",
+            "description": "Whether MSG91 should enable this optional flag."
+          },
+          "shortUrlExpirySeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The optional short URL expiry time in seconds when shortUrl is enabled."
+          },
+          "realTimeResponse": {
+            "type": "boolean",
+            "description": "Whether MSG91 should enable this optional flag."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateId",
+          "recipients"
+        ],
+        "description": "Input parameters for sending an MSG91 Flow SMS template."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "description": "Whether MSG91 accepted the message submission."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 response type."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 response message when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 response message when returned."
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 request identifier when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 request identifier when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by MSG91."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "accepted",
+          "type",
+          "message",
+          "requestId",
+          "raw"
+        ],
+        "description": "A normalized MSG91 message submission response."
+      }
+    },
+    {
+      "id": "msg91.send_otp",
+      "service": "msg91",
+      "name": "send_otp",
+      "description": "Generate or send an OTP with an MSG91 OTP template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mobile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient mobile number in international format with country code and without a plus sign."
+          },
+          "templateId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 OTP template ID from the MSG91 dashboard."
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A caller-supplied OTP value to send instead of an auto-generated OTP."
+          },
+          "otpLength": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 9,
+            "description": "The number of digits for an auto-generated OTP."
+          },
+          "otpExpiryMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080,
+            "description": "The OTP expiry duration in minutes."
+          },
+          "userIp": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end user's IP address for MSG91 security tracking."
+          },
+          "unicode": {
+            "type": "boolean",
+            "description": "Whether MSG91 should enable this optional flag."
+          },
+          "invisible": {
+            "type": "boolean",
+            "description": "Whether MSG91 should enable this optional flag."
+          },
+          "realTimeResponse": {
+            "type": "boolean",
+            "description": "Whether MSG91 should enable this optional flag."
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One template variable value."
+            },
+            "description": "Template variable values keyed by the exact MSG91 template placeholder name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mobile",
+          "templateId"
+        ],
+        "description": "Input parameters for sending an MSG91 OTP."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "description": "Whether MSG91 accepted the OTP send request."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 response type."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 response message when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 response message when returned."
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 OTP request identifier when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 OTP request identifier when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by MSG91."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sent",
+          "type",
+          "message",
+          "requestId",
+          "raw"
+        ],
+        "description": "A normalized MSG91 OTP send response."
+      }
+    },
+    {
+      "id": "msg91.verify_otp",
+      "service": "msg91",
+      "name": "verify_otp",
+      "description": "Verify an OTP previously sent through MSG91.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mobile": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mobile number in international format with country code and without a plus sign."
+          },
+          "otp": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The OTP value entered by the user."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mobile",
+          "otp"
+        ],
+        "description": "Input parameters for verifying an MSG91 OTP."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "description": "Whether MSG91 reported that the OTP was verified."
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The MSG91 response type."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 verification message when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 verification message when returned."
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The MSG91 response code when returned."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The MSG91 response code when returned."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "The raw JSON object returned by MSG91."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "verified",
+          "type",
+          "message",
+          "code",
+          "raw"
+        ],
+        "description": "A normalized MSG91 OTP verification response."
+      }
+    }
+  ]
+}

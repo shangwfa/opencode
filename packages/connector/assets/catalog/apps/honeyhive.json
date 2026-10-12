@@ -1,0 +1,468 @@
+{
+  "service": "honeyhive",
+  "displayName": "HoneyHive",
+  "description": "Manage HoneyHive evaluation datasets and their datapoints.",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "HONEYHIVE_API_KEY",
+      "description": "Project-scoped HoneyHive API key sent as a Bearer token. Create one under Settings > Project > API Keys: https://app.us.honeyhive.ai/settings/project/keys"
+    }
+  ],
+  "homepageUrl": "https://www.honeyhive.ai/",
+  "actions": [
+    {
+      "id": "honeyhive.add_datapoints",
+      "service": "honeyhive",
+      "name": "add_datapoints",
+      "description": "Create datapoints from raw JSON objects and add them to a HoneyHive dataset using a field mapping.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HoneyHive dataset identifier."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A raw datapoint source object to map into HoneyHive fields."
+            },
+            "description": "Raw datapoint source objects to add.",
+            "minItems": 1
+          },
+          "mapping": {
+            "type": "object",
+            "properties": {
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A source field name."
+                },
+                "description": "Source fields to map into datapoint inputs."
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A source field name."
+                },
+                "description": "Source fields to map into datapoint conversation history."
+              },
+              "groundTruth": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A source field name."
+                },
+                "description": "Source fields to map into datapoint ground truth."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Source field names mapped into HoneyHive datapoint sections."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "data",
+          "mapping"
+        ],
+        "description": "Datapoints to create and add to a HoneyHive dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inserted": {
+            "type": "boolean",
+            "description": "Whether HoneyHive inserted the datapoints."
+          },
+          "datapoint_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A unique HoneyHive datapoint identifier."
+            },
+            "description": "The identifiers of the inserted datapoints."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inserted",
+          "datapoint_ids"
+        ],
+        "description": "HoneyHive datapoint insertion result."
+      }
+    },
+    {
+      "id": "honeyhive.create_dataset",
+      "service": "honeyhive",
+      "name": "create_dataset",
+      "description": "Create a HoneyHive dataset with an optional name, description, and initial datapoint identifiers.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "The dataset name. HoneyHive defaults to Untitled Dataset."
+          },
+          "description": {
+            "type": "string",
+            "description": "The dataset description."
+          },
+          "datapoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A unique HoneyHive datapoint identifier."
+            },
+            "description": "Initial datapoint identifiers to include in the dataset."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Fields for creating a HoneyHive dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "inserted": {
+            "type": "boolean",
+            "description": "Whether HoneyHive inserted the dataset."
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "insertedId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique HoneyHive dataset identifier."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "insertedId"
+            ],
+            "description": "The identifier of the newly created dataset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "inserted",
+          "result"
+        ],
+        "description": "HoneyHive dataset creation result."
+      }
+    },
+    {
+      "id": "honeyhive.delete_dataset",
+      "service": "honeyhive",
+      "name": "delete_dataset",
+      "description": "Permanently delete a HoneyHive dataset by its unique identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HoneyHive dataset identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "A HoneyHive dataset identifier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique HoneyHive dataset identifier."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "description": "The deleted dataset identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "HoneyHive dataset deletion result."
+      }
+    },
+    {
+      "id": "honeyhive.list_datasets",
+      "service": "honeyhive",
+      "name": "list_datasets",
+      "description": "List HoneyHive datasets in the API key's project, optionally filtering by dataset ID or exact name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HoneyHive dataset identifier."
+          },
+          "name": {
+            "type": "string",
+            "description": "The exact dataset name to filter by."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing HoneyHive datasets in the API key's project."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The unique HoneyHive dataset identifier."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The dataset name."
+                },
+                "description": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The dataset description."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The dataset description."
+                },
+                "datapoints": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A unique HoneyHive datapoint identifier."
+                  },
+                  "description": "The datapoint identifiers currently in the dataset."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The timestamp when the dataset was created."
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The timestamp when the dataset was last updated."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "name",
+                "datapoints"
+              ],
+              "description": "A HoneyHive dataset."
+            },
+            "description": "The matching HoneyHive datasets."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasets"
+        ],
+        "description": "Datasets returned by HoneyHive."
+      }
+    },
+    {
+      "id": "honeyhive.remove_datapoint",
+      "service": "honeyhive",
+      "name": "remove_datapoint",
+      "description": "Remove a datapoint association from a HoneyHive dataset without deleting the datapoint itself.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HoneyHive dataset identifier."
+          },
+          "datapointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A unique HoneyHive datapoint identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId",
+          "datapointId"
+        ],
+        "description": "A dataset and datapoint association to remove."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "dereferenced": {
+            "type": "boolean",
+            "description": "Whether the datapoint was removed from the dataset."
+          },
+          "message": {
+            "type": "string",
+            "description": "The result message returned by HoneyHive."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dereferenced",
+          "message"
+        ],
+        "description": "HoneyHive datapoint dereference result."
+      }
+    },
+    {
+      "id": "honeyhive.update_dataset",
+      "service": "honeyhive",
+      "name": "update_dataset",
+      "description": "Update a HoneyHive dataset's name, description, or complete datapoint identifier list.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "datasetId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The unique HoneyHive dataset identifier."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "The new dataset name."
+          },
+          "description": {
+            "type": "string",
+            "description": "The new dataset description."
+          },
+          "datapoints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A unique HoneyHive datapoint identifier."
+            },
+            "description": "The complete updated list of datapoint identifiers."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "datasetId"
+        ],
+        "description": "Fields for updating a HoneyHive dataset."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The unique HoneyHive dataset identifier."
+              },
+              "name": {
+                "type": "string",
+                "description": "The dataset name."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The dataset description."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The dataset description."
+              },
+              "datapoints": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "A unique HoneyHive datapoint identifier."
+                },
+                "description": "The datapoint identifiers currently in the dataset."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The timestamp when the dataset was created."
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The timestamp when the dataset was last updated."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "name",
+              "datapoints"
+            ],
+            "description": "A HoneyHive dataset."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "result"
+        ],
+        "description": "HoneyHive dataset update result."
+      }
+    }
+  ]
+}

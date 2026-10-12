@@ -1,0 +1,286 @@
+{
+  "service": "ocr_web_service",
+  "displayName": "OCR Web Service",
+  "categories": [
+    "AI",
+    "Productivity"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "username",
+          "label": "Username",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "OCRWEBSERVICE_USERNAME",
+          "description": "OCR Web Service username used as the HTTP Basic Auth username. Create an account or view your account from OCR Web Service: https://www.ocrwebservice.com/account/signup"
+        },
+        {
+          "key": "licenseCode",
+          "label": "License Code",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "OCRWEBSERVICE_LICENSE_CODE",
+          "description": "OCR Web Service license code used as the HTTP Basic Auth password. Get it after signing in to your OCR Web Service account: https://www.ocrwebservice.com/account/login"
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.ocrwebservice.com",
+  "actions": [
+    {
+      "id": "ocr_web_service.get_account_information",
+      "service": "ocr_web_service",
+      "name": "get_account_information",
+      "description": "Get OCR Web Service account limits, remaining pages, subscription plan, and expiration metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for getting OCR Web Service account information."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "availablePages": {
+            "type": "integer",
+            "description": "The remaining available pages for the current subscription plan."
+          },
+          "maxPages": {
+            "type": "integer",
+            "description": "The maximum pages for the current subscription plan."
+          },
+          "lastProcessingTime": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The last processing time returned by OCR Web Service."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last processing time returned by OCR Web Service."
+          },
+          "subscriptionPlan": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The current subscription plan name."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The current subscription plan name."
+          },
+          "expirationDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The license expiration date returned by OCR Web Service."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The license expiration date returned by OCR Web Service."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "lastProcessingTime",
+          "subscriptionPlan",
+          "expirationDate"
+        ],
+        "description": "The normalized OCR Web Service account information."
+      }
+    },
+    {
+      "id": "ocr_web_service.process_document_from_url",
+      "service": "ocr_web_service",
+      "name": "process_document_from_url",
+      "description": "Download a public image or PDF URL through the connector SSRF guard, upload it to OCR Web Service, and return extracted text or output file metadata.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileUrl": {
+            "type": "string",
+            "description": "The public HTTP or HTTPS URL of the image or PDF file to process.",
+            "format": "uri"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One OCR Web Service recognition language, such as english or german."
+            },
+            "description": "Recognition languages to send to OCR Web Service.",
+            "minItems": 1
+          },
+          "pageRange": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Page numbers or ranges separated by commas, such as 1,3,5-12 or allpages."
+          },
+          "toBlackAndWhite": {
+            "type": "boolean",
+            "description": "Whether OCR Web Service should convert the image to black and white."
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "top": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The top coordinate in pixels from the upper-left corner."
+                },
+                "left": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The left coordinate in pixels from the upper-left corner."
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The zone height in pixels."
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The zone width in pixels."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "top",
+                "left",
+                "height",
+                "width"
+              ],
+              "description": "A rectangular OCR zone in pixel coordinates."
+            },
+            "description": "OCR zones to process on each page.",
+            "minItems": 1
+          },
+          "outputFormats": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "pdf",
+                "doc",
+                "xls",
+                "rtf",
+                "txt"
+              ],
+              "description": "An OCR Web Service output document format."
+            },
+            "description": "Output file formats to generate. OCR Web Service accepts up to two formats.",
+            "minItems": 1,
+            "maxItems": 2
+          },
+          "returnText": {
+            "type": "boolean",
+            "description": "Whether OCR Web Service should return extracted text in the response."
+          },
+          "returnWords": {
+            "type": "boolean",
+            "description": "Whether OCR Web Service should return recognized word coordinates."
+          },
+          "newline": {
+            "type": "boolean",
+            "description": "Whether returned extracted text should preserve newline characters."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A task description that OCR Web Service returns in the response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fileUrl"
+        ],
+        "description": "Input parameters for OCR Web Service document processing."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The extracted OCR text concatenated from all zones and pages."
+          },
+          "ocrText": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "The OCR text for one page."
+              },
+              "description": "The OCR text values for one zone."
+            },
+            "description": "The raw OCR text matrix returned by OCR Web Service as zones by pages."
+          },
+          "availablePages": {
+            "type": "integer",
+            "description": "The remaining available pages after this task."
+          },
+          "processedPages": {
+            "type": "integer",
+            "description": "The number of pages processed for this task."
+          },
+          "outputFileUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The OCR Web Service output file URL when an output format was requested."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The OCR Web Service output file URL when an output format was requested."
+          },
+          "taskDescription": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The task description echoed by OCR Web Service."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The task description echoed by OCR Web Service."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "ocrText",
+          "outputFileUrl",
+          "taskDescription"
+        ],
+        "description": "The normalized OCR Web Service document processing result."
+      }
+    }
+  ]
+}

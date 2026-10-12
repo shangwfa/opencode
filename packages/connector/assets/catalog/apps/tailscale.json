@@ -1,0 +1,3380 @@
+{
+  "service": "tailscale",
+  "displayName": "Tailscale",
+  "description": "Manage devices, DNS, users, keys, policy files, logs, settings, and integrations in a Tailscale tailnet through the official REST API.",
+  "categories": [
+    "Security",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "custom_credential"
+  ],
+  "auth": [
+    {
+      "type": "custom_credential",
+      "fields": [
+        {
+          "key": "clientId",
+          "label": "OAuth Client ID",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "TS_API_CLIENT_ID",
+          "description": "Tailscale OAuth client ID created from the Trust credentials page in the Tailscale admin console."
+        },
+        {
+          "key": "clientSecret",
+          "label": "OAuth Client Secret",
+          "inputType": "password",
+          "required": true,
+          "secret": true,
+          "placeholder": "TS_API_CLIENT_SECRET",
+          "description": "Tailscale OAuth client secret paired with the client ID. Tailscale only shows this secret when the OAuth client is created."
+        },
+        {
+          "key": "tailnet",
+          "label": "Tailnet ID",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "-",
+          "description": "Optional tailnet ID used in Tailscale API paths. Leave blank to use Tailscale's '-' shorthand for the OAuth client's tailnet."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://tailscale.com",
+  "actions": [
+    {
+      "id": "tailscale.approve_user",
+      "service": "tailscale",
+      "name": "approve_user",
+      "description": "Approve a pending Tailscale user for the tailnet.",
+      "operationType": "write",
+      "requiredScopes": [
+        "users"
+      ],
+      "providerPermissions": [
+        "users"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pending Tailscale user ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale approve user response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale approve user response."
+      }
+    },
+    {
+      "id": "tailscale.batch_update_device_posture_attributes",
+      "service": "tailscale",
+      "name": "batch_update_device_posture_attributes",
+      "description": "Set or remove custom posture attributes across multiple Tailscale devices.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:posture_attributes"
+      ],
+      "providerPermissions": [
+        "devices:posture_attributes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Device IDs mapped to custom: attribute keys and their {value, expiry} updates. JSON Merge Patch semantics: a null attribute deletes it."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional audit-log comment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "nodes"
+        ],
+        "description": "Tailscale batch posture attribute update input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale batch posture attribute update response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale batch posture attribute update response."
+      }
+    },
+    {
+      "id": "tailscale.create_key",
+      "service": "tailscale",
+      "name": "create_key",
+      "description": "Create an auth key, OAuth client credential, or federated trust credential and return its secret.",
+      "operationType": "write",
+      "requiredScopes": [
+        "auth_keys",
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "providerPermissions": [
+        "auth_keys",
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The key type, capabilities, expiry, scopes, tags, and identity configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key"
+        ],
+        "description": "Tailscale create key input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The created key metadata and one-time secret material."
+      }
+    },
+    {
+      "id": "tailscale.create_oauth_app",
+      "service": "tailscale",
+      "name": "create_oauth_app",
+      "description": "Create a Tailscale OAuth application and return its client secret.",
+      "operationType": "write",
+      "requiredScopes": [
+        "oauth_apps",
+        "devices:posture_attributes"
+      ],
+      "providerPermissions": [
+        "oauth_apps",
+        "devices:posture_attributes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The OAuth app name, redirect URIs, scopes, and allowed node attributes."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "app"
+        ],
+        "description": "Tailscale create OAuth app input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The created OAuth app and one-time client secret."
+      }
+    },
+    {
+      "id": "tailscale.create_posture_integration",
+      "service": "tailscale",
+      "name": "create_posture_integration",
+      "description": "Create a device posture integration using its external provider credentials.",
+      "operationType": "write",
+      "requiredScopes": [
+        "feature_settings"
+      ],
+      "providerPermissions": [
+        "feature_settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "integration": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The posture provider, tenant configuration, and client credentials."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "integration"
+        ],
+        "description": "Tailscale create posture integration input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The created device posture integration."
+      }
+    },
+    {
+      "id": "tailscale.create_webhook",
+      "service": "tailscale",
+      "name": "create_webhook",
+      "description": "Create a webhook endpoint and return its signing secret.",
+      "operationType": "write",
+      "requiredScopes": [
+        "webhooks"
+      ],
+      "providerPermissions": [
+        "webhooks"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "webhook": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The endpoint URL, provider type, and event subscriptions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "Tailscale create webhook input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The created webhook and one-time signing secret."
+      }
+    },
+    {
+      "id": "tailscale.delete_device",
+      "service": "tailscale",
+      "name": "delete_device",
+      "description": "Permanently delete a device from its Tailscale tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete device response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete device response."
+      }
+    },
+    {
+      "id": "tailscale.delete_device_invite",
+      "service": "tailscale",
+      "name": "delete_device_invite",
+      "description": "Delete a Tailscale device share invite.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "device_invites"
+      ],
+      "providerPermissions": [
+        "device_invites"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceInviteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale device invite ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceInviteId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete device invite response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete device invite response."
+      }
+    },
+    {
+      "id": "tailscale.delete_device_posture_attribute",
+      "service": "tailscale",
+      "name": "delete_device_posture_attribute",
+      "description": "Permanently remove one custom posture attribute from a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:posture_attributes"
+      ],
+      "providerPermissions": [
+        "devices:posture_attributes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "attributeKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The custom posture attribute key to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "attributeKey"
+        ],
+        "description": "Tailscale delete device posture attribute input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete posture attribute response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete posture attribute response."
+      }
+    },
+    {
+      "id": "tailscale.delete_key",
+      "service": "tailscale",
+      "name": "delete_key",
+      "description": "Permanently revoke and delete a Tailscale trust credential or key.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "api_access_tokens",
+        "auth_keys",
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "providerPermissions": [
+        "api_access_tokens",
+        "auth_keys",
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale key ID to revoke and delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete key response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete key response."
+      }
+    },
+    {
+      "id": "tailscale.delete_oauth_app",
+      "service": "tailscale",
+      "name": "delete_oauth_app",
+      "description": "Permanently delete a Tailscale OAuth application and revoke its access.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "oauth_apps"
+      ],
+      "providerPermissions": [
+        "oauth_apps"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale OAuth app ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete OAuth app response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete OAuth app response."
+      }
+    },
+    {
+      "id": "tailscale.delete_posture_integration",
+      "service": "tailscale",
+      "name": "delete_posture_integration",
+      "description": "Delete a device posture integration.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "feature_settings"
+      ],
+      "providerPermissions": [
+        "feature_settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale posture integration ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "integrationId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete posture integration response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete posture integration response."
+      }
+    },
+    {
+      "id": "tailscale.delete_service",
+      "service": "tailscale",
+      "name": "delete_service",
+      "description": "Permanently delete a named Tailscale Service.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "services"
+      ],
+      "providerPermissions": [
+        "services"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete Service response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete Service response."
+      }
+    },
+    {
+      "id": "tailscale.delete_user",
+      "service": "tailscale",
+      "name": "delete_user",
+      "description": "Permanently delete a Tailscale user from the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "users"
+      ],
+      "providerPermissions": [
+        "users"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale user ID to permanently delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete user response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete user response."
+      }
+    },
+    {
+      "id": "tailscale.delete_webhook",
+      "service": "tailscale",
+      "name": "delete_webhook",
+      "description": "Permanently delete a Tailscale webhook endpoint.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "webhooks"
+      ],
+      "providerPermissions": [
+        "webhooks"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook endpoint ID to delete."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale delete webhook response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale delete webhook response."
+      }
+    },
+    {
+      "id": "tailscale.disable_log_streaming",
+      "service": "tailscale",
+      "name": "disable_log_streaming",
+      "description": "Disable and remove the destination configuration for a Tailscale log stream.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "log_streaming"
+      ],
+      "providerPermissions": [
+        "log_streaming"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logType": {
+            "type": "string",
+            "enum": [
+              "configuration",
+              "network"
+            ],
+            "description": "The Tailscale log type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "logType"
+        ],
+        "description": "Tailscale log streaming status input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale disable log streaming response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale disable log streaming response."
+      }
+    },
+    {
+      "id": "tailscale.expire_device_key",
+      "service": "tailscale",
+      "name": "expire_device_key",
+      "description": "Immediately expire a device key and require the device to authenticate again.",
+      "operationType": "write",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale expire device key response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale expire device key response."
+      }
+    },
+    {
+      "id": "tailscale.get_aws_external_id",
+      "service": "tailscale",
+      "name": "get_aws_external_id",
+      "description": "Create or retrieve the AWS external ID used by Tailscale log streaming.",
+      "operationType": "write",
+      "requiredScopes": [
+        "log_streaming"
+      ],
+      "providerPermissions": [
+        "log_streaming"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reusable": {
+            "type": "boolean",
+            "description": "Whether later reusable calls may receive this same external ID, until it is linked with an AWS account."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tailscale get AWS external ID input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The AWS external ID assigned to the tailnet."
+      }
+    },
+    {
+      "id": "tailscale.get_contacts",
+      "service": "tailscale",
+      "name": "get_contacts",
+      "description": "Get the account, support, and security contacts for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "account_settings:read"
+      ],
+      "providerPermissions": [
+        "account_settings:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale get contacts input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The account, support, and security contacts."
+      }
+    },
+    {
+      "id": "tailscale.get_device",
+      "service": "tailscale",
+      "name": "get_device",
+      "description": "Get one Tailscale device by its preferred node ID or legacy device ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "devices:core:read"
+      ],
+      "providerPermissions": [
+        "devices:core:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The legacy numeric device identifier."
+          },
+          "nodeId": {
+            "type": "string",
+            "description": "The preferred stable device identifier."
+          },
+          "user": {
+            "type": "string",
+            "description": "The user who registered the device."
+          },
+          "name": {
+            "type": "string",
+            "description": "The device MagicDNS name."
+          },
+          "hostname": {
+            "type": "string",
+            "description": "The device hostname shown in the admin console."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Tailscale IPv4 and IPv6 addresses assigned to the device."
+          },
+          "clientVersion": {
+            "type": "string",
+            "description": "The installed Tailscale client version."
+          },
+          "os": {
+            "type": "string",
+            "description": "The operating system reported by the device."
+          },
+          "created": {
+            "type": "string",
+            "description": "When the device joined the tailnet."
+          },
+          "connectedToControl": {
+            "type": "boolean",
+            "description": "Whether the device recently connected to the Tailscale control server."
+          },
+          "lastSeen": {
+            "type": "string",
+            "description": "When the device last connected to the Tailscale control server."
+          },
+          "expires": {
+            "type": "string",
+            "description": "When the device key expires."
+          },
+          "authorized": {
+            "type": "boolean",
+            "description": "Whether the device is authorized to join the tailnet."
+          },
+          "isExternal": {
+            "type": "boolean",
+            "description": "Whether the device is shared into the tailnet."
+          },
+          "isEphemeral": {
+            "type": "boolean",
+            "description": "Whether the device is ephemeral."
+          },
+          "updateAvailable": {
+            "type": "boolean",
+            "description": "Whether a newer Tailscale client is available."
+          },
+          "keyExpiryDisabled": {
+            "type": "boolean",
+            "description": "Whether key expiry is disabled for the device."
+          },
+          "blocksIncomingConnections": {
+            "type": "boolean",
+            "description": "Whether the device blocks incoming Tailscale connections."
+          },
+          "enabledRoutes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Subnet routes enabled for the device."
+          },
+          "advertisedRoutes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Subnet routes advertised by the device."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "ACL tags assigned to the device."
+          },
+          "sshEnabled": {
+            "type": "boolean",
+            "description": "Whether Tailscale SSH is enabled for the device."
+          }
+        },
+        "additionalProperties": true,
+        "description": "A Tailscale device returned by the official API."
+      }
+    },
+    {
+      "id": "tailscale.get_device_invite",
+      "service": "tailscale",
+      "name": "get_device_invite",
+      "description": "Get one Tailscale device share invite.",
+      "operationType": "read",
+      "requiredScopes": [
+        "device_invites:read"
+      ],
+      "providerPermissions": [
+        "device_invites:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceInviteId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale device invite ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceInviteId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested device share invite."
+      }
+    },
+    {
+      "id": "tailscale.get_device_posture_attributes",
+      "service": "tailscale",
+      "name": "get_device_posture_attributes",
+      "description": "Get the posture attributes currently reported for a Tailscale device.",
+      "operationType": "read",
+      "requiredScopes": [
+        "devices:posture_attributes:read"
+      ],
+      "providerPermissions": [
+        "devices:posture_attributes:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Posture attributes and expirations for the device."
+      }
+    },
+    {
+      "id": "tailscale.get_dns_configuration",
+      "service": "tailscale",
+      "name": "get_dns_configuration",
+      "description": "Get the complete DNS configuration for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "dns:read"
+      ],
+      "providerPermissions": [
+        "dns:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale get DNS configuration input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The complete tailnet DNS configuration."
+      }
+    },
+    {
+      "id": "tailscale.get_dns_preferences",
+      "service": "tailscale",
+      "name": "get_dns_preferences",
+      "description": "Get the tailnet DNS preferences, including MagicDNS state.",
+      "operationType": "read",
+      "requiredScopes": [
+        "dns:read"
+      ],
+      "providerPermissions": [
+        "dns:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale get DNS preferences input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The tailnet DNS preferences."
+      }
+    },
+    {
+      "id": "tailscale.get_key",
+      "service": "tailscale",
+      "name": "get_key",
+      "description": "Get metadata for a Tailscale trust credential or key.",
+      "operationType": "read",
+      "requiredScopes": [
+        "api_access_tokens:read",
+        "auth_keys:read",
+        "oauth_keys:read",
+        "federated_keys:read"
+      ],
+      "providerPermissions": [
+        "api_access_tokens:read",
+        "auth_keys:read",
+        "oauth_keys:read",
+        "federated_keys:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale key ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested key metadata."
+      }
+    },
+    {
+      "id": "tailscale.get_log_streaming_configuration",
+      "service": "tailscale",
+      "name": "get_log_streaming_configuration",
+      "description": "Get the potentially sensitive destination configuration for a Tailscale log stream.",
+      "operationType": "read",
+      "requiredScopes": [
+        "log_streaming:read"
+      ],
+      "providerPermissions": [
+        "log_streaming:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logType": {
+            "type": "string",
+            "enum": [
+              "configuration",
+              "network"
+            ],
+            "description": "The Tailscale log type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "logType"
+        ],
+        "description": "Tailscale log streaming status input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The log streaming destination and credential configuration."
+      }
+    },
+    {
+      "id": "tailscale.get_log_streaming_status",
+      "service": "tailscale",
+      "name": "get_log_streaming_status",
+      "description": "Get the current publishing status for configuration or network log streaming.",
+      "operationType": "read",
+      "requiredScopes": [
+        "log_streaming:read"
+      ],
+      "providerPermissions": [
+        "log_streaming:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logType": {
+            "type": "string",
+            "enum": [
+              "configuration",
+              "network"
+            ],
+            "description": "The Tailscale log type."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "logType"
+        ],
+        "description": "Tailscale log streaming status input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Log streaming activity, throughput, and failure statistics."
+      }
+    },
+    {
+      "id": "tailscale.get_oauth_app",
+      "service": "tailscale",
+      "name": "get_oauth_app",
+      "description": "Get a Tailscale OAuth application by app ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "oauth_apps:read"
+      ],
+      "providerPermissions": [
+        "oauth_apps:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale OAuth app ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested OAuth application."
+      }
+    },
+    {
+      "id": "tailscale.get_policy_file",
+      "service": "tailscale",
+      "name": "get_policy_file",
+      "description": "Get the current Tailscale policy file as JSON, optionally with validation details.",
+      "operationType": "read",
+      "requiredScopes": [
+        "policy_file:read"
+      ],
+      "providerPermissions": [
+        "policy_file:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "details": {
+            "type": "boolean",
+            "description": "Whether to include the encoded policy, warnings, and errors."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tailscale get policy file input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The current Tailscale policy file or detailed validation result."
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The policy version to pass as set_policy_file's ifMatch input."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The policy version to pass as set_policy_file's ifMatch input."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "policy"
+        ],
+        "description": "The current Tailscale policy file and its version."
+      }
+    },
+    {
+      "id": "tailscale.get_posture_integration",
+      "service": "tailscale",
+      "name": "get_posture_integration",
+      "description": "Get one device posture integration by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "feature_settings:read"
+      ],
+      "providerPermissions": [
+        "feature_settings:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale posture integration ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "integrationId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested device posture integration."
+      }
+    },
+    {
+      "id": "tailscale.get_service",
+      "service": "tailscale",
+      "name": "get_service",
+      "description": "Get a Tailscale Service by name.",
+      "operationType": "read",
+      "requiredScopes": [
+        "services:read"
+      ],
+      "providerPermissions": [
+        "services:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested Tailscale Service."
+      }
+    },
+    {
+      "id": "tailscale.get_service_device_approval",
+      "service": "tailscale",
+      "name": "get_service_device_approval",
+      "description": "Get whether a Service is approved on a specific device.",
+      "operationType": "read",
+      "requiredScopes": [
+        "services",
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "services",
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name."
+          },
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName",
+          "deviceId"
+        ],
+        "description": "Tailscale get Service device approval input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The Service approval state on the device."
+      }
+    },
+    {
+      "id": "tailscale.get_split_dns",
+      "service": "tailscale",
+      "name": "get_split_dns",
+      "description": "Get the split DNS nameserver mapping for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "dns:read"
+      ],
+      "providerPermissions": [
+        "dns:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale get split DNS input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The split DNS domain-to-nameserver mapping."
+      }
+    },
+    {
+      "id": "tailscale.get_tailnet_settings",
+      "service": "tailscale",
+      "name": "get_tailnet_settings",
+      "description": "Get the tailnet feature, logging, networking, and policy settings visible to the OAuth client.",
+      "operationType": "read",
+      "requiredScopes": [
+        "feature_settings:read",
+        "logs:network:read",
+        "networking_settings:read",
+        "policy_file:read"
+      ],
+      "providerPermissions": [
+        "feature_settings:read",
+        "logs:network:read",
+        "networking_settings:read",
+        "policy_file:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale get tailnet settings input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The visible tailnet settings."
+      }
+    },
+    {
+      "id": "tailscale.get_user",
+      "service": "tailscale",
+      "name": "get_user",
+      "description": "Get a Tailscale user by user ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "users:read"
+      ],
+      "providerPermissions": [
+        "users:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale user ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested Tailscale user."
+      }
+    },
+    {
+      "id": "tailscale.get_webhook",
+      "service": "tailscale",
+      "name": "get_webhook",
+      "description": "Get a Tailscale webhook endpoint by ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "webhooks:read"
+      ],
+      "providerPermissions": [
+        "webhooks:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale webhook endpoint ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The requested webhook endpoint."
+      }
+    },
+    {
+      "id": "tailscale.list_configuration_audit_logs",
+      "service": "tailscale",
+      "name": "list_configuration_audit_logs",
+      "description": "List configuration audit logs for an RFC 3339 time window, with optional filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "logs:configuration:read"
+      ],
+      "providerPermissions": [
+        "logs:configuration:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the log window in RFC 3339 format."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the log window in RFC 3339 format."
+          },
+          "actors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Actor IDs or wildcard actor searches."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Target filters."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "Audit event type filters."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start",
+          "end"
+        ],
+        "description": "Tailscale configuration audit log input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Configuration audit log entries and tailnet metadata."
+      }
+    },
+    {
+      "id": "tailscale.list_device_invites",
+      "service": "tailscale",
+      "name": "list_device_invites",
+      "description": "List all share invites for a Tailscale device.",
+      "operationType": "read",
+      "requiredScopes": [
+        "device_invites:read"
+      ],
+      "providerPermissions": [
+        "device_invites:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "A device share invite."
+        },
+        "description": "The device share invites returned by Tailscale."
+      }
+    },
+    {
+      "id": "tailscale.list_device_routes",
+      "service": "tailscale",
+      "name": "list_device_routes",
+      "description": "List the subnet routes advertised and enabled for a Tailscale device.",
+      "operationType": "read",
+      "requiredScopes": [
+        "devices:routes:read"
+      ],
+      "providerPermissions": [
+        "devices:routes:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Advertised and enabled routes for the device."
+      }
+    },
+    {
+      "id": "tailscale.list_devices",
+      "service": "tailscale",
+      "name": "list_devices",
+      "description": "List all devices in the configured Tailscale tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "devices:core:read"
+      ],
+      "providerPermissions": [
+        "devices:core:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list devices input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The legacy numeric device identifier."
+                },
+                "nodeId": {
+                  "type": "string",
+                  "description": "The preferred stable device identifier."
+                },
+                "user": {
+                  "type": "string",
+                  "description": "The user who registered the device."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The device MagicDNS name."
+                },
+                "hostname": {
+                  "type": "string",
+                  "description": "The device hostname shown in the admin console."
+                },
+                "addresses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "Tailscale IPv4 and IPv6 addresses assigned to the device."
+                },
+                "clientVersion": {
+                  "type": "string",
+                  "description": "The installed Tailscale client version."
+                },
+                "os": {
+                  "type": "string",
+                  "description": "The operating system reported by the device."
+                },
+                "created": {
+                  "type": "string",
+                  "description": "When the device joined the tailnet."
+                },
+                "connectedToControl": {
+                  "type": "boolean",
+                  "description": "Whether the device recently connected to the Tailscale control server."
+                },
+                "lastSeen": {
+                  "type": "string",
+                  "description": "When the device last connected to the Tailscale control server."
+                },
+                "expires": {
+                  "type": "string",
+                  "description": "When the device key expires."
+                },
+                "authorized": {
+                  "type": "boolean",
+                  "description": "Whether the device is authorized to join the tailnet."
+                },
+                "isExternal": {
+                  "type": "boolean",
+                  "description": "Whether the device is shared into the tailnet."
+                },
+                "isEphemeral": {
+                  "type": "boolean",
+                  "description": "Whether the device is ephemeral."
+                },
+                "updateAvailable": {
+                  "type": "boolean",
+                  "description": "Whether a newer Tailscale client is available."
+                },
+                "keyExpiryDisabled": {
+                  "type": "boolean",
+                  "description": "Whether key expiry is disabled for the device."
+                },
+                "blocksIncomingConnections": {
+                  "type": "boolean",
+                  "description": "Whether the device blocks incoming Tailscale connections."
+                },
+                "enabledRoutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "Subnet routes enabled for the device."
+                },
+                "advertisedRoutes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "Subnet routes advertised by the device."
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "ACL tags assigned to the device."
+                },
+                "sshEnabled": {
+                  "type": "boolean",
+                  "description": "Whether Tailscale SSH is enabled for the device."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Tailscale device returned by the official API."
+            },
+            "description": "Devices in the connected tailnet."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "devices"
+        ],
+        "description": "The devices returned by Tailscale."
+      }
+    },
+    {
+      "id": "tailscale.list_dns_nameservers",
+      "service": "tailscale",
+      "name": "list_dns_nameservers",
+      "description": "List the global DNS nameservers configured for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "dns:read"
+      ],
+      "providerPermissions": [
+        "dns:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list DNS nameservers input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The configured global DNS nameservers."
+      }
+    },
+    {
+      "id": "tailscale.list_dns_search_paths",
+      "service": "tailscale",
+      "name": "list_dns_search_paths",
+      "description": "List the DNS search paths configured for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "dns:read"
+      ],
+      "providerPermissions": [
+        "dns:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list DNS search paths input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The configured DNS search paths."
+      }
+    },
+    {
+      "id": "tailscale.list_keys",
+      "service": "tailscale",
+      "name": "list_keys",
+      "description": "List trust credentials and keys visible to the OAuth client.",
+      "operationType": "read",
+      "requiredScopes": [
+        "api_access_tokens:read",
+        "auth_keys:read",
+        "oauth_keys:read",
+        "federated_keys:read"
+      ],
+      "providerPermissions": [
+        "api_access_tokens:read",
+        "auth_keys:read",
+        "oauth_keys:read",
+        "federated_keys:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "boolean",
+            "description": "Whether to include expired and revoked keys."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tailscale list keys input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The visible Tailscale trust credentials and keys."
+      }
+    },
+    {
+      "id": "tailscale.list_network_flow_logs",
+      "service": "tailscale",
+      "name": "list_network_flow_logs",
+      "description": "List network flow logs for an RFC 3339 time window.",
+      "operationType": "read",
+      "requiredScopes": [
+        "logs:network:read"
+      ],
+      "providerPermissions": [
+        "logs:network:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The start of the log window in RFC 3339 format."
+          },
+          "end": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The end of the log window in RFC 3339 format."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "start",
+          "end"
+        ],
+        "description": "Tailscale network flow log input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Network flow log entries and tailnet metadata."
+      }
+    },
+    {
+      "id": "tailscale.list_oauth_apps",
+      "service": "tailscale",
+      "name": "list_oauth_apps",
+      "description": "List OAuth applications configured for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "oauth_apps:read"
+      ],
+      "providerPermissions": [
+        "oauth_apps:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list OAuth apps input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The OAuth applications configured for the tailnet."
+      }
+    },
+    {
+      "id": "tailscale.list_posture_integrations",
+      "service": "tailscale",
+      "name": "list_posture_integrations",
+      "description": "List the device posture integrations configured for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "feature_settings:read"
+      ],
+      "providerPermissions": [
+        "feature_settings:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list posture integrations input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The configured device posture integrations."
+      }
+    },
+    {
+      "id": "tailscale.list_service_hosts",
+      "service": "tailscale",
+      "name": "list_service_hosts",
+      "description": "List devices currently hosting a named Tailscale Service.",
+      "operationType": "read",
+      "requiredScopes": [
+        "services",
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "services",
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The devices hosting the Service."
+      }
+    },
+    {
+      "id": "tailscale.list_services",
+      "service": "tailscale",
+      "name": "list_services",
+      "description": "List the Services configured in the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "services:read"
+      ],
+      "providerPermissions": [
+        "services:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list Services input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The Services configured in the tailnet."
+      }
+    },
+    {
+      "id": "tailscale.list_users",
+      "service": "tailscale",
+      "name": "list_users",
+      "description": "List tailnet users with optional user-type and role filters.",
+      "operationType": "read",
+      "requiredScopes": [
+        "users:read"
+      ],
+      "providerPermissions": [
+        "users:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "member",
+              "shared",
+              "all"
+            ],
+            "description": "User type filter. Defaults to all users, including users shared into the tailnet."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "member",
+              "admin",
+              "it-admin",
+              "network-admin",
+              "billing-admin",
+              "auditor",
+              "all"
+            ],
+            "description": "User role filter."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Tailscale list users input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The users in the connected tailnet."
+      }
+    },
+    {
+      "id": "tailscale.list_webhooks",
+      "service": "tailscale",
+      "name": "list_webhooks",
+      "description": "List webhook endpoints configured for the tailnet.",
+      "operationType": "read",
+      "requiredScopes": [
+        "webhooks:read"
+      ],
+      "providerPermissions": [
+        "webhooks:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Tailscale list webhooks input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The webhook endpoints configured for the tailnet."
+      }
+    },
+    {
+      "id": "tailscale.preview_policy_rule_matches",
+      "service": "tailscale",
+      "name": "preview_policy_rule_matches",
+      "description": "Preview which rules in a proposed policy match a user or IP address and port without saving it.",
+      "operationType": "read",
+      "requiredScopes": [
+        "policy_file:read"
+      ],
+      "providerPermissions": [
+        "policy_file:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "ipport"
+            ],
+            "description": "The resource type to preview."
+          },
+          "previewFor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A user email or an IP address and port, depending on type."
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The proposed JSON policy document to evaluate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "previewFor",
+          "policy"
+        ],
+        "description": "Tailscale policy rule preview input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "users": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "Source entities affected by the rule."
+                },
+                "ports": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "A Tailscale string value."
+                  },
+                  "description": "Destinations that can be accessed."
+                },
+                "lineNumber": {
+                  "type": "integer",
+                  "description": "The rule's location in the policy file."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A matching policy rule."
+            },
+            "description": "The proposed policy rules matching the requested resource."
+          },
+          "type": {
+            "type": "string",
+            "description": "Echoes the resource type provided in the request."
+          },
+          "previewFor": {
+            "type": "string",
+            "description": "Echoes the previewed user or IP address and port provided in the request."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "matches"
+        ],
+        "description": "The proposed policy rules matching the requested resource."
+      }
+    },
+    {
+      "id": "tailscale.resend_contact_verification_email",
+      "service": "tailscale",
+      "name": "resend_contact_verification_email",
+      "description": "Resend the verification email for a tailnet contact.",
+      "operationType": "write",
+      "requiredScopes": [
+        "account_settings"
+      ],
+      "providerPermissions": [
+        "account_settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactType": {
+            "type": "string",
+            "enum": [
+              "account",
+              "support",
+              "security"
+            ],
+            "description": "The contact category whose verification should be resent."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactType"
+        ],
+        "description": "Tailscale resend contact verification input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale resend contact verification response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale resend contact verification response."
+      }
+    },
+    {
+      "id": "tailscale.restore_user",
+      "service": "tailscale",
+      "name": "restore_user",
+      "description": "Restore a suspended Tailscale user.",
+      "operationType": "write",
+      "requiredScopes": [
+        "users"
+      ],
+      "providerPermissions": [
+        "users"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The suspended Tailscale user ID to restore."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale restore user response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale restore user response."
+      }
+    },
+    {
+      "id": "tailscale.rotate_webhook_secret",
+      "service": "tailscale",
+      "name": "rotate_webhook_secret",
+      "description": "Rotate a webhook signing secret and return the new secret once.",
+      "operationType": "read",
+      "requiredScopes": [
+        "webhooks"
+      ],
+      "providerPermissions": [
+        "webhooks"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook endpoint ID whose secret should be rotated."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The rotated one-time webhook signing secret."
+      }
+    },
+    {
+      "id": "tailscale.set_device_authorized",
+      "service": "tailscale",
+      "name": "set_device_authorized",
+      "description": "Authorize or deauthorize a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "authorized": {
+            "type": "boolean",
+            "description": "Whether the device should be authorized."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "authorized"
+        ],
+        "description": "Tailscale set device authorization input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale device authorization response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale device authorization response."
+      }
+    },
+    {
+      "id": "tailscale.set_device_ip",
+      "service": "tailscale",
+      "name": "set_device_ip",
+      "description": "Set the Tailscale IPv4 address for a device.",
+      "operationType": "write",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "ipv4": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new Tailscale IPv4 address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "ipv4"
+        ],
+        "description": "Tailscale set device IP input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale set device IP response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale set device IP response."
+      }
+    },
+    {
+      "id": "tailscale.set_device_key_expiry",
+      "service": "tailscale",
+      "name": "set_device_key_expiry",
+      "description": "Enable or disable key expiry for a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "keyExpiryDisabled": {
+            "type": "boolean",
+            "description": "Whether device key expiry should be disabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "keyExpiryDisabled"
+        ],
+        "description": "Tailscale set device key expiry input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale set device key expiry response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale set device key expiry response."
+      }
+    },
+    {
+      "id": "tailscale.set_device_name",
+      "service": "tailscale",
+      "name": "set_device_name",
+      "description": "Set a Tailscale device name, or reset it from the OS hostname with an empty name.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "name": {
+            "type": "string",
+            "description": "The new device name, or an empty string to reset it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "name"
+        ],
+        "description": "Tailscale set device name input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale set device name response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale set device name response."
+      }
+    },
+    {
+      "id": "tailscale.set_device_posture_attribute",
+      "service": "tailscale",
+      "name": "set_device_posture_attribute",
+      "description": "Set one custom posture attribute on a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:posture_attributes"
+      ],
+      "providerPermissions": [
+        "devices:posture_attributes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "attributeKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A custom posture attribute key in the custom: namespace."
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "description": "The attribute value. Tailscale accepts only a string, number, or boolean."
+          },
+          "expiry": {
+            "type": "string",
+            "description": "Optional RFC 3339 expiry time."
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional audit-log comment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "attributeKey",
+          "value"
+        ],
+        "description": "Tailscale set device posture attribute input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The device's custom posture attributes after the update."
+      }
+    },
+    {
+      "id": "tailscale.set_device_routes",
+      "service": "tailscale",
+      "name": "set_device_routes",
+      "description": "Replace the enabled subnet routes for a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:routes"
+      ],
+      "providerPermissions": [
+        "devices:routes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "The complete list of subnet routes to enable."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "routes"
+        ],
+        "description": "Tailscale set device routes input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The advertised and enabled routes after the update."
+      }
+    },
+    {
+      "id": "tailscale.set_device_tags",
+      "service": "tailscale",
+      "name": "set_device_tags",
+      "description": "Replace all ACL tags assigned to a Tailscale device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "The complete replacement list of ACL tags."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "tags"
+        ],
+        "description": "Tailscale set device tags input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale set device tags response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale set device tags response."
+      }
+    },
+    {
+      "id": "tailscale.set_dns_configuration",
+      "service": "tailscale",
+      "name": "set_dns_configuration",
+      "description": "Replace the entire tailnet DNS configuration, including nameservers, split DNS, search paths, and preferences.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "configuration": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The complete replacement DNS configuration. This replaces rather than merges: any section left out is cleared, so send the full configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "configuration"
+        ],
+        "description": "Tailscale set DNS configuration input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The replacement complete DNS configuration."
+      }
+    },
+    {
+      "id": "tailscale.set_dns_nameservers",
+      "service": "tailscale",
+      "name": "set_dns_nameservers",
+      "description": "Replace the global DNS nameservers configured for the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "The complete replacement list of DNS nameserver addresses."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "dns"
+        ],
+        "description": "Tailscale set DNS nameservers input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated global DNS nameservers."
+      }
+    },
+    {
+      "id": "tailscale.set_dns_preferences",
+      "service": "tailscale",
+      "name": "set_dns_preferences",
+      "description": "Enable or disable MagicDNS for the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "magicDNS": {
+            "type": "boolean",
+            "description": "Whether MagicDNS should be enabled."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "magicDNS"
+        ],
+        "description": "Tailscale set DNS preferences input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated tailnet DNS preferences."
+      }
+    },
+    {
+      "id": "tailscale.set_dns_search_paths",
+      "service": "tailscale",
+      "name": "set_dns_search_paths",
+      "description": "Replace the DNS search paths configured for the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "searchPaths": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A Tailscale string value."
+            },
+            "description": "The complete replacement list of DNS search domains."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "searchPaths"
+        ],
+        "description": "Tailscale set DNS search paths input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated DNS search paths."
+      }
+    },
+    {
+      "id": "tailscale.set_log_streaming_configuration",
+      "service": "tailscale",
+      "name": "set_log_streaming_configuration",
+      "description": "Create or replace a Tailscale log streaming destination configuration.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "log_streaming",
+        "device_invites",
+        "policy_file"
+      ],
+      "providerPermissions": [
+        "log_streaming",
+        "device_invites",
+        "policy_file"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logType": {
+            "type": "string",
+            "enum": [
+              "configuration",
+              "network"
+            ],
+            "description": "The Tailscale log type."
+          },
+          "configuration": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The complete destination configuration, including any required credentials."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "logType",
+          "configuration"
+        ],
+        "description": "Tailscale set log streaming configuration input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale set log streaming configuration response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale set log streaming configuration response."
+      }
+    },
+    {
+      "id": "tailscale.set_policy_file",
+      "service": "tailscale",
+      "name": "set_policy_file",
+      "description": "Replace the Tailscale policy file after its embedded tests pass.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "policy_file"
+      ],
+      "providerPermissions": [
+        "policy_file"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "policy": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The complete replacement Tailscale policy document."
+          },
+          "ifMatch": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The etag returned by get_policy_file. Rejects the write with HTTP 412 if the policy changed since that read, instead of overwriting the change. Omit to overwrite unconditionally."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "policy"
+        ],
+        "description": "Tailscale set policy file input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The accepted replacement policy file."
+      }
+    },
+    {
+      "id": "tailscale.set_split_dns",
+      "service": "tailscale",
+      "name": "set_split_dns",
+      "description": "Replace the entire tailnet split DNS configuration.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "splitDns": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The complete domain-to-resolver mapping."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "splitDns"
+        ],
+        "description": "Tailscale set split DNS input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The replacement split DNS mapping."
+      }
+    },
+    {
+      "id": "tailscale.suspend_user",
+      "service": "tailscale",
+      "name": "suspend_user",
+      "description": "Suspend a Tailscale user and their access to the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "users"
+      ],
+      "providerPermissions": [
+        "users"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale user ID to suspend."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale suspend user response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale suspend user response."
+      }
+    },
+    {
+      "id": "tailscale.test_webhook",
+      "service": "tailscale",
+      "name": "test_webhook",
+      "description": "Send a test event to a Tailscale webhook endpoint.",
+      "operationType": "write",
+      "requiredScopes": [
+        "webhooks"
+      ],
+      "providerPermissions": [
+        "webhooks"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The webhook endpoint ID to test."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId"
+        ],
+        "description": "Tailscale action input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale test webhook response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale test webhook response."
+      }
+    },
+    {
+      "id": "tailscale.update_contact",
+      "service": "tailscale",
+      "name": "update_contact",
+      "description": "Change the account, support, or security contact email for the tailnet.",
+      "operationType": "write",
+      "requiredScopes": [
+        "account_settings"
+      ],
+      "providerPermissions": [
+        "account_settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactType": {
+            "type": "string",
+            "enum": [
+              "account",
+              "support",
+              "security"
+            ],
+            "description": "The contact category to update."
+          },
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The replacement contact email address."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "contactType",
+          "email"
+        ],
+        "description": "Tailscale update contact input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale update contact response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale update contact response."
+      }
+    },
+    {
+      "id": "tailscale.update_key",
+      "service": "tailscale",
+      "name": "update_key",
+      "description": "Replace the mutable configuration of an OAuth or federated Tailscale trust credential.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "providerPermissions": [
+        "oauth_keys",
+        "federated_keys"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale key ID."
+          },
+          "key": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The replacement key description, scopes, tags, and identity configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyId",
+          "key"
+        ],
+        "description": "Tailscale update key input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated key metadata."
+      }
+    },
+    {
+      "id": "tailscale.update_oauth_app",
+      "service": "tailscale",
+      "name": "update_oauth_app",
+      "description": "Replace the configuration of a Tailscale OAuth application.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "oauth_apps",
+        "devices:posture_attributes"
+      ],
+      "providerPermissions": [
+        "oauth_apps",
+        "devices:posture_attributes"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale OAuth app ID."
+          },
+          "app": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The replacement OAuth app configuration."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "appId",
+          "app"
+        ],
+        "description": "Tailscale update OAuth app input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated OAuth application."
+      }
+    },
+    {
+      "id": "tailscale.update_posture_integration",
+      "service": "tailscale",
+      "name": "update_posture_integration",
+      "description": "Update a device posture integration and optionally replace its client secret.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "feature_settings"
+      ],
+      "providerPermissions": [
+        "feature_settings"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale posture integration ID."
+          },
+          "integration": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The posture integration fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "integrationId",
+          "integration"
+        ],
+        "description": "Tailscale update posture integration input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated device posture integration."
+      }
+    },
+    {
+      "id": "tailscale.update_service",
+      "service": "tailscale",
+      "name": "update_service",
+      "description": "Create or replace a named Tailscale Service definition.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "services"
+      ],
+      "providerPermissions": [
+        "services"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name."
+          },
+          "service": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The Service addresses, ports, tags, and comment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName",
+          "service"
+        ],
+        "description": "Tailscale update Service input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated Tailscale Service."
+      }
+    },
+    {
+      "id": "tailscale.update_service_device_approval",
+      "service": "tailscale",
+      "name": "update_service_device_approval",
+      "description": "Approve or revoke approval for a Service on a device.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "services",
+        "devices:core"
+      ],
+      "providerPermissions": [
+        "services",
+        "devices:core"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale Service name."
+          },
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The preferred nodeId or legacy id of the device."
+          },
+          "approved": {
+            "type": "boolean",
+            "description": "Whether the Service should be approved on the device."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "serviceName",
+          "deviceId",
+          "approved"
+        ],
+        "description": "Tailscale update Service device approval input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated Service approval state."
+      }
+    },
+    {
+      "id": "tailscale.update_split_dns",
+      "service": "tailscale",
+      "name": "update_split_dns",
+      "description": "Merge domain-to-resolver entries into the tailnet split DNS configuration.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "dns"
+      ],
+      "providerPermissions": [
+        "dns"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "splitDns": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Domain names mapped to resolver address lists."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "splitDns"
+        ],
+        "description": "Tailscale update split DNS input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated split DNS mapping."
+      }
+    },
+    {
+      "id": "tailscale.update_tailnet_settings",
+      "service": "tailscale",
+      "name": "update_tailnet_settings",
+      "description": "Update reversible feature, logging, networking, or policy-link settings for the tailnet.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "feature_settings",
+        "logs:network",
+        "networking_settings",
+        "policy_file"
+      ],
+      "providerPermissions": [
+        "feature_settings",
+        "logs:network",
+        "networking_settings",
+        "policy_file"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The tailnet settings fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "settings"
+        ],
+        "description": "Tailscale update tailnet settings input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated tailnet settings."
+      }
+    },
+    {
+      "id": "tailscale.update_user_role",
+      "service": "tailscale",
+      "name": "update_user_role",
+      "description": "Change a Tailscale user's administrative role.",
+      "operationType": "write",
+      "requiredScopes": [
+        "users"
+      ],
+      "providerPermissions": [
+        "users"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale user ID."
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The new Tailscale user role."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "role"
+        ],
+        "description": "Tailscale update user role input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale update user role response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale update user role response."
+      }
+    },
+    {
+      "id": "tailscale.update_webhook",
+      "service": "tailscale",
+      "name": "update_webhook",
+      "description": "Replace the subscribed events for a Tailscale webhook endpoint.",
+      "operationType": "destructive",
+      "requiredScopes": [
+        "webhooks"
+      ],
+      "providerPermissions": [
+        "webhooks"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "endpointId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale webhook endpoint ID."
+          },
+          "webhook": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The webhook fields to update."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "endpointId",
+          "webhook"
+        ],
+        "description": "Tailscale update webhook input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The updated webhook endpoint."
+      }
+    },
+    {
+      "id": "tailscale.validate_aws_external_id",
+      "service": "tailscale",
+      "name": "validate_aws_external_id",
+      "description": "Validate an AWS IAM role trust policy against a Tailscale external ID.",
+      "operationType": "read",
+      "requiredScopes": [
+        "log_streaming"
+      ],
+      "providerPermissions": [
+        "log_streaming"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Tailscale AWS external ID."
+          },
+          "roleArn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The AWS IAM role ARN to validate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "externalId",
+          "roleArn"
+        ],
+        "description": "Tailscale validate AWS external ID input."
+      },
+      "outputSchema": {
+        "anyOf": [
+          {
+            "description": "Tailscale AWS trust policy validation response."
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Tailscale AWS trust policy validation response."
+      }
+    },
+    {
+      "id": "tailscale.validate_policy_file",
+      "service": "tailscale",
+      "name": "validate_policy_file",
+      "description": "Validate a proposed policy file or run ACL tests without changing the tailnet policy.",
+      "operationType": "read",
+      "requiredScopes": [
+        "policy_file:read"
+      ],
+      "providerPermissions": [
+        "policy_file:read"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "validation": {
+            "description": "A JSON policy document, its JSON string representation, or an array of ACL tests."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "validation"
+        ],
+        "description": "Tailscale policy validation input."
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Policy parsing errors, warnings, or ACL test results."
+      }
+    }
+  ]
+}

@@ -1,0 +1,646 @@
+{
+  "service": "e2b",
+  "displayName": "E2B",
+  "categories": [
+    "AI",
+    "Developer Tools"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "E2B_API_KEY",
+      "description": "E2B API key used with the X-API-Key header. Create or view keys in the E2B dashboard: https://e2b.dev/dashboard?tab=keys."
+    }
+  ],
+  "homepageUrl": "https://e2b.dev",
+  "actions": [
+    {
+      "id": "e2b.create_sandbox",
+      "service": "e2b",
+      "name": "create_sandbox",
+      "description": "Create an E2B sandbox from a template.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "templateID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The E2B template identifier used to create the sandbox.",
+            "pattern": "\\S"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Time to live for the sandbox in seconds."
+          },
+          "autoPause": {
+            "type": "boolean",
+            "description": "Whether E2B should automatically pause the sandbox after timeout."
+          },
+          "autoPauseMemory": {
+            "type": "boolean",
+            "description": "Whether auto-pause should preserve the sandbox memory snapshot when autoPause is true."
+          },
+          "autoResume": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether auto-resume is enabled for paused sandboxes."
+              }
+            },
+            "additionalProperties": false,
+            "description": "Auto-resume configuration for paused sandboxes."
+          },
+          "secure": {
+            "type": "boolean",
+            "description": "Whether E2B should secure all system communication with the sandbox."
+          },
+          "allow_internet_access": {
+            "type": "boolean",
+            "description": "Whether the sandbox can access the internet."
+          },
+          "network": {
+            "type": "object",
+            "properties": {
+              "allowPublicTraffic": {
+                "type": "boolean",
+                "description": "Whether sandbox URLs are publicly accessible."
+              },
+              "allowOut": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One allowed destination such as a CIDR block, IP address, or domain."
+                },
+                "description": "Allowed outbound destinations for sandbox egress traffic."
+              },
+              "denyOut": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "One denied CIDR block or IP address."
+                },
+                "description": "Denied outbound CIDR blocks or IP addresses for sandbox egress traffic."
+              },
+              "egressProxy": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "The egress proxy configuration returned or accepted by E2B."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The egress proxy configuration returned or accepted by E2B."
+              },
+              "maskRequestHost": {
+                "type": "string",
+                "description": "The host mask used for sandbox requests."
+              },
+              "rules": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Per-domain outbound request transform rules."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The E2B sandbox network configuration object."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One sandbox metadata value."
+            },
+            "description": "String metadata attached to the sandbox."
+          },
+          "envVars": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "One sandbox environment variable value."
+            },
+            "description": "Environment variables passed to the sandbox."
+          },
+          "mcp": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "MCP configuration for the sandbox."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "MCP configuration for the sandbox."
+          },
+          "volumeMounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The volume name."
+                },
+                "path": {
+                  "type": "string",
+                  "description": "The volume mount path inside the sandbox."
+                }
+              },
+              "additionalProperties": false,
+              "description": "An E2B sandbox volume mount."
+            },
+            "description": "Volume mounts to attach to the sandbox."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "templateID"
+        ],
+        "description": "The input payload for creating an E2B sandbox."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "templateID": {
+                "type": "string",
+                "description": "Identifier of the template from which the sandbox was created."
+              },
+              "sandboxID": {
+                "type": "string",
+                "description": "Identifier of the sandbox."
+              },
+              "alias": {
+                "type": "string",
+                "description": "Alias of the template when returned by E2B."
+              },
+              "clientID": {
+                "type": "string",
+                "description": "Deprecated E2B client identifier."
+              },
+              "envdVersion": {
+                "type": "string",
+                "description": "Version of envd running in the sandbox."
+              },
+              "envdAccessToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Access token for envd requests when the sandbox is secure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Access token for envd requests when the sandbox is secure."
+              },
+              "trafficAccessToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Token required for accessing the sandbox through the E2B proxy when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Token required for accessing the sandbox through the E2B proxy when returned."
+              },
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Deprecated E2B sandbox domain field."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Deprecated E2B sandbox domain field."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The E2B sandbox created by the API."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when creating an E2B sandbox."
+      }
+    },
+    {
+      "id": "e2b.delete_sandbox",
+      "service": "e2b",
+      "name": "delete_sandbox",
+      "description": "Kill an E2B sandbox by sandbox identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sandboxID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The E2B sandbox identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for selecting an E2B sandbox."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sandboxID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The E2B sandbox identifier.",
+            "pattern": "\\S"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the sandbox delete request completed successfully."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned after deleting an E2B sandbox."
+      }
+    },
+    {
+      "id": "e2b.get_sandbox",
+      "service": "e2b",
+      "name": "get_sandbox",
+      "description": "Get one E2B sandbox by sandbox identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sandboxID": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The E2B sandbox identifier.",
+            "pattern": "\\S"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for selecting an E2B sandbox."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sandbox": {
+            "type": "object",
+            "properties": {
+              "templateID": {
+                "type": "string",
+                "description": "Identifier of the template from which the sandbox was created."
+              },
+              "alias": {
+                "type": "string",
+                "description": "Alias of the template when returned by E2B."
+              },
+              "sandboxID": {
+                "type": "string",
+                "description": "Identifier of the sandbox."
+              },
+              "clientID": {
+                "type": "string",
+                "description": "Deprecated E2B client identifier."
+              },
+              "startedAt": {
+                "type": "string",
+                "description": "Time when the sandbox was started.",
+                "format": "date-time"
+              },
+              "endAt": {
+                "type": "string",
+                "description": "Time when the sandbox will expire.",
+                "format": "date-time"
+              },
+              "envdVersion": {
+                "type": "string",
+                "description": "Version of envd running in the sandbox."
+              },
+              "envdAccessToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Access token for envd requests when the sandbox is secure."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Access token for envd requests when the sandbox is secure."
+              },
+              "trafficAccessToken": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Token required for accessing the sandbox through the E2B proxy when returned."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Token required for accessing the sandbox through the E2B proxy when returned."
+              },
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Deprecated E2B sandbox domain field."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Deprecated E2B sandbox domain field."
+              },
+              "allowInternetAccess": {
+                "anyOf": [
+                  {
+                    "type": "boolean",
+                    "description": "Whether internet access was explicitly enabled or disabled for the sandbox."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Whether internet access was explicitly enabled or disabled for the sandbox."
+              },
+              "cpuCount": {
+                "type": "integer",
+                "description": "CPU cores allocated to the sandbox."
+              },
+              "memoryMB": {
+                "type": "integer",
+                "description": "Memory allocated to the sandbox in MiB."
+              },
+              "diskSizeMB": {
+                "type": "integer",
+                "description": "Disk size allocated to the sandbox in MiB."
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "description": "One sandbox metadata value."
+                },
+                "description": "String metadata attached to the sandbox."
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "paused"
+                ],
+                "description": "The E2B sandbox lifecycle state."
+              },
+              "network": {
+                "type": "object",
+                "properties": {
+                  "allowPublicTraffic": {
+                    "type": "boolean",
+                    "description": "Whether sandbox URLs are publicly accessible."
+                  },
+                  "allowOut": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One allowed destination such as a CIDR block, IP address, or domain."
+                    },
+                    "description": "Allowed outbound destinations for sandbox egress traffic."
+                  },
+                  "denyOut": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One denied CIDR block or IP address."
+                    },
+                    "description": "Denied outbound CIDR blocks or IP addresses for sandbox egress traffic."
+                  },
+                  "egressProxy": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": true,
+                        "description": "The egress proxy configuration returned or accepted by E2B."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The egress proxy configuration returned or accepted by E2B."
+                  },
+                  "maskRequestHost": {
+                    "type": "string",
+                    "description": "The host mask used for sandbox requests."
+                  },
+                  "rules": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "Per-domain outbound request transform rules."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The E2B sandbox network configuration object."
+              },
+              "lifecycle": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Sandbox lifecycle configuration returned by E2B."
+              },
+              "volumeMounts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The volume name."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "The volume mount path inside the sandbox."
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "An E2B sandbox volume mount."
+                },
+                "description": "Volume mounts attached to the sandbox."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Detailed E2B sandbox information."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when retrieving an E2B sandbox."
+      }
+    },
+    {
+      "id": "e2b.list_sandboxes",
+      "service": "e2b",
+      "name": "list_sandboxes",
+      "description": "List E2B sandboxes visible to the current API key.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "metadata": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Metadata query used to filter sandboxes, such as \"user=abc&app=prod\". Keys and values must already be URL encoded."
+          },
+          "state": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "running",
+                "paused"
+              ],
+              "description": "The E2B sandbox lifecycle state."
+            },
+            "description": "Sandbox states used to filter the list.",
+            "minItems": 1
+          },
+          "nextToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Cursor returned by E2B for the next page."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Maximum number of sandboxes to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The input payload for listing E2B sandboxes."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sandboxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "templateID": {
+                  "type": "string",
+                  "description": "Identifier of the template from which the sandbox was created."
+                },
+                "alias": {
+                  "type": "string",
+                  "description": "Alias of the template when returned by E2B."
+                },
+                "sandboxID": {
+                  "type": "string",
+                  "description": "Identifier of the sandbox."
+                },
+                "clientID": {
+                  "type": "string",
+                  "description": "Deprecated E2B client identifier."
+                },
+                "startedAt": {
+                  "type": "string",
+                  "description": "Time when the sandbox was started.",
+                  "format": "date-time"
+                },
+                "endAt": {
+                  "type": "string",
+                  "description": "Time when the sandbox will expire.",
+                  "format": "date-time"
+                },
+                "cpuCount": {
+                  "type": "integer",
+                  "description": "CPU cores allocated to the sandbox."
+                },
+                "memoryMB": {
+                  "type": "integer",
+                  "description": "Memory allocated to the sandbox in MiB."
+                },
+                "diskSizeMB": {
+                  "type": "integer",
+                  "description": "Disk size allocated to the sandbox in MiB."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "One sandbox metadata value."
+                  },
+                  "description": "String metadata attached to the sandbox."
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "paused"
+                  ],
+                  "description": "The E2B sandbox lifecycle state."
+                },
+                "envdVersion": {
+                  "type": "string",
+                  "description": "Version of envd running in the sandbox."
+                },
+                "volumeMounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "The volume name."
+                      },
+                      "path": {
+                        "type": "string",
+                        "description": "The volume mount path inside the sandbox."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "An E2B sandbox volume mount."
+                  },
+                  "description": "Volume mounts attached to the sandbox."
+                }
+              },
+              "additionalProperties": true,
+              "description": "An E2B sandbox returned by the sandbox list endpoint."
+            },
+            "description": "The sandboxes returned by E2B."
+          }
+        },
+        "additionalProperties": false,
+        "description": "The response returned when listing E2B sandboxes."
+      }
+    }
+  ]
+}

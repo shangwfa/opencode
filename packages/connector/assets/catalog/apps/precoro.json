@@ -1,0 +1,513 @@
+{
+  "service": "precoro",
+  "displayName": "Precoro",
+  "categories": [
+    "Finance",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "X-AUTH-TOKEN",
+      "placeholder": "PRECORO_X_AUTH_TOKEN",
+      "description": "Precoro company API token sent with the X-AUTH-TOKEN header. Generate it under Configuration > Integrations > API Key: https://help.precoro.com/using-api-in-precoro.",
+      "extraFields": [
+        {
+          "key": "email",
+          "label": "User Email",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "user@company.com",
+          "description": "Precoro user email sent with the email header alongside X-AUTH-TOKEN. Use the email of the Precoro user that generated or is allowed to use the API key."
+        },
+        {
+          "key": "region",
+          "label": "API Region",
+          "inputType": "text",
+          "required": false,
+          "secret": false,
+          "placeholder": "com",
+          "description": "Precoro API region derived from your app URL. Use com for app.precoro.com and us for app.precoro.us."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://precoro.com/",
+  "actions": [
+    {
+      "id": "precoro.get_item",
+      "service": "precoro",
+      "name": "get_item",
+      "description": "Get one Precoro catalog item by numeric item ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Precoro numeric record ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a Precoro catalog item."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Precoro item returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Precoro catalog item response."
+      }
+    },
+    {
+      "id": "precoro.get_purchase_order",
+      "service": "precoro",
+      "name": "get_purchase_order",
+      "description": "Get one Precoro purchase order by its company-visible IDN.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "idn": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Precoro company-visible document IDN."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a Precoro purchase order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "purchaseOrder": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Precoro purchase order returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Precoro purchase order response."
+      }
+    },
+    {
+      "id": "precoro.get_supplier",
+      "service": "precoro",
+      "name": "get_supplier",
+      "description": "Get one Precoro supplier by numeric supplier ID.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Precoro numeric record ID."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for getting a Precoro supplier."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "supplier": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A Precoro supplier returned by the API."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A Precoro supplier response."
+      }
+    },
+    {
+      "id": "precoro.list_items",
+      "service": "precoro",
+      "name": "list_items",
+      "description": "List Precoro catalog items with pagination and optional modified-since filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modifiedSince": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return records created or modified since this UTC timestamp."
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Number of records per page. Precoro supports 10, 20, 50, 100, or 200."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive page number."
+              },
+              {
+                "const": "last",
+                "type": "string",
+                "description": "The last page marker."
+              }
+            ],
+            "description": "The page number to request, or last to request the final page."
+          },
+          "externalIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One numeric external ID."
+            },
+            "description": "External IDs to pass as repeated external_id[] filters. Precoro supports up to 200 values.",
+            "maxItems": 200
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common Precoro list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Precoro item returned by the API."
+            },
+            "description": "Records returned by Precoro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Precoro."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Precoro catalog items."
+      }
+    },
+    {
+      "id": "precoro.list_purchase_orders",
+      "service": "precoro",
+      "name": "list_purchase_orders",
+      "description": "List Precoro purchase orders with pagination and optional status/date filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modifiedSince": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return records created or modified since this UTC timestamp."
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Number of records per page. Precoro supports 10, 20, 50, 100, or 200."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive page number."
+              },
+              {
+                "const": "last",
+                "type": "string",
+                "description": "The last page marker."
+              }
+            ],
+            "description": "The page number to request, or last to request the final page."
+          },
+          "externalIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One numeric external ID."
+            },
+            "description": "External IDs to pass as repeated external_id[] filters. Precoro supports up to 200 values.",
+            "maxItems": 200
+          },
+          "approvalLeftDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return purchase orders approved on or after this UTC timestamp."
+          },
+          "approvalRightDate": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return purchase orders approved on or before this UTC timestamp."
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Precoro status value."
+            },
+            "description": "Purchase order status values to pass as repeated status[] filters."
+          },
+          "logicTypes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Precoro logic type value."
+            },
+            "description": "Purchase order logic type values to pass as repeated logicType[] filters."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Precoro purchase order list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Precoro purchase order returned by the API."
+            },
+            "description": "Records returned by Precoro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Precoro."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Precoro purchase orders."
+      }
+    },
+    {
+      "id": "precoro.list_suppliers",
+      "service": "precoro",
+      "name": "list_suppliers",
+      "description": "List Precoro suppliers with pagination and optional modified-since filtering.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "modifiedSince": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Return records created or modified since this UTC timestamp."
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Number of records per page. Precoro supports 10, 20, 50, 100, or 200."
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "description": "A positive page number."
+              },
+              {
+                "const": "last",
+                "type": "string",
+                "description": "The last page marker."
+              }
+            ],
+            "description": "The page number to request, or last to request the final page."
+          },
+          "externalIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "One numeric external ID."
+            },
+            "description": "External IDs to pass as repeated external_id[] filters. Precoro supports up to 200 values.",
+            "maxItems": 200
+          }
+        },
+        "additionalProperties": false,
+        "description": "Common Precoro list filters."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Precoro supplier returned by the API."
+            },
+            "description": "Records returned by Precoro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Precoro."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Precoro suppliers."
+      }
+    },
+    {
+      "id": "precoro.list_users",
+      "service": "precoro",
+      "name": "list_users",
+      "description": "List Precoro users visible to the connected API user.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Precoro users."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Precoro user returned by the API."
+            },
+            "description": "Records returned by Precoro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Precoro."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Precoro users."
+      }
+    },
+    {
+      "id": "precoro.list_warehouses",
+      "service": "precoro",
+      "name": "list_warehouses",
+      "description": "List Precoro warehouses configured in the connected company.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for listing Precoro warehouses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A Precoro warehouse returned by the API."
+            },
+            "description": "Records returned by Precoro."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Pagination metadata returned by Precoro."
+          },
+          "raw": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional upstream fields returned by Precoro."
+          }
+        },
+        "additionalProperties": false,
+        "description": "A page of Precoro warehouses."
+      }
+    }
+  ]
+}

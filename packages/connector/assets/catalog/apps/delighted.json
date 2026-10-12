@@ -1,0 +1,822 @@
+{
+  "service": "delighted",
+  "displayName": "Delighted",
+  "categories": [
+    "Marketing",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "delighted_api_key",
+      "description": "Delighted private API key used as the HTTP Basic Auth username with an empty password. Find the project-specific key under Integrations > API in Delighted: https://app.delighted.com/docs/api.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://delighted.com",
+  "actions": [
+    {
+      "id": "delighted.create_or_update_person",
+      "service": "delighted",
+      "name": "create_or_update_person",
+      "description": "Create or update a Delighted person and optionally schedule a survey request.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "format": "email"
+          },
+          "phone_number": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+            "pattern": "^\\+[0-9]+$"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "sms"
+            ],
+            "description": "Survey channel used to send the request. The default is email."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the person."
+          },
+          "delay": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount of seconds to wait before sending the survey request."
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "A custom property value."
+            },
+            "description": "Custom properties associated with the person."
+          },
+          "send": {
+            "type": "boolean",
+            "description": "Set to false to create or update the person without sending a survey."
+          },
+          "last_sent_at": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "email_update": {
+            "type": "string",
+            "description": "New email address used to update an existing person.",
+            "format": "email"
+          },
+          "phone_number_update": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+            "pattern": "^\\+[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for creating or updating a Delighted person."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier of the person."
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address of the person.",
+                "format": "email"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Display name of the person."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Display name of the person."
+              },
+              "created_at": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Unix timestamp in seconds."
+              },
+              "phone_number": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 16,
+                "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+                "pattern": "^\\+[0-9]+$"
+              },
+              "last_sent_at": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Unix timestamp in seconds."
+              },
+              "last_responded_at": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Unix timestamp in seconds."
+              },
+              "next_survey_scheduled_at": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix timestamp in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Unix timestamp in seconds."
+              },
+              "survey_scheduled_at": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Unix timestamp in seconds."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Unix timestamp in seconds."
+              },
+              "properties": {
+                "type": "object",
+                "additionalProperties": {
+                  "description": "A custom property value."
+                },
+                "description": "Custom properties associated with the person."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Delighted person."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Created or updated Delighted person."
+      }
+    },
+    {
+      "id": "delighted.delete_person",
+      "service": "delighted",
+      "name": "delete_person",
+      "description": "Delete a Delighted person and all related survey history.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the person."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "format": "email"
+          },
+          "phone_number": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+            "pattern": "^\\+[0-9]+$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for deleting a Delighted person by id, email, or phone number."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Delighted accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Boolean confirmation returned by Delighted mutation endpoints."
+      }
+    },
+    {
+      "id": "delighted.get_metrics",
+      "service": "delighted",
+      "name": "get_metrics",
+      "description": "Retrieve Net Promoter Score and related metrics from Delighted.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "trend": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trend identifier restricting metrics to a specific trend."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "core",
+                "email",
+                "kiosk",
+                "link",
+                "sms",
+                "web"
+              ],
+              "description": "Metric group identifier."
+            },
+            "description": "Metric groups to return. The default is core."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for retrieving Delighted metrics."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "nps": {
+                "type": "integer",
+                "description": "Net Promoter Score for the selected time range."
+              },
+              "promoter_count": {
+                "type": "integer",
+                "description": "Number of promoter responses in the selected time range."
+              },
+              "promoter_percent": {
+                "type": "integer",
+                "description": "Percentage of promoter responses in the selected time range."
+              },
+              "passive_count": {
+                "type": "integer",
+                "description": "Number of passive responses in the selected time range."
+              },
+              "passive_percent": {
+                "type": "integer",
+                "description": "Percentage of passive responses in the selected time range."
+              },
+              "detractor_count": {
+                "type": "integer",
+                "description": "Number of detractor responses in the selected time range."
+              },
+              "detractor_percent": {
+                "type": "integer",
+                "description": "Percentage of detractor responses in the selected time range."
+              },
+              "response_count": {
+                "type": "integer",
+                "description": "Total number of responses in the selected time range."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Metrics payload returned by Delighted."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Delighted metrics response."
+      }
+    },
+    {
+      "id": "delighted.list_bounced_people",
+      "service": "delighted",
+      "name": "list_bounced_people",
+      "description": "List bounced people in the connected Delighted account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return per page. The default is 20. The maximum is 100."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. The default is 1."
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing bounced Delighted people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bounces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "person_id": {
+                  "type": "string",
+                  "description": "Identifier of the bounced person."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the person.",
+                  "format": "email"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Display name of the bounced person."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Display name of the bounced person."
+                },
+                "bounced_at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Unix timestamp in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Delighted bounce record."
+            },
+            "description": "Bounce records returned by Delighted."
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Next page number when another page is likely available, or null otherwise."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next page number when another page is likely available, or null otherwise."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Delighted bounce records."
+      }
+    },
+    {
+      "id": "delighted.list_people",
+      "service": "delighted",
+      "name": "list_people",
+      "description": "List people in the connected Delighted account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return per page. The default is 20. The maximum is 100."
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "format": "email"
+          },
+          "phone_number": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16,
+            "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+            "pattern": "^\\+[0-9]+$"
+          },
+          "page_info": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque pagination cursor returned in the Link header of a previous response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing Delighted people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier of the person."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the person.",
+                  "format": "email"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Display name of the person."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Display name of the person."
+                },
+                "created_at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Unix timestamp in seconds."
+                },
+                "phone_number": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16,
+                  "description": "Phone number in E.164 format. The value must start with a plus sign followed by digits.",
+                  "pattern": "^\\+[0-9]+$"
+                },
+                "last_sent_at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Unix timestamp in seconds."
+                },
+                "last_responded_at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Unix timestamp in seconds."
+                },
+                "next_survey_scheduled_at": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Unix timestamp in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Unix timestamp in seconds."
+                },
+                "survey_scheduled_at": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Unix timestamp in seconds."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Unix timestamp in seconds."
+                },
+                "properties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "description": "A custom property value."
+                  },
+                  "description": "Custom properties associated with the person."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Delighted person."
+            },
+            "description": "People returned by Delighted."
+          },
+          "next_page_info": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Opaque page_info cursor for the next page, or null when there is no next page."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opaque page_info cursor for the next page, or null when there is no next page."
+          },
+          "next_page_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Absolute URL for the next page returned in the Link header, or null when absent."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Absolute URL for the next page returned in the Link header, or null when absent."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Delighted people."
+      }
+    },
+    {
+      "id": "delighted.list_survey_responses",
+      "service": "delighted",
+      "name": "list_survey_responses",
+      "description": "List survey responses collected in the connected Delighted account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return per page. The default is 20. The maximum is 100."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. The default is 1."
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "updated_since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "updated_until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "trend": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trend identifier restricting responses to a specific trend."
+          },
+          "person_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier of the person."
+          },
+          "person_email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "format": "email"
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc",
+              "asc:updated_at",
+              "desc:updated_at"
+            ],
+            "description": "Sort order for responses based on creation time or updated_at."
+          },
+          "expand": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "person",
+                "notes"
+              ],
+              "description": "Expanded response relation."
+            },
+            "description": "Objects to expand in the survey response payload. The default is notes."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing Delighted survey responses."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Delighted survey response."
+            },
+            "description": "Survey responses returned by Delighted."
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Next page number when another page is likely available, or null otherwise."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next page number when another page is likely available, or null otherwise."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Delighted survey responses."
+      }
+    },
+    {
+      "id": "delighted.list_unsubscribed_people",
+      "service": "delighted",
+      "name": "list_unsubscribed_people",
+      "description": "List unsubscribed people in the connected Delighted account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of results to return per page. The default is 20. The maximum is 100."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The page number to return. The default is 1."
+          },
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          },
+          "until": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for listing unsubscribed Delighted people."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "unsubscribes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "person_id": {
+                  "type": "string",
+                  "description": "Identifier of the unsubscribed person."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "Email address of the person.",
+                  "format": "email"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Display name of the unsubscribed person."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Display name of the unsubscribed person."
+                },
+                "unsubscribed_at": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Unix timestamp in seconds."
+                }
+              },
+              "additionalProperties": true,
+              "description": "Delighted unsubscribe record."
+            },
+            "description": "Unsubscribe records returned by Delighted."
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "Next page number when another page is likely available, or null otherwise."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Next page number when another page is likely available, or null otherwise."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated list of Delighted unsubscribe records."
+      }
+    },
+    {
+      "id": "delighted.unsubscribe_person",
+      "service": "delighted",
+      "name": "unsubscribe_person",
+      "description": "Add a person to the Delighted unsubscribe list.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "person_email": {
+            "type": "string",
+            "description": "Email address of the person.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for adding a person to the Delighted unsubscribe list."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether Delighted accepted the request."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Boolean confirmation returned by Delighted mutation endpoints."
+      }
+    }
+  ]
+}

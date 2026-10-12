@@ -1,0 +1,809 @@
+{
+  "service": "crustdata",
+  "displayName": "Crustdata",
+  "categories": [
+    "Data",
+    "Marketing"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CRUSTDATA_API_KEY",
+      "description": "Crustdata API key used with the Authorization Bearer header. Create or view it from the official Crustdata dashboard: https://crustdata.com/demo",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://crustdata.com",
+  "actions": [
+    {
+      "id": "crustdata.autocomplete_companies",
+      "service": "crustdata",
+      "name": "autocomplete_companies",
+      "description": "Return exact field values to reuse in Crustdata company search filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The searchable field to autocomplete."
+          },
+          "query": {
+            "type": "string",
+            "description": "The partial text to match. Use an empty string for common values."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "The maximum number of suggestions to return."
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The searchable field name to filter on."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "=",
+                  "!=",
+                  ">",
+                  "<",
+                  "=>",
+                  "=<",
+                  "in",
+                  "not_in",
+                  "is_null",
+                  "is_not_null",
+                  "(.)",
+                  "[.]"
+                ],
+                "description": "The official Crustdata filter operator. Use `=>` and `=<` instead of `>=` and `<=`."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string filter value."
+                  },
+                  {
+                    "type": "integer",
+                    "description": "An integer filter value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric filter value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean filter value."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string array item."
+                        },
+                        {
+                          "type": "integer",
+                          "description": "An integer array item."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric array item."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean array item."
+                        }
+                      ],
+                      "description": "One array item for a Crustdata filter value."
+                    },
+                    "description": "An array filter value accepted by the Crustdata API.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "One supported Crustdata filter value."
+              },
+              "and": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One nested filter condition or group."
+                },
+                "description": "A list of nested filter conditions or groups combined with logical AND.",
+                "minItems": 1
+              },
+              "or": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One nested filter condition or group."
+                },
+                "description": "A list of nested filter conditions or groups combined with logical OR.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Crustdata filter condition or nested group using `and` or `or` arrays."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "query"
+        ],
+        "description": "Input parameters for requesting Crustdata company autocomplete suggestions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string",
+                  "description": "The exact field value to reuse in a later search filter."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "value"
+              ],
+              "description": "One autocomplete suggestion."
+            },
+            "description": "The ordered autocomplete suggestions returned by Crustdata."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "suggestions"
+        ],
+        "description": "The normalized Crustdata company autocomplete response."
+      }
+    },
+    {
+      "id": "crustdata.enrich_companies",
+      "service": "crustdata",
+      "name": "enrich_companies",
+      "description": "Enrich companies from one identifier family and optional field sections, returning ranked company matches with detailed profiles.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company domain."
+            },
+            "description": "The company domains to resolve or enrich.",
+            "minItems": 1
+          },
+          "professionalNetworkProfileUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company profile URL."
+            },
+            "description": "The company profile URLs to resolve or enrich.",
+            "minItems": 1
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company name."
+            },
+            "description": "The company names to resolve or enrich.",
+            "minItems": 1
+          },
+          "crustdataCompanyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Crustdata company ID."
+            },
+            "description": "The Crustdata company IDs to enrich.",
+            "minItems": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field or section name accepted by the Crustdata API."
+            },
+            "description": "The response fields or sections to request from Crustdata.",
+            "minItems": 1
+          },
+          "exactMatch": {
+            "type": "boolean",
+            "description": "Whether Crustdata should enforce strict domain matching."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for identifying or enriching companies with Crustdata. Provide exactly one identifier array."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "matchedOn": {
+                  "type": "string",
+                  "description": "The identifier Crustdata matched on."
+                },
+                "matchType": {
+                  "type": "string",
+                  "description": "The identifier type Crustdata reports for this result."
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceScore": {
+                        "type": "number",
+                        "description": "The Crustdata confidence score for this match."
+                      },
+                      "companyData": {
+                        "type": "object",
+                        "properties": {
+                          "crustdata_company_id": {
+                            "type": "integer",
+                            "description": "The Crustdata company ID when present."
+                          },
+                          "basic_info": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "The company name returned by Crustdata."
+                              },
+                              "primary_domain": {
+                                "type": "string",
+                                "description": "The primary domain returned by Crustdata."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "The `basic_info` section returned by Crustdata."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "A string response value."
+                                },
+                                {
+                                  "type": "integer",
+                                  "description": "An integer response value."
+                                },
+                                {
+                                  "type": "number",
+                                  "description": "A numeric response value."
+                                },
+                                {
+                                  "type": "boolean",
+                                  "description": "A boolean response value."
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {},
+                                  "additionalProperties": false,
+                                  "description": "An empty object response value."
+                                }
+                              ],
+                              "description": "One primitive Crustdata response value."
+                            },
+                            "description": "Additional metadata returned by Crustdata."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "The upstream Crustdata company payload."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "confidenceScore",
+                      "companyData"
+                    ],
+                    "description": "One Crustdata company match."
+                  },
+                  "description": "The ranked company matches returned by Crustdata."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "matchedOn",
+                "matchType",
+                "matches"
+              ],
+              "description": "One normalized Crustdata identify or enrich result."
+            },
+            "description": "The normalized enrich results for each submitted identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The normalized Crustdata enrich response."
+      }
+    },
+    {
+      "id": "crustdata.identify_companies",
+      "service": "crustdata",
+      "name": "identify_companies",
+      "description": "Resolve companies from domains, profile URLs, names, or Crustdata company IDs and return ranked matches.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company domain."
+            },
+            "description": "The company domains to resolve or enrich.",
+            "minItems": 1
+          },
+          "professionalNetworkProfileUrls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company profile URL."
+            },
+            "description": "The company profile URLs to resolve or enrich.",
+            "minItems": 1
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One company name."
+            },
+            "description": "The company names to resolve or enrich.",
+            "minItems": 1
+          },
+          "crustdataCompanyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "One Crustdata company ID."
+            },
+            "description": "The Crustdata company IDs to enrich.",
+            "minItems": 1
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field or section name accepted by the Crustdata API."
+            },
+            "description": "The response fields or sections to request from Crustdata.",
+            "minItems": 1
+          },
+          "exactMatch": {
+            "type": "boolean",
+            "description": "Whether Crustdata should enforce strict domain matching."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for identifying or enriching companies with Crustdata. Provide exactly one identifier array."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "matchedOn": {
+                  "type": "string",
+                  "description": "The identifier Crustdata matched on."
+                },
+                "matchType": {
+                  "type": "string",
+                  "description": "The identifier type Crustdata reports for this result."
+                },
+                "matches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceScore": {
+                        "type": "number",
+                        "description": "The Crustdata confidence score for this match."
+                      },
+                      "companyData": {
+                        "type": "object",
+                        "properties": {
+                          "crustdata_company_id": {
+                            "type": "integer",
+                            "description": "The Crustdata company ID when present."
+                          },
+                          "basic_info": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "The company name returned by Crustdata."
+                              },
+                              "primary_domain": {
+                                "type": "string",
+                                "description": "The primary domain returned by Crustdata."
+                              }
+                            },
+                            "additionalProperties": true,
+                            "description": "The `basic_info` section returned by Crustdata."
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "description": "A string response value."
+                                },
+                                {
+                                  "type": "integer",
+                                  "description": "An integer response value."
+                                },
+                                {
+                                  "type": "number",
+                                  "description": "A numeric response value."
+                                },
+                                {
+                                  "type": "boolean",
+                                  "description": "A boolean response value."
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {},
+                                  "additionalProperties": false,
+                                  "description": "An empty object response value."
+                                }
+                              ],
+                              "description": "One primitive Crustdata response value."
+                            },
+                            "description": "Additional metadata returned by Crustdata."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "The upstream Crustdata company payload."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "confidenceScore",
+                      "companyData"
+                    ],
+                    "description": "One Crustdata company match."
+                  },
+                  "description": "The ranked company matches returned by Crustdata."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "matchedOn",
+                "matchType",
+                "matches"
+              ],
+              "description": "One normalized Crustdata identify or enrich result."
+            },
+            "description": "The normalized identify results for each submitted identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "results"
+        ],
+        "description": "The normalized Crustdata identify response."
+      }
+    },
+    {
+      "id": "crustdata.search_companies",
+      "service": "crustdata",
+      "name": "search_companies",
+      "description": "Search companies with Crustdata filters, optional field selection, sorting, and cursor pagination.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The searchable field name to filter on."
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "=",
+                  "!=",
+                  ">",
+                  "<",
+                  "=>",
+                  "=<",
+                  "in",
+                  "not_in",
+                  "is_null",
+                  "is_not_null",
+                  "(.)",
+                  "[.]"
+                ],
+                "description": "The official Crustdata filter operator. Use `=>` and `=<` instead of `>=` and `<=`."
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "A string filter value."
+                  },
+                  {
+                    "type": "integer",
+                    "description": "An integer filter value."
+                  },
+                  {
+                    "type": "number",
+                    "description": "A numeric filter value."
+                  },
+                  {
+                    "type": "boolean",
+                    "description": "A boolean filter value."
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "A string array item."
+                        },
+                        {
+                          "type": "integer",
+                          "description": "An integer array item."
+                        },
+                        {
+                          "type": "number",
+                          "description": "A numeric array item."
+                        },
+                        {
+                          "type": "boolean",
+                          "description": "A boolean array item."
+                        }
+                      ],
+                      "description": "One array item for a Crustdata filter value."
+                    },
+                    "description": "An array filter value accepted by the Crustdata API.",
+                    "minItems": 1
+                  }
+                ],
+                "description": "One supported Crustdata filter value."
+              },
+              "and": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One nested filter condition or group."
+                },
+                "description": "A list of nested filter conditions or groups combined with logical AND.",
+                "minItems": 1
+              },
+              "or": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "One nested filter condition or group."
+                },
+                "description": "A list of nested filter conditions or groups combined with logical OR.",
+                "minItems": 1
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Crustdata filter condition or nested group using `and` or `or` arrays."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One field or section name accepted by the Crustdata API."
+            },
+            "description": "The response fields or sections to request from Crustdata.",
+            "minItems": 1
+          },
+          "sorts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The sortable field name to order by."
+                },
+                "order": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "description": "The sort order for one Crustdata sort rule."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "column",
+                "order"
+              ],
+              "description": "One Crustdata sort rule."
+            },
+            "description": "The ordered sort rules for a company search request.",
+            "minItems": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "The number of companies to return per page."
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The pagination cursor returned by a previous search response."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for searching companies with Crustdata."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "crustdata_company_id": {
+                  "type": "integer",
+                  "description": "The Crustdata company ID when present."
+                },
+                "basic_info": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The company name returned by Crustdata."
+                    },
+                    "primary_domain": {
+                      "type": "string",
+                      "description": "The primary domain returned by Crustdata."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The `basic_info` section returned by Crustdata."
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "A string response value."
+                      },
+                      {
+                        "type": "integer",
+                        "description": "An integer response value."
+                      },
+                      {
+                        "type": "number",
+                        "description": "A numeric response value."
+                      },
+                      {
+                        "type": "boolean",
+                        "description": "A boolean response value."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false,
+                        "description": "An empty object response value."
+                      }
+                    ],
+                    "description": "One primitive Crustdata response value."
+                  },
+                  "description": "Additional metadata returned by Crustdata."
+                }
+              },
+              "additionalProperties": true,
+              "description": "The upstream Crustdata company payload."
+            },
+            "description": "The company search results returned by Crustdata."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The cursor for the next company search page, or null when no further page exists."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor for the next company search page, or null when no further page exists."
+          },
+          "totalCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "description": "The total number of matching companies when Crustdata returns it."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The total number of matching companies when Crustdata returns it."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "companies",
+          "nextCursor",
+          "totalCount"
+        ],
+        "description": "The normalized Crustdata company search response."
+      }
+    }
+  ]
+}

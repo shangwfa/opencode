@@ -1,0 +1,300 @@
+{
+  "service": "castingwords",
+  "displayName": "CastingWords",
+  "categories": [
+    "Design & Media",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "CASTINGWORDS_API_KEY",
+      "description": "CastingWords API key used to order and retrieve transcriptions. Sign in and copy the API key from your account settings: https://castingwords.com/customer/info."
+    }
+  ],
+  "homepageUrl": "https://castingwords.com",
+  "actions": [
+    {
+      "id": "castingwords.get_prepay_balance",
+      "service": "castingwords",
+      "name": "get_prepay_balance",
+      "description": "Get the current CastingWords prepay balance in US dollars.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "No input is required to read the prepay balance."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "string",
+            "description": "The current prepay balance in US dollars."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw CastingWords balance response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "balance",
+          "raw"
+        ],
+        "description": "The CastingWords prepay balance response."
+      }
+    },
+    {
+      "id": "castingwords.get_transcript",
+      "service": "castingwords",
+      "name": "get_transcript",
+      "description": "Retrieve a completed CastingWords transcript as plain text or HTML.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "audiofileId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CastingWords audio file identifier."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "txt",
+              "html"
+            ],
+            "description": "The requested text transcript format. Defaults to txt."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether to request the official fake transcript response for supported test audio file IDs."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audiofileId"
+        ],
+        "description": "A CastingWords transcript retrieval request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "txt",
+              "html"
+            ],
+            "description": "The returned transcript format."
+          },
+          "transcript": {
+            "type": "string",
+            "description": "The transcript content as plain text or HTML."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "format",
+          "transcript"
+        ],
+        "description": "The retrieved CastingWords transcript."
+      }
+    },
+    {
+      "id": "castingwords.get_transcription_status",
+      "service": "castingwords",
+      "name": "get_transcription_status",
+      "description": "Get the current CastingWords processing state and documented audio file details.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "audiofileId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CastingWords audio file identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audiofileId"
+        ],
+        "description": "A CastingWords transcription status request."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "audiofileId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CastingWords audio file identifier."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled",
+              "refunded"
+            ],
+            "description": "The normalized lifecycle state used for Connector polling."
+          },
+          "providerStatus": {
+            "type": "string",
+            "description": "The original CastingWords statename value."
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The documented CastingWords audio file details."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audiofileId",
+          "status",
+          "providerStatus",
+          "details"
+        ],
+        "description": "The normalized CastingWords transcription state."
+      },
+      "followUpActions": [
+        "castingwords.get_transcript"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "castingwords.submit_transcription",
+        "statusActionId": "castingwords.get_transcription_status"
+      }
+    },
+    {
+      "id": "castingwords.submit_transcription",
+      "service": "castingwords",
+      "name": "submit_transcription",
+      "description": "Submit one publicly accessible audio or video URL for asynchronous human transcription.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mediaUrl": {
+            "type": "string",
+            "description": "A directly downloadable public audio or video URL that CastingWords should transcribe.",
+            "format": "uri"
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "TRANS14",
+              "TRANS2",
+              "TRANS6",
+              "TRANS7"
+            ],
+            "description": "The transcription tier: TRANS14 for Budget, TRANS2 for 1-Day, or TRANS6/TRANS7 for 7-Day service."
+          },
+          "addons": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DIFFQ2",
+                "TSTMP1",
+                "VERBATIM1"
+              ],
+              "description": "An add-on SKU: DIFFQ2 for difficult audio, TSTMP1 for timestamps, or VERBATIM1 for verbatim transcription."
+            },
+            "description": "Optional add-on SKUs applied to the transcription.",
+            "minItems": 1
+          },
+          "speakerNames": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One speaker name."
+            },
+            "description": "Speaker names that help transcribers identify people in the recording.",
+            "minItems": 1
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Instructions or context for the transcribers."
+          },
+          "test": {
+            "type": "boolean",
+            "description": "Whether to create a no-charge test order that validates the media URL without producing a real transcript."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mediaUrl",
+          "serviceTier"
+        ],
+        "description": "A URL-based CastingWords transcription order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "The CastingWords order identifier."
+          },
+          "audiofileId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The CastingWords audio file identifier used for status and transcript requests."
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "The order result message when CastingWords returned one."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The order result message when CastingWords returned one."
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The raw CastingWords order response."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId",
+          "audiofileId",
+          "message",
+          "raw"
+        ],
+        "description": "The accepted CastingWords transcription order."
+      },
+      "followUpActions": [
+        "castingwords.get_transcription_status",
+        "castingwords.get_transcript"
+      ],
+      "asyncLifecycle": {
+        "startActionId": "castingwords.submit_transcription",
+        "statusActionId": "castingwords.get_transcription_status"
+      }
+    }
+  ]
+}

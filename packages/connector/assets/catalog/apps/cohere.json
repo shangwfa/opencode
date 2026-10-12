@@ -1,0 +1,581 @@
+{
+  "service": "cohere",
+  "displayName": "Cohere",
+  "categories": [
+    "AI"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "cohere_api_key",
+      "description": "Cohere API key used with the Authorization Bearer header. Create or copy one from https://dashboard.cohere.com/api-keys.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://cohere.com",
+  "actions": [
+    {
+      "id": "cohere.chat",
+      "service": "cohere",
+      "name": "chat",
+      "description": "Generate a synchronous text response using the Cohere Chat API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name of a compatible Cohere chat model."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "description": "The author role for the message."
+                },
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "Plain text message content."
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": "The content block type, such as text or image_url."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "required": [
+                          "type"
+                        ],
+                        "description": "A Cohere chat message content block."
+                      },
+                      "description": "Structured content blocks for the message.",
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "The content of a Cohere chat message."
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": true,
+                    "description": "A JSON object accepted or returned by the Cohere API."
+                  },
+                  "description": "Tool calls made by the assistant message."
+                },
+                "tool_call_id": {
+                  "type": "string",
+                  "description": "The identifier of the tool call this tool message responds to."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "role"
+              ],
+              "description": "A message in the conversation sent to the Cohere Chat API."
+            },
+            "description": "The ordered conversation messages to send to Cohere.",
+            "minItems": 1
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "A JSON object accepted or returned by the Cohere API."
+            },
+            "description": "Function tools available to the model."
+          },
+          "strict_tools": {
+            "type": "boolean",
+            "description": "Whether tool calls must strictly follow the tool definition."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Document text."
+                },
+                {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object accepted or returned by the Cohere API."
+                }
+              ],
+              "description": "A document supplied to the model."
+            },
+            "description": "Documents that the model can cite while generating the response."
+          },
+          "citation_options": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object accepted or returned by the Cohere API."
+          },
+          "response_format": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object accepted or returned by the Cohere API."
+          },
+          "safety_mode": {
+            "type": "string",
+            "description": "The Cohere safety mode to use for the request."
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "The maximum number of output tokens the model will generate."
+          },
+          "stop_sequences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A stop sequence."
+            },
+            "description": "Stop sequences that halt generation.",
+            "maxItems": 5
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Randomness used for generation."
+          },
+          "seed": {
+            "type": "integer",
+            "description": "A best-effort deterministic sampling seed."
+          },
+          "frequency_penalty": {
+            "type": "number",
+            "description": "Penalty used to reduce repeated tokens."
+          },
+          "presence_penalty": {
+            "type": "number",
+            "description": "Penalty used to reduce reused token content."
+          },
+          "k": {
+            "type": "integer",
+            "description": "Top-k sampling value. Use 0 to disable k-sampling."
+          },
+          "p": {
+            "type": "number",
+            "description": "Top-p sampling value."
+          },
+          "logprobs": {
+            "type": "boolean",
+            "description": "Whether to include generated-token log probabilities."
+          },
+          "tool_choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "A predefined tool choice value."
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "A JSON object accepted or returned by the Cohere API."
+              }
+            ],
+            "description": "Tool selection behavior for the model."
+          },
+          "thinking": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "A JSON object accepted or returned by the Cohere API."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Lower values are handled earlier by Cohere."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages"
+        ],
+        "description": "Input for generating a synchronous response with the Cohere Chat API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique Cohere response identifier."
+          },
+          "finish_reason": {
+            "type": "string",
+            "description": "Why generation finished."
+          },
+          "message": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string",
+                "description": "The role of the returned message."
+              },
+              "content": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object accepted or returned by the Cohere API."
+                },
+                "description": "Content blocks returned by the assistant message."
+              },
+              "tool_calls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": true,
+                  "description": "A JSON object accepted or returned by the Cohere API."
+                },
+                "description": "Tool calls returned by Cohere."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The assistant message returned by Cohere."
+          },
+          "usage": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Usage statistics returned by Cohere."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "finish_reason",
+          "message",
+          "usage"
+        ],
+        "description": "The response returned by the Cohere Chat API."
+      }
+    },
+    {
+      "id": "cohere.embed_texts",
+      "service": "cohere",
+      "name": "embed_texts",
+      "description": "Generate embeddings for text inputs using the Cohere Embed API.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cohere embedding model identifier."
+          },
+          "input_type": {
+            "type": "string",
+            "enum": [
+              "search_document",
+              "search_query",
+              "classification",
+              "clustering"
+            ],
+            "description": "The type of input passed to the embedding model."
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A text value to embed."
+            },
+            "description": "Text strings for the model to embed.",
+            "minItems": 1,
+            "maxItems": 96
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "The maximum number of tokens to embed per input."
+          },
+          "output_dimension": {
+            "type": "integer",
+            "description": "The number of dimensions for embed-v4 and newer models."
+          },
+          "embedding_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "float",
+                "int8",
+                "uint8",
+                "binary",
+                "ubinary",
+                "base64"
+              ],
+              "description": "The embedding representation to return."
+            },
+            "description": "Embedding representations to return.",
+            "minItems": 1
+          },
+          "truncate": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "START",
+              "END"
+            ],
+            "description": "How Cohere handles inputs longer than the model limit."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Lower values are handled earlier by Cohere."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "input_type",
+          "texts"
+        ],
+        "description": "Input for generating text embeddings with the Cohere Embed API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique Cohere response identifier."
+          },
+          "embeddings": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Embeddings grouped by requested representation type."
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A text input."
+            },
+            "description": "Text inputs echoed by Cohere."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "description": "The API version used for the response."
+                  },
+                  "is_deprecated": {
+                    "type": "boolean",
+                    "description": "Whether this API version is deprecated."
+                  },
+                  "is_experimental": {
+                    "type": "boolean",
+                    "description": "Whether this API version is experimental."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Cohere API version metadata."
+              },
+              "billed_units": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Billing unit counts reported by Cohere."
+              },
+              "tokens": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Token usage counts reported by Cohere."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A warning message."
+                },
+                "description": "Warnings returned by Cohere."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cohere API metadata including usage and billing details."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "embeddings",
+          "texts",
+          "meta"
+        ],
+        "description": "The response returned by the Cohere Embed API."
+      }
+    },
+    {
+      "id": "cohere.rerank_documents",
+      "service": "cohere",
+      "name": "rerank_documents",
+      "description": "Rank text documents by relevance to a query using the Cohere Rerank API.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cohere rerank model identifier."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The search query used to rank documents."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A text document to rank."
+            },
+            "description": "Texts that will be compared to the query.",
+            "minItems": 1
+          },
+          "top_n": {
+            "type": "integer",
+            "description": "Maximum number of rerank results to return."
+          },
+          "max_tokens_per_doc": {
+            "type": "integer",
+            "description": "Maximum tokens to keep per document before ranking."
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Lower values are handled earlier by Cohere."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "query",
+          "documents"
+        ],
+        "description": "Input for ranking documents by relevance with the Cohere Rerank API."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique Cohere response identifier."
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The original zero-based index of the ranked document."
+                },
+                "relevance_score": {
+                  "type": "number",
+                  "description": "Normalized relevance score between 0 and 1."
+                }
+              },
+              "additionalProperties": false,
+              "description": "A ranked document result returned by Cohere."
+            },
+            "description": "Ranked document results."
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "api_version": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "description": "The API version used for the response."
+                  },
+                  "is_deprecated": {
+                    "type": "boolean",
+                    "description": "Whether this API version is deprecated."
+                  },
+                  "is_experimental": {
+                    "type": "boolean",
+                    "description": "Whether this API version is experimental."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "The Cohere API version metadata."
+              },
+              "billed_units": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Billing unit counts reported by Cohere."
+              },
+              "tokens": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true,
+                "description": "Token usage counts reported by Cohere."
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "A warning message."
+                },
+                "description": "Warnings returned by Cohere."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Cohere API metadata including usage and billing details."
+          }
+        },
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "results",
+          "meta"
+        ],
+        "description": "The response returned by the Cohere Rerank API."
+      }
+    }
+  ]
+}

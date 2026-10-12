@@ -1,0 +1,1017 @@
+{
+  "service": "neetodesk",
+  "displayName": "NeetoDesk",
+  "categories": [
+    "Communication",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "neetodesk_api_key",
+      "description": "NeetoDesk workspace API key sent in the X-Api-Key header. Create it in Settings > API Keys: https://help.neetodesk.com/articles/api-keys.",
+      "extraFields": [
+        {
+          "key": "subdomain",
+          "label": "Workspace Subdomain",
+          "inputType": "text",
+          "required": true,
+          "secret": false,
+          "placeholder": "your-workspace",
+          "description": "The part before .neetodesk.com in your workspace URL. See https://apidocs.neetodesk.com/getting-started/workspace-subdomain."
+        }
+      ]
+    }
+  ],
+  "homepageUrl": "https://www.neeto.com/neetodesk",
+  "actions": [
+    {
+      "id": "neetodesk.create_comment",
+      "service": "neetodesk",
+      "name": "create_comment",
+      "description": "Create a reply or private note on a NeetoDesk ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket UUID or sequential ticket number."
+          },
+          "author_email": {
+            "type": "string",
+            "description": "The email address attributed as the comment author.",
+            "format": "email"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The comment content."
+          },
+          "author_type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "description": "The kind of author represented by author_email."
+          },
+          "comment_type": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "note"
+            ],
+            "description": "Whether to create a public reply or private note."
+          },
+          "message_id": {
+            "type": "string",
+            "description": "A caller-supplied idempotency identifier unique per ticket."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id",
+          "author_email",
+          "content"
+        ],
+        "description": "The NeetoDesk ticket comment to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The comment's unique identifier."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The comment creation timestamp.",
+                "format": "date-time"
+              },
+              "comment_type": {
+                "type": "string",
+                "description": "The comment type, such as reply or note."
+              },
+              "content": {
+                "type": "string",
+                "description": "The comment content."
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The person's unique identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The person's display name."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "The person's email address."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A NeetoDesk person summary."
+              }
+            },
+            "additionalProperties": true,
+            "required": [
+              "id",
+              "created_at",
+              "comment_type",
+              "content"
+            ],
+            "description": "A NeetoDesk ticket comment and any additional upstream fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "comment"
+        ],
+        "description": "The created NeetoDesk comment."
+      }
+    },
+    {
+      "id": "neetodesk.create_ticket",
+      "service": "neetodesk",
+      "name": "create_ticket",
+      "description": "Create a ticket in a NeetoDesk workspace.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The customer email address.",
+            "format": "email"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The ticket subject."
+          },
+          "description": {
+            "type": "string",
+            "description": "The ticket description."
+          },
+          "status": {
+            "type": "string",
+            "description": "A default or custom workspace ticket status."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
+            "description": "The ticket priority."
+          },
+          "group": {
+            "type": "string",
+            "description": "The name of an existing NeetoDesk group."
+          },
+          "assignee_email": {
+            "type": "string",
+            "description": "The email address of an existing team member.",
+            "format": "email"
+          },
+          "category": {
+            "type": "string",
+            "description": "The ticket category."
+          },
+          "sub_category_one": {
+            "type": "string",
+            "description": "The ticket's first-level sub-category."
+          },
+          "sub_category_two": {
+            "type": "string",
+            "description": "The ticket's second-level sub-category."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ticket tag."
+            },
+            "description": "Tags to assign to the ticket."
+          },
+          "ticket_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom ticket field value."
+            },
+            "description": "Custom ticket fields keyed by field name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "subject",
+          "description"
+        ],
+        "description": "The NeetoDesk ticket to create."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The created ticket's unique identifier."
+              },
+              "number": {
+                "type": "integer",
+                "description": "The created ticket's sequential workspace number."
+              },
+              "url": {
+                "type": "string",
+                "description": "The NeetoDesk admin URL for the created ticket.",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "number",
+              "url"
+            ],
+            "description": "A newly created NeetoDesk ticket reference."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The created NeetoDesk ticket reference."
+      }
+    },
+    {
+      "id": "neetodesk.get_ticket",
+      "service": "neetodesk",
+      "name": "get_ticket",
+      "description": "Retrieve one NeetoDesk ticket by UUID or sequential ticket number.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket UUID or sequential ticket number."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "The NeetoDesk ticket to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The ticket's unique identifier."
+              },
+              "number": {
+                "type": "integer",
+                "description": "The ticket's sequential workspace number."
+              },
+              "subject": {
+                "type": "string",
+                "description": "The ticket subject."
+              },
+              "description": {
+                "type": "string",
+                "description": "The ticket description as HTML content."
+              },
+              "priority": {
+                "type": "string",
+                "description": "The ticket priority."
+              },
+              "status": {
+                "type": "string",
+                "description": "The ticket status."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The ticket creation timestamp.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The ticket update timestamp.",
+                "format": "date-time"
+              },
+              "assignee": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The person's unique identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The person's display name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The person's email address."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A NeetoDesk person summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A NeetoDesk person summary."
+              },
+              "customer": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The person's unique identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The person's display name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The person's email address."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A NeetoDesk person summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A NeetoDesk person summary."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A NeetoDesk ticket and any additional upstream fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The requested NeetoDesk ticket."
+      }
+    },
+    {
+      "id": "neetodesk.list_comments",
+      "service": "neetodesk",
+      "name": "list_comments",
+      "description": "List comments for a NeetoDesk ticket.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket UUID or sequential ticket number."
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "The ticket and page of comments to retrieve."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The comment's unique identifier."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The comment creation timestamp.",
+                  "format": "date-time"
+                },
+                "comment_type": {
+                  "type": "string",
+                  "description": "The comment type, such as reply or note."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "The comment content."
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The person's unique identifier."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The person's display name."
+                    },
+                    "email": {
+                      "type": "string",
+                      "description": "The person's email address."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "A NeetoDesk person summary."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "created_at",
+                "comment_type",
+                "content"
+              ],
+              "description": "A NeetoDesk ticket comment and any additional upstream fields."
+            },
+            "description": "The returned comments."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total_records": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "current_page_number": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "page_size": {
+                "type": "integer",
+                "description": "The number of records in one page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "total_records",
+              "total_pages",
+              "current_page_number",
+              "page_size"
+            ],
+            "description": "Pagination metadata returned by NeetoDesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "comments",
+          "pagination"
+        ],
+        "description": "A page of NeetoDesk ticket comments."
+      }
+    },
+    {
+      "id": "neetodesk.list_team_members",
+      "service": "neetodesk",
+      "name": "list_team_members",
+      "description": "List team members in a NeetoDesk workspace.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          },
+          "email": {
+            "type": "string",
+            "description": "The exact team member email address to match.",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing NeetoDesk team members."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "team_members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The team member's unique identifier."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The team member's email address."
+                },
+                "first_name": {
+                  "type": "string",
+                  "description": "The team member's first name."
+                },
+                "last_name": {
+                  "type": "string",
+                  "description": "The team member's last name."
+                },
+                "active": {
+                  "type": "boolean",
+                  "description": "Whether the team member is active."
+                }
+              },
+              "additionalProperties": true,
+              "required": [
+                "id",
+                "email",
+                "first_name",
+                "last_name",
+                "active"
+              ],
+              "description": "A NeetoDesk team member."
+            },
+            "description": "The returned team members."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total_records": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "current_page_number": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "page_size": {
+                "type": "integer",
+                "description": "The number of records in one page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "total_records",
+              "total_pages",
+              "current_page_number",
+              "page_size"
+            ],
+            "description": "Pagination metadata returned by NeetoDesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "team_members",
+          "pagination"
+        ],
+        "description": "A page of NeetoDesk team members."
+      }
+    },
+    {
+      "id": "neetodesk.list_tickets",
+      "service": "neetodesk",
+      "name": "list_tickets",
+      "description": "List tickets in a NeetoDesk workspace with pagination and optional filters.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The one-based page number to retrieve."
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The number of records to return per page."
+          },
+          "status": {
+            "type": "string",
+            "description": "Comma-separated default or custom ticket statuses."
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The external source identifier to match."
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "created_at",
+              "updated_at"
+            ],
+            "description": "The ticket field used for sorting."
+          },
+          "order": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "The sort direction."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Filters for listing NeetoDesk tickets."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tickets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "The ticket's unique identifier."
+                },
+                "number": {
+                  "type": "integer",
+                  "description": "The ticket's sequential workspace number."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "The ticket subject."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "The ticket description as HTML content."
+                },
+                "priority": {
+                  "type": "string",
+                  "description": "The ticket priority."
+                },
+                "status": {
+                  "type": "string",
+                  "description": "The ticket status."
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "The ticket creation timestamp.",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "description": "The ticket update timestamp.",
+                  "format": "date-time"
+                },
+                "assignee": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The person's unique identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The person's display name."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "The person's email address."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A NeetoDesk person summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A NeetoDesk person summary."
+                },
+                "customer": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The person's unique identifier."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The person's display name."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "The person's email address."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "A NeetoDesk person summary."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A NeetoDesk person summary."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A NeetoDesk ticket and any additional upstream fields."
+            },
+            "description": "The returned tickets."
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total_records": {
+                "type": "integer",
+                "description": "The total number of matching records."
+              },
+              "total_pages": {
+                "type": "integer",
+                "description": "The total number of result pages."
+              },
+              "current_page_number": {
+                "type": "integer",
+                "description": "The current one-based page number."
+              },
+              "page_size": {
+                "type": "integer",
+                "description": "The number of records in one page."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "total_records",
+              "total_pages",
+              "current_page_number",
+              "page_size"
+            ],
+            "description": "Pagination metadata returned by NeetoDesk."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tickets",
+          "pagination"
+        ],
+        "description": "A page of NeetoDesk tickets."
+      }
+    },
+    {
+      "id": "neetodesk.update_ticket",
+      "service": "neetodesk",
+      "name": "update_ticket",
+      "description": "Update selected fields on an existing NeetoDesk ticket.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ticket UUID or sequential ticket number."
+          },
+          "email": {
+            "type": "string",
+            "description": "The customer email address.",
+            "format": "email"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The ticket subject."
+          },
+          "description": {
+            "type": "string",
+            "description": "The ticket description."
+          },
+          "status": {
+            "type": "string",
+            "description": "A default or custom workspace ticket status."
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
+            "description": "The ticket priority."
+          },
+          "group": {
+            "type": "string",
+            "description": "The name of an existing NeetoDesk group."
+          },
+          "assignee_email": {
+            "type": "string",
+            "description": "The email address of an existing team member.",
+            "format": "email"
+          },
+          "category": {
+            "type": "string",
+            "description": "The ticket category."
+          },
+          "sub_category_one": {
+            "type": "string",
+            "description": "The ticket's first-level sub-category."
+          },
+          "sub_category_two": {
+            "type": "string",
+            "description": "The ticket's second-level sub-category."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A ticket tag."
+            },
+            "description": "Tags to assign to the ticket."
+          },
+          "ticket_fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "description": "A custom ticket field value."
+            },
+            "description": "Custom ticket fields keyed by field name."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket_id"
+        ],
+        "description": "The NeetoDesk ticket update."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The ticket's unique identifier."
+              },
+              "number": {
+                "type": "integer",
+                "description": "The ticket's sequential workspace number."
+              },
+              "subject": {
+                "type": "string",
+                "description": "The ticket subject."
+              },
+              "description": {
+                "type": "string",
+                "description": "The ticket description as HTML content."
+              },
+              "priority": {
+                "type": "string",
+                "description": "The ticket priority."
+              },
+              "status": {
+                "type": "string",
+                "description": "The ticket status."
+              },
+              "created_at": {
+                "type": "string",
+                "description": "The ticket creation timestamp.",
+                "format": "date-time"
+              },
+              "updated_at": {
+                "type": "string",
+                "description": "The ticket update timestamp.",
+                "format": "date-time"
+              },
+              "assignee": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The person's unique identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The person's display name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The person's email address."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A NeetoDesk person summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A NeetoDesk person summary."
+              },
+              "customer": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The person's unique identifier."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The person's display name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "The person's email address."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "A NeetoDesk person summary."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A NeetoDesk person summary."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A NeetoDesk ticket and any additional upstream fields."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ticket"
+        ],
+        "description": "The updated NeetoDesk ticket."
+      }
+    }
+  ]
+}

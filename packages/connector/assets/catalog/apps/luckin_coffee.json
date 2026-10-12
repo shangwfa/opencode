@@ -1,0 +1,1478 @@
+{
+  "service": "luckin_coffee",
+  "displayName": "Luckin Coffee",
+  "description": "Find Luckin Coffee stores and products, preview orders, and manage orders through the official MCP service.",
+  "categories": [
+    "Location",
+    "Productivity"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "MCP Token",
+      "placeholder": "Paste your Luckin Coffee MCP token",
+      "description": "The Bearer token shared by Luckin Coffee MCP and CLI. Sign in and create or copy it at https://open.lkcoffee.com/mcp. Keep this token private because it is linked to your Luckin Coffee account session."
+    }
+  ],
+  "homepageUrl": "https://open.lkcoffee.com/mcp",
+  "actions": [
+    {
+      "id": "luckin_coffee.cancelOrder",
+      "service": "luckin_coffee",
+      "name": "cancelOrder",
+      "description": "Cancel a Luckin Coffee order. This changes a real order and may be irreversible; confirm the exact order with the user first.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact order ID to cancel."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "Input for canceling a Luckin Coffee order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "boolean",
+            "description": "Whether it was canceled."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Luckin Coffee order cancellation result."
+      }
+    },
+    {
+      "id": "luckin_coffee.createOrder",
+      "service": "luckin_coffee",
+      "name": "createOrder",
+      "description": "Create a real Luckin Coffee order that may require payment. Preview the order first and obtain the user's confirmation before calling this action.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee store ID returned by `queryShopList`."
+          },
+          "productList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The quantity to order."
+                },
+                "productId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Luckin Coffee product ID."
+                },
+                "skuCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact product SKU code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "productId",
+                "skuCode"
+              ],
+              "description": "One configured product in an order."
+            },
+            "description": "The configured products to order.",
+            "minItems": 1
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees."
+          },
+          "couponCodeList": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Coupon codes returned by `previewOrder`."
+          },
+          "remark": {
+            "type": "string",
+            "description": "An optional order note."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deptId",
+          "productList",
+          "longitude",
+          "latitude"
+        ],
+        "description": "Input for creating a confirmed Luckin Coffee order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "type": "number",
+                "description": "The numeric order ID. Prefer `orderIdStr` when passing it to another action."
+              },
+              "payOrderUrl": {
+                "type": "string",
+                "description": "The WeChat payment URL."
+              },
+              "payOrderQrCodeUrl": {
+                "type": "string",
+                "description": "The payment QR-code URL."
+              },
+              "discountPrice": {
+                "type": "number",
+                "description": "The amount to pay."
+              },
+              "needPay": {
+                "type": "boolean",
+                "description": "Whether payment is required."
+              },
+              "tradeNo": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The payment transaction number."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The payment transaction number."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "Additional order information."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional order information."
+              },
+              "businessNotifyUrl": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The business notification URL."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The business notification URL."
+              },
+              "subMchid": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "description": "The WeChat Pay sub-merchant ID."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The WeChat Pay sub-merchant ID."
+              },
+              "orderIdStr": {
+                "type": "string",
+                "description": "The order ID as a lossless string."
+              }
+            },
+            "additionalProperties": true,
+            "description": "The created Luckin Coffee order and payment details."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The created Luckin Coffee order."
+      },
+      "followUpActions": [
+        "luckin_coffee.queryOrderDetailInfo",
+        "luckin_coffee.cancelOrder"
+      ]
+    },
+    {
+      "id": "luckin_coffee.previewOrder",
+      "service": "luckin_coffee",
+      "name": "previewOrder",
+      "description": "Preview a Luckin Coffee order, including prices and available coupons, without creating it.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee store ID returned by `queryShopList`."
+          },
+          "productList": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The quantity to order."
+                },
+                "productId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "The Luckin Coffee product ID."
+                },
+                "skuCode": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The exact product SKU code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "productId",
+                "skuCode"
+              ],
+              "description": "One configured product in an order."
+            },
+            "description": "The configured products to preview.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deptId",
+          "productList"
+        ],
+        "description": "Input for previewing an order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "aboutTime": {
+                "type": "number",
+                "description": "The estimated pickup or delivery timestamp."
+              },
+              "discountPrice": {
+                "type": "number",
+                "description": "The estimated amount to pay."
+              },
+              "shopInfo": {
+                "type": "object",
+                "properties": {
+                  "deptId": {
+                    "type": "integer",
+                    "description": "The store ID."
+                  },
+                  "deptName": {
+                    "type": "string",
+                    "description": "The store name."
+                  },
+                  "address": {
+                    "type": "string",
+                    "description": "The store address."
+                  },
+                  "deptTags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Store tags."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The store longitude."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The store latitude."
+                  },
+                  "workTimeStart": {
+                    "type": "string",
+                    "description": "The opening time."
+                  },
+                  "workTimeEnd": {
+                    "type": "string",
+                    "description": "The closing time."
+                  },
+                  "distance": {
+                    "type": "number",
+                    "description": "The distance from the requested coordinates in kilometers."
+                  },
+                  "number": {
+                    "type": "string",
+                    "description": "The store number."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Luckin Coffee store."
+              },
+              "productInfoList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "productId": {
+                      "type": "integer",
+                      "description": "The product ID."
+                    },
+                    "skuCode": {
+                      "type": "string",
+                      "description": "The product SKU code."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The product name."
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "description": "The ordered quantity."
+                    },
+                    "additionDesc": {
+                      "type": "string",
+                      "description": "The selected attribute summary."
+                    },
+                    "bigPicUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The large product image URL."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The large product image URL."
+                    },
+                    "breviaryPicUrl": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The product thumbnail URL."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The product thumbnail URL."
+                    },
+                    "initPrice": {
+                      "type": "number",
+                      "description": "The product list price."
+                    },
+                    "estimatePrice": {
+                      "type": "number",
+                      "description": "The estimated unit price."
+                    },
+                    "estimateTotalPrice": {
+                      "type": "number",
+                      "description": "The estimated line total."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One product in an order response."
+                },
+                "description": "The configured products in the preview."
+              },
+              "couponCodeList": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Coupon codes selected by the preview."
+              },
+              "orderGranularCommodityList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "commodityId": {
+                      "type": "integer",
+                      "description": "The commodity ID."
+                    },
+                    "commodityCode": {
+                      "type": "string",
+                      "description": "The commodity code."
+                    },
+                    "commodityName": {
+                      "type": "string",
+                      "description": "The commodity name."
+                    },
+                    "payableMoney": {
+                      "type": "number",
+                      "description": "The payable amount."
+                    },
+                    "payMoney": {
+                      "type": "number",
+                      "description": "The paid amount."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One order commodity price breakdown."
+                },
+                "description": "Per-commodity price details."
+              },
+              "expressExpectTime": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "description": "The estimated delivery time."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The estimated delivery time."
+              },
+              "privilegeMoney": {
+                "type": "number",
+                "description": "The discount amount."
+              },
+              "totalInitialPrice": {
+                "type": "number",
+                "description": "The total list price."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Luckin Coffee order preview."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The Luckin Coffee order preview."
+      },
+      "followUpActions": [
+        "luckin_coffee.createOrder"
+      ]
+    },
+    {
+      "id": "luckin_coffee.queryOrderDetailInfo",
+      "service": "luckin_coffee",
+      "name": "queryOrderDetailInfo",
+      "description": "Get the current status, pickup details, products, payment, and delivery information for an order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The lossless order ID string returned by `createOrder`."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orderId"
+        ],
+        "description": "Input for reading Luckin Coffee order details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "type": "string",
+                "description": "The order ID."
+              },
+              "orderStatus": {
+                "type": "integer",
+                "description": "Order status: 10 pending payment, 20 placed, 30 preparing, 60 ready, 80 completed, 100 canceled."
+              },
+              "orderStatusName": {
+                "type": "string",
+                "description": "The localized order status name."
+              },
+              "aboutTime": {
+                "type": "number",
+                "description": "The estimated pickup or delivery timestamp."
+              },
+              "takeMealTime": {
+                "type": "string",
+                "description": "The actual pickup time."
+              },
+              "takeMealCodeInfo": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The pickup code or its generation status."
+                  },
+                  "takeOrderId": {
+                    "type": "string",
+                    "description": "The pickup order ID."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Pickup-code information."
+              },
+              "shopInfo": {
+                "type": "object",
+                "properties": {
+                  "deptId": {
+                    "type": "integer",
+                    "description": "The store ID."
+                  },
+                  "deptName": {
+                    "type": "string",
+                    "description": "The store name."
+                  },
+                  "address": {
+                    "type": "string",
+                    "description": "The store address."
+                  },
+                  "deptTags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Store tags."
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "description": "The store longitude."
+                  },
+                  "latitude": {
+                    "type": "number",
+                    "description": "The store latitude."
+                  },
+                  "workTimeStart": {
+                    "type": "string",
+                    "description": "The opening time."
+                  },
+                  "workTimeEnd": {
+                    "type": "string",
+                    "description": "The closing time."
+                  },
+                  "distance": {
+                    "type": "number",
+                    "description": "The distance from the requested coordinates in kilometers."
+                  },
+                  "number": {
+                    "type": "string",
+                    "description": "The store number."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "A Luckin Coffee store."
+              },
+              "productInfoList": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "integer",
+                          "description": "The product ID."
+                        },
+                        "skuCode": {
+                          "type": "string",
+                          "description": "The product SKU code."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The product name."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "The ordered quantity."
+                        },
+                        "additionDesc": {
+                          "type": "string",
+                          "description": "The selected attribute summary."
+                        },
+                        "bigPicUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The large product image URL."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The large product image URL."
+                        },
+                        "breviaryPicUrl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The product thumbnail URL."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The product thumbnail URL."
+                        },
+                        "initPrice": {
+                          "type": "number",
+                          "description": "The product list price."
+                        },
+                        "estimatePrice": {
+                          "type": "number",
+                          "description": "The estimated unit price."
+                        },
+                        "estimateTotalPrice": {
+                          "type": "number",
+                          "description": "The estimated line total."
+                        }
+                      },
+                      "additionalProperties": true,
+                      "description": "One product in an order response."
+                    },
+                    "description": "Products in the order."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Products in the order."
+              },
+              "orderPayAmount": {
+                "type": "number",
+                "description": "The paid order amount."
+              },
+              "dispatchInfo": {
+                "type": "object",
+                "properties": {
+                  "dispatcherName": {
+                    "type": "string",
+                    "description": "The courier name."
+                  },
+                  "dispatcherMobile": {
+                    "type": "string",
+                    "description": "The courier phone number."
+                  },
+                  "dispatchAboutTime": {
+                    "type": "string",
+                    "description": "The estimated delivery time."
+                  },
+                  "destinationDistance": {
+                    "type": "number",
+                    "description": "The remaining delivery distance."
+                  }
+                },
+                "additionalProperties": true,
+                "description": "Delivery information."
+              },
+              "orderCommodityList": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "commodityId": {
+                      "type": "integer",
+                      "description": "The commodity ID."
+                    },
+                    "commodityCode": {
+                      "type": "string",
+                      "description": "The commodity code."
+                    },
+                    "commodityName": {
+                      "type": "string",
+                      "description": "The commodity name."
+                    },
+                    "payableMoney": {
+                      "type": "number",
+                      "description": "The payable amount."
+                    },
+                    "payMoney": {
+                      "type": "number",
+                      "description": "The paid amount."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One order commodity price breakdown."
+                },
+                "description": "Commodity price details."
+              },
+              "orderType": {
+                "type": "string",
+                "description": "The order type."
+              },
+              "customerParams": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "Additional customer parameters."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional customer parameters."
+              }
+            },
+            "additionalProperties": true,
+            "description": "Luckin Coffee order details."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Luckin Coffee order details."
+      },
+      "followUpActions": [
+        "luckin_coffee.cancelOrder"
+      ]
+    },
+    {
+      "id": "luckin_coffee.queryProductDetailInfo",
+      "service": "luckin_coffee",
+      "name": "queryProductDetailInfo",
+      "description": "Get the current details, attributes, SKU, and price for one Luckin Coffee product at a store.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee store ID returned by `queryShopList`."
+          },
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee product ID."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deptId",
+          "productId"
+        ],
+        "description": "Input for reading product details."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "integer",
+                "description": "The product ID."
+              },
+              "productName": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "skuCode": {
+                "type": "string",
+                "description": "The configured product SKU code."
+              },
+              "pictureUrl": {
+                "type": "string",
+                "description": "The product image URL."
+              },
+              "productAttrs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "integer",
+                      "description": "The attribute group ID."
+                    },
+                    "attributeName": {
+                      "type": "string",
+                      "description": "The attribute group name."
+                    },
+                    "productSubAttrs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "attributeId": {
+                            "type": "integer",
+                            "description": "The attribute value ID."
+                          },
+                          "attributeName": {
+                            "type": "string",
+                            "description": "The attribute value name."
+                          },
+                          "selected": {
+                            "anyOf": [
+                              {
+                                "type": "boolean",
+                                "description": "Whether this value is selected."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether this value is selected."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "The price adjustment for this value."
+                          },
+                          "canSelected": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "description": "Whether this value can be selected."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether this value can be selected."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "One selectable product attribute value."
+                      },
+                      "description": "Selectable values in this group."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One product attribute group."
+                },
+                "description": "The product attribute groups."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Product tags."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Product tags."
+              },
+              "initialPrice": {
+                "type": "number",
+                "description": "The list price."
+              },
+              "estimatePrice": {
+                "type": "number",
+                "description": "The estimated final price."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Luckin Coffee product and its current configuration."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Luckin Coffee product details."
+      },
+      "followUpActions": [
+        "luckin_coffee.switchProduct",
+        "luckin_coffee.previewOrder"
+      ]
+    },
+    {
+      "id": "luckin_coffee.queryShopList",
+      "service": "luckin_coffee",
+      "name": "queryShopList",
+      "description": "Find nearby Luckin Coffee stores using a location and optional store name.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptName": {
+            "type": "string",
+            "description": "An optional store-name filter."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "longitude",
+          "latitude"
+        ],
+        "description": "Input for finding Luckin Coffee stores."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deptId": {
+                  "type": "integer",
+                  "description": "The store ID."
+                },
+                "deptName": {
+                  "type": "string",
+                  "description": "The store name."
+                },
+                "address": {
+                  "type": "string",
+                  "description": "The store address."
+                },
+                "deptTags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "Store tags."
+                },
+                "longitude": {
+                  "type": "number",
+                  "description": "The store longitude."
+                },
+                "latitude": {
+                  "type": "number",
+                  "description": "The store latitude."
+                },
+                "workTimeStart": {
+                  "type": "string",
+                  "description": "The opening time."
+                },
+                "workTimeEnd": {
+                  "type": "string",
+                  "description": "The closing time."
+                },
+                "distance": {
+                  "type": "number",
+                  "description": "The distance from the requested coordinates in kilometers."
+                },
+                "number": {
+                  "type": "string",
+                  "description": "The store number."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Luckin Coffee store."
+            },
+            "description": "Matching stores."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Nearby Luckin Coffee stores."
+      },
+      "followUpActions": [
+        "luckin_coffee.searchProductForMcp"
+      ]
+    },
+    {
+      "id": "luckin_coffee.searchProductForMcp",
+      "service": "luckin_coffee",
+      "name": "searchProductForMcp",
+      "description": "Search and recommend Luckin Coffee products at a specific store from the user's original request.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee store ID returned by `queryShopList`."
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The user's original product request in natural language."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deptId",
+          "query"
+        ],
+        "description": "Input for searching Luckin Coffee products."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "integer",
+                  "description": "The product ID."
+                },
+                "productName": {
+                  "type": "string",
+                  "description": "The product name."
+                },
+                "skuCode": {
+                  "type": "string",
+                  "description": "The configured product SKU code."
+                },
+                "pictureUrl": {
+                  "type": "string",
+                  "description": "The product image URL."
+                },
+                "productAttrs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attributeId": {
+                        "type": "integer",
+                        "description": "The attribute group ID."
+                      },
+                      "attributeName": {
+                        "type": "string",
+                        "description": "The attribute group name."
+                      },
+                      "productSubAttrs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "attributeId": {
+                              "type": "integer",
+                              "description": "The attribute value ID."
+                            },
+                            "attributeName": {
+                              "type": "string",
+                              "description": "The attribute value name."
+                            },
+                            "selected": {
+                              "anyOf": [
+                                {
+                                  "type": "boolean",
+                                  "description": "Whether this value is selected."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Whether this value is selected."
+                            },
+                            "price": {
+                              "type": "number",
+                              "description": "The price adjustment for this value."
+                            },
+                            "canSelected": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "description": "Whether this value can be selected."
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Whether this value can be selected."
+                            }
+                          },
+                          "additionalProperties": true,
+                          "description": "One selectable product attribute value."
+                        },
+                        "description": "Selectable values in this group."
+                      }
+                    },
+                    "additionalProperties": true,
+                    "description": "One product attribute group."
+                  },
+                  "description": "The product attribute groups."
+                },
+                "tags": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Product tags."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Product tags."
+                },
+                "initialPrice": {
+                  "type": "number",
+                  "description": "The list price."
+                },
+                "estimatePrice": {
+                  "type": "number",
+                  "description": "The estimated final price."
+                }
+              },
+              "additionalProperties": true,
+              "description": "A Luckin Coffee product and its current configuration."
+            },
+            "description": "Matching products."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "Matching Luckin Coffee products."
+      },
+      "followUpActions": [
+        "luckin_coffee.queryProductDetailInfo",
+        "luckin_coffee.switchProduct"
+      ]
+    },
+    {
+      "id": "luckin_coffee.switchProduct",
+      "service": "luckin_coffee",
+      "name": "switchProduct",
+      "description": "Change a selectable attribute on a Luckin Coffee product and return the updated SKU and price.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deptId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee store ID returned by `queryShopList`."
+          },
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The Luckin Coffee product ID."
+          },
+          "skuCode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The exact product SKU code."
+          },
+          "attrOperationParam": {
+            "type": "object",
+            "properties": {
+              "attributeId": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "The attribute group ID."
+              },
+              "subAttr": {
+                "type": "object",
+                "properties": {
+                  "attributeId": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The attribute value ID."
+                  },
+                  "operation": {
+                    "type": "integer",
+                    "description": "The operation code. Use 3 to select the value."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "attributeId",
+                  "operation"
+                ],
+                "description": "The attribute value operation."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "attributeId",
+              "subAttr"
+            ],
+            "description": "The attribute operation to apply."
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The product quantity."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deptId",
+          "productId",
+          "skuCode",
+          "attrOperationParam",
+          "amount"
+        ],
+        "description": "Input for changing one product attribute."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "The upstream result code. Zero indicates success."
+          },
+          "msg": {
+            "type": "string",
+            "description": "The upstream result message."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "integer",
+                "description": "The product ID."
+              },
+              "productName": {
+                "type": "string",
+                "description": "The product name."
+              },
+              "skuCode": {
+                "type": "string",
+                "description": "The configured product SKU code."
+              },
+              "pictureUrl": {
+                "type": "string",
+                "description": "The product image URL."
+              },
+              "productAttrs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "attributeId": {
+                      "type": "integer",
+                      "description": "The attribute group ID."
+                    },
+                    "attributeName": {
+                      "type": "string",
+                      "description": "The attribute group name."
+                    },
+                    "productSubAttrs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "attributeId": {
+                            "type": "integer",
+                            "description": "The attribute value ID."
+                          },
+                          "attributeName": {
+                            "type": "string",
+                            "description": "The attribute value name."
+                          },
+                          "selected": {
+                            "anyOf": [
+                              {
+                                "type": "boolean",
+                                "description": "Whether this value is selected."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether this value is selected."
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "The price adjustment for this value."
+                          },
+                          "canSelected": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "description": "Whether this value can be selected."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Whether this value can be selected."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "One selectable product attribute value."
+                      },
+                      "description": "Selectable values in this group."
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "One product attribute group."
+                },
+                "description": "The product attribute groups."
+              },
+              "tags": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Product tags."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Product tags."
+              },
+              "initialPrice": {
+                "type": "number",
+                "description": "The list price."
+              },
+              "estimatePrice": {
+                "type": "number",
+                "description": "The estimated final price."
+              }
+            },
+            "additionalProperties": true,
+            "description": "A Luckin Coffee product and its current configuration."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded."
+          }
+        },
+        "additionalProperties": true,
+        "description": "The updated product configuration."
+      },
+      "followUpActions": [
+        "luckin_coffee.previewOrder"
+      ]
+    }
+  ]
+}

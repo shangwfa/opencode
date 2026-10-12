@@ -1,0 +1,1801 @@
+{
+  "service": "taxjar",
+  "displayName": "TaxJar",
+  "categories": [
+    "Finance",
+    "Data"
+  ],
+  "authTypes": [
+    "api_key"
+  ],
+  "auth": [
+    {
+      "type": "api_key",
+      "label": "API Key",
+      "placeholder": "TAXJAR_API_KEY",
+      "description": "TaxJar API token sent as a Bearer token. Get it from TaxJar under Account > TaxJar API.",
+      "extraFields": []
+    }
+  ],
+  "homepageUrl": "https://www.taxjar.com/",
+  "actions": [
+    {
+      "id": "taxjar.calculate_sales_tax_for_order",
+      "service": "taxjar",
+      "name": "calculate_sales_tax_for_order",
+      "description": "Calculate TaxJar sales tax for an order.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Origin country code, using ISO 3166-1 alpha-2 format."
+          },
+          "from_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Origin ZIP or postal code."
+          },
+          "from_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Origin state or province."
+          },
+          "from_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Origin city."
+          },
+          "from_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Origin street address."
+          },
+          "to_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination country code, using ISO 3166-1 alpha-2 format."
+          },
+          "to_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination ZIP or postal code."
+          },
+          "to_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination state or province."
+          },
+          "to_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination city."
+          },
+          "to_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination street address."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Order amount excluding shipping."
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Shipping cost for the order."
+          },
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier, if known."
+          },
+          "exemption_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exemption type for the order."
+          },
+          "nexus_addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for this nexus address."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Country code for the address, using ISO 3166-1 alpha-2 format."
+                },
+                "zip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ZIP or postal code for the address."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "State or province for the address."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "City for the address."
+                },
+                "street": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Street address."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "country",
+                "zip",
+                "state"
+              ],
+              "description": "TaxJar address input."
+            },
+            "description": "Seller nexus addresses to consider for the tax calculation.",
+            "minItems": 1
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Line item identifier."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of units for this line item."
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Price per unit for this line item."
+                },
+                "discount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Discount amount applied to this line item."
+                },
+                "product_tax_code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "TaxJar product tax category code for this item."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "unit_price"
+              ],
+              "description": "Tax calculation line item."
+            },
+            "description": "Line items in the order.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_country",
+          "from_zip",
+          "from_state",
+          "to_country",
+          "to_zip",
+          "to_state",
+          "amount",
+          "shipping"
+        ],
+        "description": "Input parameters for calculating TaxJar sales tax for an order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tax": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tax"
+        ],
+        "description": "TaxJar tax calculation result."
+      }
+    },
+    {
+      "id": "taxjar.create_customer",
+      "service": "taxjar",
+      "name": "create_customer",
+      "description": "Create a TaxJar customer for exemption management.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier."
+          },
+          "exemption_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer exemption type, such as wholesale, government, non_profit, or other."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer name."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer country code, using ISO 3166-1 alpha-2 format."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer state or province."
+          },
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer ZIP or postal code."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer city."
+          },
+          "street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer street address."
+          },
+          "exempt_regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for this nexus address."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Country code for the address, using ISO 3166-1 alpha-2 format."
+                },
+                "zip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ZIP or postal code for the address."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "State or province for the address."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "City for the address."
+                },
+                "street": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Street address."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "country",
+                "zip",
+                "state"
+              ],
+              "description": "TaxJar address input."
+            },
+            "description": "Customer exempt regions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id",
+          "exemption_type",
+          "name"
+        ],
+        "description": "TaxJar customer payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer"
+        ],
+        "description": "TaxJar customer response."
+      }
+    },
+    {
+      "id": "taxjar.create_order_transaction",
+      "service": "taxjar",
+      "name": "create_order_transaction",
+      "description": "Create a TaxJar order transaction for reporting and filing.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique transaction identifier."
+          },
+          "transaction_date": {
+            "type": "string",
+            "description": "Transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider name."
+          },
+          "to_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination country code, using ISO 3166-1 alpha-2 format."
+          },
+          "to_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination ZIP or postal code."
+          },
+          "to_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination state or province."
+          },
+          "to_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination city."
+          },
+          "to_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination street address."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Order total including shipping and excluding sales tax."
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Shipping cost for the order."
+          },
+          "sales_tax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sales tax collected for the order."
+          },
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional TaxJar user identifier."
+          },
+          "exemption_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exemption type applied to the order."
+          },
+          "to_lat": {
+            "type": "number",
+            "description": "Destination latitude."
+          },
+          "to_lng": {
+            "type": "number",
+            "description": "Destination longitude."
+          },
+          "nexus_addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for this nexus address."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Country code for the address, using ISO 3166-1 alpha-2 format."
+                },
+                "zip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ZIP or postal code for the address."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "State or province for the address."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "City for the address."
+                },
+                "street": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Street address."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "country",
+                "zip",
+                "state"
+              ],
+              "description": "TaxJar address input."
+            },
+            "description": "Seller nexus addresses for the transaction.",
+            "minItems": 1
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Line item identifier."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of units for this line item."
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Price per unit for this line item."
+                },
+                "discount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Discount amount applied to this line item."
+                },
+                "sales_tax": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Sales tax collected for this line item."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Description of this line item."
+                },
+                "product_identifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Product identifier, SKU, or other merchant item code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "unit_price"
+              ],
+              "description": "TaxJar transaction line item."
+            },
+            "description": "Order line items.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id",
+          "transaction_date",
+          "to_country",
+          "to_zip",
+          "to_state",
+          "amount",
+          "shipping"
+        ],
+        "description": "Input parameters for creating a TaxJar order."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "order"
+        ],
+        "description": "TaxJar order transaction response."
+      }
+    },
+    {
+      "id": "taxjar.create_refund_transaction",
+      "service": "taxjar",
+      "name": "create_refund_transaction",
+      "description": "Create a TaxJar refund transaction.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique refund transaction identifier."
+          },
+          "transaction_date": {
+            "type": "string",
+            "description": "Refund transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "transaction_reference_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Original order transaction identifier."
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider name."
+          },
+          "to_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination country code, using ISO 3166-1 alpha-2 format."
+          },
+          "to_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination ZIP or postal code."
+          },
+          "to_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination state or province."
+          },
+          "to_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination city."
+          },
+          "to_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination street address."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Refund amount excluding sales tax."
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Shipping amount refunded."
+          },
+          "sales_tax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sales tax refunded."
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Line item identifier."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of units refunded for this line item."
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Price per unit for this refunded line item."
+                },
+                "sales_tax": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Sales tax refunded for this line item."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Description of this refunded line item."
+                },
+                "product_identifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Product identifier, SKU, or other merchant item code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "unit_price"
+              ],
+              "description": "TaxJar refund line item."
+            },
+            "description": "Refund line items.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id",
+          "transaction_date",
+          "transaction_reference_id",
+          "to_country",
+          "to_zip",
+          "to_state",
+          "amount"
+        ],
+        "description": "Input parameters for creating a TaxJar refund."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "refund"
+        ],
+        "description": "TaxJar refund transaction response."
+      }
+    },
+    {
+      "id": "taxjar.delete_customer",
+      "service": "taxjar",
+      "name": "delete_customer",
+      "description": "Delete a TaxJar customer by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id"
+        ],
+        "description": "Input parameters for a TaxJar customer lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the TaxJar customer delete request succeeded."
+          },
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier that was deleted."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "customer_id"
+        ],
+        "description": "TaxJar customer delete result."
+      }
+    },
+    {
+      "id": "taxjar.delete_order_transaction",
+      "service": "taxjar",
+      "name": "delete_order_transaction",
+      "description": "Delete a TaxJar order transaction by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id"
+        ],
+        "description": "Input parameters for a TaxJar transaction lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the TaxJar transaction delete request succeeded."
+          },
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier that was deleted."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "transaction_id"
+        ],
+        "description": "TaxJar transaction delete result."
+      }
+    },
+    {
+      "id": "taxjar.delete_refund_transaction",
+      "service": "taxjar",
+      "name": "delete_refund_transaction",
+      "description": "Delete a TaxJar refund transaction by identifier.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id"
+        ],
+        "description": "Input parameters for a TaxJar transaction lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the TaxJar transaction delete request succeeded."
+          },
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier that was deleted."
+          },
+          "response": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "deleted",
+          "transaction_id"
+        ],
+        "description": "TaxJar transaction delete result."
+      }
+    },
+    {
+      "id": "taxjar.list_customers",
+      "service": "taxjar",
+      "name": "list_customers",
+      "description": "List TaxJar customer identifiers.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Page number to retrieve."
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of customers per page."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input parameters for listing TaxJar customers."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Customer identifiers returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customers"
+        ],
+        "description": "TaxJar customer list."
+      }
+    },
+    {
+      "id": "taxjar.list_nexus_regions",
+      "service": "taxjar",
+      "name": "list_nexus_regions",
+      "description": "List TaxJar nexus regions for the account.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for this TaxJar action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw object payload returned by TaxJar."
+            },
+            "description": "Nexus regions returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "regions"
+        ],
+        "description": "TaxJar nexus region list."
+      }
+    },
+    {
+      "id": "taxjar.list_order_transactions",
+      "service": "taxjar",
+      "name": "list_order_transactions",
+      "description": "List TaxJar order transaction identifiers within a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_transaction_date": {
+            "type": "string",
+            "description": "Start transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to_transaction_date": {
+            "type": "string",
+            "description": "End transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider filter used by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_transaction_date",
+          "to_transaction_date"
+        ],
+        "description": "Input parameters for listing TaxJar transactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Order transaction identifiers returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "orders"
+        ],
+        "description": "TaxJar order transaction list."
+      }
+    },
+    {
+      "id": "taxjar.list_refund_transactions",
+      "service": "taxjar",
+      "name": "list_refund_transactions",
+      "description": "List TaxJar refund transaction identifiers within a date range.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from_transaction_date": {
+            "type": "string",
+            "description": "Start transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "to_transaction_date": {
+            "type": "string",
+            "description": "End transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider filter used by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "from_transaction_date",
+          "to_transaction_date"
+        ],
+        "description": "Input parameters for listing TaxJar transactions."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refunds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Refund transaction identifiers returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "refunds"
+        ],
+        "description": "TaxJar refund transaction list."
+      }
+    },
+    {
+      "id": "taxjar.list_tax_categories",
+      "service": "taxjar",
+      "name": "list_tax_categories",
+      "description": "List TaxJar product tax categories and codes.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for this TaxJar action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw object payload returned by TaxJar."
+            },
+            "description": "Product tax categories returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "categories"
+        ],
+        "description": "TaxJar product tax category list."
+      }
+    },
+    {
+      "id": "taxjar.show_customer",
+      "service": "taxjar",
+      "name": "show_customer",
+      "description": "Retrieve a TaxJar customer by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id"
+        ],
+        "description": "Input parameters for a TaxJar customer lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer"
+        ],
+        "description": "TaxJar customer response."
+      }
+    },
+    {
+      "id": "taxjar.show_order_transaction",
+      "service": "taxjar",
+      "name": "show_order_transaction",
+      "description": "Retrieve a TaxJar order transaction by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id"
+        ],
+        "description": "Input parameters for a TaxJar transaction lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "order"
+        ],
+        "description": "TaxJar order transaction response."
+      }
+    },
+    {
+      "id": "taxjar.show_refund_transaction",
+      "service": "taxjar",
+      "name": "show_refund_transaction",
+      "description": "Retrieve a TaxJar refund transaction by identifier.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar transaction identifier."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "transaction_id"
+        ],
+        "description": "Input parameters for a TaxJar transaction lookup."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "refund"
+        ],
+        "description": "TaxJar refund transaction response."
+      }
+    },
+    {
+      "id": "taxjar.show_tax_rates_for_location",
+      "service": "taxjar",
+      "name": "show_tax_rates_for_location",
+      "description": "Retrieve TaxJar sales tax rates for a location.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ZIP or postal code for the location."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country code for the location, using ISO 3166-1 alpha-2 format."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "State or province for the location."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "City for the location."
+          },
+          "street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Street address for rooftop-level rates when available."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "zip"
+        ],
+        "description": "Input parameters for retrieving TaxJar rates for a location."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rate": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "rate"
+        ],
+        "description": "TaxJar rate response."
+      }
+    },
+    {
+      "id": "taxjar.summarize_tax_rates_for_all_regions",
+      "service": "taxjar",
+      "name": "summarize_tax_rates_for_all_regions",
+      "description": "Retrieve TaxJar minimum and average sales tax rates by region.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "description": "Input parameters for this TaxJar action."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "summary_rates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": true,
+              "description": "Raw object payload returned by TaxJar."
+            },
+            "description": "Summary rates returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "summary_rates"
+        ],
+        "description": "TaxJar summary rate list."
+      }
+    },
+    {
+      "id": "taxjar.update_customer",
+      "service": "taxjar",
+      "name": "update_customer",
+      "description": "Update an existing TaxJar customer.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TaxJar customer identifier."
+          },
+          "exemption_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer exemption type, such as wholesale, government, non_profit, or other."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer name."
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer country code, using ISO 3166-1 alpha-2 format."
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer state or province."
+          },
+          "zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer ZIP or postal code."
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer city."
+          },
+          "street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Customer street address."
+          },
+          "exempt_regions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for this nexus address."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Country code for the address, using ISO 3166-1 alpha-2 format."
+                },
+                "zip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ZIP or postal code for the address."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "State or province for the address."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "City for the address."
+                },
+                "street": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Street address."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "country",
+                "zip",
+                "state"
+              ],
+              "description": "TaxJar address input."
+            },
+            "description": "Customer exempt regions."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer_id",
+          "exemption_type",
+          "name"
+        ],
+        "description": "TaxJar customer payload."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "customer"
+        ],
+        "description": "TaxJar customer response."
+      }
+    },
+    {
+      "id": "taxjar.update_order_transaction",
+      "service": "taxjar",
+      "name": "update_order_transaction",
+      "description": "Update an existing TaxJar order transaction.",
+      "operationType": "write",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique transaction identifier."
+          },
+          "transaction_date": {
+            "type": "string",
+            "description": "Transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider name."
+          },
+          "to_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination country code, using ISO 3166-1 alpha-2 format."
+          },
+          "to_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination ZIP or postal code."
+          },
+          "to_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination state or province."
+          },
+          "to_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination city."
+          },
+          "to_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination street address."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Order total including shipping and excluding sales tax."
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Shipping cost for the order."
+          },
+          "sales_tax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sales tax collected for the order."
+          },
+          "user_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional TaxJar user identifier."
+          },
+          "exemption_type": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Exemption type applied to the order."
+          },
+          "to_lat": {
+            "type": "number",
+            "description": "Destination latitude."
+          },
+          "to_lng": {
+            "type": "number",
+            "description": "Destination longitude."
+          },
+          "nexus_addresses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique identifier for this nexus address."
+                },
+                "country": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Country code for the address, using ISO 3166-1 alpha-2 format."
+                },
+                "zip": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "ZIP or postal code for the address."
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "State or province for the address."
+                },
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "City for the address."
+                },
+                "street": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Street address."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "country",
+                "zip",
+                "state"
+              ],
+              "description": "TaxJar address input."
+            },
+            "description": "Seller nexus addresses for the transaction.",
+            "minItems": 1
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Line item identifier."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of units for this line item."
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Price per unit for this line item."
+                },
+                "discount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Discount amount applied to this line item."
+                },
+                "sales_tax": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Sales tax collected for this line item."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Description of this line item."
+                },
+                "product_identifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Product identifier, SKU, or other merchant item code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "unit_price"
+              ],
+              "description": "TaxJar transaction line item."
+            },
+            "description": "Order line items.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for updating a TaxJar order.",
+        "required": [
+          "transaction_id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "order"
+        ],
+        "description": "TaxJar order transaction response."
+      }
+    },
+    {
+      "id": "taxjar.update_refund_transaction",
+      "service": "taxjar",
+      "name": "update_refund_transaction",
+      "description": "Update an existing TaxJar refund transaction.",
+      "operationType": "destructive",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique refund transaction identifier."
+          },
+          "transaction_date": {
+            "type": "string",
+            "description": "Refund transaction date in YYYY-MM-DD format.",
+            "format": "date"
+          },
+          "transaction_reference_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Original order transaction identifier."
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional source provider name."
+          },
+          "to_country": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination country code, using ISO 3166-1 alpha-2 format."
+          },
+          "to_zip": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination ZIP or postal code."
+          },
+          "to_state": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination state or province."
+          },
+          "to_city": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination city."
+          },
+          "to_street": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Destination street address."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Refund amount excluding sales tax."
+          },
+          "shipping": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Shipping amount refunded."
+          },
+          "sales_tax": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sales tax refunded."
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Line item identifier."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Number of units refunded for this line item."
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Price per unit for this refunded line item."
+                },
+                "sales_tax": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Sales tax refunded for this line item."
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Description of this refunded line item."
+                },
+                "product_identifier": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Product identifier, SKU, or other merchant item code."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "unit_price"
+              ],
+              "description": "TaxJar refund line item."
+            },
+            "description": "Refund line items.",
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true,
+        "description": "Input parameters for updating a TaxJar refund.",
+        "required": [
+          "transaction_id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "refund"
+        ],
+        "description": "TaxJar refund transaction response."
+      }
+    },
+    {
+      "id": "taxjar.validate_vat_number",
+      "service": "taxjar",
+      "name": "validate_vat_number",
+      "description": "Validate a VAT identification number with TaxJar.",
+      "operationType": "read",
+      "requiredScopes": [],
+      "providerPermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vat_number": {
+            "type": "string",
+            "minLength": 1,
+            "description": "VAT identification number to validate."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "vat_number"
+        ],
+        "description": "Input parameters for validating a VAT number with TaxJar."
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "validation": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Raw object payload returned by TaxJar."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "validation"
+        ],
+        "description": "TaxJar VAT validation response."
+      }
+    }
+  ]
+}
